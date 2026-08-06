@@ -1,0 +1,449 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://babylon-sim.local/protocol/babylon-sim-v3.schema.json",
+  "title": "BabylonSimMessage",
+  "oneOf": [
+    { "$ref": "#/$defs/Hello" },
+    { "$ref": "#/$defs/InputSnapshot" },
+    { "$ref": "#/$defs/Command" },
+    { "$ref": "#/$defs/PlaybackCommand" },
+    { "$ref": "#/$defs/TerrainCommand" },
+    { "$ref": "#/$defs/Ping" },
+    { "$ref": "#/$defs/HelloAck" },
+    { "$ref": "#/$defs/InputAck" },
+    { "$ref": "#/$defs/CommandApplied" },
+    { "$ref": "#/$defs/PlaybackApplied" },
+    { "$ref": "#/$defs/TerrainApplied" },
+    { "$ref": "#/$defs/TerrainView" },
+    { "$ref": "#/$defs/TerrainPatch" },
+    { "$ref": "#/$defs/ViewState" },
+    { "$ref": "#/$defs/Status" },
+    { "$ref": "#/$defs/RecordingStatus" },
+    { "$ref": "#/$defs/Error" },
+    { "$ref": "#/$defs/Pong" }
+  ],
+  "$defs": {
+    "ProtocolVersion": {
+      "type": "string",
+      "const": "babylon-sim-v3"
+    },
+    "Lifecycle": {
+      "type": "string",
+      "enum": ["stopped", "running", "paused", "fault"]
+    },
+    "SourceMode": {
+      "type": "string",
+      "enum": ["live", "imported"]
+    },
+    "PlaybackState": {
+      "type": "string",
+      "enum": ["following", "paused", "playing", "complete"]
+    },
+    "VersionManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "state_schema_version",
+        "model_version",
+        "calibration_version",
+        "software_version", "terrain_spec_version", "terrain_algorithm_version",
+        "visual_model_version"
+      ],
+      "properties": {
+        "protocol_version": { "$ref": "#/$defs/ProtocolVersion" },
+        "state_schema_version": { "type": "string", "const": "babylon-sim-state-v2" },
+        "model_version": { "type": "string", "const": "docs-urdf-v3" },
+        "calibration_version": { "type": "string", "const": "machine-calibration-v2" },
+        "software_version": { "type": "string", "const": "0.1.0" },
+        "terrain_spec_version": { "type": "string", "const": "terrain-spec-v1" },
+        "terrain_algorithm_version": { "type": "string", "const": "terrain-algorithm-v2" },
+        "visual_model_version": { "type": "string", "const": "original-skin-v1" }
+      }
+    },
+    "AxisVector": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "type": "number", "minimum": -1, "maximum": 1 }
+    },
+    "JointVector": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "type": "number" }
+    },
+    "MatrixRow": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "type": "number" }
+    },
+    "Matrix4": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "$ref": "#/$defs/MatrixRow" }
+    },
+    "Hello": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "protocol_version", "capabilities"],
+      "properties": {
+        "type": { "const": "hello" },
+        "protocol_version": { "$ref": "#/$defs/ProtocolVersion" },
+        "capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["input_snapshot", "commands", "latency", "playback", "recording", "terrain"] }
+        }
+      }
+    },
+    "InputSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "client_sequence", "connected", "focused", "axes", "client_sent_ms"],
+      "properties": {
+        "type": { "const": "input_snapshot" },
+        "client_sequence": { "type": "integer", "minimum": 0 },
+        "connected": { "type": "boolean" },
+        "focused": { "type": "boolean" },
+        "axes": { "$ref": "#/$defs/AxisVector" },
+        "client_sent_ms": { "type": "number", "minimum": 0 }
+      }
+    },
+    "Command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "command"],
+      "properties": {
+        "type": { "const": "command" },
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "command": { "type": "string", "enum": ["start", "pause", "reset"] }
+      }
+    },
+    "PlaybackCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "expected_recording_epoch", "action"],
+      "properties": {
+        "type": { "const": "playback_command" },
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "expected_recording_epoch": { "type": "string", "minLength": 1 },
+        "action": { "type": "string", "enum": ["play", "pause", "seek", "go_live", "return_live"] },
+        "recording_time_ns": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "TerrainCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "expected_recording_epoch", "expected_terrain_epoch", "action"],
+      "properties": {
+        "type": { "const": "terrain_command" },
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "expected_recording_epoch": { "type": "string", "minLength": 1 },
+        "expected_terrain_epoch": { "type": "string", "minLength": 1 },
+        "action": { "enum": ["apply_preview", "reset_terrain"] },
+        "preview_token": { "type": "string", "minLength": 1, "maxLength": 128 }
+      },
+      "oneOf": [
+        {
+          "required": ["preview_token"],
+          "properties": {
+            "action": { "const": "apply_preview" },
+            "preview_token": { "type": "string", "minLength": 1, "maxLength": 128 }
+          }
+        },
+        {
+          "properties": {
+            "action": { "const": "reset_terrain" },
+            "preview_token": false
+          }
+        }
+      ]
+    },
+    "Ping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "client_sent_ms"],
+      "properties": {
+        "type": { "const": "ping" },
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "client_sent_ms": { "type": "number", "minimum": 0 }
+      }
+    },
+    "HelloAck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "session_id", "simulation_epoch", "recording_epoch", "versions", "model_url", "lifecycle", "capabilities"],
+      "properties": {
+        "type": { "const": "hello_ack" },
+        "session_id": { "type": "string", "minLength": 1 },
+        "simulation_epoch": { "type": "string", "minLength": 1 },
+        "recording_epoch": { "type": "string", "minLength": 1 },
+        "versions": { "$ref": "#/$defs/VersionManifest" },
+        "model_url": { "type": "string", "const": "/api/model" },
+        "lifecycle": { "$ref": "#/$defs/Lifecycle" },
+        "capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["input_snapshot", "commands", "latency", "playback", "recording", "terrain"] }
+        }
+      }
+    },
+    "InputAck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "client_sequence", "accepted"],
+      "properties": {
+        "type": { "const": "input_ack" },
+        "client_sequence": { "type": "integer", "minimum": 0 },
+        "accepted": { "type": "boolean" },
+        "error_code": { "type": "string" }
+      }
+    },
+    "CommandApplied": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "command", "lifecycle", "state_sequence"],
+      "properties": {
+        "type": { "const": "command_applied" },
+        "id": { "type": "string" },
+        "command": { "type": "string", "enum": ["start", "pause", "reset"] },
+        "lifecycle": { "$ref": "#/$defs/Lifecycle" },
+        "state_sequence": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "PlaybackApplied": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type", "id", "action", "recording_epoch", "buffer_generation",
+        "view_revision", "source_mode", "playback_state", "cursor_recording_time_ns",
+        "retained_start_ns", "retained_end_ns", "selected_sample_sequence"
+      ],
+      "properties": {
+        "type": { "const": "playback_applied" },
+        "id": { "type": "string" },
+        "action": { "type": "string", "enum": ["play", "pause", "seek", "go_live", "return_live"] },
+        "recording_epoch": { "type": "string", "minLength": 1 },
+        "buffer_generation": { "type": "integer", "minimum": 0 },
+        "view_revision": { "type": "integer", "minimum": 0 },
+        "source_mode": { "$ref": "#/$defs/SourceMode" },
+        "playback_state": { "$ref": "#/$defs/PlaybackState" },
+        "cursor_recording_time_ns": { "type": "integer", "minimum": 0 },
+        "retained_start_ns": { "type": "integer", "minimum": 0 },
+        "retained_end_ns": { "type": "integer", "minimum": 0 },
+        "selected_sample_sequence": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "TerrainApplied": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type", "id", "action", "recording_epoch", "terrain_epoch",
+        "terrain_config_id", "terrain_revision", "selected_sample_sequence"
+      ],
+      "properties": {
+        "type": { "const": "terrain_applied" },
+        "id": { "type": "string", "minLength": 1 },
+        "action": { "enum": ["apply_preview", "reset_terrain"] },
+        "recording_epoch": { "type": "string", "minLength": 1 },
+        "terrain_epoch": { "type": "string", "minLength": 1 },
+        "terrain_config_id": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "terrain_revision": { "type": "integer", "minimum": 0 },
+        "selected_sample_sequence": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "TerrainView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type", "recording_epoch", "selected_sample_sequence", "terrain_epoch",
+        "terrain_config_id", "terrain_algorithm_version", "terrain_revision", "rows",
+        "columns", "origin_xy_m", "spacing_m", "height_min_m", "height_max_m",
+        "snapshot_sha256", "bucket_soil_volume_m3", "read_only", "snapshot_required"
+      ],
+      "properties": {
+        "type": { "const": "terrain_view" },
+        "recording_epoch": { "type": "string", "minLength": 1 },
+        "selected_sample_sequence": { "type": "integer", "minimum": 0 },
+        "terrain_epoch": { "type": "string", "minLength": 1 },
+        "terrain_config_id": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "terrain_algorithm_version": { "type": "string", "const": "terrain-algorithm-v2" },
+        "terrain_revision": { "type": "integer", "minimum": 0 },
+        "rows": { "type": "integer", "minimum": 2, "maximum": 201 },
+        "columns": { "type": "integer", "minimum": 2, "maximum": 201 },
+        "origin_xy_m": {
+          "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "number" }
+        },
+        "spacing_m": { "type": "number", "minimum": 0.25, "maximum": 1 },
+        "height_min_m": { "type": "number" },
+        "height_max_m": { "type": "number" },
+        "snapshot_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "bucket_soil_volume_m3": { "type": "number", "minimum": 0 },
+        "read_only": { "type": "boolean" },
+        "snapshot_required": { "type": "boolean" }
+      }
+    },
+    "TerrainPatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type", "recording_epoch", "selected_sample_sequence", "terrain_epoch",
+        "base_revision", "new_revision", "indices", "heights_m", "dirty_bounds",
+        "snapshot_sha256"
+      ],
+      "properties": {
+        "type": { "const": "terrain_patch" },
+        "recording_epoch": { "type": "string", "minLength": 1 },
+        "selected_sample_sequence": { "type": "integer", "minimum": 0 },
+        "terrain_epoch": { "type": "string", "minLength": 1 },
+        "base_revision": { "type": "integer", "minimum": 0 },
+        "new_revision": { "type": "integer", "minimum": 1 },
+        "indices": {
+          "type": "array", "minItems": 1, "maxItems": 4096, "uniqueItems": true,
+          "items": { "type": "integer", "minimum": 0, "maximum": 49999 }
+        },
+        "heights_m": {
+          "type": "array", "minItems": 1, "maxItems": 4096,
+          "items": { "type": "number" }
+        },
+        "dirty_bounds": {
+          "type": "array", "minItems": 4, "maxItems": 4,
+          "items": { "type": "integer", "minimum": 0, "maximum": 49999 }
+        },
+        "snapshot_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "ViewState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type", "emitted_sequence", "source_sequence", "simulation_epoch",
+        "recording_epoch", "buffer_generation", "end_sample_sequence", "view_revision",
+        "source_mode", "playback_state", "cursor_recording_time_ns",
+        "retained_start_ns", "retained_end_ns", "selected_sample_sequence",
+        "simulation_time_s", "lifecycle", "versions", "joint_names",
+        "joint_position", "joint_velocity", "joint_acceleration",
+        "frame_transforms", "quality_flags", "last_input_client_sequence",
+        "server_monotonic_ms"
+      ],
+      "properties": {
+        "type": { "const": "view_state" },
+        "emitted_sequence": { "type": "integer", "minimum": 0 },
+        "source_sequence": { "type": "integer", "minimum": 0 },
+        "simulation_epoch": { "type": "string", "minLength": 1 },
+        "recording_epoch": { "type": "string", "minLength": 1 },
+        "buffer_generation": { "type": "integer", "minimum": 0 },
+        "end_sample_sequence": { "type": "integer", "minimum": 0 },
+        "view_revision": { "type": "integer", "minimum": 0 },
+        "source_mode": { "$ref": "#/$defs/SourceMode" },
+        "playback_state": { "$ref": "#/$defs/PlaybackState" },
+        "cursor_recording_time_ns": { "type": "integer", "minimum": 0 },
+        "retained_start_ns": { "type": "integer", "minimum": 0 },
+        "retained_end_ns": { "type": "integer", "minimum": 0 },
+        "selected_sample_sequence": { "type": "integer", "minimum": 0 },
+        "simulation_time_s": { "type": "number", "minimum": 0 },
+        "lifecycle": { "$ref": "#/$defs/Lifecycle" },
+        "versions": { "$ref": "#/$defs/VersionManifest" },
+        "joint_names": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "prefixItems": [
+            { "const": "swing_joint" },
+            { "const": "boom_joint" },
+            { "const": "arm_joint" },
+            { "const": "bucket_joint" }
+          ],
+          "items": false
+        },
+        "joint_position": { "$ref": "#/$defs/JointVector" },
+        "joint_velocity": { "$ref": "#/$defs/JointVector" },
+        "joint_acceleration": { "$ref": "#/$defs/JointVector" },
+        "frame_transforms": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "$ref": "#/$defs/Matrix4" }
+        },
+        "quality_flags": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string" }
+        },
+        "last_input_client_sequence": {
+          "oneOf": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "null" }
+          ]
+        },
+        "server_monotonic_ms": { "type": "number", "minimum": 0 }
+      }
+    },
+    "Status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type", "simulation_hz", "state_hz", "render_target_hz", "overruns",
+        "dropped_snapshots", "controller_source", "stale"
+      ],
+      "properties": {
+        "type": { "const": "status" },
+        "simulation_hz": { "type": "number", "minimum": 0 },
+        "state_hz": { "type": "number", "minimum": 0 },
+        "render_target_hz": { "type": "number", "const": 30 },
+        "overruns": { "type": "integer", "minimum": 0 },
+        "dropped_snapshots": { "type": "integer", "minimum": 0 },
+        "controller_source": { "type": ["string", "null"] },
+        "stale": { "type": "boolean" }
+      }
+    },
+    "RecordingStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type", "recording_epoch", "buffer_generation", "end_sample_sequence",
+        "sample_count", "retained_start_ns", "retained_end_ns", "evicted_samples",
+        "source_mode", "playback_state", "cursor_recording_time_ns", "view_revision"
+      ],
+      "properties": {
+        "type": { "const": "recording_status" },
+        "recording_epoch": { "type": "string", "minLength": 1 },
+        "buffer_generation": { "type": "integer", "minimum": 0 },
+        "end_sample_sequence": { "type": "integer", "minimum": 0 },
+        "sample_count": { "type": "integer", "minimum": 0 },
+        "retained_start_ns": { "type": ["integer", "null"], "minimum": 0 },
+        "retained_end_ns": { "type": ["integer", "null"], "minimum": 0 },
+        "evicted_samples": { "type": "integer", "minimum": 0 },
+        "source_mode": { "$ref": "#/$defs/SourceMode" },
+        "playback_state": { "$ref": "#/$defs/PlaybackState" },
+        "cursor_recording_time_ns": { "type": "integer", "minimum": 0 },
+        "view_revision": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "Error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "code", "message", "recoverable"],
+      "properties": {
+        "type": { "const": "error" },
+        "code": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 },
+        "request_id": { "type": "string" },
+        "recoverable": { "type": "boolean" }
+      }
+    },
+    "Pong": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "client_sent_ms", "server_monotonic_ms"],
+      "properties": {
+        "type": { "const": "pong" },
+        "id": { "type": "string" },
+        "client_sent_ms": { "type": "number", "minimum": 0 },
+        "server_monotonic_ms": { "type": "number", "minimum": 0 }
+      }
+    }
+  }
+}

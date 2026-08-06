@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://babylon-sim.local/protocol/terrain-http-v1.schema.json",
+  "title": "TerrainHttpV1",
+  "oneOf": [
+    { "$ref": "#/$defs/PreviewRequest" },
+    { "$ref": "#/$defs/PreviewResponse" }
+  ],
+  "$defs": {
+    "PreviewRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expected_recording_epoch", "expected_terrain_epoch", "spec"],
+      "properties": {
+        "expected_recording_epoch": { "type": "string", "minLength": 1 },
+        "expected_terrain_epoch": { "type": "string", "minLength": 1 },
+        "spec": {
+          "$ref": "https://babylon-sim.local/protocol/terrain-spec-v1.schema.json"
+        }
+      }
+    },
+    "PreviewResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "token", "expires_in_seconds", "terrain_config_id", "terrain_algorithm_version",
+        "rows", "columns", "origin_xy_m", "spacing_m", "height_min_m", "height_max_m",
+        "snapshot_sha256", "snapshot_bytes"
+      ],
+      "properties": {
+        "token": { "type": "string", "minLength": 1 },
+        "expires_in_seconds": { "type": "integer", "minimum": 0, "maximum": 300 },
+        "terrain_config_id": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "terrain_algorithm_version": { "const": "terrain-algorithm-v2" },
+        "rows": { "type": "integer", "minimum": 2, "maximum": 201 },
+        "columns": { "type": "integer", "minimum": 2, "maximum": 201 },
+        "origin_xy_m": {
+          "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "number" }
+        },
+        "spacing_m": { "type": "number", "minimum": 0.25, "maximum": 1 },
+        "height_min_m": { "type": "number" },
+        "height_max_m": { "type": "number" },
+        "snapshot_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "snapshot_bytes": { "type": "integer", "minimum": 16, "maximum": 200000 }
+      }
+    }
+  }
+}

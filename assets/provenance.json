@@ -1,0 +1,289 @@
+{
+  "schema_version": 1,
+  "hash_canonicalization": "text-crlf-to-lf",
+  "source_baseline": {
+    "repository": "https://github.com/Rosatus/KinematicSim.git",
+    "commit": "782cceb76afb635b3f9854cf48dbba1ba946f7fb"
+  },
+  "entries": [
+    {
+      "source_repository": "https://github.com/Rosatus/KinematicSim.git",
+      "source_commit": "782cceb76afb635b3f9854cf48dbba1ba946f7fb",
+      "source_path": "docs/urdf/kinematic_excavator.urdf",
+      "source_blob": "e501e40fa5db47b62b4b78c193255ee0055dca09",
+      "destination_path": "assets/model/kinematic_excavator.urdf",
+      "destination_sha256": "2f32a9f635f6fb1b43da9fb624612ade5b7a7b7d2d84f5eed401ffb414afc485",
+      "license": "AGPL-3.0-only",
+      "imported_at": "2026-07-29",
+      "relationship": "verbatim-generated-asset",
+      "locally_modified": false
+    },
+    {
+      "source_repository": "https://github.com/Rosatus/KinematicSim.git",
+      "source_commit": "782cceb76afb635b3f9854cf48dbba1ba946f7fb",
+      "source_path": "config/m1_provisional_calibration.json",
+      "source_blob": "4cefe83cb4e1779ff82869396e2f934570746e74",
+      "destination_path": "assets/calibration/m1_provisional_calibration.json",
+      "destination_sha256": "2e1714c46c262ff78acf1c8ebbf8a98f51b13f25722efef8d4143d137ece800c",
+      "license": "AGPL-3.0-only",
+      "imported_at": "2026-07-29",
+      "relationship": "verbatim-configuration",
+      "locally_modified": false
+    },
+    {
+      "source_repository": "https://github.com/Rosatus/KinematicSim.git",
+      "source_commit": "782cceb76afb635b3f9854cf48dbba1ba946f7fb",
+      "source_path": "LICENSE",
+      "source_blob": "0ad25db4bd1d86c452db3f9602ccdbe172438f52",
+      "destination_path": "assets/licenses/KinematicSim-AGPL-3.0.txt",
+      "destination_sha256": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef",
+      "license": "AGPL-3.0-only",
+      "imported_at": "2026-07-29",
+      "relationship": "verbatim-license",
+      "locally_modified": false
+    },
+    {
+      "source_repository": "https://github.com/Rosatus/KinematicSim.git",
+      "source_commit": "782cceb76afb635b3f9854cf48dbba1ba946f7fb",
+      "source_path": "kinematic_sim/model.py",
+      "source_blob": "40506bea6a474e24b6152ac1cf16f3bccb209f90",
+      "destination_path": "tests/fixtures/frame-parity/baseline.json",
+      "destination_sha256": "3ce552cb222c573fb210e67af62c25c9781025d54fb77a302e7a79c6c7944bb1",
+      "license": "AGPL-3.0-only",
+      "imported_at": "2026-07-29",
+      "relationship": "generated-reference-fixture",
+      "locally_modified": false,
+      "generated_from": [
+        "kinematic_sim/model.py",
+        "docs/urdf/kinematic_excavator.urdf",
+        "pixi.lock"
+      ]
+    }
+  ],
+  "conceptual_derivations": [
+    {
+      "sources": [
+        {
+          "repository": "https://github.com/Rosatus/KinematicSim.git",
+          "commit": "782cceb76afb635b3f9854cf48dbba1ba946f7fb",
+          "path": "kinematic_sim/model.py",
+          "blob": "40506bea6a474e24b6152ac1cf16f3bccb209f90",
+          "symbols": [{ "name": "ACTIVE_JOINT_NAMES and REQUIRED_FRAME_NAMES", "lines": "17-28" }]
+        },
+        {
+          "repository": "https://github.com/Rosatus/KinematicSim.git",
+          "commit": "782cceb76afb635b3f9854cf48dbba1ba946f7fb",
+          "path": "kinematic_sim/versioning.py",
+          "blob": "70351075b94c8afebf75fd64c2d2a3e3e8fb5bce",
+          "symbols": [{ "name": "version compatibility constants", "lines": "1-13" }]
+        }
+      ],
+      "destination_path": "src/babylon_sim/constants.py",
+      "destination_sha256": "c932aec972b623a3315c99728c18089fccd90eec3086a0b9898ce745c699c598",
+      "destination_symbols": [{ "name": "motion and runtime constants", "lines": "1-29" }],
+      "license": "AGPL-3.0-only",
+      "modified_at": "2026-07-29",
+      "relationship": "adapted-source-many-to-one",
+      "locally_modified": true,
+      "tests": ["tests/backend/test_model.py", "tests/backend/test_state.py"]
+    },
+    {
+      "sources": [{
+        "repository": "https://github.com/Rosatus/KinematicSim.git",
+        "commit": "782cceb76afb635b3f9854cf48dbba1ba946f7fb",
+        "path": "kinematic_sim/state.py",
+        "blob": "96307776df40f1a719bd1043b5993573e5d63b4b",
+        "symbols": [{ "name": "UnifiedState and matrix validation", "lines": "1-98" }]
+      }],
+      "destination_path": "src/babylon_sim/state.py",
+      "destination_sha256": "831e60b260d48e264642720e67a5e8b38301d35f7ebc90019c630f56cb7ff957",
+      "destination_symbols": [{ "name": "SimulationState", "lines": "1-52" }],
+      "license": "AGPL-3.0-only",
+      "modified_at": "2026-07-29",
+      "relationship": "adapted-source",
+      "locally_modified": true,
+      "tests": ["tests/backend/test_state.py", "tests/backend/test_protocol.py"]
+    },
+    {
+      "sources": [{
+        "repository": "https://github.com/Rosatus/KinematicSim.git",
+        "commit": "782cceb76afb635b3f9854cf48dbba1ba946f7fb",
+        "path": "kinematic_sim/model.py",
+        "blob": "40506bea6a474e24b6152ac1cf16f3bccb209f90",
+        "symbols": [{ "name": "ExcavatorModel", "lines": "33-262" }]
+      }],
+      "destination_path": "src/babylon_sim/model.py",
+      "destination_sha256": "2592487b6fd1019a0b144d0d12ece3d5cc3e5b2f905f54b0be484e5c07679eb1",
+      "destination_symbols": [{ "name": "ExcavatorModel", "lines": "19-186" }],
+      "license": "AGPL-3.0-only",
+      "modified_at": "2026-07-29",
+      "relationship": "adapted-source",
+      "locally_modified": true,
+      "tests": ["tests/backend/test_model.py", "frontend/tests/urdfMatrix.test.ts"]
+    },
+    {
+      "sources": [{
+        "repository": "https://github.com/Rosatus/KinematicSim.git",
+        "commit": "782cceb76afb635b3f9854cf48dbba1ba946f7fb",
+        "path": "kinematic_sim/calibration.py",
+        "blob": "c8f8963a150de38e4e4b3865efbbfce5fc3ade8f",
+        "symbols": [{ "name": "JointLimit, CylinderCalibration, MachineCalibration", "lines": "19-188" }]
+      }],
+      "destination_path": "src/babylon_sim/calibration.py",
+      "destination_sha256": "73e70b558e029828dc41c55c3a52c9f663a44d1a39423c41704fcef627284c33",
+      "destination_symbols": [{ "name": "motion calibration types", "lines": "16-146" }],
+      "license": "AGPL-3.0-only",
+      "modified_at": "2026-07-29",
+      "relationship": "adapted-source",
+      "locally_modified": true,
+      "tests": ["tests/backend/test_calibration.py"]
+    },
+    {
+      "sources": [{
+        "repository": "https://github.com/Rosatus/KinematicSim.git",
+        "commit": "782cceb76afb635b3f9854cf48dbba1ba946f7fb",
+        "path": "kinematic_sim/control.py",
+        "blob": "5b6c8bcd53a15cfb9035ffb38045454ac034b714",
+        "symbols": [{ "name": "AxisProfile, ControlCommand, axis normalization", "lines": "13-114" }]
+      }],
+      "destination_path": "src/babylon_sim/control.py",
+      "destination_sha256": "da05642751d88f1c5d06384b2deee0925f8f566166a3d203ccadebc82fca5f8e",
+      "destination_symbols": [{ "name": "control command and axis mapping", "lines": "13-123" }],
+      "license": "AGPL-3.0-only",
+      "modified_at": "2026-07-29",
+      "relationship": "adapted-source",
+      "locally_modified": true,
+      "tests": ["tests/backend/test_control.py", "frontend/tests/keyboard.test.ts"]
+    },
+    {
+      "sources": [{
+        "repository": "https://github.com/Rosatus/KinematicSim.git",
+        "commit": "782cceb76afb635b3f9854cf48dbba1ba946f7fb",
+        "path": "kinematic_sim/input_router.py",
+        "blob": "aefa0372a07e487db38d86a0a9163058e8a06348",
+        "symbols": [{ "name": "InputSnapshot and InputRouter", "lines": "21-287" }]
+      }],
+      "destination_path": "src/babylon_sim/input_router.py",
+      "destination_sha256": "91276d4f0384e9b9033dfff2efe4e47d347b4a9997d62d7a4aeca5806788c529",
+      "destination_symbols": [{ "name": "InputSnapshot and InputRouter", "lines": "18-288" }],
+      "license": "AGPL-3.0-only",
+      "modified_at": "2026-07-29",
+      "relationship": "adapted-source",
+      "locally_modified": true,
+      "tests": ["tests/backend/test_input_router.py", "tests/backend/test_web.py"]
+    },
+    {
+      "sources": [{
+        "repository": "https://github.com/Rosatus/KinematicSim.git",
+        "commit": "782cceb76afb635b3f9854cf48dbba1ba946f7fb",
+        "path": "kinematic_sim/simulation.py",
+        "blob": "90facec67ee81d196f1f2effe52d0aa2ff747900",
+        "symbols": [{ "name": "SimulationStatus and Simulator", "lines": "16-158" }]
+      }],
+      "destination_path": "src/babylon_sim/simulation.py",
+      "destination_sha256": "0eb81d9675540e03f3a37dc4b0f27f063db9d5ecf23c1e2d3f50b564c2a66cb9",
+      "destination_symbols": [{ "name": "SimulationStatus and Simulator", "lines": "16-175" }],
+      "license": "AGPL-3.0-only",
+      "modified_at": "2026-07-29",
+      "relationship": "adapted-source",
+      "locally_modified": true,
+      "tests": ["tests/backend/test_simulation.py", "tests/backend/test_runtime.py"]
+    },
+    {
+      "sources": [{
+        "repository": "https://github.com/Rosatus/KinematicSim.git", "commit": "782cceb76afb635b3f9854cf48dbba1ba946f7fb",
+        "path": "tests/test_state.py", "blob": "8efe2b3e19ba7bfb0a86f7478ca2d1295d6efec8",
+        "symbols": [{ "name": "StateContractTests", "lines": "8-48" }]
+      }],
+      "destination_path": "tests/backend/test_state.py",
+      "destination_sha256": "e56205840558a41d3aaf154dcd0bdea2ae564bdc83a03ef5dac8b656e2610108",
+      "destination_symbols": [{ "name": "SimulationState contract tests", "lines": "1-39" }],
+      "license": "AGPL-3.0-only", "modified_at": "2026-07-29", "relationship": "adapted-test", "locally_modified": true,
+      "tests": ["tests/backend/test_state.py"]
+    },
+    {
+      "sources": [{
+        "repository": "https://github.com/Rosatus/KinematicSim.git", "commit": "782cceb76afb635b3f9854cf48dbba1ba946f7fb",
+        "path": "tests/test_model.py", "blob": "d5df9fa14f6ee0b95317f7b0d2ed644bec3682ad",
+        "symbols": [{ "name": "ExcavatorModelTests", "lines": "14-81" }]
+      }],
+      "destination_path": "tests/backend/test_model.py",
+      "destination_sha256": "9f147894838ec2828d2a8ec188ef3522f719238cfc2f1e5045d05d3a4343c1fb",
+      "destination_symbols": [{ "name": "model and frame parity tests", "lines": "1-55" }],
+      "license": "AGPL-3.0-only", "modified_at": "2026-07-29", "relationship": "adapted-test", "locally_modified": true,
+      "tests": ["tests/backend/test_model.py"]
+    },
+    {
+      "sources": [{
+        "repository": "https://github.com/Rosatus/KinematicSim.git", "commit": "782cceb76afb635b3f9854cf48dbba1ba946f7fb",
+        "path": "tests/test_calibration.py", "blob": "0093bb16eedd05e6db146779e4b9271b4b0658ac",
+        "symbols": [{ "name": "CalibrationTests", "lines": "15-64" }]
+      }],
+      "destination_path": "tests/backend/test_calibration.py",
+      "destination_sha256": "4b5e2ccc3aa2a4d6a5f3ab7db5e912ebd443cb7bbf3317b2053acbc2af5441f9",
+      "destination_symbols": [{ "name": "motion calibration tests", "lines": "1-27" }],
+      "license": "AGPL-3.0-only", "modified_at": "2026-07-29", "relationship": "adapted-test", "locally_modified": true,
+      "tests": ["tests/backend/test_calibration.py"]
+    },
+    {
+      "sources": [{
+        "repository": "https://github.com/Rosatus/KinematicSim.git", "commit": "782cceb76afb635b3f9854cf48dbba1ba946f7fb",
+        "path": "tests/test_control.py", "blob": "58b59288ca91d14c4888e1d06e0d8dac0c2c6661",
+        "symbols": [{ "name": "ControlTests", "lines": "8-43" }]
+      }],
+      "destination_path": "tests/backend/test_control.py",
+      "destination_sha256": "9f6cb963723cad045dcdabf3aae27757c4cd21121342c70b86f12575c04fd94d",
+      "destination_symbols": [{ "name": "control tests", "lines": "1-30" }],
+      "license": "AGPL-3.0-only", "modified_at": "2026-07-29", "relationship": "adapted-test", "locally_modified": true,
+      "tests": ["tests/backend/test_control.py"]
+    },
+    {
+      "sources": [{
+        "repository": "https://github.com/Rosatus/KinematicSim.git", "commit": "782cceb76afb635b3f9854cf48dbba1ba946f7fb",
+        "path": "tests/test_input_router.py", "blob": "f0e943bd01e3f2dc7cc517ab4dd0c9c2e05ee459",
+        "symbols": [{ "name": "InputRouterTests", "lines": "9-178" }]
+      }],
+      "destination_path": "tests/backend/test_input_router.py",
+      "destination_sha256": "28aaeaa6611ae304af0fa1e8b88164191c51b94e264bbdbd45b4c73706fa7046",
+      "destination_symbols": [{ "name": "input routing and lease tests", "lines": "1-107" }],
+      "license": "AGPL-3.0-only", "modified_at": "2026-07-29", "relationship": "adapted-test", "locally_modified": true,
+      "tests": ["tests/backend/test_input_router.py"]
+    },
+    {
+      "sources": [{
+        "repository": "https://github.com/Rosatus/KinematicSim.git", "commit": "782cceb76afb635b3f9854cf48dbba1ba946f7fb",
+        "path": "tests/test_simulation.py", "blob": "f7621ba34072886a5ad17ca5b5441220dcfc230c",
+        "symbols": [{ "name": "SimulatorTests", "lines": "18-140" }]
+      }],
+      "destination_path": "tests/backend/test_simulation.py",
+      "destination_sha256": "8d7f189ff410b51692d1d67a4e7a02302bc8f619780caa77f1c1eb6fe4d3d8fd",
+      "destination_symbols": [{ "name": "fixed-step simulation tests", "lines": "1-87" }],
+      "license": "AGPL-3.0-only", "modified_at": "2026-07-29", "relationship": "adapted-test", "locally_modified": true,
+      "tests": ["tests/backend/test_simulation.py"]
+    }
+  ],
+  "manual_review": {
+    "required": true,
+    "completed": true,
+    "reviewed_at": "2026-07-29",
+    "reviewer": "Codex technical review",
+    "checklist": {
+      "source_ranges_checked": true,
+      "destination_hashes_checked": true,
+      "test_mappings_checked": true,
+      "conceptual_rewrites_checked": true
+    },
+    "notes": "Technical derivation review completed. External distribution rights remain separately gated."
+  },
+  "external_distribution_review": {
+    "required_before_external_distribution": true,
+    "completed": false,
+    "items": {
+      "source_offer": false,
+      "ui_notice": false,
+      "machine_calibration_rights": false,
+      "asset_rights": true
+    },
+    "notes": "Owner/legal approval remains outside engineering verification. Visual asset rights were explicitly confirmed by the project user on 2026-07-29; the authorization record is assets/visual/original/SOURCE-RIGHTS.md."
+  }
+}

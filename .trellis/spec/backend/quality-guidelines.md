@@ -1,0 +1,23 @@
+# Backend Quality Guidelines
+
+## Required checks
+
+Run `pixi run verify`, which executes Ruff, strict mypy, the backend pytest suite, provenance validation, and standalone-path validation. Keep documentation and protocol schemas in English.
+
+## Determinism and immutability
+
+Terrain edits must be deterministic for identical baseline, input, and sample sequence. Preserve Float32 array semantics, stable/loose layer digests, event equality, patch bytes, and volume conservation. Tests should compare bytes or full dataclass values where replay identity matters; do not assert only a rounded visual value.
+
+## Forbidden patterns
+
+- Do not use the browser, Godot renderer, or wall-clock scheduling as authority time.
+- Do not add a second terrain state store in the client.
+- Do not create one rigid body per sand grain.
+- Do not import from `E:/projects/BabylonSim`, use sibling paths, symlinks, editable installs, or copied frontend build output.
+- Do not silently rename `babylon-sim-*` protocol/version identifiers.
+- Do not broaden stale-port cleanup to terminate unverified processes.
+
+## Tests
+
+Add a focused regression beside the owning module. For cross-layer changes cover both the typed protocol boundary and the state transition. For worker/lifecycle changes prove reset, close, stale generation, and replay behavior. Use existing fixtures under `backend/tests/fixtures/` rather than creating alternate baselines.
+

@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://babylon-sim.local/schema/visual-model-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "visual_model_version", "source_model", "entries"],
+  "properties": {
+    "schema_version": { "const": "visual-model-v1" },
+    "visual_model_version": { "type": "string", "minLength": 1 },
+    "source_model": { "type": "string", "minLength": 1 },
+    "entries": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "vec3": {
+      "type": "array",
+      "prefixItems": [{ "type": "number" }, { "type": "number" }, { "type": "number" }],
+      "items": false,
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "asset_id",
+        "file",
+        "sha256",
+        "authoritative_frame",
+        "translation_m",
+        "rpy_rad",
+        "scale",
+        "expected_bounds_m",
+        "replace_primitive_visual"
+      ],
+      "properties": {
+        "asset_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "file": { "type": "string", "pattern": "^[a-z][a-z0-9-]*\\.glb$" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "authoritative_frame": { "type": "string", "minLength": 1 },
+        "translation_m": { "$ref": "#/$defs/vec3" },
+        "rpy_rad": { "$ref": "#/$defs/vec3" },
+        "scale": { "$ref": "#/$defs/vec3" },
+        "expected_bounds_m": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["min", "max"],
+          "properties": {
+            "min": { "$ref": "#/$defs/vec3" },
+            "max": { "$ref": "#/$defs/vec3" }
+          }
+        },
+        "replace_primitive_visual": { "type": "boolean" }
+      }
+    }
+  }
+}

@@ -1,0 +1,10 @@
+.pixi/
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+artifacts/
+godot/.godot/
+godot/.cache/
+

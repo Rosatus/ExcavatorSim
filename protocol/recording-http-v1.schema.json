@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://babylon-sim.local/protocol/recording-http-v1.schema.json",
+  "title": "BabylonSim Recording HTTP API v1",
+  "oneOf": [
+    { "$ref": "#/$defs/seriesResponse" },
+    { "$ref": "#/$defs/importSummary" },
+    { "$ref": "#/$defs/importCommitRequest" },
+    { "$ref": "#/$defs/importCommitResponse" }
+  ],
+  "$defs": {
+    "nonNegativeInteger": { "type": "integer", "minimum": 0 },
+    "nullableNonNegativeInteger": {
+      "oneOf": [
+        { "$ref": "#/$defs/nonNegativeInteger" },
+        { "type": "null" }
+      ]
+    },
+    "sourceMode": { "enum": ["live", "imported"] },
+    "playbackState": { "enum": ["following", "paused", "playing", "complete"] },
+    "seriesEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimum", "maximum"],
+      "properties": {
+        "minimum": { "type": "array", "maxItems": 4096, "items": { "type": "number" } },
+        "maximum": { "type": "array", "maxItems": 4096, "items": { "type": "number" } }
+      }
+    },
+    "recordingEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sample_sequence", "recording_time_ns", "kind", "value"],
+      "properties": {
+        "sample_sequence": { "$ref": "#/$defs/nonNegativeInteger" },
+        "recording_time_ns": { "$ref": "#/$defs/nonNegativeInteger" },
+        "kind": { "enum": ["lifecycle", "quality"] },
+        "value": { "type": "string" }
+      }
+    },
+    "seriesResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recording_epoch", "buffer_generation", "end_sample_sequence",
+        "requested_start_ns", "requested_end_ns", "actual_start_ns", "actual_end_ns",
+        "retained_start_ns", "retained_end_ns", "bucket_start_ns", "bucket_end_ns",
+        "series", "events"
+      ],
+      "properties": {
+        "recording_epoch": { "type": "string", "minLength": 1 },
+        "buffer_generation": { "$ref": "#/$defs/nonNegativeInteger" },
+        "end_sample_sequence": { "type": "integer", "minimum": -1 },
+        "requested_start_ns": { "$ref": "#/$defs/nonNegativeInteger" },
+        "requested_end_ns": { "$ref": "#/$defs/nonNegativeInteger" },
+        "actual_start_ns": { "$ref": "#/$defs/nullableNonNegativeInteger" },
+        "actual_end_ns": { "$ref": "#/$defs/nullableNonNegativeInteger" },
+        "retained_start_ns": { "$ref": "#/$defs/nullableNonNegativeInteger" },
+        "retained_end_ns": { "$ref": "#/$defs/nullableNonNegativeInteger" },
+        "bucket_start_ns": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/nonNegativeInteger" } },
+        "bucket_end_ns": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/nonNegativeInteger" } },
+        "series": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 13,
+          "additionalProperties": { "$ref": "#/$defs/seriesEnvelope" }
+        },
+        "events": { "type": "array", "items": { "$ref": "#/$defs/recordingEvent" } }
+      }
+    },
+    "importSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["token", "digest_sha256", "profile", "sample_count", "start_ns", "end_ns", "source_mode", "expires_in_seconds"],
+      "properties": {
+        "token": { "type": "string", "minLength": 1 },
+        "digest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "profile": { "const": "babylon-sim/rrd-v1" },
+        "sample_count": { "type": "integer", "minimum": 1, "maximum": 360000 },
+        "start_ns": { "$ref": "#/$defs/nonNegativeInteger" },
+        "end_ns": { "$ref": "#/$defs/nonNegativeInteger" },
+        "source_mode": { "$ref": "#/$defs/sourceMode" },
+        "expires_in_seconds": { "type": "integer", "minimum": 1, "maximum": 300 }
+      }
+    },
+    "importCommitRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["token", "expected_recording_epoch"],
+      "properties": {
+        "token": { "type": "string", "minLength": 1 },
+        "expected_recording_epoch": { "type": "string", "minLength": 1 }
+      }
+    },
+    "importCommitResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recording_epoch", "source_mode", "playback_state", "cursor_recording_time_ns", "view_revision"],
+      "properties": {
+        "recording_epoch": { "type": "string", "minLength": 1 },
+        "source_mode": { "$ref": "#/$defs/sourceMode" },
+        "playback_state": { "$ref": "#/$defs/playbackState" },
+        "cursor_recording_time_ns": { "$ref": "#/$defs/nonNegativeInteger" },
+        "view_revision": { "$ref": "#/$defs/nonNegativeInteger" }
+      }
+    }
+  }
+}

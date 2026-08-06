@@ -1,0 +1,10 @@
+{
+  "protocol_version": "babylon-sim-v3",
+  "state_schema_version": "babylon-sim-state-v2",
+  "model_version": "docs-urdf-v3",
+  "calibration_version": "machine-calibration-v2",
+  "software_version": "0.1.0",
+  "terrain_spec_version": "terrain-spec-v1",
+  "terrain_algorithm_version": "terrain-algorithm-v2",
+  "visual_model_version": "original-skin-v1"
+}

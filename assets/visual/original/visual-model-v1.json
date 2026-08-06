@@ -1,0 +1,77 @@
+{
+  "schema_version": "visual-model-v1",
+  "visual_model_version": "original-skin-v1",
+  "source_model": "sil-foxglove-main/excavators/original",
+  "entries": [
+    {
+      "asset_id": "base",
+      "file": "base.glb",
+      "sha256": "0bc9bbf9547dcaa1cf4e65968cd9723cd459cdfaea1df187cef0acf3f777057a",
+      "authoritative_frame": "base_link",
+      "translation_m": [0.0, 0.0, 0.0],
+      "rpy_rad": [0.0, 0.0, 1.5707963267948966],
+      "scale": [1.75, 1.75, 1.75],
+      "expected_bounds_m": {
+        "min": [-1.04, -0.865, 0.014],
+        "max": [1.495328, 0.865, 0.6245]
+      },
+      "replace_primitive_visual": true
+    },
+    {
+      "asset_id": "upper-structure",
+      "file": "upper-structure.glb",
+      "sha256": "1040412f87367ac3fd603ef91c1dc2b0e4599902b06c8c133bdfdaec8809bac8",
+      "authoritative_frame": "upper_structure_link",
+      "translation_m": [0.0, 0.0, -0.35],
+      "rpy_rad": [0.0, 0.0, 1.5707963267948966],
+      "scale": [1.3, 1.3, 1.3],
+      "expected_bounds_m": {
+        "min": [-0.879968, -0.704728, -0.068],
+        "max": [1.178826, 0.704318, 1.823]
+      },
+      "replace_primitive_visual": true
+    },
+    {
+      "asset_id": "boom",
+      "file": "boom.glb",
+      "sha256": "3c76e3f832dab11bc21748341ad55369cc45fa4cc8e764ce48e2c2f55baa46c2",
+      "authoritative_frame": "boom_link",
+      "translation_m": [0.0, 0.0, 0.0],
+      "rpy_rad": [0.0, 0.0, 1.5707963267948966],
+      "scale": [1.75, 1.75, 1.75],
+      "expected_bounds_m": {
+        "min": [-0.042899, -0.0875, -0.669258],
+        "max": [2.630471, 0.0875, 0.433594]
+      },
+      "replace_primitive_visual": true
+    },
+    {
+      "asset_id": "arm",
+      "file": "arm.glb",
+      "sha256": "01d2f2fb9dbdd31eec5e121814daf1f1b729486640354533fc1ef934187bb6e4",
+      "authoritative_frame": "arm_link",
+      "translation_m": [0.0, 0.0, 0.0],
+      "rpy_rad": [0.0, 0.0, -1.5707963267948966],
+      "scale": [1.8, 1.8, 1.8],
+      "expected_bounds_m": {
+        "min": [-1.532563, -0.0875, -0.39832],
+        "max": [0.266898, 0.0875, 0.03669]
+      },
+      "replace_primitive_visual": true
+    },
+    {
+      "asset_id": "bucket",
+      "file": "bucket.glb",
+      "sha256": "84561b463c2747dcc927fdd6898ffbd4c2beb76e6ac8882dfc1de90625784974",
+      "authoritative_frame": "bucket_link",
+      "translation_m": [0.0, 0.0, 0.0],
+      "rpy_rad": [0.0, 0.0, 1.5707963267948966],
+      "scale": [1.75, 1.75, 1.75],
+      "expected_bounds_m": {
+        "min": [-0.169422, -0.2875, -0.05],
+        "max": [0.58915, 0.2875, 0.535891]
+      },
+      "replace_primitive_visual": true
+    }
+  ]
+}

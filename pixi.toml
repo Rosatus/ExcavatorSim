@@ -1,0 +1,36 @@
+[workspace]
+name = "excavator-sim"
+version = "0.1.0"
+description = "Desktop excavator simulator with a Python authority and Godot client"
+authors = ["rosatus"]
+channels = ["conda-forge"]
+platforms = ["win-64"]
+
+[dependencies]
+python = "3.11.*"
+pinocchio = "*"
+numpy = "*"
+aiohttp = "*"
+jsonschema = "*"
+pytest = "*"
+pytest-asyncio = "*"
+ruff = "*"
+mypy = "*"
+
+[pypi-dependencies]
+rerun-sdk = "==0.35.0"
+
+[activation.env]
+PYTHONPATH = "backend/src"
+
+[tasks]
+test-backend = "python -m pytest backend/tests/backend"
+lint-backend = "ruff check backend/src backend/tests backend/scripts"
+format-backend = "ruff format backend/src backend/tests backend/scripts"
+typecheck-backend = "mypy backend/src backend/scripts"
+verify-provenance = "python backend/scripts/verify_provenance.py"
+verify-standalone-paths = "python backend/scripts/verify_standalone.py --paths-only"
+backend-smoke = "python backend/scripts/production_smoke.py"
+verify = { depends-on = ["lint-backend", "typecheck-backend", "test-backend", "verify-provenance", "verify-standalone-paths"] }
+start = "python -m babylon_sim.cli --frontend-dir godot/dist"
+

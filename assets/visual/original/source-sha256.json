@@ -1,0 +1,13 @@
+{
+  "hash_algorithm": "sha256-raw-bytes",
+  "source_snapshot": "sil-foxglove-main/excavators/original",
+  "files": [
+    { "path": "model.urdf", "bytes": 2474, "sha256": "510f12e344827543c4850bbfe023342b613717fba8f6cb1c440b949b711f5ff3" },
+    { "path": "meshes/base.obj", "bytes": 830183, "sha256": "391449bcfa603968c3054461c73c17272f280919740344b2f7325ae9fe395937" },
+    { "path": "meshes/body.obj", "bytes": 1097409, "sha256": "0cf46f3e1316cd59d6058561468d879144d257165c2166ffac088d514af095e7" },
+    { "path": "meshes/arm1.obj", "bytes": 115131, "sha256": "b00f3357ea563765d7e7a7069bfc17616761627feba0fd042da19e89ad01f115" },
+    { "path": "meshes/arm2.obj", "bytes": 217239, "sha256": "0fa56707af1bcff07904857e4e3e00735d16100af0bc67a53fda1e9b5885923b" },
+    { "path": "meshes/shovel.obj", "bytes": 169827, "sha256": "37a36f18de4f326a801b85f60fed3249d4b1dd8fa8c9fa5267a5935ae2564603" },
+    { "path": "meshes/material.mtl", "bytes": 599, "sha256": "e3085c279f58ea62da3fc1ceb02190e3ed9c1a1094b5d9c09de1b7a8d02b98dc" }
+  ]
+}

@@ -1,0 +1,408 @@
+"""Fixed-rate simulation runtime isolated from network and render cadence."""
+
+from __future__ import annotations
+
+import math
+import queue
+import threading
+import time
+import uuid
+from collections import OrderedDict
+from collections.abc import Callable
+from concurrent.futures import Future
+from dataclasses import dataclass
+from typing import Literal
+
+from .calibration import MachineCalibration
+from .constants import DISPLAY_HZ, SIMULATION_DT_SECONDS
+from .exchange import RecordingExchange
+from .input_router import InputRouter, InputSnapshot
+from .model import ExcavatorModel
+from .recording import ChunkedRecordingBuffer
+from .replay import ReplayWorker
+from .simulation import SimulationStatus, Simulator
+from .state import SimulationState
+from .terrain_controller import TerrainController
+from .terrain_excavation import (
+    TERRAIN_EDIT_STRIDE,
+    TerrainEditInput,
+    normalized_joint,
+    point_from_matrix,
+)
+
+LifecycleCommand = Literal["start", "pause", "reset"]
+COMMAND_QUEUE_CAPACITY = 32
+COMMANDS_PER_TICK = 8
+COMMAND_CACHE_CAPACITY = 128
+
+
+class RuntimeCommandError(RuntimeError):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
+@dataclass(frozen=True)
+class CommandResult:
+    id: str
+    command: LifecycleCommand
+    lifecycle: str
+    state_sequence: int
+
+
+@dataclass(frozen=True)
+class RuntimeSnapshot:
+    generation: int
+    stream_epoch: str
+    lifecycle: str
+    state: SimulationState
+    last_input_client_sequence: int | None
+    server_monotonic_ms: float
+
+
+@dataclass(frozen=True)
+class RuntimeStatus:
+    simulation_hz: float
+    state_hz: float
+    render_target_hz: float
+    overruns: int
+    dropped_snapshots: int
+    controller_source: str | None
+    stale: bool
+
+
+@dataclass(frozen=True)
+class _QueuedCommand:
+    session_id: str
+    id: str
+    command: LifecycleCommand
+    future: Future[CommandResult]
+
+
+@dataclass
+class _CachedCommand:
+    command: LifecycleCommand
+    future: Future[CommandResult]
+
+
+class LatestStateSlot:
+    def __init__(self) -> None:
+        self._condition = threading.Condition()
+        self._snapshot: RuntimeSnapshot | None = None
+
+    def publish(self, snapshot: RuntimeSnapshot) -> None:
+        with self._condition:
+            self._snapshot = snapshot
+            self._condition.notify_all()
+
+    def read(self) -> RuntimeSnapshot:
+        with self._condition:
+            if self._snapshot is None:
+                raise RuntimeError("runtime has not published an initial state")
+            return self._snapshot
+
+    def wait_for_newer(self, generation: int, timeout: float | None = None) -> RuntimeSnapshot:
+        with self._condition:
+            self._condition.wait_for(
+                lambda: self._snapshot is not None and self._snapshot.generation > generation,
+                timeout=timeout,
+            )
+            if self._snapshot is None:
+                raise RuntimeError("runtime has not published an initial state")
+            return self._snapshot
+
+
+class RuntimeController:
+    def __init__(
+        self,
+        model: ExcavatorModel,
+        calibration: MachineCalibration,
+        *,
+        clock: Callable[[], float] = time.perf_counter,
+    ) -> None:
+        self.model = model
+        self.calibration = calibration
+        self.simulator = Simulator(model, calibration)
+        self.input_router = InputRouter(clock=clock)
+        self.latest = LatestStateSlot()
+        self.recording = ChunkedRecordingBuffer()
+        self.terrain = TerrainController(self.recording)
+        self._clock = clock
+        self._commands: queue.Queue[_QueuedCommand] = queue.Queue(COMMAND_QUEUE_CAPACITY)
+        self._command_cache: dict[str, OrderedDict[str, _CachedCommand]] = {}
+        self._cache_lock = threading.Lock()
+        self._submit_lock = threading.Lock()
+        self._metrics_lock = threading.Lock()
+        self._stop_event = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._generation = 0
+        self._stream_epoch = uuid.uuid4().hex
+        self._overruns = 0
+        self._dropped_snapshots = 0
+        self._ticks = 0
+        self._started_at = self._clock()
+        self._publish(self.simulator.snapshot())
+        self.replay = ReplayWorker(
+            self.recording,
+            ExcavatorModel.from_urdf(model.urdf_path),
+            self.latest.read,
+            clock=clock,
+        )
+        self.exchange = RecordingExchange(
+            self.recording,
+            self.replay,
+            calibration_version=calibration.calibration_version,
+        )
+
+    @property
+    def stream_epoch(self) -> str:
+        return self._stream_epoch
+
+    def start(self) -> None:
+        if self._thread is not None and self._thread.is_alive():
+            return
+        self._stop_event.clear()
+        self._started_at = self._clock()
+        self._thread = threading.Thread(target=self._run, name="babylon-sim-runtime", daemon=False)
+        self._thread.start()
+        self.replay.start()
+
+    def stop(self) -> None:
+        with self._submit_lock:
+            self._stop_event.set()
+        thread = self._thread
+        if thread is not None and thread is not threading.current_thread():
+            thread.join(timeout=3.0)
+        self.replay.stop()
+        self.exchange.close()
+        self.terrain.close()
+        self._fail_pending(RuntimeCommandError("server_shutting_down", "server is shutting down"))
+
+    def is_running(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
+
+    def submit_input(
+        self,
+        client_id: str,
+        *,
+        client_sequence: int,
+        connected: bool,
+        focused: bool,
+        axes: tuple[float, float, float, float],
+    ) -> None:
+        effective_connected = connected and focused
+        effective_axes = axes if effective_connected else (0.0, 0.0, 0.0, 0.0)
+        self.input_router.submit(
+            InputSnapshot(
+                source=f"browser:{client_id}",
+                client_sequence=client_sequence,
+                connected=effective_connected,
+                axes=effective_axes,
+            ),
+            client_id=client_id,
+        )
+
+    def disconnect_client(self, client_id: str) -> None:
+        self.input_router.disconnect_client(client_id)
+        self.terrain.cancel_session(client_id)
+        with self._cache_lock:
+            self._command_cache.pop(client_id, None)
+
+    def submit_command(
+        self, session_id: str, command_id: str, command: LifecycleCommand
+    ) -> Future[CommandResult]:
+        with self._submit_lock:
+            if self._stop_event.is_set():
+                raise RuntimeCommandError("server_shutting_down", "server is shutting down")
+            with self._cache_lock:
+                cache = self._command_cache.setdefault(session_id, OrderedDict())
+                cached = cache.get(command_id)
+                if cached is not None:
+                    if cached.command != command:
+                        raise RuntimeCommandError(
+                            "command_id_conflict",
+                            "command id was already used with another payload",
+                        )
+                    cache.move_to_end(command_id)
+                    return cached.future
+                future: Future[CommandResult] = Future()
+                cache[command_id] = _CachedCommand(command, future)
+                while len(cache) > COMMAND_CACHE_CAPACITY:
+                    oldest_id, oldest = next(iter(cache.items()))
+                    if not oldest.future.done():
+                        break
+                    cache.pop(oldest_id)
+            queued = _QueuedCommand(session_id, command_id, command, future)
+            try:
+                self._commands.put_nowait(queued)
+            except queue.Full as exc:
+                with self._cache_lock:
+                    session_cache = self._command_cache.get(session_id)
+                    if session_cache is not None:
+                        session_cache.pop(command_id, None)
+                raise RuntimeCommandError(
+                    "command_queue_full", "lifecycle command queue is full"
+                ) from exc
+            return future
+
+    def status_snapshot(self) -> RuntimeStatus:
+        elapsed = max(self._clock() - self._started_at, SIMULATION_DT_SECONDS)
+        with self._metrics_lock:
+            ticks = self._ticks
+            overruns = self._overruns
+            dropped = self._dropped_snapshots
+        actual_hz = ticks / elapsed
+        return RuntimeStatus(
+            simulation_hz=actual_hz,
+            state_hz=actual_hz,
+            render_target_hz=float(DISPLAY_HZ),
+            overruns=overruns,
+            dropped_snapshots=dropped,
+            controller_source=self.input_router.active_source,
+            stale=not self.is_running(),
+        )
+
+    def record_dropped_snapshots(self, count: int) -> None:
+        if count <= 0:
+            return
+        with self._metrics_lock:
+            self._dropped_snapshots += count
+
+    def _run(self) -> None:
+        next_deadline = self._clock()
+        while not self._stop_event.is_set():
+            now = self._clock()
+            wait_seconds = next_deadline - now
+            if wait_seconds > 0.0:
+                time.sleep(wait_seconds)
+                if self._stop_event.is_set():
+                    break
+            tick_started = self._clock()
+            self._tick(tick_started)
+            with self._metrics_lock:
+                self._ticks += 1
+            next_deadline += SIMULATION_DT_SECONDS
+            finished = self._clock()
+            if finished > next_deadline:
+                missed = max(1, math.floor((finished - next_deadline) / SIMULATION_DT_SECONDS) + 1)
+                with self._metrics_lock:
+                    self._overruns += missed
+                next_deadline = finished + SIMULATION_DT_SECONDS
+
+    def _tick(self, now: float) -> None:
+        command = self.input_router.command(
+            timestamp=self.simulator.timestamp,
+            sequence_number=self.simulator.sequence_number,
+            now=now,
+        )
+        applied: list[_QueuedCommand] = []
+        reset_applied = False
+        for _ in range(COMMANDS_PER_TICK):
+            try:
+                queued = self._commands.get_nowait()
+            except queue.Empty:
+                break
+            try:
+                reset_applied = self._apply_command(queued.command) or reset_applied
+            except RuntimeError as exc:
+                queued.future.set_exception(RuntimeCommandError("invalid_lifecycle", str(exc)))
+            else:
+                applied.append(queued)
+
+        if self.simulator.status is SimulationStatus.RUNNING:
+            state = self.simulator.step(command, dt=SIMULATION_DT_SECONDS)
+        elif reset_applied:
+            reset_flags = ["state_reset"]
+            if not command.connected:
+                reset_flags.extend(("input_disconnected", "emergency_stop"))
+            state = self.simulator.snapshot(
+                source=command.source,
+                quality_flags=reset_flags,
+            )
+        else:
+            state = self.simulator.hold(command)
+        snapshot = self._publish(state, last_input_client_sequence=command.input_client_sequence)
+        for queued in applied:
+            queued.future.set_result(
+                CommandResult(
+                    queued.id,
+                    queued.command,
+                    snapshot.lifecycle,
+                    snapshot.state.sequence_number,
+                )
+            )
+
+    def _apply_command(self, command: LifecycleCommand) -> bool:
+        if command == "start":
+            self.simulator.start()
+        elif command == "pause":
+            self.simulator.pause()
+        else:
+            self.simulator.reset()
+            self._stream_epoch = uuid.uuid4().hex
+            return True
+        return False
+
+    def _publish(
+        self,
+        state: SimulationState,
+        *,
+        last_input_client_sequence: int | None = None,
+    ) -> RuntimeSnapshot:
+        self._generation += 1
+        server_monotonic_ms = self._clock() * 1000.0
+        snapshot = RuntimeSnapshot(
+            generation=self._generation,
+            stream_epoch=self._stream_epoch,
+            lifecycle=self.simulator.status.value,
+            state=state,
+            last_input_client_sequence=last_input_client_sequence,
+            server_monotonic_ms=server_monotonic_ms,
+        )
+        sample_sequence = self.recording.append(
+            state,
+            simulation_epoch=self._stream_epoch,
+            lifecycle=self.simulator.status.value,
+            last_input_sequence=last_input_client_sequence,
+            monotonic_ns=int(server_monotonic_ms * 1_000_000.0),
+        )
+        reset_bucket = "state_reset" in state.quality_flags
+        if sample_sequence is not None and (
+            reset_bucket or sample_sequence % TERRAIN_EDIT_STRIDE == 0
+        ):
+            teeth = tuple(
+                point_from_matrix(state.frame_transforms[name])
+                for name in ("tooth_left", "tooth_center", "tooth_right")
+            )
+            bucket_limit = self.calibration.joint_limits[-1]
+            self.terrain.submit_live_edit(
+                TerrainEditInput(
+                    recording_epoch=self.recording.recording_epoch,
+                    sample_sequence=sample_sequence,
+                    recording_time_ns=int(server_monotonic_ms * 1_000_000.0),
+                    stream_epoch=self._stream_epoch,
+                    previous_teeth=teeth,  # type: ignore[arg-type]
+                    current_teeth=teeth,  # type: ignore[arg-type]
+                    bucket_joint_normalized=normalized_joint(
+                        state.joint_position[-1],
+                        bucket_limit.min_position,
+                        bucket_limit.max_position,
+                    ),
+                    reset_bucket=reset_bucket,
+                )
+            )
+        self.latest.publish(snapshot)
+        return snapshot
+
+    def _fail_pending(self, error: RuntimeCommandError) -> None:
+        while True:
+            try:
+                queued = self._commands.get_nowait()
+            except queue.Empty:
+                break
+            if not queued.future.done():
+                queued.future.set_exception(error)
+
+
+def create_runtime(model: ExcavatorModel, calibration: MachineCalibration) -> RuntimeController:
+    return RuntimeController(model, calibration)
