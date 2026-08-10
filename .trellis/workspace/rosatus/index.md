@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 7
+- **Total Sessions**: 8
 - **Last Active**: 2026-08-11
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~248 | Active |
+| `journal-1.md` | ~283 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 8 | 2026-08-11 | M7 integration release candidate | `3c2625b`, `03c71e1`, `1b4c98d` | `main` |
 | 7 | 2026-08-11 | M6 realistic visual pass | `87d509d`, `be736cd`, `5b21c02` | `main` |
 | 6 | 2026-08-11 | M5 deterministic excavation gameplay loop | `c8cfecb`, `65523a6`, `e1f6995`, `4cc5f06` | `main` |
 | 5 | 2026-08-11 | M4 deterministic Godot terrain core | `8594314`, `b2960a7`, `164946c` | `main` |

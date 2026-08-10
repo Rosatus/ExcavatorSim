@@ -246,3 +246,38 @@ Added realistic Forward+ procedural sky/ambient light, shadowed key light, follo
 ### Next Steps
 
 - None - task complete
+
+
+## Session 8: M7 integration release candidate
+
+**Date**: 2026-08-11
+**Task**: M7 integration release candidate
+**Branch**: `main`
+
+### Summary
+
+Added scene-level release candidate test using MotionClient fake WebSocket seams: hello/view-state, authoritative visual pose, local dig/deposit/reset, reconnect epoch cleanup and stale guards. ExcavationWorld now carries authority_generation and SoilEffects clears on authority or terrain generation changes. Added Godot test matrix README and explicit legacy Python terrain/recording/replay retention decision. All 7 Godot headless contracts passed, MCP main scene/runtime smoke was clean at 60 FPS cap, pixi run verify passed with 124 backend tests.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3c2625b` | (see git log) |
+| `03c71e1` | (see git log) |
+| `1b4c98d` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
