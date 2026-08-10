@@ -175,3 +175,39 @@ Implemented Godot-owned deterministic terrain state with stable/loose Float32 la
 ### Next Steps
 
 - None - task complete
+
+
+## Session 6: M5 deterministic excavation gameplay loop
+
+**Date**: 2026-08-11
+**Task**: M5 deterministic excavation gameplay loop
+**Branch**: `main`
+
+### Summary
+
+Implemented Godot BucketSoilState and ExcavationWorld with deterministic fixed-step cut/deposit, grid-volume-conserving inventory, explicit bucket contact proxy, reset/generation guards, optional chunked static collider fail-open adapter, UI dig/deposit controls, and tests. Godot 4.7 MCP scene smoke was clean; headless M4/M5/foundation/motion/GLB tests passed; pixi run verify passed with 124 backend tests.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c8cfecb` | (see git log) |
+| `65523a6` | (see git log) |
+| `e1f6995` | (see git log) |
+| `4cc5f06` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

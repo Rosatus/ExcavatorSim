@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 5
+- **Total Sessions**: 6
 - **Last Active**: 2026-08-11
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~177 | Active |
+| `journal-1.md` | ~213 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 6 | 2026-08-11 | M5 deterministic excavation gameplay loop | `c8cfecb`, `65523a6`, `e1f6995`, `4cc5f06` | `main` |
 | 5 | 2026-08-11 | M4 deterministic Godot terrain core | `8594314`, `b2960a7`, `164946c` | `main` |
 | 4 | 2026-08-11 | M3 motion-only backend profile | `8ab3269`, `8a811a4` | `main` |
 | 3 | 2026-08-10 | M2 Godot motion vertical slice | `1552414`, `618ff56` | `main` |
