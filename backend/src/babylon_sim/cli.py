@@ -38,6 +38,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument("--frontend-dir", type=Path, default=FRONTEND_DIST_PATH)
+    parser.add_argument(
+        "--runtime-profile",
+        choices=("legacy", "motion-only"),
+        default="legacy",
+        help="runtime services to enable (default: legacy)",
+    )
     return parser
 
 
@@ -69,7 +75,7 @@ def main() -> int:
         raise SystemExit("frontend build is missing; run 'pixi run build' first")
     model = ExcavatorModel.from_urdf(URDF_PATH)
     calibration = MachineCalibration.from_json(CALIBRATION_PATH)
-    runtime = RuntimeController(model, calibration)
+    runtime = RuntimeController(model, calibration, profile=args.runtime_profile)
     application = create_app(runtime, frontend_dir=frontend_dir)
     url = _application_url(args.host, args.port)
     if not args.no_browser:

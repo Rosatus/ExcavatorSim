@@ -33,4 +33,4 @@ verify-standalone-paths = "python backend/scripts/verify_standalone.py --paths-o
 backend-smoke = "python backend/scripts/production_smoke.py"
 verify = { depends-on = ["lint-backend", "typecheck-backend", "test-backend", "verify-provenance", "verify-standalone-paths"] }
 start = "python -m babylon_sim.cli --frontend-dir godot/dist"
-
+start-motion-only = "python -m babylon_sim.cli --runtime-profile motion-only --frontend-dir godot/dist"

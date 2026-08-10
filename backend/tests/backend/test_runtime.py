@@ -244,3 +244,57 @@ def test_shutdown_cannot_leave_a_concurrent_submission_pending(
     future = submitted[0]
     with pytest.raises(RuntimeCommandError, match="server is shutting down"):
         future.result(timeout=1.0)  # type: ignore[union-attr]
+
+
+def test_motion_only_profile_has_no_optional_workers(
+    model: ExcavatorModel, calibration: MachineCalibration
+) -> None:
+    runtime = RuntimeController(model, calibration, profile="motion-only")
+    assert runtime.recording is None
+    assert runtime.terrain is None
+    assert runtime.replay is None
+    assert runtime.exchange is None
+    assert runtime.capabilities == frozenset({"input_snapshot", "commands"})
+    runtime.start()
+    try:
+        first = runtime.latest_view.read()
+        assert first.source_mode is SourceMode.LIVE
+        assert first.playback_state.value == "following"
+        runtime.submit_command("motion", "reset", "reset").result(timeout=1.0)
+        second = runtime.latest_view.read()
+        assert second.simulation_epoch != first.simulation_epoch
+        assert second.view_revision > first.view_revision
+        assert len(second.frame_transforms) >= 5
+    finally:
+        runtime.stop()
+
+
+def test_motion_only_stop_clears_input_lease_and_command_cache(
+    model: ExcavatorModel, calibration: MachineCalibration
+) -> None:
+    runtime = RuntimeController(model, calibration, profile="motion-only")
+    runtime.start()
+    try:
+        runtime.submit_input(
+            "client",
+            client_sequence=0,
+            connected=True,
+            focused=True,
+            axes=(0.0, 0.0, 0.0, 0.0),
+        )
+        runtime.submit_input(
+            "client",
+            client_sequence=1,
+            connected=True,
+            focused=True,
+            axes=(1.0, 0.0, 0.0, 0.0),
+        )
+        _wait_for(lambda: runtime.input_router.active_source == "browser:client")
+        applied = runtime.submit_command("client", "start", "start")
+        assert applied.result(timeout=1.0).lifecycle == "running"
+        assert "client" in runtime._command_cache
+    finally:
+        runtime.stop()
+
+    assert runtime.input_router.active_source is None
+    assert runtime._command_cache == {}

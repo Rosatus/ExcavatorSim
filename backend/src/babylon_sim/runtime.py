@@ -19,7 +19,8 @@ from .exchange import RecordingExchange
 from .input_router import InputRouter, InputSnapshot
 from .model import ExcavatorModel
 from .recording import ChunkedRecordingBuffer
-from .replay import ReplayWorker
+from .replay import AuthoritativeViewState, LatestViewSlot, ReplayWorker
+from .replay_contract import PlaybackState, SourceMode
 from .simulation import SimulationStatus, Simulator
 from .state import SimulationState
 from .terrain_controller import TerrainController
@@ -31,6 +32,7 @@ from .terrain_excavation import (
 )
 
 LifecycleCommand = Literal["start", "pause", "reset"]
+RuntimeProfile = Literal["legacy", "motion-only"]
 COMMAND_QUEUE_CAPACITY = 32
 COMMANDS_PER_TICK = 8
 COMMAND_CACHE_CAPACITY = 128
@@ -118,19 +120,27 @@ class RuntimeController:
         model: ExcavatorModel,
         calibration: MachineCalibration,
         *,
+        profile: RuntimeProfile = "legacy",
         clock: Callable[[], float] = time.perf_counter,
     ) -> None:
+        if profile not in ("legacy", "motion-only"):
+            raise ValueError(f"unknown runtime profile: {profile}")
+        self.profile = profile
         self.model = model
         self.calibration = calibration
         self.simulator = Simulator(model, calibration)
         self.input_router = InputRouter(clock=clock)
         self.latest = LatestStateSlot()
-        self.recording = ChunkedRecordingBuffer()
-        self.terrain = TerrainController(self.recording)
+        self.recording = ChunkedRecordingBuffer() if profile == "legacy" else None
+        self.terrain = TerrainController(self.recording) if self.recording is not None else None
+        self._motion_recording_epoch = uuid.uuid4().hex
+        self._motion_view = LatestViewSlot()
         self._clock = clock
         self._commands: queue.Queue[_QueuedCommand] = queue.Queue(COMMAND_QUEUE_CAPACITY)
         self._command_cache: dict[str, OrderedDict[str, _CachedCommand]] = {}
         self._cache_lock = threading.Lock()
+        self._input_clients: set[str] = set()
+        self._input_clients_lock = threading.Lock()
         self._submit_lock = threading.Lock()
         self._metrics_lock = threading.Lock()
         self._stop_event = threading.Event()
@@ -142,21 +152,48 @@ class RuntimeController:
         self._ticks = 0
         self._started_at = self._clock()
         self._publish(self.simulator.snapshot())
-        self.replay = ReplayWorker(
-            self.recording,
-            ExcavatorModel.from_urdf(model.urdf_path),
-            self.latest.read,
-            clock=clock,
-        )
-        self.exchange = RecordingExchange(
-            self.recording,
-            self.replay,
-            calibration_version=calibration.calibration_version,
-        )
+        self.replay = None
+        self.exchange = None
+        if self.recording is not None and self.terrain is not None:
+            self.replay = ReplayWorker(
+                self.recording,
+                ExcavatorModel.from_urdf(model.urdf_path),
+                self.latest.read,
+                clock=clock,
+            )
+            self.exchange = RecordingExchange(
+                self.recording,
+                self.replay,
+                calibration_version=calibration.calibration_version,
+            )
 
     @property
     def stream_epoch(self) -> str:
         return self._stream_epoch
+
+    @property
+    def capabilities(self) -> frozenset[str]:
+        if self.profile == "motion-only":
+            return frozenset({"input_snapshot", "commands"})
+        return frozenset(
+            {"input_snapshot", "commands", "latency", "playback", "recording", "terrain"}
+        )
+
+    @property
+    def latest_view(self) -> LatestViewSlot:
+        if self.profile == "motion-only":
+            return self._motion_view
+        if self.replay is None:
+            raise RuntimeError("legacy runtime replay service is unavailable")
+        return self.replay.latest
+
+    @property
+    def recording_epoch(self) -> str:
+        return (
+            self._motion_recording_epoch
+            if self.recording is None
+            else self.recording.recording_epoch
+        )
 
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():
@@ -165,7 +202,8 @@ class RuntimeController:
         self._started_at = self._clock()
         self._thread = threading.Thread(target=self._run, name="babylon-sim-runtime", daemon=False)
         self._thread.start()
-        self.replay.start()
+        if self.replay is not None:
+            self.replay.start()
 
     def stop(self) -> None:
         with self._submit_lock:
@@ -173,10 +211,21 @@ class RuntimeController:
         thread = self._thread
         if thread is not None and thread is not threading.current_thread():
             thread.join(timeout=3.0)
-        self.replay.stop()
-        self.exchange.close()
-        self.terrain.close()
+        if self.replay is not None:
+            self.replay.stop()
+        if self.exchange is not None:
+            self.exchange.close()
+        if self.terrain is not None:
+            self.terrain.close()
         self._fail_pending(RuntimeCommandError("server_shutting_down", "server is shutting down"))
+        if self.profile == "motion-only":
+            with self._input_clients_lock:
+                input_clients = tuple(self._input_clients)
+                self._input_clients.clear()
+            for client_id in input_clients:
+                self.input_router.disconnect_client(client_id)
+            with self._cache_lock:
+                self._command_cache.clear()
 
     def is_running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
@@ -201,10 +250,15 @@ class RuntimeController:
             ),
             client_id=client_id,
         )
+        with self._input_clients_lock:
+            self._input_clients.add(client_id)
 
     def disconnect_client(self, client_id: str) -> None:
         self.input_router.disconnect_client(client_id)
-        self.terrain.cancel_session(client_id)
+        with self._input_clients_lock:
+            self._input_clients.discard(client_id)
+        if self.terrain is not None:
+            self.terrain.cancel_session(client_id)
         with self._cache_lock:
             self._command_cache.pop(client_id, None)
 
@@ -359,16 +413,23 @@ class RuntimeController:
             last_input_client_sequence=last_input_client_sequence,
             server_monotonic_ms=server_monotonic_ms,
         )
-        sample_sequence = self.recording.append(
-            state,
-            simulation_epoch=self._stream_epoch,
-            lifecycle=self.simulator.status.value,
-            last_input_sequence=last_input_client_sequence,
-            monotonic_ns=int(server_monotonic_ms * 1_000_000.0),
-        )
-        reset_bucket = "state_reset" in state.quality_flags
-        if sample_sequence is not None and (
-            reset_bucket or sample_sequence % TERRAIN_EDIT_STRIDE == 0
+        if self.recording is not None and self.terrain is not None:
+            sample_sequence = self.recording.append(
+                state,
+                simulation_epoch=self._stream_epoch,
+                lifecycle=self.simulator.status.value,
+                last_input_sequence=last_input_client_sequence,
+                monotonic_ns=int(server_monotonic_ms * 1_000_000.0),
+            )
+            reset_bucket = "state_reset" in state.quality_flags
+        else:
+            sample_sequence = None
+            reset_bucket = False
+        if (
+            self.recording is not None
+            and self.terrain is not None
+            and sample_sequence is not None
+            and (reset_bucket or sample_sequence % TERRAIN_EDIT_STRIDE == 0)
         ):
             teeth = tuple(
                 point_from_matrix(state.frame_transforms[name])
@@ -392,6 +453,33 @@ class RuntimeController:
                 )
             )
         self.latest.publish(snapshot)
+        if self.profile == "motion-only":
+            timestamp_ns = int(server_monotonic_ms * 1_000_000.0)
+            self._motion_view.publish(
+                AuthoritativeViewState(
+                    recording_epoch=self._motion_recording_epoch,
+                    buffer_generation=self._generation,
+                    end_sample_sequence=self._generation - 1,
+                    view_revision=self._generation,
+                    source_mode=SourceMode.LIVE,
+                    playback_state=PlaybackState.FOLLOWING,
+                    cursor_recording_time_ns=timestamp_ns,
+                    retained_start_ns=0,
+                    retained_end_ns=timestamp_ns,
+                    selected_sample_sequence=self._generation - 1,
+                    simulation_epoch=snapshot.stream_epoch,
+                    source_sequence=state.sequence_number,
+                    simulation_time_s=state.timestamp,
+                    lifecycle=snapshot.lifecycle,
+                    joint_position=state.joint_position,
+                    joint_velocity=state.joint_velocity,
+                    joint_acceleration=state.joint_acceleration,
+                    frame_transforms=state.frame_transforms,
+                    quality_flags=state.quality_flags,
+                    last_input_sequence=last_input_client_sequence,
+                    server_monotonic_ms=server_monotonic_ms,
+                )
+            )
         return snapshot
 
     def _fail_pending(self, error: RuntimeCommandError) -> None:
@@ -404,5 +492,10 @@ class RuntimeController:
                 queued.future.set_exception(error)
 
 
-def create_runtime(model: ExcavatorModel, calibration: MachineCalibration) -> RuntimeController:
-    return RuntimeController(model, calibration)
+def create_runtime(
+    model: ExcavatorModel,
+    calibration: MachineCalibration,
+    *,
+    profile: RuntimeProfile = "legacy",
+) -> RuntimeController:
+    return RuntimeController(model, calibration, profile=profile)

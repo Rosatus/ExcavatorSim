@@ -52,9 +52,6 @@ COMMAND_RATE_LIMIT = 20
 PING_RATE_LIMIT = 20
 RATE_WINDOW_SECONDS = 1.0
 MAX_PROTOCOL_VIOLATIONS = 3
-SERVER_CAPABILITIES = frozenset(
-    {"input_snapshot", "commands", "latency", "playback", "recording", "terrain"}
-)
 # Leave headroom for strict JSON encoding/validation after each poll.
 # A sender still emits only new ReplayWorker revisions, capped by DISPLAY_HZ.
 VIEW_POLL_HZ = 200
@@ -140,6 +137,8 @@ def _status_message(runtime: RuntimeController) -> dict[str, object]:
 
 
 def _recording_status_message(runtime: RuntimeController) -> dict[str, object]:
+    if runtime.recording is None or runtime.replay is None:
+        raise RuntimeError("recording capability is unavailable")
     snapshot = runtime.recording.snapshot()
     view = runtime.replay.latest.read()
     return {
@@ -267,6 +266,14 @@ def create_app(
     return app
 
 
+def _require_capability(runtime: RuntimeController, capability: str) -> None:
+    if capability not in runtime.capabilities:
+        raise web.HTTPConflict(
+            text=f"capability_unavailable: {capability} is not available",
+            content_type="application/problem+json",
+        )
+
+
 async def _health(request: web.Request) -> web.Response:
     runtime = request.app[RUNTIME_KEY]
     snapshot = runtime.latest.read()
@@ -315,6 +322,8 @@ async def _visual_asset_not_found(_: web.Request) -> web.Response:
 
 async def _recording_series(request: web.Request) -> web.Response:
     runtime = request.app[RUNTIME_KEY]
+    _require_capability(runtime, "recording")
+    assert runtime.recording is not None
     try:
         fields = tuple(part for part in request.query.get("fields", "").split(",") if part)
         start_ns = int(request.query["from_ns"])
@@ -344,8 +353,10 @@ def _session_id(request: web.Request) -> str:
 
 
 async def _recording_export(request: web.Request) -> web.StreamResponse:
-    _session_id(request)
     runtime = request.app[RUNTIME_KEY]
+    _require_capability(runtime, "recording")
+    _session_id(request)
+    assert runtime.exchange is not None and runtime.replay is not None
     source_mode = runtime.replay.latest.read().source_mode
     try:
         path = await asyncio.to_thread(runtime.exchange.begin_export, source_mode=source_mode)
@@ -372,6 +383,8 @@ async def _recording_export(request: web.Request) -> web.StreamResponse:
 
 async def _recording_import_validate(request: web.Request) -> web.Response:
     runtime = request.app[RUNTIME_KEY]
+    _require_capability(runtime, "recording")
+    assert runtime.exchange is not None
     session_id = _session_id(request)
     expected_epoch = request.query.get("expected_recording_epoch", "")
     if not expected_epoch:
@@ -417,6 +430,8 @@ async def _recording_import_validate(request: web.Request) -> web.Response:
 
 async def _recording_import_commit(request: web.Request) -> web.Response:
     runtime = request.app[RUNTIME_KEY]
+    _require_capability(runtime, "recording")
+    assert runtime.exchange is not None and runtime.terrain is not None
     session_id = _session_id(request)
     try:
         payload = await request.json()
@@ -452,6 +467,8 @@ async def _recording_import_commit(request: web.Request) -> web.Response:
 
 async def _recording_import_cancel(request: web.Request) -> web.Response:
     runtime = request.app[RUNTIME_KEY]
+    _require_capability(runtime, "recording")
+    assert runtime.exchange is not None
     session_id = _session_id(request)
     if not runtime.exchange.cancel(request.match_info["token"], session_id=session_id):
         raise web.HTTPNotFound(text="import token is missing or belongs to another session")
@@ -468,6 +485,8 @@ def _terrain_http_error(error: TerrainCommandError) -> web.HTTPException:
 
 async def _terrain_preview(request: web.Request) -> web.Response:
     runtime = request.app[RUNTIME_KEY]
+    _require_capability(runtime, "terrain")
+    assert runtime.terrain is not None and runtime.replay is not None
     session_id = _session_id(request)
     try:
         payload = await request.json()
@@ -501,6 +520,8 @@ async def _terrain_preview(request: web.Request) -> web.Response:
 
 async def _terrain_preview_snapshot(request: web.Request) -> web.Response:
     runtime = request.app[RUNTIME_KEY]
+    _require_capability(runtime, "terrain")
+    assert runtime.terrain is not None
     session_id = _session_id(request)
     try:
         preview = runtime.terrain.preview(session_id, request.match_info["token"])
@@ -522,6 +543,8 @@ async def _terrain_preview_snapshot(request: web.Request) -> web.Response:
 
 async def _terrain_preview_cancel(request: web.Request) -> web.Response:
     runtime = request.app[RUNTIME_KEY]
+    _require_capability(runtime, "terrain")
+    assert runtime.terrain is not None
     session_id = _session_id(request)
     if not runtime.terrain.cancel_preview(session_id, request.match_info["token"]):
         raise web.HTTPNotFound(text="terrain preview is unavailable")
@@ -530,6 +553,8 @@ async def _terrain_preview_cancel(request: web.Request) -> web.Response:
 
 async def _terrain_snapshot(request: web.Request) -> web.Response:
     runtime = request.app[RUNTIME_KEY]
+    _require_capability(runtime, "terrain")
+    assert runtime.terrain is not None
     _session_id(request)
     try:
         recording_epoch = request.query["recording_epoch"]
@@ -626,11 +651,11 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
                 "type": "hello_ack",
                 "session_id": session_id,
                 "simulation_epoch": runtime.latest.read().stream_epoch,
-                "recording_epoch": runtime.recording.recording_epoch,
+                "recording_epoch": runtime.recording_epoch,
                 "versions": load_version_manifest().as_dict(),
                 "model_url": "/api/model",
                 "lifecycle": runtime.latest.read().lifecycle,
-                "capabilities": sorted(set(hello.capabilities) & SERVER_CAPABILITIES),
+                "capabilities": sorted(set(hello.capabilities) & runtime.capabilities),
             }
         )
         sender_task = asyncio.create_task(
@@ -686,6 +711,13 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
                             ) from exc
                         await _send_command_result(send, future, message.id)
                     elif isinstance(message, PlaybackMessage):
+                        if "playback" not in runtime.capabilities:
+                            raise ProtocolError(
+                                "capability_unavailable",
+                                "playback capability is unavailable",
+                                request_id=message.id,
+                            )
+                        assert runtime.replay is not None
                         try:
                             playback = runtime.replay.submit(
                                 message.id,
@@ -697,10 +729,18 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
                             raise ProtocolError(exc.code, str(exc), request_id=message.id) from exc
                         playback_applied = await _send_playback_result(send, playback, message.id)
                         if playback_applied is not None:
+                            assert runtime.terrain is not None
                             runtime.terrain.sync_source(
                                 playback_applied.recording_epoch, playback_applied.source_mode
                             )
                     elif isinstance(message, TerrainMessage):
+                        if "terrain" not in runtime.capabilities:
+                            raise ProtocolError(
+                                "capability_unavailable",
+                                "terrain capability is unavailable",
+                                request_id=message.id,
+                            )
+                        assert runtime.replay is not None and runtime.terrain is not None
                         try:
                             async with authority_lock:
                                 current_view = runtime.replay.latest.read()
@@ -794,7 +834,8 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
         if close_tasks:
             await asyncio.gather(*close_tasks, return_exceptions=True)
         runtime.disconnect_client(session_id)
-        runtime.exchange.cancel_session(session_id)
+        if runtime.exchange is not None:
+            runtime.exchange.cancel_session(session_id)
     return ws
 
 
@@ -843,10 +884,15 @@ async def _state_sender(
     while not ws.closed:
         await asyncio.sleep(interval)
         async with authority_lock:
-            view = runtime.replay.latest.read()
+            view = runtime.latest_view.read()
             if view.view_revision <= view_revision:
                 continue
             view_revision = view.view_revision
+            if "terrain" not in runtime.capabilities:
+                await send(_state_message(view, emitted))
+                emitted += 1
+                continue
+            assert runtime.terrain is not None
             terrain_view = runtime.terrain.view_for(
                 view.recording_epoch,
                 view.selected_sample_sequence,
@@ -875,7 +921,8 @@ async def _status_sender(
     while not ws.closed:
         await asyncio.sleep(1.0)
         await send(_status_message(runtime))
-        await send(_recording_status_message(runtime))
+        if "recording" in runtime.capabilities:
+            await send(_recording_status_message(runtime))
 
 
 async def _static(request: web.Request) -> web.StreamResponse:

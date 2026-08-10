@@ -24,6 +24,73 @@ async def _receive_type(ws: ClientWebSocketResponse, expected: str) -> dict[str,
 
 
 @pytest.mark.asyncio
+async def test_motion_only_negotiates_capabilities_and_rejects_optional_routes(
+    model: ExcavatorModel, calibration: MachineCalibration, tmp_path: Path
+) -> None:
+    frontend = tmp_path / "dist"
+    frontend.mkdir()
+    (frontend / "index.html").write_text("<html></html>", encoding="utf-8")
+    runtime = RuntimeController(model, calibration, profile="motion-only")
+    client = TestClient(TestServer(create_app(runtime, frontend_dir=frontend)))
+    await client.start_server()
+    try:
+        optional_routes = (
+            ("get", "/api/recording/series"),
+            ("get", "/api/recording/export"),
+            ("post", "/api/recording/import/validate"),
+            ("post", "/api/recording/import/commit"),
+            ("delete", "/api/recording/import/token"),
+            ("post", "/api/terrain/preview"),
+            ("get", "/api/terrain/preview/token/snapshot"),
+            ("delete", "/api/terrain/preview/token"),
+            ("get", "/api/terrain/snapshot"),
+        )
+        for method, path in optional_routes:
+            response = await getattr(client, method)(path)
+            assert response.status == 409
+            assert "capability_unavailable" in await response.text()
+        origin = str(client.make_url("/")).rstrip("/")
+        ws = await client.ws_connect("/ws", headers={"Origin": origin})
+        await ws.send_json(
+            {
+                "type": "hello",
+                "protocol_version": "babylon-sim-v3",
+                "capabilities": ["input_snapshot", "commands", "playback", "recording", "terrain"],
+            }
+        )
+        hello = await _receive_type(ws, "hello_ack")
+        assert hello["capabilities"] == ["commands", "input_snapshot"]
+        view = await _receive_type(ws, "view_state")
+        assert view["source_mode"] == "live"
+        await ws.send_json(
+            {
+                "type": "playback_command",
+                "id": "unsupported",
+                "expected_recording_epoch": hello["recording_epoch"],
+                "action": "pause",
+            }
+        )
+        error = await _receive_type(ws, "error")
+        assert error["code"] == "capability_unavailable"
+        assert error["request_id"] == "unsupported"
+        await ws.send_json(
+            {
+                "type": "terrain_command",
+                "id": "unsupported-terrain",
+                "expected_recording_epoch": hello["recording_epoch"],
+                "expected_terrain_epoch": "unused",
+                "action": "reset_terrain",
+            }
+        )
+        error = await _receive_type(ws, "error")
+        assert error["code"] == "capability_unavailable"
+        assert error["request_id"] == "unsupported-terrain"
+        await ws.close()
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
 async def test_health_model_and_realtime_round_trip(
     model: ExcavatorModel,
     calibration: MachineCalibration,
