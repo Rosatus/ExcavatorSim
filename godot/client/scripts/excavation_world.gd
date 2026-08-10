@@ -12,6 +12,7 @@ signal excavation_changed(status: Dictionary)
 var terrain_world: TerrainWorld
 var terrain_collider: TerrainCollider
 var soil_state: BucketSoilState
+var authority_generation := 0
 var _next_command_sequence := 0
 var _previous_tooth := Vector3.ZERO
 var _has_previous_tooth := false
@@ -119,13 +120,15 @@ func reset_for_test() -> void:
 
 func get_status_snapshot() -> Dictionary:
 	var status := soil_state.get_status_snapshot() if soil_state != null else {"bucket_volume_m3": 0.0, "world_generation": -1}
+	status["authority_generation"] = authority_generation
 	status["collider_available"] = terrain_collider != null and terrain_collider.available
 	status["collider_enabled"] = terrain_collider != null and terrain_collider.enabled
 	status["physics_fail_open"] = true
 	return status
 
 
-func _on_pose_cleared(_generation: int, _reason: String) -> void:
+func _on_pose_cleared(generation: int, _reason: String) -> void:
+	authority_generation = maxi(authority_generation, generation)
 	if soil_state != null and terrain_world != null:
 		soil_state.reset_for_generation(terrain_world.terrain_state.world_generation)
 	_previous_tooth = Vector3.ZERO
@@ -133,8 +136,8 @@ func _on_pose_cleared(_generation: int, _reason: String) -> void:
 	excavation_changed.emit(get_status_snapshot())
 
 
-func _on_authority_changed(_session_id: String, _simulation_epoch: String, _generation: int) -> void:
-	_on_pose_cleared(0, "authority_generation")
+func _on_authority_changed(_session_id: String, _simulation_epoch: String, generation: int) -> void:
+	_on_pose_cleared(generation, "authority_generation")
 
 
 func _bucket_tooth_world() -> Variant:

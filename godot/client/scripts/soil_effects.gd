@@ -73,11 +73,12 @@ func _connect_excavation() -> void:
 		call_deferred("_connect_excavation")
 		return
 	excavation.excavation_changed.connect(_on_excavation_changed)
-	_generation = int(excavation.get_status_snapshot().get("world_generation", -1))
+	var status := excavation.get_status_snapshot()
+	_generation = maxi(int(status.get("world_generation", -1)), int(status.get("authority_generation", -1)))
 
 
 func _on_excavation_changed(status: Dictionary) -> void:
-	var generation := int(status.get("world_generation", -1))
+	var generation := maxi(int(status.get("world_generation", -1)), int(status.get("authority_generation", -1)))
 	if generation < _generation:
 		return
 	if generation > _generation:
