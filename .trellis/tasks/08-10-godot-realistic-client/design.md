@@ -18,7 +18,7 @@ Python is authoritative for four-joint kinematics, limits, acceleration, input l
 
 ## Incremental delivery boundary
 
-The parent task is an integration program, not a single implementation batch. Implementation proceeds through seven ordered child milestones: Godot foundation, connected motion, motion-only backend, deterministic terrain, excavation gameplay, realistic visuals, and release-candidate integration. Each milestone has an executable exit gate and may be checked/committed independently. The final GLB is required only for the last part of the visual milestone and does not block foundation, motion, terrain, or excavation work.
+The parent task is an integration program, not a single implementation batch. Implementation proceeds through eight ordered child milestones: Godot foundation, supplied-GLB adaptation, connected motion, motion-only backend, deterministic terrain, excavation gameplay, realistic visuals, and release-candidate integration. Each milestone has an executable exit gate and may be checked/committed independently. The delivered combined SY205 GLB is imported and mapped immediately after foundation so connected motion uses the real visual hierarchy; the placeholder remains the rollback path.
 
 ## Backend boundary
 
@@ -47,9 +47,9 @@ The parent task is an integration program, not a single implementation batch. Im
 
 ## GLB and coordinate handling
 
-- Treat the user-supplied GLB as a deferred input; GLB authoring is outside this task.
-- Build the runtime around five stable placeholder frame nodes so transport, pose parity, terrain and controls do not wait for the final asset.
-- On delivery, identify the five independently movable parts, map them to the stable frame nodes, and calibrate local TRS/scale/bounds/materials against the frame-parity fixture.
+- Treat GLB authoring as user-owned and the delivered combined SY205 GLB as the Godot client's visual source.
+- Keep five stable placeholder frame nodes as a rollback path while the combined GLB import and calibration are validated.
+- Map the supplied root, slew, boom, arm and bucket pivot nodes to the stable protocol frame aliases and calibrate local TRS/scale/bounds/materials against the frame-parity fixture before M2.
 - Keep collision meshes optional and separate from visual assets until the user supplies and approves their contract.
 
 ## Compatibility and migration
@@ -61,7 +61,7 @@ The parent task is an integration program, not a single implementation batch. Im
 ## Human review gates
 
 - Performance baseline is approved as 1920×1080 at a target 60 FPS on a modern Windows desktop.
-- GLB integration waits for delivery, but no additional product decision is required while the five independently movable parts remain identifiable.
+- The delivered GLB exposes the five required pivot targets. Preserve its auxiliary linkage meshes as visual-only children unless a later human visual review finds a visible mechanical mismatch.
 - Local terrain colliders are approved as Godot-owned presentation/gameplay support and must never feed authority transforms back to Python.
 - Before replacing legacy backend terrain: review deterministic test results and confirm that no future motion model needs terrain feedback.
 

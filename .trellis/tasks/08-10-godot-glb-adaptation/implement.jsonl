@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Godot client implementation must follow the incremental client boundary and existing integration references."}
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"The GLB is presentation-only; Python remains authoritative for joint transforms and state."}
+{"file":".trellis/spec/frontend/godot-mcp.md","reason":"Godot MCP authoring and validation must use read-first, scoped, generation-safe operations."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"The asset adapter crosses the GLB/import/frame-transform boundary and needs an explicit data-flow contract."}
+{"file":".trellis/tasks/08-10-godot-glb-adaptation/research/model-inspection.md","reason":"Recorded inspection of the supplied GLB, node hierarchy, materials, bounds, and frame mapping."}

@@ -28,6 +28,19 @@ through `mcp__godot_ai__editor_manage`. A successful connection returns a struct
 
 Some startup-sensitive settings, including `application/run/main_scene`, are intentionally rejected by the MCP `project_manage(settings_set)` safety guard. When a scoped task must change one, edit `project.godot` through the normal project change path, then validate with a headless Godot import/run or restart the editor before relying on the live settings cache. A stale live setting read is not evidence that the file change failed.
 
+### GLB embedded-texture policy
+
+For a user-supplied `.glb` whose textures are already embedded, keep the asset self-contained:
+
+- Track adjacent `.glb.import` metadata with `gltf/embedded_image_handling=2` (Embed as Basis Universal).
+- Do not commit PNG sidecars produced by default extract-textures mode, and do not treat `.godot/imported/` as source input.
+- After changing import mode, force a filesystem scan or restart the editor before reading logs; a live editor can retain stale reimport entries.
+- Validate source/destination byte identity and SHA-256 separately from import success.
+
+Good: preserve the supplied GLB as the single visual source, record its hash and node mapping in a project manifest, and validate the imported hierarchy with a headless test.
+
+Bad: hand-copy extracted textures into the repository, infer pivots from mesh names at runtime, or treat a successful editor preview as proof of source-byte identity.
+
 ## Cross-Layer Contract
 
 The MCP edits only the Godot presentation client. Python remains authoritative for joint state, terrain layers, bucket inventory, events, recording, replay, and lifecycle. MCP-assisted Godot code may consume HTTP/WebSocket snapshots and patches, but must not write authoritative transforms, terrain heights, bucket volume, or replay cursors back to Python.

@@ -6,7 +6,7 @@ Build the first usable Windows desktop Godot Forward+ client for ExcavatorSim. T
 
 ## Confirmed Facts
 
-- The repository already contains a tested Python motion/terrain/replay service, protocol schemas, five visual GLBs, a visual manifest, calibration/provenance data, and a documented Godot boundary.
+- The repository already contains a tested Python motion/terrain/replay service, protocol schemas, five legacy visual GLBs, a visual manifest, calibration/provenance data, and a documented Godot boundary. The user has now supplied one combined SY205 GLB with an explicit mechanical hierarchy for the Godot client.
 - `godot/client/` is a newly created Godot 4.7.1 Forward+ project with the Godot MCP plugin enabled, but it currently has no product scenes or scripts.
 - Godot MCP is a development-time tool only. It may inspect and author the client, but it must not become a runtime dependency.
 - Visual direction is “尽量拟真” (as realistic as practical for the first slice). Realism applies first to lighting, materials, scale, camera motion, authoritative pose presentation, terrain heightfield presentation, and bounded soil effects.
@@ -17,7 +17,7 @@ Build the first usable Windows desktop Godot Forward+ client for ExcavatorSim. T
 - Recording/replay is not a first-slice requirement.
 - The first input layer supports keyboard/mouse and a generic Xbox-style gamepad through Godot action mappings; dedicated excavator hardware is a later mapping-only extension.
 - The realistic Forward+ performance baseline is 1920×1080 at a target 60 FPS on a modern Windows desktop. Degraded graphics settings may be added later, but the first visual acceptance review uses this baseline.
-- GLB authoring is user-owned and does not block the rest of development. The delivered asset only needs to expose five clearly identifiable, independently movable parts corresponding to base, upper structure, boom, arm, and bucket; Godot-side adapters may calibrate names and local transforms after delivery.
+- GLB authoring is user-owned. The delivered combined SY205 asset exposes five clearly identifiable, independently movable pivot groups corresponding to base, upper structure, boom, arm, and bucket; a Godot-side adapter calibrates names and local transforms before M2.
 - The current `RuntimeController` still composes terrain and replay workers; implementation must introduce an optional motion-only boundary before removing or archiving those subsystems.
 
 ## Requirements
@@ -44,7 +44,7 @@ Build the first usable Windows desktop Godot Forward+ client for ExcavatorSim. T
 
 ### R4 — Realistic excavator visual skin
 
-- Import and validate the five user-supplied GLB parts through the existing visual manifest.
+- Import and validate the supplied combined SY205 GLB through a Godot-local adapter manifest; keep the existing five-file backend visual manifest unchanged.
 - Bind `base_link`, `upper_structure_link`, `boom_link`, `arm_link`, and `bucket_link` to authoritative `frame_transforms`.
 - Preserve the existing transform composition and frame-parity fixture before adding visual polish.
 - Add realistic scene lighting, materials, camera composition, scale, and presentation effects without changing Python authority.
@@ -90,6 +90,6 @@ Build the first usable Windows desktop Godot Forward+ client for ExcavatorSim. T
 
 ## Deferred Input
 
-The final GLB files are not required to begin development. Until they arrive, the client uses five placeholder frame nodes for pose parity, camera, transport and terrain integration. Asset names, local transform calibration, materials and optional collision proxies are inspected and adapted when the files are delivered; this does not reopen the architecture unless the five independently movable parts cannot be identified.
+The supplied combined SY205 GLB is now available for the Godot client. The GLB-adaptation child milestone must copy and inspect it before the motion vertical slice; the placeholder frame nodes remain a rollback path. Asset names, local transform calibration, materials and optional collision proxies are adapted on the Godot side; this does not reopen the architecture because the five independently movable frame targets are identifiable.
 
 The approved architecture is a split authority: Python owns deterministic excavator motion and input safety; Godot owns deterministic-enough terrain/world interaction plus all presentation and convenience state. The existing Python terrain/replay modules remain available as legacy compatibility code until the new boundary is validated; they are not required by the first Godot client.

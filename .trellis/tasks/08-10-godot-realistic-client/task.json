@@ -19,7 +19,8 @@
   "pr_url": null,
   "subtasks": [],
   "children": [
-    "08-10-godot-foundation"
+    "08-10-godot-foundation",
+    "08-10-godot-glb-adaptation"
   ],
   "parent": null,
   "relatedFiles": [],

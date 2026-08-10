@@ -13,11 +13,12 @@ This parent task is delivered through sequential, independently verifiable child
 | Milestone | Planned child task | Depends on | Demonstrable exit |
 |---|---|---|---|
 | M1 | `godot-foundation` | Planning approval | Godot opens/runs a reproducible main scene with five placeholder frame nodes and a test harness. |
-| M2 | `motion-vertical-slice` | M1 | Existing Python backend drives the placeholder rig; keyboard/gamepad input, lifecycle and reconnect work. |
+| M1.5 | `godot-glb-adaptation` | M1 | The supplied combined SY205 GLB is copied, imported, mapped to five protocol frame aliases, and statically validated. |
+| M2 | `motion-vertical-slice` | M1.5 | Existing Python backend drives the delivered GLB rig; keyboard/gamepad input, lifecycle and reconnect work. |
 | M3 | `motion-only-backend` | M2 | Opt-in Python profile runs motion without terrain/recording/replay and keeps `pixi run verify` green. |
 | M4 | `deterministic-terrain-core` | M1 | Same seed/commands reproduce the same Godot terrain; mesh and generation reset are tested. |
 | M5 | `excavation-gameplay-loop` | M2 + M4 | Bucket interaction edits terrain and tracks local volume; collider failure does not stop the client. |
-| M6 | `realistic-visual-pass` | M2; GLB optional | Realistic lighting/camera/materials and soil FX reach the performance baseline; placeholders remain valid if GLB is absent. |
+| M6 | `realistic-visual-pass` | M2 | Realistic lighting/camera/materials and soil FX polish the already-integrated SY205 asset at the performance baseline. |
 | M7 | `integration-release-candidate` | M3 + M5 + M6 | Connect, operate, dig, reset and reconnect pass end-to-end at the approved performance target. |
 
 ## M1 — Godot foundation
@@ -29,6 +30,15 @@ This parent task is delivered through sequential, independently verifiable child
 5. [ ] Establish Godot-side test conventions and verify the scene through MCP.
 
 Exit gate: editor state, filesystem scan, scene hierarchy and project smoke all pass without the Python backend.
+
+## M1.5 — Supplied SY205 GLB adaptation
+
+1. [x] Copy and hash-verify the user-supplied combined GLB under `godot/client/assets/visual/`.
+2. [x] Validate the imported pivot hierarchy and publish a Godot-local five-frame mapping manifest.
+3. [x] Preserve the imported linkage hierarchy as visual-only auxiliaries and keep the placeholder foundation as rollback.
+4. [x] Capture imported rest transforms and pass a frame-parity-ready calibration contract to M2.
+
+Exit gate: the delivered GLB imports, renders, and resolves all five frame aliases with no backend/protocol changes. [x]
 
 ## M2 — Connected motion vertical slice
 
@@ -67,15 +77,15 @@ Exit gate: terrain repeatability tests pass on the supported Windows/Godot runti
 
 Exit gate: the placeholder bucket can dig and deposit deterministically, reset cleanly, and continue when local physics is unavailable.
 
-## M6 — Realistic visual pass and deferred GLB integration
+## M6 — Realistic visual pass and soil effects
 
 1. [ ] Add realistic environment lighting, camera behavior, PBR defaults and scalable quality settings.
 2. [ ] Add bounded soil clumps, dust and falling-soil effects driven by Godot world state.
 3. [ ] Profile terrain mesh, collider and effects at 1920×1080 against the 60 FPS target.
-4. [ ] When the GLB arrives, identify and attach its five movable parts without changing motion/terrain modules.
-5. [ ] Calibrate local transforms, scale and materials against the frame-parity fixture.
+4. [ ] Refine the integrated SY205 materials and local presentation calibration without changing motion/terrain modules.
+5. [ ] Recheck scale, bounds, materials and frame parity after visual polish.
 
-Exit gate: the placeholder or delivered GLB visual pass is stable at the approved performance baseline and disposable effects never alter deterministic state.
+Exit gate: the delivered SY205 visual pass is stable at the approved performance baseline and disposable effects never alter deterministic state.
 
 ## M7 — Integration release candidate
 
@@ -84,7 +94,7 @@ Exit gate: the placeholder or delivered GLB visual pass is stable at the approve
 3. [ ] Complete full backend and Godot checks plus final human visual/input review.
 4. [ ] Decide separately whether legacy Python terrain/replay code should remain, be deprecated or be archived.
 
-Exit gate: all parent PRD acceptance criteria pass; any deferred GLB-only polish is explicitly recorded rather than blocking unrelated functionality.
+Exit gate: all parent PRD acceptance criteria pass; any deferred asset polish is explicitly recorded rather than blocking unrelated functionality.
 
 ## Validation commands and review gates
 

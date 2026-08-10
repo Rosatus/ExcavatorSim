@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Check that the imported GLB remains a derived visual skin and never becomes motion or physics authority."}
+{"file":".trellis/spec/frontend/godot-mcp.md","reason":"Check MCP connection, import, hierarchy, and headless validation requirements."}
+{"file":".trellis/tasks/08-10-godot-glb-adaptation/research/model-inspection.md","reason":"Check the implementation against the measured source hash, node paths, and explicit limitations."}
