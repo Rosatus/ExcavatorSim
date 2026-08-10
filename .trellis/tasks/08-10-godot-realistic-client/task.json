@@ -1,0 +1,28 @@
+{
+  "id": "godot-realistic-client",
+  "name": "godot-realistic-client",
+  "title": "Develop Realistic Godot ExcavatorSim",
+  "description": "",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "rosatus",
+  "assignee": "rosatus",
+  "createdAt": "2026-08-10",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "08-10-godot-foundation"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

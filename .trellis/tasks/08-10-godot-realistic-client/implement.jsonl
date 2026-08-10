@@ -1,0 +1,9 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/frontend/index.md", "reason": "Godot client layer and pre-development checklist"}
+{"file": ".trellis/spec/frontend/client-boundary.md", "reason": "Authority, presentation, terrain and local physics boundary"}
+{"file": ".trellis/spec/frontend/godot-mcp.md", "reason": "MCP connection and safe editor authoring contract"}
+{"file": ".trellis/spec/backend/authority-and-concurrency.md", "reason": "Fixed-rate motion and lifecycle constraints"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Determinism, forbidden patterns and verification gate"}
+{"file": "docs/godot-integration.md", "reason": "Existing Godot transport and authority boundary"}
+{"file": "protocol/babylon-sim-v3.schema.json", "reason": "Existing motion protocol field contract"}
+{"file": ".trellis/tasks/08-10-godot-realistic-client/research/architecture-evidence.md", "reason": "Task-specific architecture evidence"}

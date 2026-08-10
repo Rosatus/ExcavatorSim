@@ -1,0 +1,7 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/frontend/client-boundary.md", "reason": "Review Godot ownership and authority inversion risks"}
+{"file": ".trellis/spec/frontend/godot-mcp.md", "reason": "Review MCP safety and editor validation"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Review determinism and quality gate"}
+{"file": ".trellis/spec/backend/authority-and-concurrency.md", "reason": "Review lifecycle and fixed-rate behavior"}
+{"file": "docs/godot-integration.md", "reason": "Cross-layer contract review"}
+{"file": ".trellis/tasks/08-10-godot-realistic-client/research/architecture-evidence.md", "reason": "Task-specific review evidence"}
