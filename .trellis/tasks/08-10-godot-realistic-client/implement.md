@@ -73,12 +73,12 @@ Exit gate: terrain repeatability tests pass on the supported Windows/Godot runti
 
 ## M5 — Excavation gameplay loop
 
-1. [ ] Implement bucket/terrain intersection against deterministic world state.
-2. [ ] Implement Godot-owned bucket volume accounting and deposit/dig commands.
-3. [ ] Add chunked/static terrain colliders without feeding transforms back to Python.
-4. [ ] Prove graceful operation when colliders or local physics are disabled.
+1. [x] Implement bucket/terrain intersection against deterministic world state.
+2. [x] Implement Godot-owned bucket volume accounting and deposit/dig commands.
+3. [x] Add chunked/static terrain colliders without feeding transforms back to Python.
+4. [x] Prove graceful operation when colliders or local physics are disabled.
 
-Exit gate: the placeholder bucket can dig and deposit deterministically, reset cleanly, and continue when local physics is unavailable.
+Exit gate: the placeholder bucket can dig and deposit deterministically, reset cleanly, and continue when local physics is unavailable. [x]
 
 ## M6 — Realistic visual pass and soil effects
 

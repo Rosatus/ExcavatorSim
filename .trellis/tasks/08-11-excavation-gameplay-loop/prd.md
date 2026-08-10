@@ -30,17 +30,17 @@ deterministic soil edit and bucket inventory for this profile.
 
 ## Acceptance Criteria
 
-- [ ] Same seed, pose/contact sequence and command sequence produce identical
+- [x] Same seed, pose/contact sequence and command sequence produce identical
   terrain snapshot bytes/digest, terrain revision and bucket volume.
-- [ ] Cut/deposit conserve volume within one Float32 cell-area operation and
+- [x] Cut/deposit conserve volume within one Float32 cell-area operation and
   reject invalid, stale, non-contact and capacity-underflow/overflow requests
   without changing state.
-- [ ] Reset advances the local generation, restores baseline/zero inventory and
+- [x] Reset advances the local generation, restores baseline/zero inventory and
   rejects old queued contact/collider work.
-- [ ] The optional collider builds a current generation when enabled and a
+- [x] The optional collider builds a current generation when enabled and a
   disabled or intentionally unavailable collider leaves the excavation path
   operational.
-- [ ] Godot scene smoke and `pixi run verify` remain green; no local state is
+- [x] Godot scene smoke and `pixi run verify` remain green; no local state is
   sent back to Python.
 
 ## Notes
