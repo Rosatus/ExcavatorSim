@@ -1,9 +1,9 @@
 {
-  "id": "godot-realistic-client",
-  "name": "godot-realistic-client",
-  "title": "Develop Realistic Godot ExcavatorSim",
+  "id": "motion-only-backend",
+  "name": "motion-only-backend",
+  "title": "Motion-only backend profile",
   "description": "",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -18,13 +18,8 @@
   "commit": null,
   "pr_url": null,
   "subtasks": [],
-  "children": [
-    "08-10-godot-foundation",
-    "08-10-godot-glb-adaptation",
-    "08-10-motion-vertical-slice",
-    "08-10-motion-only-backend"
-  ],
-  "parent": null,
+  "children": [],
+  "parent": "08-10-godot-realistic-client",
   "relatedFiles": [],
   "notes": "",
   "meta": {}

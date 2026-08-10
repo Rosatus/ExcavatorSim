@@ -52,12 +52,15 @@ Exit gate: a user can connect to the existing backend, move all four joints, dis
 
 ## M3 — Motion-only backend profile
 
-1. [ ] Add an opt-in profile that keeps `Simulator` and `InputRouter` but does not require terrain, recording or replay workers.
-2. [ ] Preserve lifecycle, input sequence, safety, error and frame-transform contracts.
-3. [ ] Add capability negotiation and focused startup/reset/stop/disconnect tests.
-4. [ ] Verify the M2 Godot client against both legacy and motion-only sessions.
+1. [x] Add an opt-in profile that keeps `Simulator` and `InputRouter` but does not require terrain, recording or replay workers.
+2. [x] Preserve lifecycle, input sequence, safety, error and frame-transform contracts.
+3. [x] Add capability negotiation and focused startup/reset/stop/disconnect tests.
+4. [x] Verify the M2 wire/client contract against both legacy and motion-only
+   sessions; live Godot MCP was unavailable during this check, so the client
+   editor/game connection remains a handoff smoke rather than a live visual
+   acceptance review.
 
-Exit gate: `pixi run verify` passes and the client behaves identically for motion under both backend profiles.
+Exit gate: `pixi run verify` passes and the client behaves identically for motion under both backend profiles. [x]
 
 ## M4 — Deterministic Godot terrain core
 

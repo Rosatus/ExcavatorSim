@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend quality scope"}
+{"file": ".trellis/spec/backend/authority-and-concurrency.md", "reason": "Worker lifecycle review"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Error contract review"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Full verify gate"}
+{"file": ".trellis/spec/frontend/motion-transport.md", "reason": "Cross-layer M2 compatibility"}
+{"file": ".trellis/tasks/08-10-motion-only-backend/research/backend-motion-only.md", "reason": "Runtime and wire research"}
+{"file": ".trellis/spec/backend/runtime-profiles.md", "reason": "M3 profile contract and validation matrix"}

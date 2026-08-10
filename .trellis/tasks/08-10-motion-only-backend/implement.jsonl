@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend authority and pre-development checklist"}
+{"file": ".trellis/spec/backend/authority-and-concurrency.md", "reason": "Runtime worker and lifecycle ownership"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Stable capability and shutdown errors"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Required verification and determinism constraints"}
+{"file": ".trellis/spec/frontend/motion-transport.md", "reason": "Godot M2 compatibility contract"}
+{"file": ".trellis/tasks/08-10-motion-only-backend/research/backend-motion-only.md", "reason": "Runtime and wire research"}
