@@ -1,0 +1,8 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Godot client scope and required integration documentation/schema boundaries."}
+{"file": ".trellis/spec/frontend/client-boundary.md", "reason": "Python motion authority, Godot presentation ownership, generation-safe lifecycle and local physics boundary."}
+{"file": ".trellis/spec/frontend/godot-mcp.md", "reason": "MCP connection, safe authoring, import and validation rules for the Godot project."}
+{"file": ".trellis/spec/frontend/motion-transport.md", "reason": "Executable M2 transport and presentation contract, including reconnect and JSON/Godot gotchas."}
+{"file": "docs/godot-integration.md", "reason": "Existing HTTP/WebSocket contract and authority boundary for the Godot client."}
+{"file": "protocol/babylon-sim-v3.schema.json", "reason": "Wire schema for hello, snapshots, commands, acknowledgements, view_state and errors."}
+{"file": "protocol/version-manifest.json", "reason": "Stable protocol/version identifiers that must not drift."}
+{"file": ".trellis/tasks/08-10-motion-vertical-slice/research/backend-wire-contract.md", "reason": "Curated backend source/test findings for reconnect, sequencing and generation reduction."}

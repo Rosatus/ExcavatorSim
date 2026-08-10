@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Check Godot client scope and cross-layer integration requirements."}
+{"file": ".trellis/spec/frontend/client-boundary.md", "reason": "Check Python/Godot authority and lifecycle boundaries."}
+{"file": ".trellis/spec/frontend/godot-mcp.md", "reason": "Check MCP usage and validation requirements."}
+{"file": ".trellis/spec/frontend/motion-transport.md", "reason": "Check the executable M2 WebSocket, JSON, generation, input-safety and matrix-parity contract."}
+{"file": "protocol/babylon-sim-v3.schema.json", "reason": "Check wire compatibility and stable identifiers."}
+{"file": ".trellis/tasks/08-10-motion-vertical-slice/research/backend-wire-contract.md", "reason": "Check implementation against exact backend findings."}

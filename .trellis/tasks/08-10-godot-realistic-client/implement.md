@@ -42,13 +42,13 @@ Exit gate: the delivered GLB imports, renders, and resolves all five frame alias
 
 ## M2 — Connected motion vertical slice
 
-1. [ ] Implement WebSocket hello/ack, motion snapshot decoding and connection status.
-2. [ ] Implement keyboard/mouse and generic gamepad mappings with zero-input arming and safe disconnect.
-3. [ ] Implement start/pause/reset, acknowledgements and reconnect behavior.
-4. [ ] Add generation/sequence guards and interpolation only within one motion generation.
-5. [ ] Compare the five placeholder transforms against `backend/tests/fixtures/frame-parity/baseline.json`.
+1. [x] Implement WebSocket hello/ack, motion snapshot decoding and connection status.
+2. [x] Implement keyboard/mouse and generic gamepad mappings with zero-input arming and safe disconnect.
+3. [x] Implement start/pause/reset, acknowledgements and reconnect behavior.
+4. [x] Add generation/sequence guards and interpolation only within one motion generation.
+5. [x] Compare the five imported SY205 transforms against the checked-in Godot frame-parity fixture.
 
-Exit gate: a user can connect to the existing backend, move all four joints, disconnect/reconnect safely and observe frame-parity-correct placeholder motion.
+Exit gate: a user can connect to the existing backend, move all four joints, disconnect/reconnect safely and observe frame-parity-correct imported SY205 motion. [x]
 
 ## M3 — Motion-only backend profile
 

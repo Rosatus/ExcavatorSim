@@ -20,7 +20,8 @@
   "subtasks": [],
   "children": [
     "08-10-godot-foundation",
-    "08-10-godot-glb-adaptation"
+    "08-10-godot-glb-adaptation",
+    "08-10-motion-vertical-slice"
   ],
   "parent": null,
   "relatedFiles": [],
