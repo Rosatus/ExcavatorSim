@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend quality scope"}
+{"file": ".trellis/spec/frontend/client-boundary.md", "reason": "Authority and generation safety review"}
+{"file": ".trellis/spec/frontend/godot-mcp.md", "reason": "Godot validation and failure handling"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Backend compatibility gate"}
+{"file": ".trellis/tasks/08-11-deterministic-terrain-core/research/terrain-contracts.md", "reason": "M4 terrain invariants and scope"}

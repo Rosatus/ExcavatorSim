@@ -16,7 +16,14 @@ The first Godot adapter should consume the existing BabylonSim HTTP/WebSocket co
 
 ## Authority boundary
 
-Python remains authoritative for joint state, terrain layers, bucket inventory, events, recording, and replay. Godot may interpolate or present received state, but it must not publish local physics transforms as authoritative state.
+Python remains authoritative for joint state, input safety and lifecycle in every
+profile. The legacy BabylonSim profile also remains authoritative for terrain
+layers, bucket inventory, events, recording and replay. The approved Godot-first
+local-world profile used by the realistic client instead keeps deterministic
+terrain/world and convenience bucket state in Godot; it does not mirror Python
+terrain packets or publish local terrain, physics transforms or replay cursors
+back to Python. The two profiles coexist until the integration release-candidate
+review selects one runtime contract.
 
 ## Terrain and physics seam
 
@@ -27,4 +34,3 @@ The first soil presentation is not a per-grain rigid-body simulation. It combine
 ## Deferred model decisions
 
 The current GLBs are visual assets. URDF collision geometry, mass/inertia, hydraulic forces, material contact parameters, bucket cavity calibration, and a fully dynamic articulated excavator require a separate model contract and are not part of this bootstrap.
-

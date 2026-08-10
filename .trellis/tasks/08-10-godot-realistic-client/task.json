@@ -22,7 +22,8 @@
     "08-10-godot-foundation",
     "08-10-godot-glb-adaptation",
     "08-10-motion-vertical-slice",
-    "08-10-motion-only-backend"
+    "08-10-motion-only-backend",
+    "08-11-deterministic-terrain-core"
   ],
   "parent": null,
   "relatedFiles": [],
