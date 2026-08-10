@@ -1,4 +1,6 @@
-[gd_scene format=3 uid="uid://bt370y5j1aq7a"]
+[gd_scene load_steps=8 format=3 uid="uid://bt370y5j1aq7a"]
+
+[ext_resource type="PackedScene" path="res://assets/visual/SY205_excavator_godot.glb" id="1_sy205"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_sgp6g"]
 size = Vector3(1.2, 0.8, 0.9)
@@ -27,11 +29,12 @@ transform = Transform3D(0.7960838, 0.4546647, -0.3994128, 0, 0.6599831, 0.751280
 light_energy = 1.2
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=759888586]
-transform = Transform3D(0.71091354, -0.24115296, 0.66064143, 0, 0.9393727, 0.3428978, -0.7032794, -0.24377069, 0.66781276, 8, 5, 8)
+transform = Transform3D(0.71091354, -0.24115296, 0.66064143, 0, 0.9393727, 0.3428978, -0.7032794, -0.24377069, 0.66781276, 10, 6, 10)
 current = true
 fov = 55.0
 
 [node name="ExcavatorRig" type="Node3D" parent="." unique_id=1680409432]
+visible = false
 
 [node name="base_link" type="Node3D" parent="ExcavatorRig" unique_id=23243033]
 
@@ -69,5 +72,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
 mesh = SubResource("BoxMesh_tbgi4")
 
 [node name="PresentationRoot" type="Node3D" parent="." unique_id=1465378192]
+
+[node name="SY205Excavator" parent="PresentationRoot" instance=ExtResource("1_sy205")]
 
 [node name="OperatorUI" type="CanvasLayer" parent="." unique_id=232332145]
