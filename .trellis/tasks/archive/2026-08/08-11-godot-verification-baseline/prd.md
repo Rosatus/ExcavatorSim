@@ -22,17 +22,17 @@ changing the approved runtime authority split or the user-supplied GLB.
 
 ## Acceptance Criteria
 
-- [ ] `project.godot` reports a 1920x1080 viewport and retains Forward+,
+- [x] `project.godot` reports a 1920x1080 viewport and retains Forward+,
   responsive stretch, D3D12 and Jolt settings.
-- [ ] One PowerShell runner executes the full standalone Godot matrix and
+- [x] One PowerShell runner executes the full standalone Godot matrix and
   propagates the first non-zero exit code.
-- [ ] The release documentation gives reproducible standalone, MCP and backend
+- [x] The release documentation gives reproducible standalone, MCP and backend
   smoke steps with expected evidence.
-- [ ] Godot MCP connects to `ExcavatorSim` 4.7.1, opens `main.tscn`, runs the
+- [x] Godot MCP connects to `ExcavatorSim` 4.7.1, opens `main.tscn`, runs the
   scene, and exposes the expected release-candidate nodes/UI.
-- [ ] The standalone matrix, `pixi run backend-smoke`, `pixi run verify`, task
+- [x] The standalone matrix, `pixi run backend-smoke`, `pixi run verify`, task
   validation and `git diff --check` all pass.
-- [ ] The SY205 GLB SHA-256 and five-pivot manifest remain unchanged.
+- [x] The SY205 GLB SHA-256 and five-pivot manifest remain unchanged.
 
 ## Notes
 
