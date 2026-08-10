@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Godot client pre-development checklist"}
+{"file": ".trellis/spec/frontend/client-boundary.md", "reason": "Local terrain, bucket and physics authority boundary"}
+{"file": ".trellis/spec/frontend/godot-mcp.md", "reason": "Godot MCP validation and failure handling"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Cross-layer determinism and verify gate"}
+{"file": ".trellis/tasks/08-11-excavation-gameplay-loop/research/excavation-contracts.md", "reason": "M5 constants and supplied asset constraints"}

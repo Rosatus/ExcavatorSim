@@ -23,7 +23,8 @@
     "08-10-godot-glb-adaptation",
     "08-10-motion-vertical-slice",
     "08-10-motion-only-backend",
-    "08-11-deterministic-terrain-core"
+    "08-11-deterministic-terrain-core",
+    "08-11-excavation-gameplay-loop"
   ],
   "parent": null,
   "relatedFiles": [],

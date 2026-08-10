@@ -64,12 +64,12 @@ Exit gate: `pixi run verify` passes and the client behaves identically for motio
 
 ## M4 — Deterministic Godot terrain core
 
-1. [ ] Implement versioned seeded terrain initialization with a stable grid representation.
-2. [ ] Implement fixed-step, monotonically ordered terrain edit commands.
-3. [ ] Build the derived mesh with generation-gated asynchronous updates.
-4. [ ] Add reset/rebuild and same-seed/same-command repeatability fixtures.
+1. [x] Implement versioned seeded terrain initialization with a stable grid representation.
+2. [x] Implement fixed-step, monotonically ordered terrain edit commands.
+3. [x] Build the derived mesh with generation-gated asynchronous updates.
+4. [x] Add reset/rebuild and same-seed/same-command repeatability fixtures.
 
-Exit gate: terrain repeatability tests pass on the supported Windows/Godot runtime and stale jobs cannot overwrite a newer generation.
+Exit gate: terrain repeatability tests pass on the supported Windows/Godot runtime and stale jobs cannot overwrite a newer generation. [x]
 
 ## M5 — Excavation gameplay loop
 

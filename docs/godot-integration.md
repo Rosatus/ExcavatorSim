@@ -25,6 +25,12 @@ terrain packets or publish local terrain, physics transforms or replay cursors
 back to Python. The two profiles coexist until the integration release-candidate
 review selects one runtime contract.
 
+The M5 excavation path keeps `BucketSoilState` as the one local inventory owner:
+fixed-step cut/deposit commands use explicit bucket contact proxies and conserve
+the changed grid-cell volume. `TerrainCollider` is a copied, generation-gated
+static derivative and is disabled/fail-open when local physics is unavailable;
+its failure cannot stop motion or terrain presentation.
+
 ## Terrain and physics seam
 
 Godot should build a derived render mesh from the selected surface snapshot. A later physics adapter may maintain chunked static terrain colliders and local probes. Collider updates must be generation-gated and stale-safe; a disabled or failed physics backend must leave the Python service and visual state usable.
