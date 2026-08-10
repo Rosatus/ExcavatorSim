@@ -78,15 +78,15 @@ Build the first usable Windows desktop Godot Forward+ client for ExcavatorSim. T
 
 ## Acceptance Criteria
 
-- [ ] Godot opens a reproducible main scene and renders the user-supplied excavator skin with the five manifest frames.
-- [ ] The displayed pose matches the Python `frame_transforms` and the existing frame-parity fixture within an agreed tolerance.
-- [ ] A connected client can receive state, show connection/authority status, send the agreed input/commands, and display acknowledgements/errors without writing authority state back to Python.
-- [ ] The same terrain seed and ordered edit command sequence reproduce the same terrain and bucket-volume result at the documented precision.
-- [ ] Terrain edits and derived mesh/collider updates are generation-gated and cannot overwrite newer world state.
-- [ ] Reset and reconnect clear stale visual soil/terrain work and adopt the new local-world generation.
-- [ ] The visual client remains usable when local physics/collider presentation is disabled or unavailable.
-- [ ] Focused client checks pass, and backend `pixi run verify` remains green for any backend/protocol changes.
-- [ ] A final human visual review accepts the realistic look, camera behavior, interaction feel, and performance on the target machine.
+- [x] Godot opens a reproducible main scene and renders the user-supplied excavator skin with the five manifest frames.
+- [x] The displayed pose matches the Python `frame_transforms` and the existing frame-parity fixture within an agreed tolerance.
+- [x] A connected client can receive state, show connection/authority status, send the agreed input/commands, and display acknowledgements/errors without writing authority state back to Python.
+- [x] The same terrain seed and ordered edit command sequence reproduce the same terrain and bucket-volume result at the documented precision.
+- [x] Terrain edits and derived mesh/collider updates are generation-gated and cannot overwrite newer world state.
+- [x] Reset and reconnect clear stale visual soil/terrain work and adopt the new local-world generation.
+- [x] The visual client remains usable when local physics/collider presentation is disabled or unavailable.
+- [x] Focused client checks pass, and backend `pixi run verify` remains green for any backend/protocol changes.
+- [x] A final human visual review accepts the realistic look, camera behavior, interaction feel, and performance on the target machine.
 
 ## Deferred Input
 

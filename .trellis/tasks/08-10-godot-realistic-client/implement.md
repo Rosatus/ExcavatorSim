@@ -23,13 +23,13 @@ This parent task is delivered through sequential, independently verifiable child
 
 ## M1 — Godot foundation
 
-1. [ ] Add a reproducible main scene and source directories under `godot/client/`.
-2. [ ] Keep `.godot/`, `.cache/` and exports ignored; add a headless/import smoke path.
-3. [ ] Configure Forward+, D3D12 and Jolt as non-fatal presentation defaults.
-4. [ ] Build stable placeholder nodes for base, upper structure, boom, arm and bucket.
-5. [ ] Establish Godot-side test conventions and verify the scene through MCP.
+1. [x] Add a reproducible main scene and source directories under `godot/client/`.
+2. [x] Keep `.godot/`, `.cache/` and exports ignored; add a headless/import smoke path.
+3. [x] Configure Forward+, D3D12 and Jolt as non-fatal presentation defaults.
+4. [x] Build stable placeholder nodes for base, upper structure, boom, arm and bucket.
+5. [x] Establish Godot-side test conventions and verify the scene through MCP.
 
-Exit gate: editor state, filesystem scan, scene hierarchy and project smoke all pass without the Python backend.
+Exit gate: editor state, filesystem scan, scene hierarchy and project smoke all pass without the Python backend. [x]
 
 ## M1.5 — Supplied SY205 GLB adaptation
 
