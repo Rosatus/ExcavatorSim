@@ -140,3 +140,38 @@ Implemented and verified opt-in motion-only Python runtime; preserved legacy pro
 ### Next Steps
 
 - None - task complete
+
+
+## Session 5: M4 deterministic Godot terrain core
+
+**Date**: 2026-08-11
+**Task**: M4 deterministic Godot terrain core
+**Branch**: `main`
+
+### Summary
+
+Implemented Godot-owned deterministic terrain state with stable/loose Float32 layers, ordered brush edits, reset generation guards, derived ArrayMesh rendering, and main-scene integration. Godot MCP runtime checks confirmed repeatability, stale rejection, reset identity, and mesh presence; pixi run verify passed with 124 backend tests.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8594314` | (see git log) |
+| `b2960a7` | (see git log) |
+| `164946c` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
