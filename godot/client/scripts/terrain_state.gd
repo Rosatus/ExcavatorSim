@@ -103,6 +103,49 @@ func get_surface() -> PackedFloat32Array:
 	return result
 
 
+func is_inside_grid(world_xz: Vector2) -> bool:
+	return world_xz.x >= origin_xz.x and world_xz.y >= origin_xz.y \
+		and world_xz.x <= origin_xz.x + float(columns - 1) * spacing_m \
+		and world_xz.y <= origin_xz.y + float(rows - 1) * spacing_m
+
+
+func sample_surface_at(world_xz: Vector2) -> float:
+	if not is_inside_grid(world_xz):
+		return NAN
+	var column := clampi(roundi((world_xz.x - origin_xz.x) / spacing_m), 0, columns - 1)
+	var row := clampi(roundi((world_xz.y - origin_xz.y) / spacing_m), 0, rows - 1)
+	var index := row * columns + column
+	return stable_heights[index] + loose_depth[index]
+
+
+func estimate_brush_volume(center_xz: Vector2, radius_m: float, delta_m: float) -> float:
+	if radius_m <= 0.0 or not _is_finite(center_xz.x) or not _is_finite(center_xz.y) or not _is_finite(radius_m) or not _is_finite(delta_m):
+		return 0.0
+	var volume := 0.0
+	var cell_area := spacing_m * spacing_m
+	for row in rows:
+		var z := origin_xz.y + float(row) * spacing_m
+		for column in columns:
+			var x := origin_xz.x + float(column) * spacing_m
+			var distance := Vector2(x, z).distance_to(center_xz)
+			if distance > radius_m:
+				continue
+			var amount := delta_m * (1.0 - distance / radius_m)
+			if is_zero_approx(amount):
+				continue
+			var index := row * columns + column
+			if amount > 0.0:
+				volume += amount * cell_area
+				continue
+			var remaining := -amount
+			var loose_taken := minf(loose_depth[index], remaining)
+			remaining -= loose_taken
+			var stable_floor := _baseline_stable[index] - 3.0
+			var stable_taken := minf(maxf(0.0, stable_heights[index] - stable_floor), remaining)
+			volume += (loose_taken + stable_taken) * cell_area
+	return volume
+
+
 func surface_to_bytes(surface: PackedFloat32Array) -> PackedByteArray:
 	var bytes := PackedByteArray()
 	bytes.resize(surface.size() * 4)

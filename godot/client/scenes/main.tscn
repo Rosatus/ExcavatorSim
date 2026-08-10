@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3 uid="uid://bt370y5j1aq7a"]
+[gd_scene load_steps=15 format=3 uid="uid://bt370y5j1aq7a"]
 
 [ext_resource type="PackedScene" path="res://assets/visual/SY205_excavator_godot.glb" id="1_sy205"]
 [ext_resource type="Script" path="res://scripts/motion_client.gd" id="2_motion_client"]
@@ -6,6 +6,8 @@
 [ext_resource type="Script" path="res://scripts/operator_ui.gd" id="4_operator_ui"]
 [ext_resource type="Script" path="res://scripts/terrain_world.gd" id="5_terrain_world"]
 [ext_resource type="Script" path="res://scripts/terrain_renderer.gd" id="6_terrain_renderer"]
+[ext_resource type="Script" path="res://scripts/terrain_collider.gd" id="7_terrain_collider"]
+[ext_resource type="Script" path="res://scripts/excavation_world.gd" id="8_excavation_world"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_sgp6g"]
 size = Vector3(1.2, 0.8, 0.9)
@@ -82,6 +84,12 @@ script = ExtResource("5_terrain_world")
 [node name="TerrainMesh" type="MeshInstance3D" parent="TerrainRoot/TerrainWorld"]
 script = ExtResource("6_terrain_renderer")
 
+[node name="TerrainCollider" type="Node3D" parent="TerrainRoot"]
+script = ExtResource("7_terrain_collider")
+
+[node name="ExcavationWorld" type="Node3D" parent="TerrainRoot"]
+script = ExtResource("8_excavation_world")
+
 [node name="PresentationRoot" type="Node3D" parent="." unique_id=1465378192]
 
 [node name="SY205Excavator" parent="PresentationRoot" instance=ExtResource("1_sy205")]
@@ -99,7 +107,7 @@ script = ExtResource("4_operator_ui")
 offset_left = 16.0
 offset_top = 16.0
 offset_right = 430.0
-offset_bottom = 190.0
+offset_bottom = 250.0
 
 [node name="Margin" type="MarginContainer" parent="OperatorUI/StatusPanel"]
 theme_override_constants/margin_left = 12
@@ -122,6 +130,9 @@ text = "Lifecycle: stopped"
 [node name="Diagnostics" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
 text = "Input ACK: —"
 
+[node name="BucketVolume" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
+text = "Bucket soil: 0.000 / 0.35 m³"
+
 [node name="Buttons" type="HBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox"]
 theme_override_constants/separation = 6
 
@@ -133,3 +144,9 @@ text = "Pause (F7)"
 
 [node name="Reset" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Buttons"]
 text = "Reset (F8)"
+
+[node name="Dig" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Buttons"]
+text = "Dig (F9)"
+
+[node name="Deposit" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Buttons"]
+text = "Deposit (F10)"
