@@ -350,3 +350,36 @@ Audited all archived Godot M1-M7 tasks and closed release evidence gaps. Added e
 ### Next Steps
 
 - None - task complete
+
+
+## Session 11: Record MCP verification boundary
+
+**Date**: 2026-08-11
+**Task**: Record MCP verification boundary
+**Branch**: `main`
+
+### Summary
+
+Updated .trellis/spec/frontend/godot-mcp.md with the executable distinction between standalone SceneTree contracts and MCP McpTestSuite discovery, plus the 1920x1080 persisted viewport baseline check. No runtime authority or user asset changed.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3754f92` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
