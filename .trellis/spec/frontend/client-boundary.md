@@ -28,4 +28,9 @@ inventory or local terrain edits to Python. `TerrainCollider` is an optional
 generation-gated static derivative, disabled/fail-open by default. Missing or
 failed local physics cannot block terrain edits or motion presentation.
 
+The M6 visual layer (`VisualEnvironment`, `CameraRig`, `VisualQualityController`
+and bounded `SoilEffects`) is presentation-only. Quality changes may adjust
+lighting, camera range, shadow flags and particle budgets, but may not change
+simulation cadence, pose transforms, terrain bytes or bucket inventory.
+
 Reference: `docs/godot-integration.md`, `protocol/`, and `.trellis/tasks/08-06-excavator-sim-bootstrap/design.md`.

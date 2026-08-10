@@ -82,13 +82,13 @@ Exit gate: the placeholder bucket can dig and deposit deterministically, reset c
 
 ## M6 — Realistic visual pass and soil effects
 
-1. [ ] Add realistic environment lighting, camera behavior, PBR defaults and scalable quality settings.
-2. [ ] Add bounded soil clumps, dust and falling-soil effects driven by Godot world state.
-3. [ ] Profile terrain mesh, collider and effects at 1920×1080 against the 60 FPS target.
-4. [ ] Refine the integrated SY205 materials and local presentation calibration without changing motion/terrain modules.
-5. [ ] Recheck scale, bounds, materials and frame parity after visual polish.
+1. [x] Add realistic environment lighting, camera behavior, PBR defaults and scalable quality settings.
+2. [x] Add bounded soil clumps, dust and falling-soil effects driven by Godot world state.
+3. [x] Profile terrain mesh, collider and effects at 1920×1080 against the 60 FPS target.
+4. [x] Refine the integrated SY205 materials and local presentation calibration without changing motion/terrain modules.
+5. [x] Recheck scale, bounds, materials and frame parity after visual polish.
 
-Exit gate: the delivered SY205 visual pass is stable at the approved performance baseline and disposable effects never alter deterministic state.
+Exit gate: the delivered SY205 visual pass is stable at the approved performance baseline and disposable effects never alter deterministic state. [x]
 
 ## M7 — Integration release candidate
 

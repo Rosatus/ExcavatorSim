@@ -31,6 +31,11 @@ the changed grid-cell volume. `TerrainCollider` is a copied, generation-gated
 static derivative and is disabled/fail-open when local physics is unavailable;
 its failure cannot stop motion or terrain presentation.
 
+The realistic visual pass uses a procedural sky/ambient environment, a
+generation-gated soil particle emitter and a bounded camera/quality controller.
+These are disposable presentation resources; changing their profile cannot
+alter motion cadence, terrain snapshots, bucket volume or any Python message.
+
 ## Terrain and physics seam
 
 Godot should build a derived render mesh from the selected surface snapshot. A later physics adapter may maintain chunked static terrain colliders and local probes. Collider updates must be generation-gated and stale-safe; a disabled or failed physics backend must leave the Python service and visual state usable.

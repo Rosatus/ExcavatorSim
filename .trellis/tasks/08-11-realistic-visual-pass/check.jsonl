@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Visual quality scope"}
+{"file": ".trellis/spec/frontend/client-boundary.md", "reason": "Presentation-only and generation guard review"}
+{"file": ".trellis/spec/frontend/godot-mcp.md", "reason": "MCP validation review"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Protocol and determinism review"}
+{"file": ".trellis/tasks/08-11-realistic-visual-pass/research/visual-contracts.md", "reason": "M6 contract evidence"}
