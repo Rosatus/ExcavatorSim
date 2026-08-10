@@ -106,3 +106,37 @@ Implemented and validated the Godot M2 connected motion slice: WebSocket hello/a
 ### Next Steps
 
 - None - task complete
+
+
+## Session 4: M3 motion-only backend profile
+
+**Date**: 2026-08-11
+**Task**: M3 motion-only backend profile
+**Branch**: `main`
+
+### Summary
+
+Implemented and verified opt-in motion-only Python runtime; preserved legacy protocol behavior, added capability gating, CLI/pixi launcher, tests, backend runtime profile spec, and archived the milestone. Godot MCP had no active session; headless import and CLI health fallback checks passed.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8ab3269` | (see git log) |
+| `8a811a4` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
