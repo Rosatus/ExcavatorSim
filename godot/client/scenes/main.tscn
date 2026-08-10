@@ -1,9 +1,11 @@
-[gd_scene load_steps=11 format=3 uid="uid://bt370y5j1aq7a"]
+[gd_scene load_steps=13 format=3 uid="uid://bt370y5j1aq7a"]
 
 [ext_resource type="PackedScene" path="res://assets/visual/SY205_excavator_godot.glb" id="1_sy205"]
 [ext_resource type="Script" path="res://scripts/motion_client.gd" id="2_motion_client"]
 [ext_resource type="Script" path="res://scripts/motion_presentation.gd" id="3_motion_presentation"]
 [ext_resource type="Script" path="res://scripts/operator_ui.gd" id="4_operator_ui"]
+[ext_resource type="Script" path="res://scripts/terrain_world.gd" id="5_terrain_world"]
+[ext_resource type="Script" path="res://scripts/terrain_renderer.gd" id="6_terrain_renderer"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_sgp6g"]
 size = Vector3(1.2, 0.8, 0.9)
@@ -73,6 +75,12 @@ mesh = SubResource("BoxMesh_jyhfs")
 [node name="FoundationGround" type="MeshInstance3D" parent="TerrainRoot" unique_id=808724095]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
 mesh = SubResource("BoxMesh_tbgi4")
+
+[node name="TerrainWorld" type="Node3D" parent="TerrainRoot"]
+script = ExtResource("5_terrain_world")
+
+[node name="TerrainMesh" type="MeshInstance3D" parent="TerrainRoot/TerrainWorld"]
+script = ExtResource("6_terrain_renderer")
 
 [node name="PresentationRoot" type="Node3D" parent="." unique_id=1465378192]
 
