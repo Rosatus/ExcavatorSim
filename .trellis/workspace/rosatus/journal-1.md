@@ -281,3 +281,37 @@ Added scene-level release candidate test using MotionClient fake WebSocket seams
 ### Next Steps
 
 - None - task complete
+
+
+## Session 9: Godot realistic client parent release candidate
+
+**Date**: 2026-08-11
+**Task**: Godot realistic client parent release candidate
+**Branch**: `main`
+
+### Summary
+
+Closed the 8-child Trellis roadmap M1 through M7. Parent acceptance criteria and implementation gates are checked, release-candidate retention docs preserve legacy Python terrain/recording/replay compatibility, and all child milestones are archived. Final Godot MCP scene screenshot showed the imported SY205 skin, shadowed lighting, terrain and operator UI; runtime held 60 FPS cap. Full standalone Godot matrix and pixi run verify passed.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `389ab38` | (see git log) |
+| `b408904` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
