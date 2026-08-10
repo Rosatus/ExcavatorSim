@@ -38,3 +38,37 @@ Initialized E:/projects/ExcavatorSim with Git, Trellis, and CodeGraph; captured 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 2: Integrate SY205 GLB into Godot
+
+**Date**: 2026-08-10
+**Task**: Integrate SY205 GLB into Godot
+**Branch**: `main`
+
+### Summary
+
+Copied and hash-verified the combined SY205 GLB, mapped its five authoritative motion pivots, added a Godot-local visual manifest and parity-ready fixtures, integrated it into the main scene, validated it through Godot MCP and headless tests, and recorded the M1.5 Trellis milestone and embedded-texture import policy.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `32f693a` | (see git log) |
+| `9951470` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
