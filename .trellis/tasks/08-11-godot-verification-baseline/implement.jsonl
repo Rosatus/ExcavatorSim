@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Godot client ownership and pre-development entry point."}
+{"file":".trellis/spec/frontend/godot-mcp.md","reason":"Optional MCP tooling, project setting and validation boundaries."}
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Preserve the approved Python/Godot authority split."}
+{"file":".trellis/spec/guides/index.md","reason":"Shared cross-layer and reuse review prompts."}

@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/godot-mcp.md","reason":"Verify editor/runtime smoke and optional-tool boundaries."}
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Review authority and generation ownership for drift."}
+{"file":".trellis/spec/frontend/motion-transport.md","reason":"Verify live transport and reconnect evidence."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Audit the standalone/MCP/backend verification boundary."}

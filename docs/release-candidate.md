@@ -16,3 +16,41 @@ back to Python.
 Release-candidate checks include the Godot standalone matrix in
 `godot/client/tests/README.md`, Godot MCP scene/runtime smoke, and `pixi run
 verify` for the backend/provenance/standalone gates.
+
+## Reproducible release evidence
+
+Run the following from the repository root. The standalone runner accepts an
+explicit Godot 4.7 executable, so it does not depend on a user profile PATH:
+
+```powershell
+.\godot\client\tests\run_standalone_matrix.ps1 `
+  -GodotExe "E:\applications\Godot_v4.7.1-stable_mono_win64\Godot_v4.7.1-stable_mono_win64.exe"
+pixi run backend-smoke
+pixi run verify
+```
+
+The backend smoke starts a temporary legacy service and verifies health, URDF,
+the five-part visual manifest/GLB, WebSocket handshake, aligned `view_state` /
+`terrain_view`, and the authoritative Float32 terrain snapshot. It is kept out
+of `pixi run verify` because it launches a live network process.
+
+With the Godot editor connected to MCP, use this exact smoke sequence:
+
+1. `editor_manage({"op":"state"})` must report `project_name="ExcavatorSim"`,
+   Godot 4.7.x and `readiness="ready"`.
+2. `scene_open({"path":"res://scenes/main.tscn"})`, then
+   `project_run({"mode":"main"})`.
+3. `game_manage({"op":"get_ui_elements"})` must expose the connection,
+   authority/lifecycle and bucket-soil status labels; inspect
+   `PresentationRoot/SY205Excavator`, `TerrainRoot/TerrainWorld`,
+   `TerrainRoot/ExcavationWorld`, `VisualEnvironment`, `CameraRig` and
+   `SoilEffects` with `game_manage({"op":"get_scene_tree"})`.
+4. Exercise Start and Reset through `game_manage({"op":"input_action",...})`
+   or `editor_manage({"op":"game_eval",...})`; observe lifecycle revision and
+   authority-generation changes, pose clearing and bucket-soil reset. Stop the
+   game with `project_manage({"op":"stop"})`.
+
+MCP test discovery is not part of this matrix: the add-on only loads
+`res://tests/test_*.gd` `McpTestSuite` classes, while the product contracts are
+standalone `SceneTree` scripts. This keeps the optional editor bridge from
+becoming a runtime or CI dependency.

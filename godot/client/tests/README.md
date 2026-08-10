@@ -2,11 +2,17 @@
 
 Deterministic fixtures and focused Godot-side checks belong here. Tests should cover scene contracts, motion decoding, generation guards and world-state repeatability as those milestones land.
 
-Run focused contracts from `godot/client/` (replace `godot` with the installed
-Godot 4.7 executable on Windows):
+Run the complete standalone matrix from PowerShell (replace the executable
+with the installed Godot 4.7 binary when `godot` is not on `PATH`):
 
 ```powershell
-godot --headless --path . --script res://tests/foundation_scene_test.gd
+.\tests\run_standalone_matrix.ps1 -GodotExe "E:\applications\Godot_v4.7.1-stable_mono_win64\Godot_v4.7.1-stable_mono_win64.exe"
+```
+
+For one focused contract, run the same executable from `godot/client/`:
+
+```powershell
+& $GodotExe --headless --path . --script res://tests/foundation_scene_test.gd
 ```
 
 The release-candidate matrix is:
@@ -23,4 +29,15 @@ release_candidate_test.gd
 
 These scripts are standalone `SceneTree` checks rather than an addon test
 framework. They use fake transport or local seams and never require a running
-Python service; the backend contract remains covered by `pixi run verify`.
+Python service. The MCP add-on discovers only `res://tests/test_*.gd` classes
+that extend `McpTestSuite`, so these files are intentionally run by the
+PowerShell matrix instead of `test_run`; MCP remains a development-time scene
+and runtime smoke tool.
+
+The standalone matrix does not replace the live service probes:
+
+```powershell
+cd E:\projects\ExcavatorSim
+pixi run backend-smoke
+pixi run verify
+```
