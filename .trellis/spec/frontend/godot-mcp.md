@@ -69,6 +69,21 @@ The MCP edits only the Godot presentation client. Python remains authoritative f
 - Client lifecycle changes: exercise missing scene, reconnect, stale generation, reset, seek, and Return Live transitions where applicable.
 - Cross-layer changes: run `pixi run verify`; preserve protocol schema/version and deterministic backend tests.
 
+## Verification runner boundary
+
+The bundled MCP test handler discovers only `res://tests/test_*.gd` scripts that
+instantiate `McpTestSuite`. The ExcavatorSim product contracts intentionally use
+standalone `SceneTree` scripts (for example `motion_client_test.gd` and
+`release_candidate_test.gd`) so they can run without the editor addon or a
+running service. Run those scripts through
+`godot/client/tests/run_standalone_matrix.ps1`, then use MCP for the live editor
+and runtime smoke sequence documented in `docs/release-candidate.md`.
+
+The project baseline is a 1920x1080 viewport with responsive `canvas_items` /
+`expand` stretch. A smaller MCP capture is a resized observation, not evidence
+that the project baseline changed; verify the persisted settings with
+`project_manage(settings_get)` after the editor has reloaded the project.
+
 ## Wrong vs Correct
 
 ### Wrong
