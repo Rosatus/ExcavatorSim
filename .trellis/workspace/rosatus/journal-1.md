@@ -315,3 +315,38 @@ Closed the 8-child Trellis roadmap M1 through M7. Parent acceptance criteria and
 ### Next Steps
 
 - None - task complete
+
+
+## Session 10: Godot verification baseline and release evidence
+
+**Date**: 2026-08-11
+**Task**: Godot verification baseline and release evidence
+**Branch**: `main`
+
+### Summary
+
+Audited all archived Godot M1-M7 tasks and closed release evidence gaps. Added explicit 1920x1080 viewport settings while retaining Forward+/D3D12/Jolt and responsive stretch, added a fail-fast PowerShell runner for the seven standalone Godot SceneTree tests, documented standalone/MCP/backend-smoke/verify boundaries and exact MCP smoke sequence, verified MCP 4.7.1 live runtime with real motion-only backend start/reset generation transitions and 1920x1080 screenshot, ran backend-smoke, pixi verify (124 tests), task validation, GLB SHA256 and five pivot manifest checks. Archived verification baseline task; left MCP-generated addon/editor/UID files and .codex/config.toml uncommitted as user/tool changes.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `69c54e8` | (see git log) |
+| `805b603` | (see git log) |
+| `43131d7` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
