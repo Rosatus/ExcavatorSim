@@ -7,6 +7,11 @@ var _latest_queued_generation := -1
 var _latest_queued_revision := -1
 var _applied_generation := -1
 var _applied_revision := -1
+var _soil_material: StandardMaterial3D
+
+
+func _ready() -> void:
+	_ensure_soil_material()
 
 
 func queue_snapshot(snapshot: Dictionary) -> bool:
@@ -92,7 +97,19 @@ func _build_mesh(snapshot: Dictionary) -> ArrayMesh:
 	arrays[Mesh.ARRAY_INDEX] = indices
 	var result := ArrayMesh.new()
 	result.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	_ensure_soil_material()
+	result.surface_set_material(0, _soil_material)
 	return result
+
+
+func _ensure_soil_material() -> void:
+	if _soil_material != null:
+		return
+	_soil_material = StandardMaterial3D.new()
+	_soil_material.albedo_color = Color("#6d5038")
+	_soil_material.roughness = 0.96
+	_soil_material.metallic = 0.0
+	_soil_material.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
 
 
 func _normal_at(surface: PackedFloat32Array, rows: int, columns: int, row: int, column: int, spacing: float) -> Vector3:

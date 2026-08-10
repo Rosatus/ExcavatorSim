@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3 uid="uid://bt370y5j1aq7a"]
+[gd_scene load_steps=19 format=3 uid="uid://bt370y5j1aq7a"]
 
 [ext_resource type="PackedScene" path="res://assets/visual/SY205_excavator_godot.glb" id="1_sy205"]
 [ext_resource type="Script" path="res://scripts/motion_client.gd" id="2_motion_client"]
@@ -8,6 +8,10 @@
 [ext_resource type="Script" path="res://scripts/terrain_renderer.gd" id="6_terrain_renderer"]
 [ext_resource type="Script" path="res://scripts/terrain_collider.gd" id="7_terrain_collider"]
 [ext_resource type="Script" path="res://scripts/excavation_world.gd" id="8_excavation_world"]
+[ext_resource type="Script" path="res://scripts/visual_environment.gd" id="9_visual_environment"]
+[ext_resource type="Script" path="res://scripts/camera_rig.gd" id="10_camera_rig"]
+[ext_resource type="Script" path="res://scripts/visual_quality_controller.gd" id="11_visual_quality"]
+[ext_resource type="Script" path="res://scripts/soil_effects.gd" id="12_soil_effects"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_sgp6g"]
 size = Vector3(1.2, 0.8, 0.9)
@@ -39,6 +43,16 @@ light_energy = 1.2
 transform = Transform3D(0.71091354, -0.24115296, 0.66064143, 0, 0.9393727, 0.3428978, -0.7032794, -0.24377069, 0.66781276, 10, 6, 10)
 current = true
 fov = 55.0
+script = ExtResource("10_camera_rig")
+
+[node name="VisualEnvironment" type="Node" parent="."]
+script = ExtResource("9_visual_environment")
+
+[node name="VisualQualityController" type="Node" parent="."]
+script = ExtResource("11_visual_quality")
+
+[node name="SoilEffects" type="Node3D" parent="."]
+script = ExtResource("12_soil_effects")
 
 [node name="ExcavatorRig" type="Node3D" parent="." unique_id=1680409432]
 visible = false
