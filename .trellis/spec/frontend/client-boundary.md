@@ -33,4 +33,8 @@ and bounded `SoilEffects`) is presentation-only. Quality changes may adjust
 lighting, camera range, shadow flags and particle budgets, but may not change
 simulation cadence, pose transforms, terrain bytes or bucket inventory.
 
+The M7 release candidate retains the legacy Python terrain/recording/replay
+profile for compatibility; removal or deprecation requires a separate approved
+migration decision and client inventory.
+
 Reference: `docs/godot-integration.md`, `protocol/`, and `.trellis/tasks/08-06-excavator-sim-bootstrap/design.md`.

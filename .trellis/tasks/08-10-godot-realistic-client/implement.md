@@ -92,12 +92,12 @@ Exit gate: the delivered SY205 visual pass is stable at the approved performance
 
 ## M7 — Integration release candidate
 
-1. [ ] Run end-to-end connect, operate, dig, deposit, reset, disconnect and reconnect scenarios.
-2. [ ] Run no-physics degradation and stale-generation fault injection.
-3. [ ] Complete full backend and Godot checks plus final human visual/input review.
-4. [ ] Decide separately whether legacy Python terrain/replay code should remain, be deprecated or be archived.
+1. [x] Run end-to-end connect, operate, dig, deposit, reset, disconnect and reconnect scenarios.
+2. [x] Run no-physics degradation and stale-generation fault injection.
+3. [x] Complete full backend and Godot checks plus final human visual/input review.
+4. [x] Decide separately whether legacy Python terrain/replay code should remain, be deprecated or be archived.
 
-Exit gate: all parent PRD acceptance criteria pass; any deferred asset polish is explicitly recorded rather than blocking unrelated functionality.
+Exit gate: all parent PRD acceptance criteria pass; any deferred asset polish is explicitly recorded rather than blocking unrelated functionality. [x]
 
 ## Validation commands and review gates
 

@@ -25,7 +25,8 @@
     "08-10-motion-only-backend",
     "08-11-deterministic-terrain-core",
     "08-11-excavation-gameplay-loop",
-    "08-11-realistic-visual-pass"
+    "08-11-realistic-visual-pass",
+    "08-11-integration-release-candidate"
   ],
   "parent": null,
   "relatedFiles": [],

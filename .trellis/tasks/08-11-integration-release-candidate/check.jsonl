@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Client release scope"}
+{"file": ".trellis/spec/frontend/client-boundary.md", "reason": "Authority and stale-generation review"}
+{"file": ".trellis/spec/frontend/godot-mcp.md", "reason": "MCP runtime and headless review"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Backend compatibility review"}
+{"file": ".trellis/tasks/08-11-integration-release-candidate/research/release-contracts.md", "reason": "M7 evidence"}
