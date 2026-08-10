@@ -1,6 +1,9 @@
-[gd_scene load_steps=8 format=3 uid="uid://bt370y5j1aq7a"]
+[gd_scene load_steps=11 format=3 uid="uid://bt370y5j1aq7a"]
 
 [ext_resource type="PackedScene" path="res://assets/visual/SY205_excavator_godot.glb" id="1_sy205"]
+[ext_resource type="Script" path="res://scripts/motion_client.gd" id="2_motion_client"]
+[ext_resource type="Script" path="res://scripts/motion_presentation.gd" id="3_motion_presentation"]
+[ext_resource type="Script" path="res://scripts/operator_ui.gd" id="4_operator_ui"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_sgp6g"]
 size = Vector3(1.2, 0.8, 0.9)
@@ -75,4 +78,50 @@ mesh = SubResource("BoxMesh_tbgi4")
 
 [node name="SY205Excavator" parent="PresentationRoot" instance=ExtResource("1_sy205")]
 
-[node name="OperatorUI" type="CanvasLayer" parent="." unique_id=232332145]
+[node name="MotionClient" type="Node" parent="." node_paths=PackedStringArray()]
+script = ExtResource("2_motion_client")
+
+[node name="MotionPresentation" type="Node3D" parent="." node_paths=PackedStringArray()]
+script = ExtResource("3_motion_presentation")
+
+[node name="OperatorUI" type="CanvasLayer" parent="." unique_id=232332145 node_paths=PackedStringArray()]
+script = ExtResource("4_operator_ui")
+
+[node name="StatusPanel" type="PanelContainer" parent="OperatorUI"]
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 430.0
+offset_bottom = 190.0
+
+[node name="Margin" type="MarginContainer" parent="OperatorUI/StatusPanel"]
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 10
+
+[node name="VBox" type="VBoxContainer" parent="OperatorUI/StatusPanel/Margin"]
+theme_override_constants/separation = 5
+
+[node name="Connection" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
+text = "Connection: disconnected"
+
+[node name="Authority" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
+text = "Authority: waiting for Python"
+
+[node name="Lifecycle" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
+text = "Lifecycle: stopped"
+
+[node name="Diagnostics" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
+text = "Input ACK: —"
+
+[node name="Buttons" type="HBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox"]
+theme_override_constants/separation = 6
+
+[node name="Start" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Buttons"]
+text = "Start (F6)"
+
+[node name="Pause" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Buttons"]
+text = "Pause (F7)"
+
+[node name="Reset" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Buttons"]
+text = "Reset (F8)"
