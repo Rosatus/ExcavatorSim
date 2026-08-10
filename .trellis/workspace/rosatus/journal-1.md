@@ -211,3 +211,38 @@ Implemented Godot BucketSoilState and ExcavationWorld with deterministic fixed-s
 ### Next Steps
 
 - None - task complete
+
+
+## Session 7: M6 realistic visual pass
+
+**Date**: 2026-08-11
+**Task**: M6 realistic visual pass
+**Branch**: `main`
+
+### Summary
+
+Added realistic Forward+ procedural sky/ambient light, shadowed key light, follow camera, soil PBR material, high/balanced/low quality budgets, bounded generation-gated GPU soil effects and visual smoke tests. MCP runtime confirmed environment/material/effects/quality nodes, 60 FPS cap and reset clears particle emission; headless visual contract passed; pixi run verify passed with 124 backend tests.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `87d509d` | (see git log) |
+| `be736cd` | (see git log) |
+| `5b21c02` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
