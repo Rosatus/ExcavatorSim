@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 2
+- **Total Sessions**: 3
 - **Last Active**: 2026-08-10
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~74 | Active |
+| `journal-1.md` | ~108 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 3 | 2026-08-10 | M2 Godot motion vertical slice | `1552414`, `618ff56` | `main` |
 | 2 | 2026-08-10 | Integrate SY205 GLB into Godot | `32f693a`, `9951470` | `main` |
 | 1 | 2026-08-06 | Bootstrap ExcavatorSim and migrate reusable BabylonSim backend | `10b5a29` | `main` |
 <!-- @@@/auto:session-history -->
