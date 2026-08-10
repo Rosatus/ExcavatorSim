@@ -1,0 +1,73 @@
+[gd_scene format=3 uid="uid://bt370y5j1aq7a"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_sgp6g"]
+size = Vector3(1.2, 0.8, 0.9)
+
+[sub_resource type="BoxMesh" id="BoxMesh_o5qli"]
+size = Vector3(0.35, 2.4, 0.35)
+
+[sub_resource type="BoxMesh" id="BoxMesh_0wfyh"]
+size = Vector3(0.45, 2.6, 0.45)
+
+[sub_resource type="BoxMesh" id="BoxMesh_sugp2"]
+size = Vector3(2.4, 0.7, 1.8)
+
+[sub_resource type="BoxMesh" id="BoxMesh_jyhfs"]
+size = Vector3(3, 0.8, 2.4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_tbgi4"]
+size = Vector3(20, 0.2, 20)
+
+[node name="Main" type="Node3D" unique_id=615713361]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1005988133]
+
+[node name="KeyLight" type="DirectionalLight3D" parent="." unique_id=1459257187]
+transform = Transform3D(0.7960838, 0.4546647, -0.3994128, 0, 0.6599831, 0.7512804, 0.6051864, -0.5980822, 0.52540183, 0, 0, 0)
+light_energy = 1.2
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=759888586]
+transform = Transform3D(0.71091354, -0.24115296, 0.66064143, 0, 0.9393727, 0.3428978, -0.7032794, -0.24377069, 0.66781276, 8, 5, 8)
+current = true
+fov = 55.0
+
+[node name="ExcavatorRig" type="Node3D" parent="." unique_id=1680409432]
+
+[node name="base_link" type="Node3D" parent="ExcavatorRig" unique_id=23243033]
+
+[node name="upper_structure_link" type="Node3D" parent="ExcavatorRig/base_link" unique_id=1806155121]
+
+[node name="boom_link" type="Node3D" parent="ExcavatorRig/base_link/upper_structure_link" unique_id=453817769]
+
+[node name="arm_link" type="Node3D" parent="ExcavatorRig/base_link/upper_structure_link/boom_link" unique_id=1740095450]
+
+[node name="bucket_link" type="Node3D" parent="ExcavatorRig/base_link/upper_structure_link/boom_link/arm_link" unique_id=507555084]
+
+[node name="PlaceholderBucket" type="MeshInstance3D" parent="ExcavatorRig/base_link/upper_structure_link/boom_link/arm_link/bucket_link" unique_id=1404440200]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+mesh = SubResource("BoxMesh_sgp6g")
+
+[node name="PlaceholderArm" type="MeshInstance3D" parent="ExcavatorRig/base_link/upper_structure_link/boom_link/arm_link" unique_id=1791597141]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+mesh = SubResource("BoxMesh_o5qli")
+
+[node name="PlaceholderBoom" type="MeshInstance3D" parent="ExcavatorRig/base_link/upper_structure_link/boom_link" unique_id=1810792424]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3, 0)
+mesh = SubResource("BoxMesh_0wfyh")
+
+[node name="PlaceholderUpper" type="MeshInstance3D" parent="ExcavatorRig/base_link/upper_structure_link" unique_id=17232727]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.65, 0)
+mesh = SubResource("BoxMesh_sugp2")
+
+[node name="PlaceholderBase" type="MeshInstance3D" parent="ExcavatorRig/base_link" unique_id=1217250074]
+mesh = SubResource("BoxMesh_jyhfs")
+
+[node name="TerrainRoot" type="Node3D" parent="." unique_id=1278878018]
+
+[node name="FoundationGround" type="MeshInstance3D" parent="TerrainRoot" unique_id=808724095]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+mesh = SubResource("BoxMesh_tbgi4")
+
+[node name="PresentationRoot" type="Node3D" parent="." unique_id=1465378192]
+
+[node name="OperatorUI" type="CanvasLayer" parent="." unique_id=232332145]
