@@ -9,7 +9,7 @@ extends RefCounted
 
 const PROTOCOL_VERSION := "babylon-sim-v3"
 const STATE_SCHEMA_VERSION := "babylon-sim-state-v2"
-const MODEL_VERSION := "docs-urdf-v3"
+const MODEL_VERSION := "sy205-glb-urdf-v4"
 const CALIBRATION_VERSION := "machine-calibration-v2"
 const SOFTWARE_VERSION := "0.1.0"
 const TERRAIN_SPEC_VERSION := "terrain-spec-v1"

@@ -5,7 +5,7 @@ const FIXTURE_PATH := "res://tests/fixtures/sy205_frame_parity_cases.json"
 const VERSIONS := {
 	"protocol_version": "babylon-sim-v3",
 	"state_schema_version": "babylon-sim-state-v2",
-	"model_version": "docs-urdf-v3",
+	"model_version": "sy205-glb-urdf-v4",
 	"calibration_version": "machine-calibration-v2",
 	"software_version": "0.1.0",
 	"terrain_spec_version": "terrain-spec-v1",

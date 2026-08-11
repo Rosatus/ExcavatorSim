@@ -17,11 +17,11 @@ URDF.
 
 ## Acceptance Criteria
 
-- [ ] Godot accepts backend handshakes using `sy205-glb-urdf-v4`.
-- [ ] Zero and one asymmetric pose render without missing frames, detached pivots, or non-finite
+- [x] Godot accepts backend handshakes using `sy205-glb-urdf-v4`.
+- [x] Zero and one asymmetric pose render without missing frames, detached pivots, or non-finite
       transforms.
-- [ ] Existing focused motion/pivot/linkage tests pass after fixture updates.
-- [ ] The normal Godot standalone matrix and one MCP runtime smoke pass.
+- [x] Existing focused motion/pivot/linkage tests pass after fixture updates.
+- [x] The normal Godot standalone matrix and one MCP runtime smoke pass.
 
 ## Out of Scope
 

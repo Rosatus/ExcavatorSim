@@ -59,7 +59,7 @@
         },
         {
           "path": "godot/client/resources/visual/sy205_visual_manifest.json",
-          "sha256": "332eb6026ed83f177d97fe968744721d6c8e90f581427f489f435697b571f2af"
+          "sha256": "e307f0473de1501663d79a1e60adfb48da600270de6963b077c77d45faa08e4c"
         },
         {
           "path": "assets/model/sy205_glb_derived_v4.params.json",
@@ -67,7 +67,7 @@
         },
         {
           "path": "assets/model/sy205_glb_derived_v4.json",
-          "sha256": "03a2cef43a733e90ae2314231d02172d779b341d218e3c9f63545e23b18c5f41"
+          "sha256": "671673279089c2e8171fda8f66d0ac4c027f24da5a9998d2f9145d3e09d4dd6c"
         },
         {
           "path": "assets/model/sy205_glb_derived_v4.urdf",

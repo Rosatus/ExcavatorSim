@@ -30,4 +30,5 @@ as GLB files; text inputs use CRLF-to-LF canonicalization. A regenerated frame f
 the active URDF, model implementation, dependency lock, model version, and Pinocchio version.
 
 Run `pixi run verify-provenance` after changing an imported or generated asset, its generator, or
-any recorded input.
+any recorded input. If a recorded generator input changes, rerun the generator even when the main
+artifact bytes are expected to remain stable; evidence and provenance hashes still need to advance.

@@ -3,7 +3,7 @@
   "name": "align-godot-urdf-v4",
   "title": "Align Godot with URDF v4",
   "description": "Align Godot model identity and parity fixtures with the active SY205 URDF and run ordinary client regression tests.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": "Godot model identity and fixture alignment",
   "package": "backend,frontend,protocol,assets",
