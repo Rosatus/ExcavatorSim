@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/motion-transport.md","reason":"Defines the unique Z-up to Y-up conversion, visual authority boundary, five-frame parity, and passive linkage restrictions that the local-pivot fix must preserve."}
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Defines Godot as presentation consumer and forbids local visual transforms or physics from becoming motion authority."}
+{"file":".trellis/tasks/08-11-godot-pivot-local-kinematics/research/pivot-evidence.md","reason":"Records guide-backed local pivot values and a reproducible proof of the independent-global-write defect."}

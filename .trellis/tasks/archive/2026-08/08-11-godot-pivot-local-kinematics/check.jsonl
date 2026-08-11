@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/motion-transport.md","reason":"Quality review must check coordinate conversion is performed exactly once and local pivot writes remain presentation-only."}
+{"file":".trellis/tasks/08-11-godot-pivot-local-kinematics/design.md","reason":"Quality review must verify adjacent relative-rotation math, axis-only application, hierarchy preservation, and passive solver ordering."}
+{"file":".trellis/tasks/08-11-godot-pivot-local-kinematics/research/pivot-evidence.md","reason":"Review should compare test evidence against the guide's exact parent-local positions and reproduced drift values."}
