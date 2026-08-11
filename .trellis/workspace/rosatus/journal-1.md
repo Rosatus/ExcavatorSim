@@ -515,3 +515,39 @@ Converted authoritative Python Z-up frame transforms once at the Godot protocol 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 16: Activate GLB-derived SY205 URDF v4
+
+**Date**: 2026-08-11
+**Task**: Activate GLB-derived SY205 URDF v4
+**Branch**: `main`
+
+### Summary
+
+Generated the deterministic SY205 URDF and evidence, preserved the old model as a future SY135 reference, activated the new URDF in the Python backend, aligned protocol and Godot model identity plus parity fixtures, updated provenance, passed backend and Godot standalone verification, and validated zero/asymmetric poses through Godot MCP.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e78a3c8` | (see git log) |
+| `020d82e` | (see git log) |
+| `55bbee9` | (see git log) |
+| `c9759a9` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
