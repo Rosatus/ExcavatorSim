@@ -1,0 +1,7 @@
+interface:
+  display_name: "Adapt Articulated GLB to Godot"
+  short_description: "Inspect and adapt articulated mechanical GLBs"
+  default_prompt: "Use $godot-adapt-articulated-glb to inspect this mechanical GLB and plan a safe Godot adaptation."
+
+policy:
+  allow_implicit_invocation: true
