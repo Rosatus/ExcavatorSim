@@ -482,3 +482,36 @@ Converted authoritative Python Z-up frame transforms once at the Godot protocol 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 15: 建立机械 GLB 到 Godot 适配 Skill
+
+**Date**: 2026-08-11
+**Task**: 建立机械 GLB 到 Godot 适配 Skill
+**Branch**: `main`
+
+### Summary
+
+创建项目级共享 skill godot-adapt-articulated-glb，用于在不依赖资产专用指南的情况下检查 Blender 机械 GLB、区分 observed/declared/validated/decision 证据、统一收集落盘前人工决策，并指导 Godot PackedScene 验证、局部枢轴适配与被动机构求解。新增无第三方运行依赖的确定性 GLB 2.0 检查器、稳定错误/跨引用 diagnostics、两份按需参考、OpenAI UI 元数据及 8 个单元/集成测试。fresh default agent 前向测试通过；official quick_validate、Ruff、strict mypy、pixi run verify（124 tests）、Trellis validation、git diff --check 全绿。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e96d03e` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

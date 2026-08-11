@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 14
+- **Total Sessions**: 15
 - **Last Active**: 2026-08-11
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~484 | Active |
+| `journal-1.md` | ~517 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 15 | 2026-08-11 | 建立机械 GLB 到 Godot 适配 Skill | `e96d03e` | `main` |
 | 14 | 2026-08-11 | 修复 SY205 局部枢轴运动链 | `72374da` | `main` |
 | 13 | 2026-08-11 | 修复 SY205 被动四连杆机构 | `c4c3184` | `main` |
 | 12 | 2026-08-11 | Fix Godot joint coordinate parity | `f79173b` | `main` |
