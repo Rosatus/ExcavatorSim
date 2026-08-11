@@ -88,6 +88,21 @@
       "bucket_linkage_connector"
     ]
   },
+  "passive_linkage": {
+    "mode": "godot_visual_four_bar",
+    "solver_plane": "arm_link_local_yz",
+    "driven_frame": "bucket_link",
+    "pin_paths_relative_to_arm": {
+      "A": "PIVOT_LINKAGE_B_ARM/PIVOT_LINKAGE_A_COMMON",
+      "B": "PIVOT_LINKAGE_B_ARM",
+      "C": "PIVOT_BUCKET_JOINT/PIVOT_LINKAGE_C_BUCKET",
+      "D": "PIVOT_BUCKET_JOINT",
+      "side_controller": "CTRL_LINKAGE_SIDE_LINKS"
+    },
+    "constraints": ["AB", "AC", "CD"],
+    "branch_policy": "nearest_previous_valid_a",
+    "unreachable_policy": "retain_last_valid_pose"
+  },
   "calibration": {
     "status": "imported_rest_pose_captured_frame_parity_pending",
     "authority_fixture": "backend/tests/fixtures/frame-parity/baseline.json",

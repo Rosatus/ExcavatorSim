@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend package ownership and pre-development checklist"}
+{"file": ".trellis/spec/frontend/client-boundary.md", "reason": "Keeps passive linkage visual-only and Python motion authoritative"}
+{"file": ".trellis/spec/frontend/motion-transport.md", "reason": "Defines converted frame consumption and parity test boundary"}
+{"file": ".trellis/tasks/08-11-godot-passive-fourbar-linkage/research/guide-and-glb-evidence.md", "reason": "Guide-backed A/B/C/D node semantics and solver geometry"}

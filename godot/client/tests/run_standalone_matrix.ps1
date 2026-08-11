@@ -17,7 +17,7 @@ $tests = @(
 )
 
 & $GodotExe --headless --path $projectDir --editor --quit
-if (-not $?) {
+if ($LASTEXITCODE -ne 0) {
     throw "Godot import check failed"
 }
 
@@ -25,7 +25,7 @@ foreach ($test in $tests) {
     $path = "res://tests/$test"
     Write-Host "[godot] $test"
     & $GodotExe --headless --path $projectDir --script $path
-    if (-not $?) {
+    if ($LASTEXITCODE -ne 0) {
         throw "Godot test failed: $test"
     }
 }

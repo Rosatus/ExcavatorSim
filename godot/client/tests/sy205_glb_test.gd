@@ -41,6 +41,13 @@ const REQUIRED_LINKAGE_NAMES := [
 	"bucket_linkage_primary",
 	"bucket_linkage_connector",
 ]
+const EXPECTED_PASSIVE_LINKAGE_PATHS := {
+	"A": "PIVOT_LINKAGE_B_ARM/PIVOT_LINKAGE_A_COMMON",
+	"B": "PIVOT_LINKAGE_B_ARM",
+	"C": "PIVOT_BUCKET_JOINT/PIVOT_LINKAGE_C_BUCKET",
+	"D": "PIVOT_BUCKET_JOINT",
+	"side_controller": "CTRL_LINKAGE_SIDE_LINKS",
+}
 
 
 func _init() -> void:
@@ -67,6 +74,8 @@ func _validate_asset_contract() -> int:
 		return 1
 	var manifest: Dictionary = parsed_manifest
 	if not _validate_coordinate_system(manifest):
+		return 1
+	if not _validate_passive_linkage_manifest(manifest):
 		return 1
 	if not _validate_parity_handoff(manifest):
 		return 1
@@ -217,6 +226,33 @@ func _validate_coordinate_system(manifest: Dictionary) -> bool:
 	for frame_name in EXPECTED_FRAME_NAMES:
 		if runtime_axes.get(frame_name, "") != EXPECTED_RUNTIME_PIVOT_AXES[frame_name]:
 			push_error("SY205 runtime pivot axis drifted for %s." % frame_name)
+			return false
+	return true
+
+
+func _validate_passive_linkage_manifest(manifest: Dictionary) -> bool:
+	var passive: Dictionary = manifest.get("passive_linkage", {})
+	if passive.get("mode", "") != "godot_visual_four_bar":
+		push_error("SY205 passive linkage mode drifted.")
+		return false
+	if passive.get("solver_plane", "") != "arm_link_local_yz":
+		push_error("SY205 passive linkage solver plane drifted.")
+		return false
+	if passive.get("branch_policy", "") != "nearest_previous_valid_a":
+		push_error("SY205 passive linkage branch policy drifted.")
+		return false
+	if passive.get("unreachable_policy", "") != "retain_last_valid_pose":
+		push_error("SY205 passive linkage unreachable policy drifted.")
+		return false
+	var paths: Dictionary = passive.get("pin_paths_relative_to_arm", {})
+	for pin_name in EXPECTED_PASSIVE_LINKAGE_PATHS:
+		if paths.get(pin_name, "") != EXPECTED_PASSIVE_LINKAGE_PATHS[pin_name]:
+			push_error("SY205 passive linkage path drifted for %s." % pin_name)
+			return false
+	var constraints: Array = passive.get("constraints", [])
+	for constraint in ["AB", "AC", "CD"]:
+		if not constraints.has(constraint):
+			push_error("SY205 passive linkage is missing %s constraint." % constraint)
 			return false
 	return true
 

@@ -132,3 +132,29 @@ pivot.global_transform = transform * calibration_offset
 Only the Python `view_state` reducer owns the incoming frame; Godot applies the
 derived transform to the visual pivot and sends control axes through the typed
 `input_snapshot` contract.
+
+## 8. Passive SY205 linkage contract
+
+The imported GLB has no Blender drivers or animation tracks. After the five
+authoritative frame globals are applied, `MotionPresentation` may derive the
+visual four-bar only in Godot:
+
+- D=`PIVOT_BUCKET_JOINT` is driven by the bucket frame;
+- B=`PIVOT_LINKAGE_B_ARM` and D are fixed in arm-local space;
+- C=`PIVOT_LINKAGE_C_BUCKET` follows the imported bucket hierarchy;
+- A=`PIVOT_LINKAGE_A_COMMON` is the continuous intersection of the AB and AC
+  circles in the arm-local Y-Z plane;
+- `CTRL_LINKAGE_SIDE_LINKS` is positioned at A and rotated about Godot +X to
+  align A-C; the primary rocker follows B's +X rotation.
+
+The solver may only write B's local rotation and the side controller's local
+position/rotation. It must not reposition A/C, write mesh transforms directly,
+read raw Python joint angles, perform another coordinate conversion, or publish
+the result to Python. Capture AB/AC/CD from the imported zero pose, choose the
+candidate nearest the previous valid A, and retain the last valid local pose for
+an unreachable/non-finite circle intersection. Emit a local diagnostic rather
+than throwing from the render loop.
+
+Good: apply all five incoming frames, then solve the passive linkage from the
+current imported pin geometry. Bad: leave the linkage meshes at the static GLB
+zero pose, or make the linkage solver a second motion/physics authority.

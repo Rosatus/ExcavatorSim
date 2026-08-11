@@ -53,6 +53,19 @@ generation-gated soil particle emitter and a bounded camera/quality controller.
 These are disposable presentation resources; changing their profile cannot
 alter motion cadence, terrain snapshots, bucket volume or any Python message.
 
+### SY205 passive four-bar linkage
+
+The supplied SY205 import guide defines a Godot-only passive linkage because
+the GLB intentionally contains no Blender drivers or animation tracks. After
+the authoritative five pivots are updated, the client solves in
+`PIVOT_ARM_JOINT` local Y-Z space using D=`PIVOT_BUCKET_JOINT`,
+B=`PIVOT_LINKAGE_B_ARM`, A=`PIVOT_LINKAGE_A_COMMON` and
+C=`PIVOT_LINKAGE_C_BUCKET`. AB and AC are captured from the imported zero pose;
+the continuous circle-intersection branch gives A, B rotates around +X, and
+`CTRL_LINKAGE_SIDE_LINKS` is positioned/rotated along A-C. A and C are never
+written directly. Unreachable poses retain the last valid passive pose and
+remain a visual diagnostic; no linkage result is sent back to Python.
+
 ## Terrain and physics seam
 
 Godot should build a derived render mesh from the selected surface snapshot. A later physics adapter may maintain chunked static terrain colliders and local probes. Collider updates must be generation-gated and stale-safe; a disabled or failed physics backend must leave the Python service and visual state usable.

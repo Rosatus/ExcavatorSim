@@ -10,3 +10,9 @@ converted once by `MotionProtocol.rows_to_transform()` using
 `pivot_axis` values preserve Blender authoring metadata; its `coordinate_system`
 section records the Godot runtime axes. Do not add a compensating rotation to
 the imported scene.
+
+The manifest's `passive_linkage` section mirrors the supplied import guide's
+visual-only A/B/C/D contract. `MotionPresentation` solves AB/AC in the arm
+local Y-Z plane after authoritative frame application; it rotates only the B
+rocker and `CTRL_LINKAGE_SIDE_LINKS`. The GLB remains static and no passive
+linkage transform becomes Python, terrain, tooth or physics authority.

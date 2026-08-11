@@ -267,6 +267,20 @@ func _test_scene_presentation() -> int:
 	if _check(excavation != null, "excavation world exposes the bucket tooth proxy") != 0:
 		instance.queue_free()
 		return 1
+	var zero_linkage: Dictionary = presentation.get_passive_linkage_snapshot_for_test()
+	if _check(bool(zero_linkage.get("reachable", false)), "zero pose passive linkage is reachable") != 0:
+		instance.queue_free()
+		return 1
+	if _check_linkage_lengths(zero_linkage, "zero") != 0:
+		instance.queue_free()
+		return 1
+	var zero_a_world: Vector3 = zero_linkage["a_world"]
+	var zero_b_rotation: Vector3 = zero_linkage["b_rotation"]
+	var zero_side_position: Vector3 = zero_linkage["side_position"]
+	var zero_side_rotation: Vector3 = zero_linkage["side_rotation"]
+	var arm_node := presentation.get_frame_node("arm_link")
+	var zero_primary_transform: Transform3D = arm_node.get_node("PIVOT_LINKAGE_B_ARM/bucket_linkage_primary").global_transform
+	var zero_secondary_transform: Transform3D = arm_node.get_node("CTRL_LINKAGE_SIDE_LINKS/bucket_linkage_secondary_a").global_transform
 	var fixture := _read_fixture()
 	var poses: Dictionary = fixture["poses"]
 	var rest_globals := {}
@@ -304,7 +318,89 @@ func _test_scene_presentation() -> int:
 		if _check((actual_tooth as Vector3).is_equal_approx(expected_tooth), "%s bucket tooth proxy follows the corrected bucket frame" % pose_name) != 0:
 			instance.queue_free()
 			return 1
+		var linkage: Dictionary = presentation.get_passive_linkage_snapshot_for_test()
+		if bool(linkage.get("reachable", false)):
+			if _check_linkage_lengths(linkage, pose_name) != 0:
+				instance.queue_free()
+				return 1
+		else:
+			if _check(not String(linkage.get("reason", "")).is_empty(), "%s unreachable linkage has a diagnostic" % pose_name) != 0:
+				instance.queue_free()
+				return 1
+	presentation.restore_rest_pose_for_test()
+	var valid_bucket := presentation.get_frame_node("bucket_link")
+	valid_bucket.rotation.x += 0.2
+	presentation.recompute_passive_linkage_for_test()
+	var valid_linkage: Dictionary = presentation.get_passive_linkage_snapshot_for_test()
+	if _check(bool(valid_linkage.get("reachable", false)), "valid bucket motion solves passive linkage") != 0:
+		instance.queue_free()
+		return 1
+	if _check_linkage_lengths(valid_linkage, "valid bucket motion") != 0:
+		instance.queue_free()
+		return 1
+	if _check(not (valid_linkage["a_world"] as Vector3).is_equal_approx(zero_a_world), "valid bucket motion moves passive A") != 0:
+		instance.queue_free()
+		return 1
+	if _check(not (valid_linkage["b_rotation"] as Vector3).is_equal_approx(zero_b_rotation), "valid bucket motion rotates passive B rocker") != 0:
+		instance.queue_free()
+		return 1
+	if _check(not (valid_linkage["side_position"] as Vector3).is_equal_approx(zero_side_position), "valid bucket motion moves side-link controller") != 0:
+		instance.queue_free()
+		return 1
+	if _check(
+		not (arm_node.get_node("PIVOT_LINKAGE_B_ARM/bucket_linkage_primary").global_transform as Transform3D).is_equal_approx(zero_primary_transform),
+		"valid bucket motion moves primary rocker mesh"
+	) != 0:
+		instance.queue_free()
+		return 1
+	if _check(
+		not (arm_node.get_node("CTRL_LINKAGE_SIDE_LINKS/bucket_linkage_secondary_a").global_transform as Transform3D).is_equal_approx(zero_secondary_transform),
+		"valid bucket motion moves secondary side-link mesh"
+	) != 0:
+		instance.queue_free()
+		return 1
+	var impossible_pose: Dictionary = zero_pose.duplicate(true)
+	var impossible_frames: Dictionary = impossible_pose["frame_transforms"]
+	impossible_frames["bucket_link"] = [
+		[1.0, 0.0, 0.0, 0.0],
+		[0.0, 1.0, 0.0, 100.0],
+		[0.0, 0.0, 1.0, 0.0],
+		[0.0, 0.0, 0.0, 1.0],
+	]
+	var before_unreachable: Dictionary = valid_linkage
+	if _check(presentation.apply_pose_for_test(impossible_pose), "unreachable pose applies authoritative bucket frame") != 0:
+		instance.queue_free()
+		return 1
+	var unreachable: Dictionary = presentation.get_passive_linkage_snapshot_for_test()
+	if _check(not bool(unreachable.get("reachable", true)), "unreachable linkage pose is rejected") != 0:
+		instance.queue_free()
+		return 1
+	if _check(
+		(unreachable["a_world"] as Vector3).is_equal_approx(before_unreachable["a_world"] as Vector3),
+		"unreachable pose retains last valid passive A"
+	) != 0:
+		instance.queue_free()
+		return 1
+	if _check(
+		(unreachable["side_position"] as Vector3).is_equal_approx(before_unreachable["side_position"] as Vector3),
+		"unreachable pose retains last valid side-link controller"
+	) != 0:
+		instance.queue_free()
+		return 1
 	if _check(presentation.apply_pose_for_test(zero_pose), "zero pose reapplies after motion") != 0:
+		instance.queue_free()
+		return 1
+	var restored_linkage: Dictionary = presentation.get_passive_linkage_snapshot_for_test()
+	if _check(bool(restored_linkage.get("reachable", false)), "zero pose restores passive linkage reachability") != 0:
+		instance.queue_free()
+		return 1
+	if _check((restored_linkage["b_rotation"] as Vector3).is_equal_approx(zero_b_rotation), "zero pose restores passive B rotation") != 0:
+		instance.queue_free()
+		return 1
+	if _check((restored_linkage["side_position"] as Vector3).is_equal_approx(zero_side_position), "zero pose restores side-link position") != 0:
+		instance.queue_free()
+		return 1
+	if _check((restored_linkage["side_rotation"] as Vector3).is_equal_approx(zero_side_rotation), "zero pose restores side-link rotation") != 0:
 		instance.queue_free()
 		return 1
 	for frame_name in MotionProtocol.FRAME_NAMES:
@@ -319,6 +415,17 @@ func _test_scene_presentation() -> int:
 	instance.queue_free()
 	await process_frame
 	print("Motion presentation five-frame parity contract passed.")
+	return 0
+
+
+func _check_linkage_lengths(snapshot: Dictionary, label: String) -> int:
+	for constraint in ["ab", "ac", "cd"]:
+		var length := float(snapshot.get("%s_length" % constraint, -1.0))
+		var rest_length := float(snapshot.get("rest_%s_length" % constraint, -1.0))
+		if _check(is_finite(length) and is_finite(rest_length), "%s %s linkage length is finite" % [label, constraint]) != 0:
+			return 1
+		if _check(absf(length - rest_length) <= 0.0001, "%s %s linkage length is conserved" % [label, constraint]) != 0:
+			return 1
 	return 0
 
 
