@@ -162,7 +162,7 @@ def test_simulation_reset_preserves_deformed_terrain_and_clears_bucket(
                 client_sequence=sequence,
                 connected=True,
                 focused=True,
-                axes=(0.0, -1.0, 1.0, -1.0),
+                    axes=(0.0, 1.0, -1.0, -1.0),
             )
             sequence += 1
             time.sleep(0.04)

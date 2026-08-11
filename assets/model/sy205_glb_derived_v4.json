@@ -127,7 +127,7 @@
   "generator": {
     "algorithm_version": 1,
     "path": "backend/scripts/generate_sy205_urdf.py",
-    "sha256": "aab40cb6ad320b6eb5e1b86ad71dc9f9a75bec25b28364d4891225d4ca609aa5"
+    "sha256": "4508efd69778b8ddeaec475737d9382af01dc29618b8652f6742bb10eb46a285"
   },
   "inputs": {
     "calibration": {
@@ -152,7 +152,7 @@
       "activation_policy": "not_an_sy205_runtime_or_rollback_model",
       "byte_size": 5281,
       "evidence_level": "decision",
-      "path": "assets/model/kinematic_excavator.urdf",
+      "path": "assets/model/library/sy135_reference.urdf",
       "role": "future_sy135_reference_seed",
       "sha256": "2f32a9f635f6fb1b43da9fb624612ade5b7a7b7d2d84f5eed401ffb414afc485"
     },
@@ -878,10 +878,10 @@
       "sha256": "5707f454624fadd5630fcbfd66893b4edf7e8c5b97c84e65e06bf9f8fa46c02c"
     },
     "evidence": {
-      "byte_size": 23724,
+      "byte_size": 23728,
       "hash_basis": "canonical JSON with this sha256 field replaced by 64 zeroes",
       "path": "assets/model/sy205_glb_derived_v4.json",
-      "sha256": "6c28d6d72a400b53a58e4afcb16d68935995cda66aabbe6ab1dd596aaad22dcf"
+      "sha256": "1fca930d6542f2d1e162d625c5f96bf261633f4f28603a0a68c3de6d15d33c0b"
     },
     "reference_urdf": {
       "byte_size": 5281,

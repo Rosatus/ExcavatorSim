@@ -3,7 +3,7 @@
   "name": "migrate-backend-urdf-v4",
   "title": "Replace backend with SY205 URDF v4",
   "description": "Replace the active backend URDF with the generated SY205 model and update model identity, fixtures, and provenance.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": "backend model replacement",
   "package": "backend,protocol,assets",

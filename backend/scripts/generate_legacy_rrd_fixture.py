@@ -6,6 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
+from babylon_sim.constants import MODEL_VERSION
 from babylon_sim.protocol import load_version_manifest
 from babylon_sim.recording import ChunkedRecordingBuffer
 from babylon_sim.replay_contract import SourceMode
@@ -13,7 +14,7 @@ from babylon_sim.rrd import export_rrd
 from babylon_sim.state import SimulationState
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-OUTPUT = PROJECT_ROOT / "tests" / "fixtures" / "rrd" / "motion-only-protocol-v2.rrd"
+OUTPUT = PROJECT_ROOT / "backend" / "tests" / "fixtures" / "rrd" / "motion-only-protocol-v2.rrd"
 
 
 def _state(sequence: int) -> SimulationState:
@@ -22,7 +23,7 @@ def _state(sequence: int) -> SimulationState:
         timestamp=sequence / 100.0,
         sequence_number=sequence,
         source="legacy-v2-fixture",
-        model_version="docs-urdf-v3",
+        model_version=MODEL_VERSION,
         calibration_version="m1-provisional-2",
         joint_position=position,
         joint_velocity=tuple(value * -0.25 for value in position),

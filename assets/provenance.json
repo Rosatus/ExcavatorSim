@@ -11,11 +11,11 @@
       "source_commit": "782cceb76afb635b3f9854cf48dbba1ba946f7fb",
       "source_path": "docs/urdf/kinematic_excavator.urdf",
       "source_blob": "e501e40fa5db47b62b4b78c193255ee0055dca09",
-      "destination_path": "assets/model/kinematic_excavator.urdf",
+      "destination_path": "assets/model/library/sy135_reference.urdf",
       "destination_sha256": "2f32a9f635f6fb1b43da9fb624612ade5b7a7b7d2d84f5eed401ffb414afc485",
       "license": "AGPL-3.0-only",
       "imported_at": "2026-07-29",
-      "relationship": "verbatim-generated-asset",
+      "relationship": "future-sy135-reference",
       "locally_modified": false
     },
     {
@@ -41,23 +41,63 @@
       "imported_at": "2026-07-29",
       "relationship": "verbatim-license",
       "locally_modified": false
+    }
+  ],
+  "generated_assets": [
+    {
+      "destination_path": "assets/model/kinematic_excavator.urdf",
+      "destination_sha256": "5707f454624fadd5630fcbfd66893b4edf7e8c5b97c84e65e06bf9f8fa46c02c",
+      "generator": {
+        "path": "backend/scripts/generate_sy205_urdf.py",
+        "sha256": "4508efd69778b8ddeaec475737d9382af01dc29618b8652f6742bb10eb46a285"
+      },
+      "inputs": [
+        {
+          "path": "godot/client/assets/visual/SY205_excavator_godot.glb",
+          "sha256": "cf95534b31bcc156980afefef0a9f273e5c6f727547b3db1e9062ca5619b495a",
+          "hash_mode": "raw"
+        },
+        {
+          "path": "godot/client/resources/visual/sy205_visual_manifest.json",
+          "sha256": "332eb6026ed83f177d97fe968744721d6c8e90f581427f489f435697b571f2af"
+        },
+        {
+          "path": "assets/model/sy205_glb_derived_v4.params.json",
+          "sha256": "24a40a8ea479daeb28cd9e3410324e647ae08eb97a92a619672ff04f99bbe2b1"
+        },
+        {
+          "path": "assets/model/sy205_glb_derived_v4.json",
+          "sha256": "03a2cef43a733e90ae2314231d02172d779b341d218e3c9f63545e23b18c5f41"
+        },
+        {
+          "path": "assets/model/sy205_glb_derived_v4.urdf",
+          "sha256": "5707f454624fadd5630fcbfd66893b4edf7e8c5b97c84e65e06bf9f8fa46c02c"
+        }
+      ],
+      "license": "project-owned-source-assets",
+      "generated_at": "2026-08-11",
+      "relationship": "activated-generated-model"
     },
     {
-      "source_repository": "https://github.com/Rosatus/KinematicSim.git",
-      "source_commit": "782cceb76afb635b3f9854cf48dbba1ba946f7fb",
-      "source_path": "kinematic_sim/model.py",
-      "source_blob": "40506bea6a474e24b6152ac1cf16f3bccb209f90",
-      "destination_path": "tests/fixtures/frame-parity/baseline.json",
-      "destination_sha256": "3ce552cb222c573fb210e67af62c25c9781025d54fb77a302e7a79c6c7944bb1",
+      "destination_path": "backend/tests/fixtures/frame-parity/baseline.json",
+      "destination_sha256": "49c66a79f3e7a335ad68fe16b125e1522c61f6633f1d217d9ce17fc80f4965de",
+      "generator": {
+        "path": "backend/src/babylon_sim/model.py",
+        "sha256": "2592487b6fd1019a0b144d0d12ece3d5cc3e5b2f905f54b0be484e5c07679eb1"
+      },
+      "inputs": [
+        {
+          "path": "assets/model/kinematic_excavator.urdf",
+          "sha256": "5707f454624fadd5630fcbfd66893b4edf7e8c5b97c84e65e06bf9f8fa46c02c"
+        },
+        {
+          "path": "pixi.lock",
+          "sha256": "b9b2ac7f544150626b7d63f04cd6643a0276f2f563b055dad0e3d0821e8610b8"
+        }
+      ],
       "license": "AGPL-3.0-only",
-      "imported_at": "2026-07-29",
-      "relationship": "generated-reference-fixture",
-      "locally_modified": false,
-      "generated_from": [
-        "kinematic_sim/model.py",
-        "docs/urdf/kinematic_excavator.urdf",
-        "pixi.lock"
-      ]
+      "generated_at": "2026-08-11",
+      "relationship": "active-model-frame-parity-fixture"
     }
   ],
   "conceptual_derivations": [
@@ -79,7 +119,7 @@
         }
       ],
       "destination_path": "src/babylon_sim/constants.py",
-      "destination_sha256": "c932aec972b623a3315c99728c18089fccd90eec3086a0b9898ce745c699c598",
+      "destination_sha256": "97497d54d4ec4de9a82e7cbb27eefdcf334caa72890489a16298e05fbb9e3377",
       "destination_symbols": [{ "name": "motion and runtime constants", "lines": "1-29" }],
       "license": "AGPL-3.0-only",
       "modified_at": "2026-07-29",
@@ -208,7 +248,7 @@
         "symbols": [{ "name": "ExcavatorModelTests", "lines": "14-81" }]
       }],
       "destination_path": "tests/backend/test_model.py",
-      "destination_sha256": "9f147894838ec2828d2a8ec188ef3522f719238cfc2f1e5045d05d3a4343c1fb",
+      "destination_sha256": "c05bd84a226a9239240317a0a7b5aabcd54efb162fdba36beb905129736265fd",
       "destination_symbols": [{ "name": "model and frame parity tests", "lines": "1-55" }],
       "license": "AGPL-3.0-only", "modified_at": "2026-07-29", "relationship": "adapted-test", "locally_modified": true,
       "tests": ["tests/backend/test_model.py"]

@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from babylon_sim.constants import MODEL_VERSION
 from babylon_sim.recording import ChunkedRecordingBuffer
 from babylon_sim.replay_contract import RRD_PROFILE, SourceMode
 from babylon_sim.rrd import RrdProfileError, export_rrd, import_rrd
@@ -17,7 +18,7 @@ def _state(sequence: int) -> SimulationState:
         timestamp=sequence / 100.0,
         sequence_number=sequence,
         source="rrd-test",
-        model_version="docs-urdf-v3",
+        model_version=MODEL_VERSION,
         calibration_version="calibration-test",
         joint_position=position,
         joint_velocity=tuple(value * -0.25 for value in position),

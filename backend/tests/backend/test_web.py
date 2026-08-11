@@ -108,7 +108,7 @@ async def test_health_model_and_realtime_round_trip(
         assert (await health.json())["status"] == "ok"
         model_response = await client.get("/api/model")
         assert model_response.status == 200
-        assert "kinematic_excavator" in await model_response.text()
+        assert 'robot name="sy205_glb_derived_v4"' in await model_response.text()
         visual_model_response = await client.get("/api/visual-model")
         assert visual_model_response.status == 200
         visual_model = await visual_model_response.json()

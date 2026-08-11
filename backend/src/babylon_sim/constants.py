@@ -17,7 +17,7 @@ REQUIRED_FRAME_NAMES = (
     *IMU_FRAME_NAMES,
 )
 
-MODEL_VERSION = "docs-urdf-v3"
+MODEL_VERSION = "sy205-glb-urdf-v4"
 CALIBRATION_SCHEMA_VERSION = "machine-calibration-v2"
 STATE_SCHEMA_VERSION = "babylon-sim-state-v2"
 SOFTWARE_VERSION = "0.1.0"

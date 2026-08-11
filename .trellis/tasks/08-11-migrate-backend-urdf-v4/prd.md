@@ -19,11 +19,11 @@ backend/protocol fixtures and provenance.
 
 ## Acceptance Criteria
 
-- [ ] The active `URDF_PATH` loads the SY205 model with four DOF and all required frames.
-- [ ] Backend state/hello/model metadata consistently report `sy205-glb-urdf-v4`.
-- [ ] The active frame-parity fixture matches the new URDF.
-- [ ] Provenance records the GLB-derived generation chain and the SY135 reference role correctly.
-- [ ] `pixi run verify` and `pixi run backend-smoke` pass.
+- [x] The active `URDF_PATH` loads the SY205 model with four DOF and all required frames.
+- [x] Backend state/hello/model metadata consistently report `sy205-glb-urdf-v4`.
+- [x] The active frame-parity fixture matches the new URDF.
+- [x] Provenance records the GLB-derived generation chain and the SY135 reference role correctly.
+- [x] `pixi run verify` and `pixi run backend-smoke` pass.
 
 ## Out of Scope
 

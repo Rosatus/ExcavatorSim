@@ -6,6 +6,7 @@ import time
 
 import pytest
 
+from babylon_sim.constants import MODEL_VERSION
 from babylon_sim.recording import ChunkedRecordingBuffer
 from babylon_sim.replay_contract import SourceMode
 from babylon_sim.state import SimulationState
@@ -28,7 +29,7 @@ def _state(sequence: int) -> SimulationState:
         timestamp=sequence / 100.0,
         sequence_number=sequence,
         source="terrain-test",
-        model_version="docs-urdf-v3",
+        model_version=MODEL_VERSION,
         calibration_version="machine-calibration-v2",
         joint_position=zeros,
         joint_velocity=zeros,

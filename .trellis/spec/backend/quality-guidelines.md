@@ -21,3 +21,13 @@ Terrain edits must be deterministic for identical baseline, input, and sample se
 
 Add a focused regression beside the owning module. For cross-layer changes cover both the typed protocol boundary and the state transition. For worker/lifecycle changes prove reset, close, stale generation, and replay behavior. Use existing fixtures under `backend/tests/fixtures/` rather than creating alternate baselines.
 
+## Generated asset provenance
+
+Keep external byte-for-byte imports in `assets/provenance.json` under `entries`. Record assets
+generated inside this repository under `generated_assets`, with a repository-relative generator,
+all material input paths, and verified SHA-256 values. Use `hash_mode: raw` for binary inputs such
+as GLB files; text inputs use CRLF-to-LF canonicalization. A regenerated frame fixture must identify
+the active URDF, model implementation, dependency lock, model version, and Pinocchio version.
+
+Run `pixi run verify-provenance` after changing an imported or generated asset, its generator, or
+any recorded input.

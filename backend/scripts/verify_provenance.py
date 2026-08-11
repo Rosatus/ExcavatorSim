@@ -8,6 +8,7 @@ import re
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from babylon_sim.constants import MODEL_VERSION
 from babylon_sim.visual_assets import VisualAssetError, load_visual_model_manifest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -29,9 +30,12 @@ EXPECTED_DERIVATIONS = {
     "backend/tests/backend/test_simulation.py",
 }
 EXPECTED_VERBATIM = {
-    "assets/model/kinematic_excavator.urdf",
+    "assets/model/library/sy135_reference.urdf",
     "assets/calibration/m1_provisional_calibration.json",
     "assets/licenses/KinematicSim-AGPL-3.0.txt",
+}
+EXPECTED_GENERATED = {
+    "assets/model/kinematic_excavator.urdf",
     "backend/tests/fixtures/frame-parity/baseline.json",
 }
 HEX_40 = re.compile(r"^[0-9a-f]{40}$")
@@ -93,6 +97,24 @@ def _verify_hash(
         actual = _sha256(ROOT / destination)
         if actual != expected:
             errors.append(f"{destination}: SHA-256 mismatch ({actual} != {expected})")
+
+
+def _verify_repository_file(item: object, label: str, errors: list[str]) -> str | None:
+    value = _mapping(item, label, errors)
+    path = _safe_destination(value.get("path"), f"{label}.path", errors)
+    expected = value.get("sha256")
+    if not isinstance(expected, str) or HEX_64.fullmatch(expected) is None:
+        errors.append(f"{label}.sha256 must be 64 lowercase hex characters")
+        return path
+    hash_mode = value.get("hash_mode", "text-crlf-to-lf")
+    if hash_mode not in {"raw", "text-crlf-to-lf"}:
+        errors.append(f"{label}.hash_mode must be raw or text-crlf-to-lf")
+        return path
+    if path is not None and (ROOT / path).is_file():
+        actual = _raw_sha256(ROOT / path) if hash_mode == "raw" else _sha256(ROOT / path)
+        if actual != expected:
+            errors.append(f"{path}: SHA-256 mismatch ({actual} != {expected})")
+    return path
 
 
 def _verify_source(
@@ -239,7 +261,6 @@ def verify() -> list[str]:
 
     destinations: set[str] = set()
     entry_destinations: set[str] = set()
-    entries_by_destination: dict[str, dict[str, Any]] = {}
     entries = root.get("entries")
     if not isinstance(entries, list):
         errors.append("entries must be an array")
@@ -264,11 +285,39 @@ def verify() -> list[str]:
                 errors.append(f"duplicate destination_path: {destination}")
             destinations.add(destination)
             entry_destinations.add(destination)
-            entries_by_destination[destination] = entry
         if entry.get("locally_modified") not in {True, False}:
             errors.append(f"{label}.locally_modified must be boolean")
         for field in ("license", "imported_at", "relationship"):
             if not isinstance(entry.get(field), str) or not entry.get(field):
+                errors.append(f"{label}.{field} is required")
+
+    generated_destinations: set[str] = set()
+    generated_by_destination: dict[str, dict[str, Any]] = {}
+    generated_assets = root.get("generated_assets")
+    if not isinstance(generated_assets, list):
+        errors.append("generated_assets must be an array")
+        generated_assets = []
+    for index, raw_asset in enumerate(generated_assets):
+        label = f"generated_assets[{index}]"
+        asset = _mapping(raw_asset, label, errors)
+        destination = _safe_destination(asset.get("destination_path"), label, errors)
+        _verify_hash(asset, label, destination, errors)
+        if destination is not None:
+            if destination in destinations:
+                errors.append(f"duplicate destination_path: {destination}")
+            destinations.add(destination)
+            generated_destinations.add(destination)
+            generated_by_destination[destination] = asset
+        generator = asset.get("generator")
+        _verify_repository_file(generator, f"{label}.generator", errors)
+        inputs = asset.get("inputs")
+        if not isinstance(inputs, list) or not inputs:
+            errors.append(f"{label}.inputs must be a non-empty array")
+        else:
+            for input_index, source in enumerate(inputs):
+                _verify_repository_file(source, f"{label}.inputs[{input_index}]", errors)
+        for field in ("license", "generated_at", "relationship"):
+            if not isinstance(asset.get(field), str) or not asset.get(field):
                 errors.append(f"{label}.{field} is required")
 
     derivation_destinations: set[str] = set()
@@ -323,6 +372,9 @@ def verify() -> list[str]:
     missing_entries = EXPECTED_VERBATIM - entry_destinations
     if missing_entries:
         errors.append(f"missing verbatim/generated entries: {sorted(missing_entries)}")
+    missing_generated = EXPECTED_GENERATED - generated_destinations
+    if missing_generated:
+        errors.append(f"missing generated asset entries: {sorted(missing_generated)}")
     missing_derivations = EXPECTED_DERIVATIONS - derivation_destinations
     if missing_derivations:
         errors.append(f"missing conceptual derivations: {sorted(missing_derivations)}")
@@ -347,33 +399,39 @@ def verify() -> list[str]:
         except json.JSONDecodeError as exc:
             errors.append(f"frame fixture is invalid JSON: {exc}")
         else:
-            if fixture.get("source_commit") != commit:
-                errors.append("frame fixture source_commit does not match source_baseline")
-            if fixture.get("source_repository") != repository:
-                errors.append("frame fixture source_repository does not match source_baseline")
-            frame_entry = entries_by_destination.get(
+            if fixture.get("schema_version") != "sy205-frame-parity-v1":
+                errors.append("frame fixture schema_version must equal sy205-frame-parity-v1")
+            if fixture.get("model_version") != MODEL_VERSION:
+                errors.append("frame fixture model_version does not match the backend")
+            frame_entry = generated_by_destination.get(
                 "backend/tests/fixtures/frame-parity/baseline.json"
             )
-            urdf_entry = entries_by_destination.get("assets/model/kinematic_excavator.urdf")
-            if frame_entry is not None and fixture.get("source_model_blob") != frame_entry.get(
-                "source_blob"
+            urdf_entry = generated_by_destination.get("assets/model/kinematic_excavator.urdf")
+            if fixture.get("source_urdf_path") != "assets/model/kinematic_excavator.urdf":
+                errors.append("frame fixture source_urdf_path is incorrect")
+            if urdf_entry is not None and fixture.get("source_urdf_sha256") != urdf_entry.get(
+                "destination_sha256"
             ):
-                errors.append("frame fixture model blob does not match its provenance entry")
-            if urdf_entry is not None and fixture.get("source_urdf_blob") != urdf_entry.get(
-                "source_blob"
+                errors.append("frame fixture URDF hash does not match the active URDF entry")
+            if fixture.get("source_model_path") != "backend/src/babylon_sim/model.py":
+                errors.append("frame fixture source_model_path is incorrect")
+            if fixture.get("source_model_sha256") != _sha256(
+                ROOT / "backend/src/babylon_sim/model.py"
             ):
-                errors.append("frame fixture URDF blob does not match the imported URDF entry")
+                errors.append("frame fixture source_model_sha256 is stale")
             source_lock_hash = fixture.get("source_pixi_lock_sha256")
-            if not isinstance(source_lock_hash, str) or HEX_64.fullmatch(source_lock_hash) is None:
-                errors.append("frame fixture source_pixi_lock_sha256 must be 64 lowercase hex")
+            if source_lock_hash != _sha256(ROOT / "pixi.lock"):
+                errors.append("frame fixture source_pixi_lock_sha256 is stale")
             if fixture.get("pinocchio_version") != "4.1.0":
                 errors.append("frame fixture must record the pinned Pinocchio 4.1.0 baseline")
-            if frame_entry is not None and set(frame_entry.get("generated_from", [])) != {
-                "kinematic_sim/model.py",
-                "docs/urdf/kinematic_excavator.urdf",
-                "pixi.lock",
-            }:
-                errors.append("frame fixture generated_from inputs are incomplete")
+            if frame_entry is not None:
+                frame_inputs = {
+                    value.get("path")
+                    for value in frame_entry.get("inputs", [])
+                    if isinstance(value, dict)
+                }
+                if frame_inputs != {"assets/model/kinematic_excavator.urdf", "pixi.lock"}:
+                    errors.append("frame fixture generated inputs are incomplete")
 
     notice = ROOT / "NOTICE.md"
     retained_license = "assets/licenses/KinematicSim-AGPL-3.0.txt"
@@ -392,7 +450,8 @@ def main() -> int:
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     print(
         "Provenance verified: "
-        f"{len(manifest['entries'])} imported/generated entries, "
+        f"{len(manifest['entries'])} imported entries, "
+        f"{len(manifest['generated_assets'])} generated assets, "
         f"{len(manifest['conceptual_derivations'])} conceptual derivations."
     )
     return 0

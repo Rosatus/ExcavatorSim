@@ -42,14 +42,12 @@ def test_frame_transforms_match_fixed_baseline(
         assert np.allclose(actual[frame_name], expected, atol=1e-12), frame_name
 
 
-def test_default_pose_is_grounded(model: ExcavatorModel) -> None:
+def test_default_pose_matches_glb_rest_height(model: ExcavatorModel) -> None:
     transforms = model.frame_transforms((0.0, 0.0, 0.0, 0.0))
     assert transforms["base_link"][2][3] == pytest.approx(0.0)
-    tooth_bottom = transforms["tooth_center"][2][3] - 0.06
-    assert 0.05 <= tooth_bottom <= 0.30
+    assert transforms["tooth_center"][2][3] == pytest.approx(3.108117024)
 
 
 def test_missing_urdf_is_diagnostic(tmp_path: Path) -> None:
     with pytest.raises(ModelValidationError, match="does not exist"):
         ExcavatorModel.from_urdf(tmp_path / "missing.urdf")
-

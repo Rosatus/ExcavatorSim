@@ -53,7 +53,7 @@
       "properties": {
         "protocol_version": { "$ref": "#/$defs/ProtocolVersion" },
         "state_schema_version": { "type": "string", "const": "babylon-sim-state-v2" },
-        "model_version": { "type": "string", "const": "docs-urdf-v3" },
+        "model_version": { "type": "string", "const": "sy205-glb-urdf-v4" },
         "calibration_version": { "type": "string", "const": "machine-calibration-v2" },
         "software_version": { "type": "string", "const": "0.1.0" },
         "terrain_spec_version": { "type": "string", "const": "terrain-spec-v1" },

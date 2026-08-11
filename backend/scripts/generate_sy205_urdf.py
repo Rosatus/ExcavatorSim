@@ -28,7 +28,7 @@ DEFAULT_GLB_PATH = ROOT / "godot/client/assets/visual/SY205_excavator_godot.glb"
 DEFAULT_VISUAL_MANIFEST_PATH = ROOT / "godot/client/resources/visual/sy205_visual_manifest.json"
 DEFAULT_PARAMETERS_PATH = ROOT / "assets/model/sy205_glb_derived_v4.params.json"
 DEFAULT_CALIBRATION_PATH = ROOT / "assets/calibration/m1_provisional_calibration.json"
-DEFAULT_REFERENCE_SOURCE_PATH = ROOT / "assets/model/kinematic_excavator.urdf"
+DEFAULT_REFERENCE_SOURCE_PATH = ROOT / "assets/model/library/sy135_reference.urdf"
 DEFAULT_URDF_PATH = ROOT / "assets/model/sy205_glb_derived_v4.urdf"
 DEFAULT_EVIDENCE_PATH = ROOT / "assets/model/sy205_glb_derived_v4.json"
 DEFAULT_REFERENCE_OUTPUT_PATH = ROOT / "assets/model/library/sy135_reference.urdf"
@@ -1222,7 +1222,7 @@ def build_artifacts(
             },
             "reference_urdf_source": {
                 "evidence_level": "decision",
-                "path": "assets/model/kinematic_excavator.urdf",
+                "path": "assets/model/library/sy135_reference.urdf",
                 "byte_size": len(reference_bytes),
                 "sha256": _sha256(reference_bytes),
                 "role": "future_sy135_reference_seed",
