@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 12
+- **Total Sessions**: 13
 - **Last Active**: 2026-08-11
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~418 | Active |
+| `journal-1.md` | ~451 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 13 | 2026-08-11 | 修复 SY205 被动四连杆机构 | `c4c3184` | `main` |
 | 12 | 2026-08-11 | Fix Godot joint coordinate parity | `f79173b` | `main` |
 | 11 | 2026-08-11 | Record MCP verification boundary | `3754f92` | `main` |
 | 10 | 2026-08-11 | Godot verification baseline and release evidence | `69c54e8`, `805b603`, `43131d7` | `main` |

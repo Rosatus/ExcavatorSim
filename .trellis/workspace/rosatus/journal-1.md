@@ -416,3 +416,36 @@ Converted authoritative Python Z-up frame transforms once at the Godot protocol 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 13: 修复 SY205 被动四连杆机构
+
+**Date**: 2026-08-11
+**Task**: 修复 SY205 被动四连杆机构
+**Branch**: `main`
+
+### Summary
+
+依据用户提供的 SY205_Godot_Import_Guide.md，在 Godot MotionPresentation 中重建 A/B/C/D 被动四连杆：arm-local Y-Z 圆交点、连续分支、不可达保留、B 摇臂与侧连杆控制器驱动；新增 manifest 契约、GLB/motion 回归测试和 frontend authority 规范。GLB 字节、五个 Python 权威 frame、后端协议均未改变。Godot 4.7.1 standalone matrix、MCP 四连杆 smoke、backend-smoke、pixi verify、Trellis validate 与 diff check 均通过。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c4c3184` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
