@@ -15,7 +15,7 @@
 7. [x] Run the seven-script Godot standalone matrix, MCP live motion smoke,
    `pixi run backend-smoke`, `pixi run verify`, task validation and
    `git diff --check`; inspect each joint direction visually.
-8. [ ] Commit the scoped fix, archive the completed Trellis task and record the
+8. [x] Commit the scoped fix, archive the completed Trellis task and record the
    session journal.
 
 ## Risky files and rollback points
