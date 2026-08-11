@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 11
+- **Total Sessions**: 12
 - **Last Active**: 2026-08-11
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~385 | Active |
+| `journal-1.md` | ~418 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 12 | 2026-08-11 | Fix Godot joint coordinate parity | `f79173b` | `main` |
 | 11 | 2026-08-11 | Record MCP verification boundary | `3754f92` | `main` |
 | 10 | 2026-08-11 | Godot verification baseline and release evidence | `69c54e8`, `805b603`, `43131d7` | `main` |
 | 9 | 2026-08-11 | Godot realistic client parent release candidate | `389ab38`, `b408904` | `main` |

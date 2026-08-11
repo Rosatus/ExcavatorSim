@@ -383,3 +383,36 @@ Updated .trellis/spec/frontend/godot-mcp.md with the executable distinction betw
 ### Next Steps
 
 - None - task complete
+
+
+## Session 12: Fix Godot joint coordinate parity
+
+**Date**: 2026-08-11
+**Task**: Fix Godot joint coordinate parity
+**Branch**: `main`
+
+### Summary
+
+Converted authoritative Python Z-up frame transforms once at the Godot protocol boundary with full basis conjugation, preserved the SY205 GLB bytes and five-pivot hierarchy, added all-frame zero/swing/asymmetric parity plus bucket-tooth proxy regressions, documented the contract, and passed Godot matrix, MCP live smoke, backend smoke, and pixi verify.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f79173b` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
