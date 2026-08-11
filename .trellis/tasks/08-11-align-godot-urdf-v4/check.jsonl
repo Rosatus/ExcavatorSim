@@ -1,0 +1,3 @@
+{"file":".trellis/tasks/08-11-glb-derived-urdf-v4/prd.md","reason":"Godot alignment acceptance and scope boundaries."}
+{"file":".trellis/spec/frontend/motion-transport.md","reason":"Verify visual parity and passive linkage behavior."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Verify model identity and fixture propagation across consumers."}

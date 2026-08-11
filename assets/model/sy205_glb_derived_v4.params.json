@@ -1,0 +1,138 @@
+{
+  "schema_version": "sy205-urdf-generation-v1",
+  "model_version": "sy205-glb-urdf-v4",
+  "source": {
+    "byte_size": 4904884,
+    "sha256": "cf95534b31bcc156980afefef0a9f273e5c6f727547b3db1e9062ca5619b495a",
+    "reference_urdf_sha256": "2f32a9f635f6fb1b43da9fb624612ade5b7a7b7d2d84f5eed401ffb414afc485"
+  },
+  "logical_paths": {
+    "glb": "godot/client/assets/visual/SY205_excavator_godot.glb",
+    "visual_manifest": "godot/client/resources/visual/sy205_visual_manifest.json",
+    "calibration": "assets/calibration/m1_provisional_calibration.json",
+    "candidate_urdf": "assets/model/sy205_glb_derived_v4.urdf",
+    "evidence": "assets/model/sy205_glb_derived_v4.json",
+    "reference_urdf": "assets/model/library/sy135_reference.urdf"
+  },
+  "coordinate_system": {
+    "source": "right_handed_gltf_y_up",
+    "target": "right_handed_python_z_up",
+    "godot_to_python_basis": [
+      [1.0, 0.0, 0.0],
+      [0.0, 0.0, -1.0],
+      [0.0, 1.0, 0.0]
+    ],
+    "joint_origin_decimals": 6,
+    "geometry_decimals": 9,
+    "validation_tolerance_m": 0.00001
+  },
+  "links": {
+    "base_link": {
+      "pivot_index_path": [19],
+      "pivot_name_path": "CTRL_EXCAVATOR_ROOT",
+      "authority_origin": "scene_identity",
+      "visual_index_paths": [[19, 0], [19, 17], [19, 18]],
+      "visual_name_paths": [
+        "CTRL_EXCAVATOR_ROOT/crawler_tracks",
+        "CTRL_EXCAVATOR_ROOT/undercarriage_chassis_left",
+        "CTRL_EXCAVATOR_ROOT/undercarriage_chassis_right"
+      ],
+      "mass_fraction": 0.44,
+      "material": "undercarriage_color"
+    },
+    "upper_structure_link": {
+      "pivot_index_path": [19, 16],
+      "pivot_name_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW",
+      "authority_origin": "pivot",
+      "visual_index_paths": [[19, 16, 15]],
+      "visual_name_paths": ["CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/upper_body"],
+      "mass_fraction": 0.36,
+      "material": "machinery_color"
+    },
+    "boom_link": {
+      "pivot_index_path": [19, 16, 14],
+      "pivot_name_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE",
+      "authority_origin": "pivot",
+      "visual_index_paths": [[19, 16, 14, 1]],
+      "visual_name_paths": [
+        "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/boom"
+      ],
+      "mass_fraction": 0.1,
+      "material": "machinery_color"
+    },
+    "arm_link": {
+      "pivot_index_path": [19, 16, 14, 13],
+      "pivot_name_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT",
+      "authority_origin": "pivot",
+      "visual_index_paths": [[19, 16, 14, 13, 5]],
+      "visual_name_paths": [
+        "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/excavator_arm"
+      ],
+      "mass_fraction": 0.06,
+      "material": "machinery_color"
+    },
+    "bucket_link": {
+      "pivot_index_path": [19, 16, 14, 13, 8],
+      "pivot_name_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT",
+      "authority_origin": "pivot",
+      "visual_index_paths": [[19, 16, 14, 13, 8, 6]],
+      "visual_name_paths": [
+        "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT/bucket"
+      ],
+      "mass_fraction": 0.04,
+      "material": "bucket_color"
+    }
+  },
+  "joints": [
+    {
+      "name": "swing_joint",
+      "parent": "base_link",
+      "child": "upper_structure_link",
+      "expected_origin_xyz": [0.0, 0.0, 0.91],
+      "expected_axis_xyz": [0.0, 0.0, 1.0],
+      "runtime_axis_godot": "Y"
+    },
+    {
+      "name": "boom_joint",
+      "parent": "upper_structure_link",
+      "child": "boom_link",
+      "expected_origin_xyz": [-0.119, 0.075, 0.713],
+      "expected_axis_xyz": [1.0, 0.0, 0.0],
+      "runtime_axis_godot": "X"
+    },
+    {
+      "name": "arm_joint",
+      "parent": "boom_link",
+      "child": "arm_link",
+      "expected_origin_xyz": [0.066, -3.915, 4.295],
+      "expected_axis_xyz": [1.0, 0.0, 0.0],
+      "runtime_axis_godot": "X"
+    },
+    {
+      "name": "bucket_joint",
+      "parent": "arm_link",
+      "child": "bucket_link",
+      "expected_origin_xyz": [-0.008, 0.63, -3.026],
+      "expected_axis_xyz": [1.0, 0.0, 0.0],
+      "runtime_axis_godot": "X"
+    }
+  ],
+  "estimates": {
+    "evidence_level": "estimated",
+    "total_operating_mass_kg": 21500.0,
+    "mass_basis": "provisional SY205-class operating mass; not encoded by the GLB",
+    "mass_fraction_basis": "provisional allocation across the five URDF authority links",
+    "collision_padding_m": 0.04,
+    "tooth_front_band_m": 0.02,
+    "tooth_cluster_size": 2,
+    "marker_radius_m": 0.03,
+    "gnss_top_margin_m": 0.05,
+    "sensor_rules": {
+      "gnss_link": {"parent": "upper_structure_link", "rule": "bounds_top_center"},
+      "swing_imu_link": {"parent": "upper_structure_link", "rule": "bounds_center"},
+      "boom_imu_link": {"parent": "boom_link", "rule": "bounds_center"},
+      "arm_imu_link": {"parent": "arm_link", "rule": "bounds_center"},
+      "bucket_imu_link": {"parent": "bucket_link", "rule": "bounds_center"}
+    }
+  }
+}

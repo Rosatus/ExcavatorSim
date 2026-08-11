@@ -1,0 +1,3 @@
+{"file":".trellis/tasks/08-11-glb-derived-urdf-v4/research/glb-urdf-evidence.md","reason":"Approved source identity, coordinate derivation, geometry findings, and resolved human gate."}
+{"file":".trellis/spec/backend/directory-structure.md","reason":"Owns placement of backend scripts, assets, and tests."}
+{"file":".agents/skills/godot-adapt-articulated-glb/references/evidence-and-human-gates.md","reason":"Separates observed, declared, validated, estimated, and decision evidence."}

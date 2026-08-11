@@ -1,0 +1,956 @@
+{
+  "coordinate_system": {
+    "base_authority_origin": "world_identity",
+    "evidence_level": "decision",
+    "godot_to_python_basis": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ]
+    ],
+    "neutral_pose": "imported_glb_rest_pose",
+    "position_rule": "(x_godot, y_godot, z_godot) -> (x, -z, y)",
+    "source": "right_handed_gltf_y_up",
+    "target": "right_handed_python_z_up"
+  },
+  "deferred": [
+    "production-accurate mass and inertia",
+    "hydraulic calibration",
+    "contact and collision validation",
+    "tooth and sensor landmark visual approval",
+    "passive four-bar authority"
+  ],
+  "fixed_frames": {
+    "arm_imu_link": {
+      "evidence_level": "estimated",
+      "origin_xyz": [
+        -0.000820003,
+        0.163279414,
+        -1.249701738
+      ],
+      "parent": "arm_link",
+      "review_state": "pending_v4_visual_gate",
+      "rule": "bounds_center"
+    },
+    "boom_imu_link": {
+      "evidence_level": "estimated",
+      "origin_xyz": [
+        0.004933506,
+        -1.972438484,
+        2.159274399
+      ],
+      "parent": "boom_link",
+      "review_state": "pending_v4_visual_gate",
+      "rule": "bounds_center"
+    },
+    "bucket_imu_link": {
+      "evidence_level": "estimated",
+      "origin_xyz": [
+        0.005774003,
+        0.5036515,
+        0.36291647
+      ],
+      "parent": "bucket_link",
+      "review_state": "pending_v4_visual_gate",
+      "rule": "bounds_center"
+    },
+    "gnss_link": {
+      "evidence_level": "estimated",
+      "origin_xyz": [
+        0.0,
+        0.740756452,
+        2.07440697
+      ],
+      "parent": "upper_structure_link",
+      "review_state": "pending_v4_visual_gate",
+      "rule": "bounds_top_center"
+    },
+    "swing_imu_link": {
+      "evidence_level": "estimated",
+      "origin_xyz": [
+        0.0,
+        0.740756452,
+        0.759832472
+      ],
+      "parent": "upper_structure_link",
+      "review_state": "pending_v4_visual_gate",
+      "rule": "bounds_center"
+    },
+    "tooth_center": {
+      "candidate_vertex_count": 12,
+      "evidence_level": "estimated",
+      "origin_xyz": [
+        0.00095452,
+        1.114953041,
+        0.216117024
+      ],
+      "parent": "bucket_link",
+      "review_state": "pending_v4_visual_gate",
+      "rule": "bucket_front_band_outer_cluster_midpoint"
+    },
+    "tooth_left": {
+      "candidate_vertex_count": 12,
+      "evidence_level": "estimated",
+      "origin_xyz": [
+        -0.590063978,
+        1.114150047,
+        0.219933033
+      ],
+      "parent": "bucket_link",
+      "review_state": "pending_v4_visual_gate",
+      "rule": "bucket_front_band_outer_cluster"
+    },
+    "tooth_right": {
+      "candidate_vertex_count": 12,
+      "evidence_level": "estimated",
+      "origin_xyz": [
+        0.591973018,
+        1.115756035,
+        0.212301016
+      ],
+      "parent": "bucket_link",
+      "review_state": "pending_v4_visual_gate",
+      "rule": "bucket_front_band_outer_cluster"
+    }
+  },
+  "generator": {
+    "algorithm_version": 1,
+    "path": "backend/scripts/generate_sy205_urdf.py",
+    "sha256": "aab40cb6ad320b6eb5e1b86ad71dc9f9a75bec25b28364d4891225d4ca609aa5"
+  },
+  "inputs": {
+    "calibration": {
+      "byte_size": 1676,
+      "evidence_level": "retained_provisional",
+      "path": "assets/calibration/m1_provisional_calibration.json",
+      "sha256": "2e1714c46c262ff78acf1c8ebbf8a98f51b13f25722efef8d4143d137ece800c"
+    },
+    "glb": {
+      "byte_size": 4904884,
+      "evidence_level": "observed",
+      "path": "godot/client/assets/visual/SY205_excavator_godot.glb",
+      "sha256": "cf95534b31bcc156980afefef0a9f273e5c6f727547b3db1e9062ca5619b495a"
+    },
+    "parameters": {
+      "byte_size": 4995,
+      "evidence_level": "decision",
+      "path": "assets/model/sy205_glb_derived_v4.params.json",
+      "sha256": "24a40a8ea479daeb28cd9e3410324e647ae08eb97a92a619672ff04f99bbe2b1"
+    },
+    "reference_urdf_source": {
+      "activation_policy": "not_an_sy205_runtime_or_rollback_model",
+      "byte_size": 5281,
+      "evidence_level": "decision",
+      "path": "assets/model/kinematic_excavator.urdf",
+      "role": "future_sy135_reference_seed",
+      "sha256": "2f32a9f635f6fb1b43da9fb624612ade5b7a7b7d2d84f5eed401ffb414afc485"
+    },
+    "visual_manifest": {
+      "byte_size": 9325,
+      "evidence_level": "validated",
+      "path": "godot/client/resources/visual/sy205_visual_manifest.json",
+      "sha256": "332eb6026ed83f177d97fe968744721d6c8e90f581427f489f435697b571f2af"
+    }
+  },
+  "joints": [
+    {
+      "axis": {
+        "evidence_level": "decision",
+        "xyz": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "child": "upper_structure_link",
+      "child_pivot": {
+        "evidence_level": "validated",
+        "node_index_path": [
+          19,
+          16
+        ],
+        "node_name_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW"
+      },
+      "joint_type": "continuous",
+      "name": "swing_joint",
+      "origin": {
+        "evidence_level": "validated",
+        "observed_unrounded_xyz": [
+          0.0,
+          0.0,
+          0.910000026
+        ],
+        "rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "xyz": [
+          0.0,
+          0.0,
+          0.91
+        ]
+      },
+      "parent": "base_link"
+    },
+    {
+      "axis": {
+        "evidence_level": "decision",
+        "xyz": [
+          1.0,
+          0.0,
+          0.0
+        ]
+      },
+      "child": "boom_link",
+      "child_pivot": {
+        "evidence_level": "validated",
+        "node_index_path": [
+          19,
+          16,
+          14
+        ],
+        "node_name_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE"
+      },
+      "joint_type": "continuous",
+      "name": "boom_joint",
+      "origin": {
+        "evidence_level": "validated",
+        "observed_unrounded_xyz": [
+          -0.119000003,
+          0.075000003,
+          0.713
+        ],
+        "rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "xyz": [
+          -0.119,
+          0.075,
+          0.713
+        ]
+      },
+      "parent": "upper_structure_link"
+    },
+    {
+      "axis": {
+        "evidence_level": "decision",
+        "xyz": [
+          1.0,
+          0.0,
+          0.0
+        ]
+      },
+      "child": "arm_link",
+      "child_pivot": {
+        "evidence_level": "validated",
+        "node_index_path": [
+          19,
+          16,
+          14,
+          13
+        ],
+        "node_name_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT"
+      },
+      "joint_type": "continuous",
+      "name": "arm_joint",
+      "origin": {
+        "evidence_level": "validated",
+        "observed_unrounded_xyz": [
+          0.066,
+          -3.914999962,
+          4.295000076
+        ],
+        "rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "xyz": [
+          0.066,
+          -3.915,
+          4.295
+        ]
+      },
+      "parent": "boom_link"
+    },
+    {
+      "axis": {
+        "evidence_level": "decision",
+        "xyz": [
+          1.0,
+          0.0,
+          0.0
+        ]
+      },
+      "child": "bucket_link",
+      "child_pivot": {
+        "evidence_level": "validated",
+        "node_index_path": [
+          19,
+          16,
+          14,
+          13,
+          8
+        ],
+        "node_name_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT"
+      },
+      "joint_type": "continuous",
+      "name": "bucket_joint",
+      "origin": {
+        "evidence_level": "validated",
+        "observed_unrounded_xyz": [
+          -0.008000001,
+          0.629999876,
+          -3.026000261
+        ],
+        "rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "xyz": [
+          -0.008,
+          0.63,
+          -3.026
+        ]
+      },
+      "parent": "arm_link"
+    }
+  ],
+  "links": {
+    "arm_link": {
+      "center_of_mass": {
+        "evidence_level": "estimated",
+        "rule": "link_local_geometry_aabb_center",
+        "xyz": [
+          -0.000820003,
+          0.163279414,
+          -1.249701738
+        ]
+      },
+      "collision_proxy": {
+        "evidence_level": "estimated",
+        "policy": "link_local_aabb_plus_checked_in_padding",
+        "shape": "box",
+        "size_xyz": [
+          0.419790009,
+          1.189338999,
+          3.943809109
+        ]
+      },
+      "geometry": {
+        "bounds_max_xyz": [
+          0.169075001,
+          0.717948914,
+          0.682202816
+        ],
+        "bounds_min_xyz": [
+          -0.170715008,
+          -0.391390085,
+          -3.181606293
+        ],
+        "evidence_level": "observed",
+        "size_xyz": [
+          0.339790009,
+          1.109338999,
+          3.863809109
+        ],
+        "sources": [
+          {
+            "mesh_index": 4,
+            "node_index_path": [
+              19,
+              16,
+              14,
+              13,
+              5
+            ],
+            "node_name_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/excavator_arm",
+            "position_accessor": 16,
+            "primitive_index": 0,
+            "vertex_count": 528
+          }
+        ]
+      },
+      "inertia": {
+        "at_com_diagonal_kg_m2": [
+          1737.162788121,
+          1617.281393485,
+          144.704703427
+        ],
+        "at_link_origin_kg_m2": [
+          [
+            3786.217624633,
+            0.172717691,
+            -1.32194006
+          ],
+          [
+            0.172717691,
+            3631.945481849,
+            263.225232378
+          ],
+          [
+            -1.32194006,
+            263.225232378,
+            179.097186381
+          ]
+        ],
+        "evidence_level": "estimated",
+        "rule": "uniform_box_proxy_with_parallel_axis_trace"
+      },
+      "mass": {
+        "basis": "provisional SY205-class operating mass; not encoded by the GLB",
+        "evidence_level": "estimated",
+        "value_kg": 1290.0
+      },
+      "pivot": {
+        "evidence_level": "validated",
+        "node_index_path": [
+          19,
+          16,
+          14,
+          13
+        ],
+        "node_name_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT"
+      },
+      "visual_proxy": {
+        "evidence_level": "estimated",
+        "shape": "box",
+        "size_xyz": [
+          0.339790009,
+          1.109338999,
+          3.863809109
+        ]
+      }
+    },
+    "base_link": {
+      "center_of_mass": {
+        "evidence_level": "estimated",
+        "rule": "link_local_geometry_aabb_center",
+        "xyz": [
+          0.0,
+          0.014860511,
+          0.460282985
+        ]
+      },
+      "collision_proxy": {
+        "evidence_level": "estimated",
+        "policy": "link_local_aabb_plus_checked_in_padding",
+        "shape": "box",
+        "size_xyz": [
+          3.067423897,
+          4.325371103,
+          0.978877971
+        ]
+      },
+      "geometry": {
+        "bounds_max_xyz": [
+          1.493711948,
+          2.137546062,
+          0.909721971
+        ],
+        "bounds_min_xyz": [
+          -1.493711948,
+          -2.107825041,
+          0.010844
+        ],
+        "evidence_level": "observed",
+        "size_xyz": [
+          2.987423897,
+          4.245371103,
+          0.898877971
+        ],
+        "sources": [
+          {
+            "mesh_index": 0,
+            "node_index_path": [
+              19,
+              0
+            ],
+            "node_name_path": "CTRL_EXCAVATOR_ROOT/crawler_tracks",
+            "position_accessor": 0,
+            "primitive_index": 0,
+            "vertex_count": 5662
+          },
+          {
+            "mesh_index": 9,
+            "node_index_path": [
+              19,
+              17
+            ],
+            "node_name_path": "CTRL_EXCAVATOR_ROOT/undercarriage_chassis_left",
+            "position_accessor": 36,
+            "primitive_index": 0,
+            "vertex_count": 180
+          },
+          {
+            "mesh_index": 10,
+            "node_index_path": [
+              19,
+              18
+            ],
+            "node_name_path": "CTRL_EXCAVATOR_ROOT/undercarriage_chassis_right",
+            "position_accessor": 40,
+            "primitive_index": 0,
+            "vertex_count": 180
+          }
+        ]
+      },
+      "inertia": {
+        "at_com_diagonal_kg_m2": [
+          14845.229092453,
+          7672.598546474,
+          21243.909972642
+        ],
+        "at_link_origin_kg_m2": [
+          [
+            16851.517823158,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            9676.798180141,
+            -64.706781082
+          ],
+          [
+            0.0,
+            -64.706781082,
+            21245.999069679
+          ]
+        ],
+        "evidence_level": "estimated",
+        "rule": "uniform_box_proxy_with_parallel_axis_trace"
+      },
+      "mass": {
+        "basis": "provisional SY205-class operating mass; not encoded by the GLB",
+        "evidence_level": "estimated",
+        "value_kg": 9460.0
+      },
+      "pivot": {
+        "evidence_level": "validated",
+        "node_index_path": [
+          19
+        ],
+        "node_name_path": "CTRL_EXCAVATOR_ROOT"
+      },
+      "visual_proxy": {
+        "evidence_level": "estimated",
+        "shape": "box",
+        "size_xyz": [
+          2.987423897,
+          4.245371103,
+          0.898877971
+        ]
+      }
+    },
+    "boom_link": {
+      "center_of_mass": {
+        "evidence_level": "estimated",
+        "rule": "link_local_geometry_aabb_center",
+        "xyz": [
+          0.004933506,
+          -1.972438484,
+          2.159274399
+        ]
+      },
+      "collision_proxy": {
+        "evidence_level": "estimated",
+        "policy": "link_local_aabb_plus_checked_in_padding",
+        "shape": "box",
+        "size_xyz": [
+          0.682465004,
+          4.184796976,
+          4.70371695
+        ]
+      },
+      "geometry": {
+        "bounds_max_xyz": [
+          0.306166008,
+          0.079960003,
+          4.471132874
+        ],
+        "bounds_min_xyz": [
+          -0.296298996,
+          -4.024836972,
+          -0.152584076
+        ],
+        "evidence_level": "observed",
+        "size_xyz": [
+          0.602465004,
+          4.104796976,
+          4.62371695
+        ],
+        "sources": [
+          {
+            "mesh_index": 1,
+            "node_index_path": [
+              19,
+              16,
+              14,
+              1
+            ],
+            "node_name_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/boom",
+            "position_accessor": 4,
+            "primitive_index": 0,
+            "vertex_count": 2103
+          }
+        ]
+      },
+      "inertia": {
+        "at_com_diagonal_kg_m2": [
+          6849.204233219,
+          3895.391951193,
+          3083.87441095
+        ],
+        "at_link_origin_kg_m2": [
+          [
+            25238.110171657,
+            20.921730822,
+            -22.903506552
+          ],
+          [
+            20.921730822,
+            13919.746033569,
+            9156.92723571
+          ],
+          [
+            -22.903506552,
+            9156.92723571,
+            11448.530926793
+          ]
+        ],
+        "evidence_level": "estimated",
+        "rule": "uniform_box_proxy_with_parallel_axis_trace"
+      },
+      "mass": {
+        "basis": "provisional SY205-class operating mass; not encoded by the GLB",
+        "evidence_level": "estimated",
+        "value_kg": 2150.0
+      },
+      "pivot": {
+        "evidence_level": "validated",
+        "node_index_path": [
+          19,
+          16,
+          14
+        ],
+        "node_name_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE"
+      },
+      "visual_proxy": {
+        "evidence_level": "estimated",
+        "shape": "box",
+        "size_xyz": [
+          0.602465004,
+          4.104796976,
+          4.62371695
+        ]
+      }
+    },
+    "bucket_link": {
+      "center_of_mass": {
+        "evidence_level": "estimated",
+        "rule": "link_local_geometry_aabb_center",
+        "xyz": [
+          0.005774003,
+          0.5036515,
+          0.36291647
+        ]
+      },
+      "collision_proxy": {
+        "evidence_level": "estimated",
+        "policy": "link_local_aabb_plus_checked_in_padding",
+        "shape": "box",
+        "size_xyz": [
+          1.391366022,
+          1.30420907,
+          1.673720913
+        ]
+      },
+      "geometry": {
+        "bounds_max_xyz": [
+          0.661457013,
+          1.115756035,
+          1.159776926
+        ],
+        "bounds_min_xyz": [
+          -0.649909008,
+          -0.108453035,
+          -0.433943987
+        ],
+        "evidence_level": "observed",
+        "size_xyz": [
+          1.311366022,
+          1.22420907,
+          1.593720913
+        ],
+        "sources": [
+          {
+            "mesh_index": 5,
+            "node_index_path": [
+              19,
+              16,
+              14,
+              13,
+              8,
+              6
+            ],
+            "node_name_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT/bucket",
+            "position_accessor": 20,
+            "primitive_index": 0,
+            "vertex_count": 767
+          }
+        ]
+      },
+      "inertia": {
+        "at_com_diagonal_kg_m2": [
+          289.435450706,
+          305.273282023,
+          230.649756136
+        ],
+        "at_link_origin_kg_m2": [
+          [
+            620.8564002,
+            -2.500953126,
+            -1.802113325
+          ],
+          [
+            -2.500953126,
+            418.571146597,
+            -157.193744798
+          ],
+          [
+            -1.802113325,
+            -157.193744798,
+            448.830184317
+          ]
+        ],
+        "evidence_level": "estimated",
+        "rule": "uniform_box_proxy_with_parallel_axis_trace"
+      },
+      "mass": {
+        "basis": "provisional SY205-class operating mass; not encoded by the GLB",
+        "evidence_level": "estimated",
+        "value_kg": 860.0
+      },
+      "pivot": {
+        "evidence_level": "validated",
+        "node_index_path": [
+          19,
+          16,
+          14,
+          13,
+          8
+        ],
+        "node_name_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT"
+      },
+      "visual_proxy": {
+        "evidence_level": "estimated",
+        "shape": "box",
+        "size_xyz": [
+          1.311366022,
+          1.22420907,
+          1.593720913
+        ]
+      }
+    },
+    "upper_structure_link": {
+      "center_of_mass": {
+        "evidence_level": "estimated",
+        "rule": "link_local_geometry_aabb_center",
+        "xyz": [
+          0.0,
+          0.740756452,
+          0.759832472
+        ]
+      },
+      "collision_proxy": {
+        "evidence_level": "estimated",
+        "policy": "link_local_aabb_plus_checked_in_padding",
+        "shape": "box",
+        "size_xyz": [
+          3.238524036,
+          4.445462899,
+          2.609148996
+        ]
+      },
+      "geometry": {
+        "bounds_max_xyz": [
+          1.579262018,
+          2.923487902,
+          2.02440697
+        ],
+        "bounds_min_xyz": [
+          -1.579262018,
+          -1.441974998,
+          -0.504742026
+        ],
+        "evidence_level": "observed",
+        "size_xyz": [
+          3.158524036,
+          4.365462899,
+          2.529148996
+        ],
+        "sources": [
+          {
+            "mesh_index": 8,
+            "node_index_path": [
+              19,
+              16,
+              15
+            ],
+            "node_name_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/upper_body",
+            "position_accessor": 32,
+            "primitive_index": 0,
+            "vertex_count": 2272
+          }
+        ]
+      },
+      "inertia": {
+        "at_com_diagonal_kg_m2": [
+          16417.740324169,
+          10560.500332079,
+          18726.633566337
+        ],
+        "at_link_origin_kg_m2": [
+          [
+            25133.487342274,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            15029.153611295,
+            -4356.465237256
+          ],
+          [
+            0.0,
+            -4356.465237256,
+            22973.727305226
+          ]
+        ],
+        "evidence_level": "estimated",
+        "rule": "uniform_box_proxy_with_parallel_axis_trace"
+      },
+      "mass": {
+        "basis": "provisional SY205-class operating mass; not encoded by the GLB",
+        "evidence_level": "estimated",
+        "value_kg": 7740.0
+      },
+      "pivot": {
+        "evidence_level": "validated",
+        "node_index_path": [
+          19,
+          16
+        ],
+        "node_name_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW"
+      },
+      "visual_proxy": {
+        "evidence_level": "estimated",
+        "shape": "box",
+        "size_xyz": [
+          3.158524036,
+          4.365462899,
+          2.529148996
+        ]
+      }
+    }
+  },
+  "model_version": "sy205-glb-urdf-v4",
+  "outputs": {
+    "candidate_urdf": {
+      "byte_size": 6946,
+      "path": "assets/model/sy205_glb_derived_v4.urdf",
+      "sha256": "5707f454624fadd5630fcbfd66893b4edf7e8c5b97c84e65e06bf9f8fa46c02c"
+    },
+    "evidence": {
+      "byte_size": 23724,
+      "hash_basis": "canonical JSON with this sha256 field replaced by 64 zeroes",
+      "path": "assets/model/sy205_glb_derived_v4.json",
+      "sha256": "6c28d6d72a400b53a58e4afcb16d68935995cda66aabbe6ab1dd596aaad22dcf"
+    },
+    "reference_urdf": {
+      "byte_size": 5281,
+      "path": "assets/model/library/sy135_reference.urdf",
+      "role": "future_sy135_reference",
+      "sha256": "2f32a9f635f6fb1b43da9fb624612ade5b7a7b7d2d84f5eed401ffb414afc485"
+    }
+  },
+  "retained_calibration": {
+    "calibration_version": "m1-provisional-2",
+    "cylinders": {
+      "activation_policy": "unchanged_in_m1",
+      "evidence_level": "retained_provisional",
+      "values": [
+        {
+          "anchor_a_m": 1.8,
+          "anchor_b_m": 1.5,
+          "angle_offset_rad": 1.6283185307179586,
+          "joint": "boom_joint",
+          "name": "boom_cylinder"
+        },
+        {
+          "anchor_a_m": 1.4,
+          "anchor_b_m": 1.2,
+          "angle_offset_rad": 2.927875959474386,
+          "joint": "arm_joint",
+          "name": "arm_cylinder"
+        },
+        {
+          "anchor_a_m": 0.9,
+          "anchor_b_m": 0.8,
+          "angle_offset_rad": 3.630727415391778,
+          "joint": "bucket_joint",
+          "name": "bucket_cylinder"
+        }
+      ]
+    },
+    "joint_limits": {
+      "arm_joint": {
+        "evidence_level": "retained_provisional",
+        "max_acceleration_rad_s2": 0.65,
+        "max_position_rad": 0.5235987755982988,
+        "max_velocity_rad_s": 0.45,
+        "min_position_rad": -0.7853981633974483
+      },
+      "boom_joint": {
+        "evidence_level": "retained_provisional",
+        "max_acceleration_rad_s2": 0.5,
+        "max_position_rad": 0.7853981633974483,
+        "max_velocity_rad_s": 0.35,
+        "min_position_rad": -0.2617993877991494
+      },
+      "bucket_joint": {
+        "evidence_level": "retained_provisional",
+        "max_acceleration_rad_s2": 0.8,
+        "max_position_rad": 0.7853981633974483,
+        "max_velocity_rad_s": 0.55,
+        "min_position_rad": -0.7853981633974483
+      },
+      "swing_joint": {
+        "evidence_level": "retained_provisional",
+        "max_acceleration_rad_s2": 0.8,
+        "max_position_rad": 3.141592653589793,
+        "max_velocity_rad_s": 0.6,
+        "min_position_rad": -3.141592653589793
+      }
+    },
+    "quality": "provisional",
+    "schema_version": "machine-calibration-v2"
+  },
+  "schema_version": "sy205-glb-urdf-evidence-v1"
+}

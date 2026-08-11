@@ -1,0 +1,206 @@
+<?xml version='1.0' encoding='utf-8'?>
+<robot name="sy205_glb_derived_v4">
+  <!-- Generated deterministically from the approved SY205 GLB; all physical values are provisional estimates. -->
+  <material name="undercarriage_color">
+    <color rgba="0.12 0.14 0.16 1" />
+  </material>
+  <material name="machinery_color">
+    <color rgba="0.88 0.55 0.05 1" />
+  </material>
+  <material name="bucket_color">
+    <color rgba="0.24 0.27 0.29 1" />
+  </material>
+  <link name="base_link">
+    <inertial>
+      <origin xyz="0 0.014860511 0.460282985" rpy="0 0 0" />
+      <mass value="9460" />
+      <inertia ixx="14845.229092453" ixy="0" ixz="0" iyy="7672.598546474" iyz="0" izz="21243.909972642" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0.014860511 0.460282985" rpy="0 0 0" />
+      <geometry>
+        <box size="2.987423897 4.245371103 0.898877971" />
+      </geometry>
+      <material name="undercarriage_color" />
+    </visual>
+    <collision>
+      <origin xyz="0 0.014860511 0.460282985" rpy="0 0 0" />
+      <geometry>
+        <box size="3.067423897 4.325371103 0.978877971" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="upper_structure_link">
+    <inertial>
+      <origin xyz="0 0.740756452 0.759832472" rpy="0 0 0" />
+      <mass value="7740" />
+      <inertia ixx="16417.740324169" ixy="0" ixz="0" iyy="10560.500332079" iyz="0" izz="18726.633566337" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0.740756452 0.759832472" rpy="0 0 0" />
+      <geometry>
+        <box size="3.158524036 4.365462899 2.529148996" />
+      </geometry>
+      <material name="machinery_color" />
+    </visual>
+    <collision>
+      <origin xyz="0 0.740756452 0.759832472" rpy="0 0 0" />
+      <geometry>
+        <box size="3.238524036 4.445462899 2.609148996" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="boom_link">
+    <inertial>
+      <origin xyz="0.004933506 -1.972438484 2.159274399" rpy="0 0 0" />
+      <mass value="2150" />
+      <inertia ixx="6849.204233219" ixy="0" ixz="0" iyy="3895.391951193" iyz="0" izz="3083.87441095" />
+    </inertial>
+    <visual>
+      <origin xyz="0.004933506 -1.972438484 2.159274399" rpy="0 0 0" />
+      <geometry>
+        <box size="0.602465004 4.104796976 4.62371695" />
+      </geometry>
+      <material name="machinery_color" />
+    </visual>
+    <collision>
+      <origin xyz="0.004933506 -1.972438484 2.159274399" rpy="0 0 0" />
+      <geometry>
+        <box size="0.682465004 4.184796976 4.70371695" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="arm_link">
+    <inertial>
+      <origin xyz="-0.000820003 0.163279414 -1.249701738" rpy="0 0 0" />
+      <mass value="1290" />
+      <inertia ixx="1737.162788121" ixy="0" ixz="0" iyy="1617.281393485" iyz="0" izz="144.704703427" />
+    </inertial>
+    <visual>
+      <origin xyz="-0.000820003 0.163279414 -1.249701738" rpy="0 0 0" />
+      <geometry>
+        <box size="0.339790009 1.109338999 3.863809109" />
+      </geometry>
+      <material name="machinery_color" />
+    </visual>
+    <collision>
+      <origin xyz="-0.000820003 0.163279414 -1.249701738" rpy="0 0 0" />
+      <geometry>
+        <box size="0.419790009 1.189338999 3.943809109" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="bucket_link">
+    <inertial>
+      <origin xyz="0.005774003 0.5036515 0.36291647" rpy="0 0 0" />
+      <mass value="860" />
+      <inertia ixx="289.435450706" ixy="0" ixz="0" iyy="305.273282023" iyz="0" izz="230.649756136" />
+    </inertial>
+    <visual>
+      <origin xyz="0.005774003 0.5036515 0.36291647" rpy="0 0 0" />
+      <geometry>
+        <box size="1.311366022 1.22420907 1.593720913" />
+      </geometry>
+      <material name="bucket_color" />
+    </visual>
+    <collision>
+      <origin xyz="0.005774003 0.5036515 0.36291647" rpy="0 0 0" />
+      <geometry>
+        <box size="1.391366022 1.30420907 1.673720913" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="tooth_center">
+    <visual>
+      <geometry>
+        <sphere radius="0.03" />
+      </geometry>
+      <material name="bucket_color" />
+    </visual>
+  </link>
+  <link name="tooth_left">
+    <visual>
+      <geometry>
+        <sphere radius="0.03" />
+      </geometry>
+      <material name="bucket_color" />
+    </visual>
+  </link>
+  <link name="tooth_right">
+    <visual>
+      <geometry>
+        <sphere radius="0.03" />
+      </geometry>
+      <material name="bucket_color" />
+    </visual>
+  </link>
+  <link name="gnss_link" />
+  <link name="swing_imu_link" />
+  <link name="boom_imu_link" />
+  <link name="arm_imu_link" />
+  <link name="bucket_imu_link" />
+  <joint name="swing_joint" type="continuous">
+    <parent link="base_link" />
+    <child link="upper_structure_link" />
+    <origin xyz="0 0 0.91" rpy="0 0 0" />
+    <axis xyz="0 0 1" />
+  </joint>
+  <joint name="boom_joint" type="continuous">
+    <parent link="upper_structure_link" />
+    <child link="boom_link" />
+    <origin xyz="-0.119 0.075 0.713" rpy="0 0 0" />
+    <axis xyz="1 0 0" />
+  </joint>
+  <joint name="arm_joint" type="continuous">
+    <parent link="boom_link" />
+    <child link="arm_link" />
+    <origin xyz="0.066 -3.915 4.295" rpy="0 0 0" />
+    <axis xyz="1 0 0" />
+  </joint>
+  <joint name="bucket_joint" type="continuous">
+    <parent link="arm_link" />
+    <child link="bucket_link" />
+    <origin xyz="-0.008 0.63 -3.026" rpy="0 0 0" />
+    <axis xyz="1 0 0" />
+  </joint>
+  <joint name="tooth_center_joint" type="fixed">
+    <parent link="bucket_link" />
+    <child link="tooth_center" />
+    <origin xyz="0.00095452 1.114953041 0.216117024" rpy="0 0 0" />
+  </joint>
+  <joint name="tooth_left_joint" type="fixed">
+    <parent link="bucket_link" />
+    <child link="tooth_left" />
+    <origin xyz="-0.590063978 1.114150047 0.219933033" rpy="0 0 0" />
+  </joint>
+  <joint name="tooth_right_joint" type="fixed">
+    <parent link="bucket_link" />
+    <child link="tooth_right" />
+    <origin xyz="0.591973018 1.115756035 0.212301016" rpy="0 0 0" />
+  </joint>
+  <joint name="gnss_joint" type="fixed">
+    <parent link="upper_structure_link" />
+    <child link="gnss_link" />
+    <origin xyz="0 0.740756452 2.07440697" rpy="0 0 0" />
+  </joint>
+  <joint name="swing_imu_joint" type="fixed">
+    <parent link="upper_structure_link" />
+    <child link="swing_imu_link" />
+    <origin xyz="0 0.740756452 0.759832472" rpy="0 0 0" />
+  </joint>
+  <joint name="boom_imu_joint" type="fixed">
+    <parent link="boom_link" />
+    <child link="boom_imu_link" />
+    <origin xyz="0.004933506 -1.972438484 2.159274399" rpy="0 0 0" />
+  </joint>
+  <joint name="arm_imu_joint" type="fixed">
+    <parent link="arm_link" />
+    <child link="arm_imu_link" />
+    <origin xyz="-0.000820003 0.163279414 -1.249701738" rpy="0 0 0" />
+  </joint>
+  <joint name="bucket_imu_joint" type="fixed">
+    <parent link="bucket_link" />
+    <child link="bucket_imu_link" />
+    <origin xyz="0.005774003 0.5036515 0.36291647" rpy="0 0 0" />
+  </joint>
+</robot>
