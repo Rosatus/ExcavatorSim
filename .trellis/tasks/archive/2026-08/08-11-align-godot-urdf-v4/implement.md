@@ -5,7 +5,7 @@
 3. [x] Update tests that encode the old model identity or old backend transforms.
 4. [x] Run focused motion/pivot/linkage tests.
 5. [x] Run the normal standalone matrix and one MCP runtime smoke.
-6. [ ] Archive the child tasks and complete the parent integration review.
+6. [x] Archive the child tasks and complete the parent integration review.
 
 Exit gate: Godot accepts and presents the active SY205 backend model under ordinary automated and
 runtime smoke checks.

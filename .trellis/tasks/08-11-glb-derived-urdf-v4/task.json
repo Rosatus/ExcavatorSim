@@ -3,7 +3,7 @@
   "name": "glb-derived-urdf-v4",
   "title": "GLB-derived URDF v4",
   "description": "Generate the SY205 GLB-derived URDF, replace the active backend model, and align the Godot client with ordinary regression coverage.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": "cross-layer model authority migration",
   "package": "backend,frontend,protocol,assets",

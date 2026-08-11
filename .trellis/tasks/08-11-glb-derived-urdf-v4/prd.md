@@ -28,14 +28,14 @@ GLB. Keep the GLB unchanged and label non-observable physical fields as provisio
 
 ## Acceptance Criteria
 
-- [ ] M1 deterministically generates the candidate URDF, evidence JSON, and SY135 reference copy.
-- [ ] The generated model loads in Pinocchio with four active velocity coordinates, the existing
+- [x] M1 deterministically generates the candidate URDF, evidence JSON, and SY135 reference copy.
+- [x] The generated model loads in Pinocchio with four active velocity coordinates, the existing
       joint order, and all required frames.
-- [ ] M2 replaces the active backend URDF, updates model identity/fixtures/provenance, and passes
+- [x] M2 replaces the active backend URDF, updates model identity/fixtures/provenance, and passes
       ordinary backend verification.
-- [ ] M3 updates Godot model identity/fixtures and passes focused motion plus normal standalone/MCP
+- [x] M3 updates Godot model identity/fixtures and passes focused motion plus normal standalone/MCP
       smoke checks.
-- [ ] Runtime and Godot agree that the active machine model is `sy205-glb-urdf-v4`.
+- [x] Runtime and Godot agree that the active machine model is `sy205-glb-urdf-v4`.
 
 ## Out of Scope
 
