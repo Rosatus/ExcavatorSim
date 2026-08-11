@@ -1,0 +1,3 @@
+{"file":".trellis/tasks/08-11-godot-articulated-glb-skill/design.md","reason":"Defines the project-local skill layout, evidence levels, consolidated human gate, inspector schema, compatibility and rollback."}
+{"file":".trellis/tasks/08-11-godot-articulated-glb-skill/research.md","reason":"Captures reusable evidence from the existing GLB/Godot implementation without relying on the two external SY205 guides."}
+{"file":".trellis/spec/frontend/motion-transport.md","reason":"Provides the authoritative one-time coordinate conversion and local-pivot runtime boundary that the generic adapter reference must preserve."}
