@@ -449,3 +449,36 @@ Converted authoritative Python Z-up frame transforms once at the Godot protocol 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 14: 修复 SY205 局部枢轴运动链
+
+**Date**: 2026-08-11
+**Task**: 修复 SY205 局部枢轴运动链
+**Branch**: `main`
+
+### Summary
+
+依据 SY205_Godot_Pivot_Definition_Guide.md 修复 Godot 端五个主枢轴的局部运动：整机根节点使用基准 delta，子枢轴使用相邻 Python frame 的局部单轴旋转 delta，保留导入 GLB 的销轴原点与层级；被动四连杆在主枢轴应用后重新求解，并在非法输入时保留最后有效姿态。补充指南驱动的 manifest/local_kinematics 与 pivot_contract 校验、boom/arm/bucket/asymmetric/恢复/不可达回归测试和协议文档。验证通过 pixi run verify（124 tests）、backend-smoke、Godot 4.7.1 standalone 7 项矩阵、Godot MCP 冷启动 smoke、Trellis validate 与 git diff --check。GLB SHA 未改变。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `72374da` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
