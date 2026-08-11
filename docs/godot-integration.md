@@ -29,7 +29,8 @@ T_godot = C * T_python * inverse(C)
 This maps Python +Z slew to Godot +Y and keeps the Python +X work-equipment
 hinges on Godot +X. The SY205 import guide is the asset-side reference for this
 mapping; do not add a second global ±90-degree scene rotation or per-pivot axis
-swap. Imported rest offsets are calculated from the converted zero pose.
+swap. The imported GLB parent-local pivot origins are retained; adjacent
+converted frame relations provide only the local single-axis joint rotations.
 
 ## Authority boundary
 
@@ -57,14 +58,16 @@ alter motion cadence, terrain snapshots, bucket volume or any Python message.
 
 The supplied SY205 import guide defines a Godot-only passive linkage because
 the GLB intentionally contains no Blender drivers or animation tracks. After
-the authoritative five pivots are updated, the client solves in
+the authoritative base delta and adjacent local pivots are updated, the client solves in
 `PIVOT_ARM_JOINT` local Y-Z space using D=`PIVOT_BUCKET_JOINT`,
 B=`PIVOT_LINKAGE_B_ARM`, A=`PIVOT_LINKAGE_A_COMMON` and
 C=`PIVOT_LINKAGE_C_BUCKET`. AB and AC are captured from the imported zero pose;
 the continuous circle-intersection branch gives A, B rotates around +X, and
 `CTRL_LINKAGE_SIDE_LINKS` is positioned/rotated along A-C. A and C are never
 written directly. Unreachable poses retain the last valid passive pose and
-remain a visual diagnostic; no linkage result is sent back to Python.
+remain a visual diagnostic; no linkage result is sent back to Python. Nested
+pivots must not be updated by independent calibrated world transforms because
+that changes the parent-local pin positions and detaches boom/arm/bucket joints.
 
 ## Terrain and physics seam
 

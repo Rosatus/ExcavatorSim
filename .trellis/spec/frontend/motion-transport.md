@@ -70,9 +70,10 @@ state, lifecycle, terrain, recording, and replay.
   validate, and reduce the normalized payload.
 - Good: derive the Origin from the configured `ws(s)` endpoint and keep the
   same `MotionProtocol.rows_to_transform` adapter for every visual consumer.
-- Good: calibrate imported rest offsets from the already-converted zero pose;
-  Python +Z swing becomes Godot +Y and Python +X work-equipment hinges remain
-  Godot +X.
+- Good: convert the authority matrices once, derive adjacent-frame local
+  rotation deltas from the converted zero pose, and retain the imported GLB
+  parent-local pivot origins; Python +Z swing becomes Godot +Y and Python +X
+  work-equipment hinges remain Godot +X.
 - Base: a backend-unavailable client remains usable in static GLB mode with a
   visible offline diagnostic.
 - Bad: read `was_string_packet()` before `get_packet()`; the result describes
@@ -99,9 +100,11 @@ state, lifecycle, terrain, recording, and replay.
   generation boundaries.
 - Reconnect: assert fresh transport/session seam, cleared pending commands,
   cleared pose samples, and zero re-arming.
-- Visual parity: apply zero, positive-swing, and asymmetric fixture poses to
-  all five mapped pivots and assert the calibrated transform deltas; reapply
-  zero after motion and assert every imported rest transform is restored.
+- Visual parity: apply zero, positive-swing, boom-only, arm-only, bucket-only
+  and asymmetric fixture poses to all five mapped pivots; assert local parent
+  positions/parent paths remain imported values, each joint rotates only on its
+  runtime axis, and zero after motion restores every imported local/global
+  transform. Global visual origins need not equal Python link-frame origins.
 - Contact presentation: assert the local bucket-tooth proxy is exactly the
   corrected `bucket_link.global_transform * local_tooth_offset` result. This
   remains a Godot presentation seam and must not be compared to backend tooth
@@ -126,12 +129,17 @@ as authoritative motion input.
 
 ```gdscript
 var transform := MotionProtocol.rows_to_transform(rows)
-pivot.global_transform = transform * calibration_offset
+var parent_relation := parent_transform.affine_inverse() * transform
+var joint_delta := zero_relation.affine_inverse() * parent_relation
+var target_local := imported_local_transform
+target_local.basis = imported_local_transform.basis * clean_runtime_axis(joint_delta)
+pivot.transform = target_local
 ```
 
-Only the Python `view_state` reducer owns the incoming frame; Godot applies the
-derived transform to the visual pivot and sends control axes through the typed
-`input_snapshot` contract.
+Only the Python `view_state` reducer owns the incoming frame; Godot derives local
+visual pivot rotations and sends control axes through the typed
+`input_snapshot` contract. Do not compare a Python link-frame world origin to a
+GLB mechanical pin origin; compare adjacent local relations instead.
 
 ## 8. Passive SY205 linkage contract
 
@@ -155,6 +163,27 @@ candidate nearest the previous valid A, and retain the last valid local pose for
 an unreachable/non-finite circle intersection. Emit a local diagnostic rather
 than throwing from the render loop.
 
-Good: apply all five incoming frames, then solve the passive linkage from the
-current imported pin geometry. Bad: leave the linkage meshes at the static GLB
-zero pose, or make the linkage solver a second motion/physics authority.
+Good: apply the base delta and all adjacent local pivot rotations, then solve
+the passive linkage from the current imported pin geometry. Bad: independently
+write calibrated world transforms to nested GLB pivots, leave linkage meshes at
+the static zero pose, or make the linkage solver a second motion/physics
+authority.
+
+## 9. SY205 local pivot contract
+
+The GLB parent-local positions are mechanical pin locations and must never be
+used as calibration translations. The runtime chain is:
+
+```text
+CTRL_EXCAVATOR_ROOT (whole-machine base)
+└─ PIVOT_SLEW (local Y)
+   └─ PIVOT_BOOM_BASE (local X)
+      └─ PIVOT_ARM_JOINT (local X)
+         └─ PIVOT_BUCKET_JOINT (local X, D)
+```
+
+For each child, compute `R0 = parent_zero^-1 * child_zero`,
+`Rq = parent_current^-1 * child_current`, then apply
+`Delta = R0^-1 * Rq` to the imported local basis while preserving the local
+origin. Reject non-rigid, non-finite, origin-drifting or materially non-axis
+authority relations and retain the last valid local pose with a diagnostic.

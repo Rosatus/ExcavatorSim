@@ -2,12 +2,15 @@ class_name MotionPresentation
 extends Node3D
 
 ## Applies converted Python named-frame transforms to the imported SY205 visual
-## skin. MotionProtocol owns the Python Z-up -> Godot Y-up conversion. The
-## calibration offset keeps the imported GLB rest pose while Python remains the
-## only owner of the world-space link transforms.
+## skin. MotionProtocol owns the one Python Z-up -> Godot Y-up conversion. The
+## imported GLB owns pivot origins; adjacent authority frames provide only the
+## clean local joint rotations while Python remains the motion authority.
 
 const MANIFEST_PATH := "res://resources/visual/sy205_visual_manifest.json"
 const PARITY_FIXTURE_PATH := "res://tests/fixtures/sy205_frame_parity_cases.json"
+const RIGID_BASIS_TOLERANCE := 0.001
+const JOINT_ORIGIN_TOLERANCE_M := 0.002
+const JOINT_AXIS_RESIDUAL_TOLERANCE := 0.001
 
 @export var motion_client_path := NodePath("../MotionClient")
 @export var asset_root_path := NodePath("../PresentationRoot/SY205Excavator")
@@ -15,8 +18,13 @@ const PARITY_FIXTURE_PATH := "res://tests/fixtures/sy205_frame_parity_cases.json
 var _motion_client: MotionClient
 var _asset_root: Node3D
 var _frame_nodes: Dictionary = {}
-var _calibration_offsets: Dictionary = {}
+var _authority_zero_globals: Dictionary = {}
+var _frame_parent_names: Dictionary = {}
+var _frame_runtime_axes: Dictionary = {}
+var _rest_locals: Dictionary = {}
 var _rest_globals: Dictionary = {}
+var _pivot_reasons: Dictionary = {}
+var _pivot_last_warning_reasons: Dictionary = {}
 var _has_pose := false
 var _last_render_revision := -1
 var _contract_error := ""
@@ -83,6 +91,10 @@ func get_frame_node(frame_name: String) -> Node3D:
 	return _frame_nodes.get(frame_name) as Node3D
 
 
+func get_pivot_diagnostics_for_test() -> Dictionary:
+	return _pivot_reasons.duplicate(true)
+
+
 func apply_pose_for_test(pose: Dictionary) -> bool:
 	if not _has_required_frames():
 		return false
@@ -110,10 +122,21 @@ func _load_mapping_contract() -> bool:
 		push_error(_contract_error)
 		return false
 	var frame_map: Dictionary = manifest.get("frame_map", {})
+	var local_kinematics: Dictionary = manifest.get("local_kinematics", {})
+	if local_kinematics.get("mode", "") != "adjacent_frame_local_rotation_delta":
+		_contract_error = "SY205 local kinematics mode is missing or unsupported"
+		push_error(_contract_error)
+		return false
+	if local_kinematics.get("base_frame", "") != "base_link":
+		_contract_error = "SY205 local kinematics must use base_link as the whole-machine base"
+		push_error(_contract_error)
+		return false
+	var frame_contracts: Dictionary = local_kinematics.get("frame_contracts", {})
 	var zero_pose: Dictionary = fixture.get("poses", {}).get("zero", {})
 	var zero_frames: Dictionary = zero_pose.get("frame_transforms", {})
 	for frame_name in MotionProtocol.FRAME_NAMES:
 		var mapping: Dictionary = frame_map.get(frame_name, {})
+		var frame_contract: Dictionary = frame_contracts.get(frame_name, {})
 		var node_path := String(mapping.get("node_path", ""))
 		var frame_node := _asset_root.get_node_or_null(NodePath(node_path)) as Node3D
 		if frame_node == null or not zero_frames.has(frame_name):
@@ -121,9 +144,56 @@ func _load_mapping_contract() -> bool:
 			push_error(_contract_error)
 			return false
 		_frame_nodes[frame_name] = frame_node
+		_rest_locals[frame_name] = frame_node.transform
 		_rest_globals[frame_name] = frame_node.global_transform
-		var authority_zero_godot := MotionProtocol.rows_to_transform(zero_frames[frame_name])
-		_calibration_offsets[frame_name] = authority_zero_godot.affine_inverse() * frame_node.global_transform
+		_authority_zero_globals[frame_name] = MotionProtocol.rows_to_transform(zero_frames[frame_name])
+		var parent_frame := String(frame_contract.get("parent_frame", ""))
+		var runtime_axis := String(frame_contract.get("runtime_axis", ""))
+		var expected_position: Variant = frame_contract.get("parent_local_position", [])
+		var expected_scale: Variant = frame_contract.get("scale", [])
+		if (
+			not expected_position is Array
+			or (expected_position as Array).size() != 3
+			or not expected_scale is Array
+			or (expected_scale as Array).size() != 3
+		):
+			_contract_error = "SY205 local pivot contract is missing position/scale for %s" % frame_name
+			push_error(_contract_error)
+			return false
+		var expected_position_vector := Vector3(
+			float((expected_position as Array)[0]),
+			float((expected_position as Array)[1]),
+			float((expected_position as Array)[2])
+		)
+		var expected_scale_vector := Vector3(
+			float((expected_scale as Array)[0]),
+			float((expected_scale as Array)[1]),
+			float((expected_scale as Array)[2])
+		)
+		if frame_node.position.distance_to(expected_position_vector) > JOINT_ORIGIN_TOLERANCE_M:
+			_contract_error = "SY205 imported local pivot origin drifted for %s" % frame_name
+			push_error(_contract_error)
+			return false
+		if not frame_node.scale.is_equal_approx(expected_scale_vector):
+			_contract_error = "SY205 imported local pivot scale drifted for %s" % frame_name
+			push_error(_contract_error)
+			return false
+		if frame_name == "base_link":
+			if not parent_frame.is_empty() or runtime_axis != "none":
+				_contract_error = "SY205 base_link must be a whole-machine base, not a slew joint"
+				push_error(_contract_error)
+				return false
+		else:
+			if not _frame_nodes.has(parent_frame) or not ["X", "Y"].has(runtime_axis):
+				_contract_error = "SY205 local kinematics contract is invalid for %s" % frame_name
+				push_error(_contract_error)
+				return false
+			if frame_node.get_parent() != _frame_nodes.get(parent_frame):
+				_contract_error = "SY205 imported pivot parent drifted for %s" % frame_name
+				push_error(_contract_error)
+				return false
+		_frame_parent_names[frame_name] = parent_frame
+		_frame_runtime_axes[frame_name] = runtime_axis
 	var passive_linkage: Dictionary = manifest.get("passive_linkage", {})
 	return _load_passive_linkage_contract(passive_linkage)
 
@@ -142,20 +212,20 @@ func _on_pose_cleared(_generation: int, _reason: String) -> void:
 
 func _apply_render_pose(pose: Dictionary) -> void:
 	var transforms: Dictionary = pose.get("transforms", {})
-	for frame_name in MotionProtocol.FRAME_NAMES:
-		var frame_node := _frame_nodes.get(frame_name) as Node3D
-		var incoming: Variant = transforms.get(frame_name)
-		var offset: Variant = _calibration_offsets.get(frame_name)
-		if frame_node != null and incoming is Transform3D and offset is Transform3D:
-			frame_node.global_transform = (incoming as Transform3D) * (offset as Transform3D)
+	_apply_base_transform(transforms)
+	for frame_index in range(1, MotionProtocol.FRAME_NAMES.size()):
+		_apply_local_joint_transform(MotionProtocol.FRAME_NAMES[frame_index], transforms)
 	_apply_passive_linkage()
 
 
 func _restore_rest_pose() -> void:
-	for frame_name in _rest_globals:
+	for frame_name in MotionProtocol.FRAME_NAMES:
 		var frame_node := _frame_nodes.get(frame_name) as Node3D
-		if frame_node != null:
-			frame_node.global_transform = _rest_globals[frame_name]
+		var rest_local: Variant = _rest_locals.get(frame_name)
+		if frame_node != null and rest_local is Transform3D:
+			frame_node.transform = rest_local as Transform3D
+	_pivot_reasons.clear()
+	_pivot_last_warning_reasons.clear()
 	if _linkage_initialized:
 		_linkage_b_pin.transform = _linkage_rest_b_transform
 		_linkage_side_controller.transform = _linkage_rest_side_transform
@@ -211,6 +281,10 @@ func _load_passive_linkage_contract(passive_linkage: Dictionary) -> bool:
 		return false
 	var paths: Dictionary = passive_linkage.get("pin_paths_relative_to_arm", {})
 	_linkage_arm = _frame_nodes.get("arm_link") as Node3D
+	if _linkage_arm == null:
+		_contract_error = "SY205 passive linkage arm pivot is missing"
+		push_error(_contract_error)
+		return false
 	_linkage_bucket = _linkage_arm.get_node_or_null(NodePath("PIVOT_BUCKET_JOINT")) as Node3D
 	_linkage_b_pin = _linkage_arm.get_node_or_null(NodePath(paths.get("B", ""))) as Node3D
 	_linkage_a_pin = _linkage_arm.get_node_or_null(NodePath(paths.get("A", ""))) as Node3D
@@ -218,8 +292,7 @@ func _load_passive_linkage_contract(passive_linkage: Dictionary) -> bool:
 	_linkage_d_pin = _linkage_arm.get_node_or_null(NodePath(paths.get("D", ""))) as Node3D
 	_linkage_side_controller = _linkage_arm.get_node_or_null(NodePath(paths.get("side_controller", ""))) as Node3D
 	if (
-		_linkage_arm == null
-		or _linkage_bucket == null
+		_linkage_bucket == null
 		or _linkage_a_pin == null
 		or _linkage_b_pin == null
 		or _linkage_c_pin == null
@@ -329,8 +402,161 @@ func _finite_vector(value: Vector3) -> bool:
 	return is_finite(value.x) and is_finite(value.y) and is_finite(value.z)
 
 
+func _apply_base_transform(transforms: Dictionary) -> void:
+	var frame_name := "base_link"
+	var frame_node := _frame_nodes.get(frame_name) as Node3D
+	var incoming: Variant = transforms.get(frame_name)
+	var authority_zero: Variant = _authority_zero_globals.get(frame_name)
+	var rest_global: Variant = _rest_globals.get(frame_name)
+	if (
+		frame_node == null
+		or not incoming is Transform3D
+		or not authority_zero is Transform3D
+		or not rest_global is Transform3D
+	):
+		_pivot_mark_invalid(frame_name, "missing_transform")
+		return
+	var current := incoming as Transform3D
+	var zero := authority_zero as Transform3D
+	if not _is_rigid_transform(current) or not _is_rigid_transform(zero):
+		_pivot_mark_invalid(frame_name, "non_rigid_transform")
+		return
+	var current_rigid := Transform3D(current.basis.orthonormalized(), current.origin)
+	var zero_rigid := Transform3D(zero.basis.orthonormalized(), zero.origin)
+	var base_delta := current_rigid * zero_rigid.affine_inverse()
+	var target_global := base_delta * (rest_global as Transform3D)
+	if not _finite_transform(target_global):
+		_pivot_mark_invalid(frame_name, "non_finite_base_delta")
+		return
+	frame_node.global_transform = target_global
+	_pivot_mark_valid(frame_name)
+
+
+func _apply_local_joint_transform(frame_name: String, transforms: Dictionary) -> void:
+	var frame_node := _frame_nodes.get(frame_name) as Node3D
+	var parent_name := String(_frame_parent_names.get(frame_name, ""))
+	if _pivot_reasons.has(parent_name):
+		_pivot_mark_invalid(frame_name, "parent_invalid")
+		return
+	var parent_current: Variant = transforms.get(parent_name)
+	var child_current: Variant = transforms.get(frame_name)
+	var parent_zero: Variant = _authority_zero_globals.get(parent_name)
+	var child_zero: Variant = _authority_zero_globals.get(frame_name)
+	var rest_local: Variant = _rest_locals.get(frame_name)
+	if (
+		frame_node == null
+		or not parent_current is Transform3D
+		or not child_current is Transform3D
+		or not parent_zero is Transform3D
+		or not child_zero is Transform3D
+		or not rest_local is Transform3D
+	):
+		_pivot_mark_invalid(frame_name, "missing_transform")
+		return
+	var transforms_to_validate: Array[Transform3D] = [
+		parent_current as Transform3D,
+		child_current as Transform3D,
+		parent_zero as Transform3D,
+		child_zero as Transform3D,
+	]
+	for transform in transforms_to_validate:
+		if not _is_rigid_transform(transform):
+			_pivot_mark_invalid(frame_name, "non_rigid_transform")
+			return
+	var parent_zero_rigid := _rigid_transform(parent_zero as Transform3D)
+	var child_zero_rigid := _rigid_transform(child_zero as Transform3D)
+	var parent_current_rigid := _rigid_transform(parent_current as Transform3D)
+	var child_current_rigid := _rigid_transform(child_current as Transform3D)
+	var rest_relation := parent_zero_rigid.affine_inverse() * child_zero_rigid
+	var current_relation := parent_current_rigid.affine_inverse() * child_current_rigid
+	if current_relation.origin.distance_to(rest_relation.origin) > JOINT_ORIGIN_TOLERANCE_M:
+		_pivot_mark_invalid(frame_name, "authority_joint_origin_drift")
+		return
+	var delta_basis := rest_relation.basis.inverse() * current_relation.basis
+	var runtime_axis := String(_frame_runtime_axes.get(frame_name, ""))
+	var angle := _single_axis_angle(delta_basis, runtime_axis)
+	var clean_delta := Basis(_axis_vector(runtime_axis), angle)
+	if _basis_max_abs_difference(delta_basis, clean_delta) > JOINT_AXIS_RESIDUAL_TOLERANCE:
+		_pivot_mark_invalid(frame_name, "non_axis_rotation_residual")
+		return
+	var target_local := rest_local as Transform3D
+	target_local.basis = target_local.basis * clean_delta
+	if not _finite_transform(target_local):
+		_pivot_mark_invalid(frame_name, "non_finite_local_transform")
+		return
+	frame_node.transform = target_local
+	_pivot_mark_valid(frame_name)
+
+
+func _rigid_transform(value: Transform3D) -> Transform3D:
+	return Transform3D(value.basis.orthonormalized(), value.origin)
+
+
+func _is_rigid_transform(value: Transform3D) -> bool:
+	if not _finite_transform(value):
+		return false
+	var basis := value.basis
+	return (
+		absf(basis.x.length() - 1.0) <= RIGID_BASIS_TOLERANCE
+		and absf(basis.y.length() - 1.0) <= RIGID_BASIS_TOLERANCE
+		and absf(basis.z.length() - 1.0) <= RIGID_BASIS_TOLERANCE
+		and absf(basis.x.dot(basis.y)) <= RIGID_BASIS_TOLERANCE
+		and absf(basis.x.dot(basis.z)) <= RIGID_BASIS_TOLERANCE
+		and absf(basis.y.dot(basis.z)) <= RIGID_BASIS_TOLERANCE
+		and absf(basis.determinant() - 1.0) <= RIGID_BASIS_TOLERANCE
+	)
+
+
+func _finite_transform(value: Transform3D) -> bool:
+	return (
+		_finite_vector(value.origin)
+		and _finite_vector(value.basis.x)
+		and _finite_vector(value.basis.y)
+		and _finite_vector(value.basis.z)
+	)
+
+
+func _axis_vector(axis_name: String) -> Vector3:
+	return Vector3.UP if axis_name == "Y" else Vector3.RIGHT
+
+
+func _single_axis_angle(basis: Basis, axis_name: String) -> float:
+	if axis_name == "Y":
+		return atan2(basis.z.x, basis.x.x)
+	return atan2(basis.y.z, basis.y.y)
+
+
+func _basis_max_abs_difference(first: Basis, second: Basis) -> float:
+	var difference := 0.0
+	var first_columns := [first.x, first.y, first.z]
+	var second_columns := [second.x, second.y, second.z]
+	for column_index in range(3):
+		var first_column: Vector3 = first_columns[column_index]
+		var second_column: Vector3 = second_columns[column_index]
+		difference = maxf(difference, absf(first_column.x - second_column.x))
+		difference = maxf(difference, absf(first_column.y - second_column.y))
+		difference = maxf(difference, absf(first_column.z - second_column.z))
+	return difference
+
+
+func _pivot_mark_invalid(frame_name: String, reason: String) -> void:
+	_pivot_reasons[frame_name] = reason
+	if _pivot_last_warning_reasons.get(frame_name, "") != reason:
+		push_warning("SY205 pivot %s retained its last valid local pose: %s" % [frame_name, reason])
+		_pivot_last_warning_reasons[frame_name] = reason
+
+
+func _pivot_mark_valid(frame_name: String) -> void:
+	_pivot_reasons.erase(frame_name)
+	_pivot_last_warning_reasons.erase(frame_name)
+
+
 func _has_required_frames() -> bool:
-	return _frame_nodes.size() == MotionProtocol.FRAME_NAMES.size() and _calibration_offsets.size() == _frame_nodes.size()
+	return (
+		_frame_nodes.size() == MotionProtocol.FRAME_NAMES.size()
+		and _authority_zero_globals.size() == _frame_nodes.size()
+		and _rest_locals.size() == _frame_nodes.size()
+	)
 
 
 func _read_json(path: String) -> Dictionary:

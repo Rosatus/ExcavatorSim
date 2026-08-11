@@ -284,31 +284,25 @@ func _test_scene_presentation() -> int:
 	var fixture := _read_fixture()
 	var poses: Dictionary = fixture["poses"]
 	var rest_globals := {}
+	var rest_locals := {}
 	for frame_name in MotionProtocol.FRAME_NAMES:
 		rest_globals[frame_name] = presentation.get_frame_node(frame_name).global_transform
+		rest_locals[frame_name] = presentation.get_frame_node(frame_name).transform
 	var zero_pose: Dictionary = poses["zero"]
-	var zero_frames: Dictionary = zero_pose["frame_transforms"]
-	var zero_transforms := {}
-	for frame_name in MotionProtocol.FRAME_NAMES:
-		zero_transforms[frame_name] = MotionProtocol.rows_to_transform(zero_frames[frame_name])
-	for pose_name in ["zero", "swing_positive_90", "asymmetric"]:
+	for pose_name in ["zero", "swing_positive_90", "boom_only", "arm_only", "bucket_only", "asymmetric"]:
 		var pose: Dictionary = poses[pose_name]
-		if _check(presentation.apply_pose_for_test(pose), "%s parity pose applies" % pose_name) != 0:
+		if _check(presentation.apply_pose_for_test(pose), "%s local pose applies" % pose_name) != 0:
 			instance.queue_free()
 			return 1
-		var frame_transforms: Dictionary = pose["frame_transforms"]
-		for frame_name in MotionProtocol.FRAME_NAMES:
-			var expected_delta: Transform3D = (
-				MotionProtocol.rows_to_transform(frame_transforms[frame_name])
-				* (zero_transforms[frame_name] as Transform3D).affine_inverse()
-			)
-			var actual_delta: Transform3D = (
-				(presentation.get_frame_node(frame_name).global_transform as Transform3D)
-				* (rest_globals[frame_name] as Transform3D).affine_inverse()
-			)
-			if _check(actual_delta.is_equal_approx(expected_delta), "%s pose parity matches %s" % [pose_name, frame_name]) != 0:
-				instance.queue_free()
-				return 1
+		if _check(presentation.get_pivot_diagnostics_for_test().is_empty(), "%s pivot transforms have no diagnostic" % pose_name) != 0:
+			instance.queue_free()
+			return 1
+		if _check_main_joint_contract(presentation, pose, pose_name) != 0:
+			instance.queue_free()
+			return 1
+		if _check_frame_local_contract(presentation, pose_name) != 0:
+			instance.queue_free()
+			return 1
 		var bucket_frame := presentation.get_frame_node("bucket_link")
 		var expected_tooth: Vector3 = bucket_frame.global_transform * excavation.local_tooth_offset
 		var actual_tooth: Variant = excavation._bucket_tooth_world()
@@ -368,22 +362,30 @@ func _test_scene_presentation() -> int:
 		[0.0, 0.0, 0.0, 1.0],
 	]
 	var before_unreachable: Dictionary = valid_linkage
+	var before_invalid_bucket_local: Transform3D = presentation.get_frame_node("bucket_link").transform
 	if _check(presentation.apply_pose_for_test(impossible_pose), "unreachable pose applies authoritative bucket frame") != 0:
 		instance.queue_free()
 		return 1
 	var unreachable: Dictionary = presentation.get_passive_linkage_snapshot_for_test()
-	if _check(not bool(unreachable.get("reachable", true)), "unreachable linkage pose is rejected") != 0:
+	var invalid_diagnostics := presentation.get_pivot_diagnostics_for_test()
+	if _check(invalid_diagnostics.get("bucket_link", "") == "authority_joint_origin_drift", "invalid bucket origin is diagnosed") != 0:
+		instance.queue_free()
+		return 1
+	if _check(
+		(presentation.get_frame_node("bucket_link").transform as Transform3D).is_equal_approx(before_invalid_bucket_local),
+		"invalid bucket origin retains its last valid local pivot"
+	) != 0:
 		instance.queue_free()
 		return 1
 	if _check(
 		(unreachable["a_world"] as Vector3).is_equal_approx(before_unreachable["a_world"] as Vector3),
-		"unreachable pose retains last valid passive A"
+		"invalid bucket pose retains last valid passive A"
 	) != 0:
 		instance.queue_free()
 		return 1
 	if _check(
 		(unreachable["side_position"] as Vector3).is_equal_approx(before_unreachable["side_position"] as Vector3),
-		"unreachable pose retains last valid side-link controller"
+		"invalid bucket pose retains last valid side-link controller"
 	) != 0:
 		instance.queue_free()
 		return 1
@@ -412,6 +414,14 @@ func _test_scene_presentation() -> int:
 		) != 0:
 			instance.queue_free()
 			return 1
+		if _check(
+			(presentation.get_frame_node(frame_name).transform as Transform3D).is_equal_approx(
+				rest_locals[frame_name] as Transform3D
+			),
+			"zero pose restores %s local pivot" % frame_name
+		) != 0:
+			instance.queue_free()
+			return 1
 	instance.queue_free()
 	await process_frame
 	print("Motion presentation five-frame parity contract passed.")
@@ -426,6 +436,70 @@ func _check_linkage_lengths(snapshot: Dictionary, label: String) -> int:
 			return 1
 		if _check(absf(length - rest_length) <= 0.0001, "%s %s linkage length is conserved" % [label, constraint]) != 0:
 			return 1
+	return 0
+
+
+func _check_main_joint_contract(presentation: MotionPresentation, pose: Dictionary, label: String) -> int:
+	var angles: Array = pose.get("joint_angles", [])
+	if _check(angles.size() == 4, "%s has four joint angles" % label) != 0:
+		return 1
+	var expected_angles := {
+		"upper_structure_link": float(angles[0]),
+		"boom_link": float(angles[1]),
+		"arm_link": float(angles[2]),
+		"bucket_link": float(angles[3]),
+	}
+	for frame_name in MotionProtocol.FRAME_NAMES:
+		var pivot := presentation.get_frame_node(frame_name)
+		var rotation := pivot.rotation
+		var expected := float(expected_angles.get(frame_name, 0.0))
+		var actual := rotation.y if frame_name == "upper_structure_link" else rotation.x
+		if _check(absf(wrapf(actual - expected, -PI, PI)) <= 0.001, "%s %s rotation matches authority" % [label, frame_name]) != 0:
+			return 1
+		if frame_name == "base_link" or frame_name == "upper_structure_link":
+			if _check(absf(rotation.x) <= 0.001 and absf(rotation.z) <= 0.001, "%s %s rotates only on runtime axis" % [label, frame_name]) != 0:
+				return 1
+		else:
+			if _check(absf(rotation.y) <= 0.001 and absf(rotation.z) <= 0.001, "%s %s rotates only on runtime axis" % [label, frame_name]) != 0:
+				return 1
+	return 0
+
+
+func _check_frame_local_contract(presentation: MotionPresentation, label: String) -> int:
+	var expected_positions := {
+		"base_link": Vector3(0.0, 0.45, 0.0),
+		"upper_structure_link": Vector3(0.0, 0.46, 0.0),
+		"boom_link": Vector3(-0.119, 0.713, -0.075),
+		"arm_link": Vector3(0.066, 4.295, 3.915),
+		"bucket_link": Vector3(-0.008, -3.026, -0.63),
+	}
+	var parent_names := {
+		"upper_structure_link": "base_link",
+		"boom_link": "upper_structure_link",
+		"arm_link": "boom_link",
+		"bucket_link": "arm_link",
+	}
+	for frame_name in MotionProtocol.FRAME_NAMES:
+		var pivot := presentation.get_frame_node(frame_name)
+		if _check(pivot.position.distance_to(expected_positions[frame_name]) <= 0.002, "%s %s parent-local pivot position is fixed" % [label, frame_name]) != 0:
+			return 1
+		if _check(pivot.scale.is_equal_approx(Vector3.ONE), "%s %s pivot scale is fixed" % [label, frame_name]) != 0:
+			return 1
+		if frame_name != "base_link":
+			var parent := presentation.get_frame_node(parent_names[frame_name])
+			if _check(pivot.get_parent() == parent, "%s %s parent hierarchy is fixed" % [label, frame_name]) != 0:
+				return 1
+	var arm := presentation.get_frame_node("arm_link")
+	var bucket := presentation.get_frame_node("bucket_link")
+	var b := arm.get_node("PIVOT_LINKAGE_B_ARM") as Node3D
+	var d := bucket
+	var c := bucket.get_node("PIVOT_LINKAGE_C_BUCKET") as Node3D
+	if _check(arm.to_local(b.global_position).distance_to(Vector3(-0.008, -2.682, -0.548)) <= 0.002, "%s B remains fixed in arm-local space" % label) != 0:
+		return 1
+	if _check(arm.to_local(d.global_position).distance_to(Vector3(-0.008, -3.026, -0.63)) <= 0.002, "%s D remains fixed in arm-local space" % label) != 0:
+		return 1
+	if _check(bucket.to_local(c.global_position).distance_to(Vector3(0.0, -0.397, -0.279)) <= 0.002, "%s C remains fixed in bucket-local space" % label) != 0:
+		return 1
 	return 0
 
 

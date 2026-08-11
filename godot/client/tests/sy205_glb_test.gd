@@ -29,7 +29,7 @@ const EXPECTED_PIVOT_AXES := {
 	"bucket_link": "X",
 }
 const EXPECTED_RUNTIME_PIVOT_AXES := {
-	"base_link": "Y",
+	"base_link": "none",
 	"upper_structure_link": "Y",
 	"boom_link": "X",
 	"arm_link": "X",
@@ -47,6 +47,62 @@ const EXPECTED_PASSIVE_LINKAGE_PATHS := {
 	"C": "PIVOT_BUCKET_JOINT/PIVOT_LINKAGE_C_BUCKET",
 	"D": "PIVOT_BUCKET_JOINT",
 	"side_controller": "CTRL_LINKAGE_SIDE_LINKS",
+}
+const EXPECTED_GUIDE_PIVOTS := {
+	"root": {
+		"node_path": "CTRL_EXCAVATOR_ROOT",
+		"parent_path": "",
+		"local_position": [0.0, 0.45, 0.0],
+		"runtime_axis": "none",
+	},
+	"slew": {
+		"node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW",
+		"parent_path": "CTRL_EXCAVATOR_ROOT",
+		"local_position": [0.0, 0.46, 0.0],
+		"runtime_axis": "Y",
+	},
+	"boom": {
+		"node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE",
+		"parent_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW",
+		"local_position": [-0.119, 0.713, -0.075],
+		"runtime_axis": "X",
+	},
+	"arm": {
+		"node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT",
+		"parent_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE",
+		"local_position": [0.066, 4.295, 3.915],
+		"runtime_axis": "X",
+	},
+	"bucket": {
+		"node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT",
+		"parent_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT",
+		"local_position": [-0.008, -3.026, -0.63],
+		"runtime_axis": "X",
+	},
+	"linkage_b": {
+		"node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_LINKAGE_B_ARM",
+		"parent_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT",
+		"local_position": [-0.008, -2.682, -0.548],
+		"runtime_axis": "X",
+	},
+	"linkage_a": {
+		"node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_LINKAGE_B_ARM/PIVOT_LINKAGE_A_COMMON",
+		"parent_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_LINKAGE_B_ARM",
+		"local_position": [0.002, -0.617, 0.206],
+		"runtime_axis": "inherited_X",
+	},
+	"linkage_c": {
+		"node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT/PIVOT_LINKAGE_C_BUCKET",
+		"parent_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT",
+		"local_position": [0.0, -0.397, -0.279],
+		"runtime_axis": "inherited_X",
+	},
+	"side_controller": {
+		"node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/CTRL_LINKAGE_SIDE_LINKS",
+		"parent_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT",
+		"local_position": [-0.006, -3.299, -0.342],
+		"runtime_axis": "X",
+	},
 }
 
 
@@ -74,6 +130,8 @@ func _validate_asset_contract() -> int:
 		return 1
 	var manifest: Dictionary = parsed_manifest
 	if not _validate_coordinate_system(manifest):
+		return 1
+	if not _validate_local_kinematics_manifest(manifest):
 		return 1
 	if not _validate_passive_linkage_manifest(manifest):
 		return 1
@@ -122,6 +180,9 @@ func _validate_asset_contract() -> int:
 				return 1
 
 	if not _validate_rest_calibration(manifest, observed_rest_transforms):
+		asset_root.free()
+		return 1
+	if not _validate_guide_pivots(asset_root, manifest):
 		asset_root.free()
 		return 1
 
@@ -334,7 +395,7 @@ func _validate_parity_handoff(manifest: Dictionary) -> bool:
 		push_error("SY205 frame-parity handoff does not match the authority fixture hash.")
 		return false
 	var poses: Dictionary = parity.get("poses", {})
-	for pose_name in ["zero", "swing_positive_90", "asymmetric"]:
+	for pose_name in ["zero", "swing_positive_90", "boom_only", "arm_only", "bucket_only", "asymmetric"]:
 		var pose: Dictionary = poses.get(pose_name, {})
 		if (pose.get("joint_angles", []) as Array).size() != 4:
 			push_error("Frame-parity pose %s must contain four joint angles." % pose_name)
@@ -343,6 +404,114 @@ func _validate_parity_handoff(manifest: Dictionary) -> bool:
 		for frame_name in EXPECTED_FRAME_NAMES:
 			if not frame_transforms.has(frame_name):
 				push_error("Frame-parity pose %s is missing %s." % [pose_name, frame_name])
+				return false
+	return true
+
+
+func _validate_local_kinematics_manifest(manifest: Dictionary) -> bool:
+	var local_kinematics: Dictionary = manifest.get("local_kinematics", {})
+	if local_kinematics.get("mode", "") != "adjacent_frame_local_rotation_delta":
+		push_error("SY205 local kinematics mode drifted.")
+		return false
+	if local_kinematics.get("base_frame", "") != "base_link":
+		push_error("SY205 local kinematics base frame drifted.")
+		return false
+	if local_kinematics.get("origin_policy", "") != "preserve_imported_parent_local_position":
+		push_error("SY205 local origin policy drifted.")
+		return false
+	if local_kinematics.get("rotation_policy", "") != "clean_single_runtime_axis":
+		push_error("SY205 local rotation policy drifted.")
+		return false
+	if local_kinematics.get("invalid_policy", "") != "retain_last_valid_local_pose":
+		push_error("SY205 local invalid-input policy drifted.")
+		return false
+	var contracts: Dictionary = local_kinematics.get("frame_contracts", {})
+	var expected_positions := {
+		"base_link": [0.0, 0.45, 0.0],
+		"upper_structure_link": [0.0, 0.46, 0.0],
+		"boom_link": [-0.119, 0.713, -0.075],
+		"arm_link": [0.066, 4.295, 3.915],
+		"bucket_link": [-0.008, -3.026, -0.63],
+	}
+	for frame_name in EXPECTED_FRAME_NAMES:
+		var expected_axis := String(EXPECTED_RUNTIME_PIVOT_AXES[frame_name])
+		var contract: Dictionary = contracts.get(frame_name, {})
+		if contract.get("runtime_axis", "") != expected_axis:
+			push_error("SY205 local runtime axis drifted for %s." % frame_name)
+			return false
+		if frame_name == "base_link":
+			if contract.get("parent_frame", "") != "":
+				push_error("SY205 local base frame must not have a parent frame.")
+				return false
+		elif contract.get("parent_frame", "") != EXPECTED_FRAME_NAMES[EXPECTED_FRAME_NAMES.find(frame_name) - 1]:
+			push_error("SY205 local parent frame drifted for %s." % frame_name)
+			return false
+		var recorded_position: Variant = contract.get("parent_local_position", [])
+		if not recorded_position is Array or (recorded_position as Array).size() != 3:
+			push_error("SY205 local parent-local position is malformed for %s." % frame_name)
+			return false
+		for axis_index in range(3):
+			if absf(float((recorded_position as Array)[axis_index]) - float(expected_positions[frame_name][axis_index])) > 0.0001:
+				push_error("SY205 local parent-local position drifted for %s." % frame_name)
+				return false
+		var recorded_scale: Variant = contract.get("scale", [])
+		if not recorded_scale is Array or (recorded_scale as Array).size() != 3:
+			push_error("SY205 local scale is malformed for %s." % frame_name)
+			return false
+		for axis_index in range(3):
+			if absf(float((recorded_scale as Array)[axis_index]) - 1.0) > 0.0001:
+				push_error("SY205 local scale drifted for %s." % frame_name)
+				return false
+	return true
+
+
+func _validate_guide_pivots(asset_root: Node, manifest: Dictionary) -> bool:
+	var contract: Dictionary = manifest.get("pivot_contract", {})
+	var manifest_nodes: Dictionary = contract.get("nodes", {})
+	for pivot_key in EXPECTED_GUIDE_PIVOTS:
+		var expected: Dictionary = EXPECTED_GUIDE_PIVOTS[pivot_key]
+		var recorded: Dictionary = manifest_nodes.get(pivot_key, {})
+		if recorded.get("node_path", "") != expected["node_path"] or recorded.get("parent_path", "") != expected["parent_path"]:
+			push_error("SY205 guide pivot metadata drifted for %s." % pivot_key)
+			return false
+		if recorded.get("runtime_axis", "") != expected["runtime_axis"]:
+			push_error("SY205 guide pivot axis metadata drifted for %s." % pivot_key)
+			return false
+		var recorded_position: Variant = recorded.get("local_position", [])
+		if not recorded_position is Array or (recorded_position as Array).size() != 3:
+			push_error("SY205 guide pivot position metadata is malformed for %s." % pivot_key)
+			return false
+		for axis_index in range(3):
+			if absf(float((recorded_position as Array)[axis_index]) - float(expected["local_position"][axis_index])) > 0.0001:
+				push_error("SY205 guide pivot position metadata drifted for %s." % pivot_key)
+				return false
+		var recorded_scale: Variant = recorded.get("scale", [])
+		if not recorded_scale is Array or (recorded_scale as Array).size() != 3:
+			push_error("SY205 guide pivot scale metadata is malformed for %s." % pivot_key)
+			return false
+		for axis_index in range(3):
+			if absf(float((recorded_scale as Array)[axis_index]) - 1.0) > 0.0001:
+				push_error("SY205 guide pivot scale metadata drifted for %s." % pivot_key)
+				return false
+		var pivot := _resolve_asset_path(asset_root, expected["node_path"]) as Node3D
+		if pivot == null:
+			push_error("Missing guide pivot node: %s" % expected["node_path"])
+			return false
+		var expected_position := Vector3(
+			float(expected["local_position"][0]),
+			float(expected["local_position"][1]),
+			float(expected["local_position"][2])
+		)
+		if pivot.position.distance_to(expected_position) > 0.002:
+			push_error("SY205 guide local position drifted for %s: %s" % [pivot_key, pivot.position])
+			return false
+		if not pivot.scale.is_equal_approx(Vector3.ONE):
+			push_error("SY205 guide scale drifted for %s." % pivot_key)
+			return false
+		if not String(expected["parent_path"]).is_empty():
+			var parent := _resolve_asset_path(asset_root, expected["parent_path"])
+			if pivot.get_parent() != parent:
+				push_error("SY205 guide parent path drifted for %s." % pivot_key)
 				return false
 	return true
 

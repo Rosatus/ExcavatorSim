@@ -37,11 +37,118 @@
     "python_to_godot_position": "(x, y, z) -> (x, z, -y)",
     "python_to_godot_transform": "C * T_python * inverse(C)",
     "runtime_axes": {
-      "base_link": "Y",
+      "base_link": "none",
       "upper_structure_link": "Y",
       "boom_link": "X",
       "arm_link": "X",
       "bucket_link": "X"
+    }
+  },
+  "local_kinematics": {
+    "mode": "adjacent_frame_local_rotation_delta",
+    "base_frame": "base_link",
+    "origin_policy": "preserve_imported_parent_local_position",
+    "rotation_policy": "clean_single_runtime_axis",
+    "invalid_policy": "retain_last_valid_local_pose",
+    "frame_contracts": {
+      "base_link": {
+        "parent_frame": "",
+        "runtime_axis": "none",
+        "parent_local_position": [0.0, 0.45, 0.0],
+        "scale": [1.0, 1.0, 1.0]
+      },
+      "upper_structure_link": {
+        "parent_frame": "base_link",
+        "runtime_axis": "Y",
+        "parent_local_position": [0.0, 0.46, 0.0],
+        "scale": [1.0, 1.0, 1.0]
+      },
+      "boom_link": {
+        "parent_frame": "upper_structure_link",
+        "runtime_axis": "X",
+        "parent_local_position": [-0.119, 0.713, -0.075],
+        "scale": [1.0, 1.0, 1.0]
+      },
+      "arm_link": {
+        "parent_frame": "boom_link",
+        "runtime_axis": "X",
+        "parent_local_position": [0.066, 4.295, 3.915],
+        "scale": [1.0, 1.0, 1.0]
+      },
+      "bucket_link": {
+        "parent_frame": "arm_link",
+        "runtime_axis": "X",
+        "parent_local_position": [-0.008, -3.026, -0.63],
+        "scale": [1.0, 1.0, 1.0]
+      }
+    }
+  },
+  "pivot_contract": {
+    "tolerance_m": 0.002,
+    "nodes": {
+      "root": {
+        "node_path": "CTRL_EXCAVATOR_ROOT",
+        "parent_path": "",
+        "local_position": [0.0, 0.45, 0.0],
+        "scale": [1.0, 1.0, 1.0],
+        "runtime_axis": "none"
+      },
+      "slew": {
+        "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW",
+        "parent_path": "CTRL_EXCAVATOR_ROOT",
+        "local_position": [0.0, 0.46, 0.0],
+        "scale": [1.0, 1.0, 1.0],
+        "runtime_axis": "Y"
+      },
+      "boom": {
+        "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE",
+        "parent_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW",
+        "local_position": [-0.119, 0.713, -0.075],
+        "scale": [1.0, 1.0, 1.0],
+        "runtime_axis": "X"
+      },
+      "arm": {
+        "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT",
+        "parent_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE",
+        "local_position": [0.066, 4.295, 3.915],
+        "scale": [1.0, 1.0, 1.0],
+        "runtime_axis": "X"
+      },
+      "bucket": {
+        "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT",
+        "parent_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT",
+        "local_position": [-0.008, -3.026, -0.63],
+        "scale": [1.0, 1.0, 1.0],
+        "runtime_axis": "X"
+      },
+      "linkage_b": {
+        "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_LINKAGE_B_ARM",
+        "parent_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT",
+        "local_position": [-0.008, -2.682, -0.548],
+        "scale": [1.0, 1.0, 1.0],
+        "runtime_axis": "X"
+      },
+      "linkage_a": {
+        "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_LINKAGE_B_ARM/PIVOT_LINKAGE_A_COMMON",
+        "parent_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_LINKAGE_B_ARM",
+        "local_position": [0.002, -0.617, 0.206],
+        "scale": [1.0, 1.0, 1.0],
+        "runtime_axis": "inherited_X"
+      },
+      "linkage_c": {
+        "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT/PIVOT_LINKAGE_C_BUCKET",
+        "parent_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT",
+        "local_position": [0.0, -0.397, -0.279],
+        "scale": [1.0, 1.0, 1.0],
+        "runtime_axis": "inherited_X"
+      },
+      "side_controller": {
+        "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/CTRL_LINKAGE_SIDE_LINKS",
+        "parent_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT",
+        "local_position": [-0.006, -3.299, -0.342],
+        "scale": [1.0, 1.0, 1.0],
+        "runtime_axis": "X"
+      }
     }
   },
   "frame_map": {
