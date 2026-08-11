@@ -28,6 +28,13 @@ const EXPECTED_PIVOT_AXES := {
 	"arm_link": "X",
 	"bucket_link": "X",
 }
+const EXPECTED_RUNTIME_PIVOT_AXES := {
+	"base_link": "Y",
+	"upper_structure_link": "Y",
+	"boom_link": "X",
+	"arm_link": "X",
+	"bucket_link": "X",
+}
 const REQUIRED_LINKAGE_NAMES := [
 	"bucket_linkage_secondary_a",
 	"bucket_linkage_secondary_b",
@@ -59,6 +66,8 @@ func _validate_asset_contract() -> int:
 		push_error("SY205 visual manifest is not a JSON object.")
 		return 1
 	var manifest: Dictionary = parsed_manifest
+	if not _validate_coordinate_system(manifest):
+		return 1
 	if not _validate_parity_handoff(manifest):
 		return 1
 	if not _validate_main_scene_mount():
@@ -190,6 +199,28 @@ func _validate_rest_calibration(manifest: Dictionary, observed: Dictionary) -> b
 	return true
 
 
+func _validate_coordinate_system(manifest: Dictionary) -> bool:
+	var coordinate_system: Dictionary = manifest.get("coordinate_system", {})
+	if coordinate_system.get("source_authoring", "") != "right_handed_blender_z_up":
+		push_error("SY205 source coordinate system must remain Blender Z-up.")
+		return false
+	if coordinate_system.get("godot_runtime", "") != "right_handed_gltf_y_up":
+		push_error("SY205 runtime coordinate system must remain Godot Y-up.")
+		return false
+	if coordinate_system.get("python_to_godot_position", "") != "(x, y, z) -> (x, z, -y)":
+		push_error("SY205 coordinate conversion mapping drifted.")
+		return false
+	if coordinate_system.get("python_to_godot_transform", "") != "C * T_python * inverse(C)":
+		push_error("SY205 transform conversion must use full basis conjugation.")
+		return false
+	var runtime_axes: Dictionary = coordinate_system.get("runtime_axes", {})
+	for frame_name in EXPECTED_FRAME_NAMES:
+		if runtime_axes.get(frame_name, "") != EXPECTED_RUNTIME_PIVOT_AXES[frame_name]:
+			push_error("SY205 runtime pivot axis drifted for %s." % frame_name)
+			return false
+	return true
+
+
 func _validate_main_scene_mount() -> bool:
 	var packed_scene := load(MAIN_SCENE_PATH) as PackedScene
 	if packed_scene == null:
@@ -267,7 +298,7 @@ func _validate_parity_handoff(manifest: Dictionary) -> bool:
 		push_error("SY205 frame-parity handoff does not match the authority fixture hash.")
 		return false
 	var poses: Dictionary = parity.get("poses", {})
-	for pose_name in ["zero", "asymmetric"]:
+	for pose_name in ["zero", "swing_positive_90", "asymmetric"]:
 		var pose: Dictionary = poses.get(pose_name, {})
 		if (pose.get("joint_angles", []) as Array).size() != 4:
 			push_error("Frame-parity pose %s must contain four joint angles." % pose_name)

@@ -18,8 +18,10 @@ state, lifecycle, terrain, recording, and replay.
   one server text frame; callers may mutate state only from an `{ok: true,
   payload: ...}` result.
 - `MotionProtocol.rows_to_transform(rows: Array) -> Transform3D` converts the
-  backend's right-handed 4x4 row matrix into Godot's `Basis` columns and
-  translation.
+  backend's right-handed Z-up 4x4 row matrix into Godot's right-handed Y-up
+  `Basis` and translation. The conversion is a complete basis conjugation, not
+  a translation-only axis swap: `T_godot = C * T_python * C^-1`, where
+  `p_godot = (x_python, z_python, -y_python)`.
 
 ## 3. Contracts (request/response/env)
 
@@ -68,10 +70,16 @@ state, lifecycle, terrain, recording, and replay.
   validate, and reduce the normalized payload.
 - Good: derive the Origin from the configured `ws(s)` endpoint and keep the
   same `MotionProtocol.rows_to_transform` adapter for every visual consumer.
+- Good: calibrate imported rest offsets from the already-converted zero pose;
+  Python +Z swing becomes Godot +Y and Python +X work-equipment hinges remain
+  Godot +X.
 - Base: a backend-unavailable client remains usable in static GLB mode with a
   visible offline diagnostic.
 - Bad: read `was_string_packet()` before `get_packet()`; the result describes
   the previous packet and can leave the client waiting forever for `hello_ack`.
+- Bad: apply the Python matrix directly to a Godot `global_transform` or add a
+  second per-pivot ±90-degree rotation. This mixes Z-up authority with the
+  Y-up GLB and changes the rotation plane.
 - Bad: cast every JSON number directly to `int`; Godot's JSON parser exposes
   integer-looking values as floats, so validate finite integral values within
   the safe JSON integer range first.
@@ -91,8 +99,13 @@ state, lifecycle, terrain, recording, and replay.
   generation boundaries.
 - Reconnect: assert fresh transport/session seam, cleared pending commands,
   cleared pose samples, and zero re-arming.
-- Visual parity: apply the zero and asymmetric fixture poses to all five
-  mapped pivots and assert the calibrated rest/asymmetric transforms.
+- Visual parity: apply zero, positive-swing, and asymmetric fixture poses to
+  all five mapped pivots and assert the calibrated transform deltas; reapply
+  zero after motion and assert every imported rest transform is restored.
+- Contact presentation: assert the local bucket-tooth proxy is exactly the
+  corrected `bucket_link.global_transform * local_tooth_offset` result. This
+  remains a Godot presentation seam and must not be compared to backend tooth
+  frames until a shared marker contract exists.
 - Runtime smoke: run the Godot headless import and the backend `pixi run
   verify` gate when backend/protocol files are touched.
 

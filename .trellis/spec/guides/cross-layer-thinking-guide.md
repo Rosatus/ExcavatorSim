@@ -100,6 +100,38 @@ create one owner for:
 
 Rendering code may format fields, but it must not redefine the payload contract.
 
+### Mistake 5: Partial Coordinate Conversion at a Layer Boundary
+
+**Symptom**: A right-handed Z-up backend pose reaches a right-handed Y-up
+renderer with plausible positions but joints rotate in the wrong plane.
+
+**Cause**: A consumer swaps translation components, or applies a second
+per-node rotation, instead of converting the complete rigid transform once.
+
+**Good**: Define one conversion owner and test both translation and basis:
+
+```text
+C = [[1, 0,  0], [0, 0, 1], [0,-1, 0]]
+T_godot = C * T_python * inverse(C)
+```
+
+The visual adapter then applies the converted global frame plus its local
+rest-pose offset. A local presentation proxy (for example, a bucket tooth)
+may derive from that corrected frame, but must not become a second authority.
+
+**Bad**: Copy the Python matrix into `global_transform`, swap only `origin`,
+or add a `rotation_degrees.x = 90` workaround to individual pivots.
+
+**Boundary checklist**:
+
+- [ ] Source and runtime handedness/up-axis are explicit in the manifest.
+- [ ] The shared adapter is tested for translation, +Z swing, +X hinge, and
+      determinant/handedness.
+- [ ] Every mapped frame is tested at zero and non-zero poses; zero is reapplied
+      after motion to prove rest-pose restoration.
+- [ ] Derived contact/visual proxies follow the corrected frame and are not
+      compared to an unrelated backend marker contract.
+
 ---
 
 ## Checklist for Cross-Layer Features

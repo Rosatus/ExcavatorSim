@@ -14,6 +14,23 @@ The first Godot adapter should consume the existing BabylonSim HTTP/WebSocket co
 - terrain epoch/revision identity and stale/gap recovery;
 - recording/replay and Return-to-Live lifecycle semantics.
 
+### Frame coordinate conversion
+
+The Python Pinocchio/URDF authority publishes right-handed Z-up frame matrices,
+while the supplied glTF scene is already exported for Godot's right-handed
+Y-up space. The client converts each complete matrix once at the protocol
+boundary:
+
+```text
+p_godot = (x_python, z_python, -y_python)
+T_godot = C * T_python * inverse(C)
+```
+
+This maps Python +Z slew to Godot +Y and keeps the Python +X work-equipment
+hinges on Godot +X. The SY205 import guide is the asset-side reference for this
+mapping; do not add a second global ±90-degree scene rotation or per-pivot axis
+swap. Imported rest offsets are calculated from the converted zero pose.
+
 ## Authority boundary
 
 Python remains authoritative for joint state, input safety and lifecycle in every

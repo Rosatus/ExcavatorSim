@@ -31,6 +31,19 @@
     "animation_count": 0,
     "collision_resource_count": 0
   },
+  "coordinate_system": {
+    "source_authoring": "right_handed_blender_z_up",
+    "godot_runtime": "right_handed_gltf_y_up",
+    "python_to_godot_position": "(x, y, z) -> (x, z, -y)",
+    "python_to_godot_transform": "C * T_python * inverse(C)",
+    "runtime_axes": {
+      "base_link": "Y",
+      "upper_structure_link": "Y",
+      "boom_link": "X",
+      "arm_link": "X",
+      "bucket_link": "X"
+    }
+  },
   "frame_map": {
     "base_link": {
       "node_path": "CTRL_EXCAVATOR_ROOT",

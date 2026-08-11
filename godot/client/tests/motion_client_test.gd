@@ -59,10 +59,43 @@ func _init() -> void:
 
 func _run() -> void:
 	ProjectSettings.set_setting("motion/auto_connect", false)
-	var result := await _test_motion_client()
+	var result := _test_coordinate_conversion()
+	if result == 0:
+		result = await _test_motion_client()
 	if result == 0:
 		result = await _test_scene_presentation()
 	quit(result)
+
+
+func _test_coordinate_conversion() -> int:
+	var translation := MotionProtocol.rows_to_transform([
+		[1.0, 0.0, 0.0, 1.0],
+		[0.0, 1.0, 0.0, 2.0],
+		[0.0, 0.0, 1.0, 3.0],
+		[0.0, 0.0, 0.0, 1.0],
+	])
+	if _check(translation.origin.is_equal_approx(Vector3(1.0, 3.0, -2.0)), "Z-up translation converts to Y-up") != 0:
+		return 1
+	var swing := MotionProtocol.rows_to_transform([
+		[0.0, -1.0, 0.0, 0.0],
+		[1.0, 0.0, 0.0, 0.0],
+		[0.0, 0.0, 1.0, 0.0],
+		[0.0, 0.0, 0.0, 1.0],
+	])
+	if _check(swing.basis.is_equal_approx(Basis(Vector3.UP, PI / 2.0)), "Python +Z swing becomes Godot +Y swing") != 0:
+		return 1
+	var work_hinge := MotionProtocol.rows_to_transform([
+		[1.0, 0.0, 0.0, 0.0],
+		[0.0, 0.0, -1.0, 0.0],
+		[0.0, 1.0, 0.0, 0.0],
+		[0.0, 0.0, 0.0, 1.0],
+	])
+	if _check(work_hinge.basis.is_equal_approx(Basis(Vector3.RIGHT, PI / 2.0)), "Python +X hinge remains Godot +X hinge") != 0:
+		return 1
+	if _check(absf(swing.basis.determinant() - 1.0) < 0.0001, "coordinate conversion preserves right-handed determinant") != 0:
+		return 1
+	print("Motion coordinate conversion contract passed.")
+	return 0
 
 
 func _test_motion_client() -> int:
@@ -230,25 +263,62 @@ func _test_scene_presentation() -> int:
 	if _check(presentation != null and presentation.get_contract_error().is_empty(), "presentation mapping contract loads") != 0:
 		instance.queue_free()
 		return 1
+	var excavation := instance.get_node_or_null("TerrainRoot/ExcavationWorld") as ExcavationWorld
+	if _check(excavation != null, "excavation world exposes the bucket tooth proxy") != 0:
+		instance.queue_free()
+		return 1
 	var fixture := _read_fixture()
-	var zero_pose: Dictionary = fixture["poses"]["zero"]
-	var asymmetric_pose: Dictionary = fixture["poses"]["asymmetric"]
-	var rest_transform := presentation.get_frame_node("arm_link").global_transform
-	if _check(presentation.apply_pose_for_test(zero_pose), "zero parity pose applies") != 0:
+	var poses: Dictionary = fixture["poses"]
+	var rest_globals := {}
+	for frame_name in MotionProtocol.FRAME_NAMES:
+		rest_globals[frame_name] = presentation.get_frame_node(frame_name).global_transform
+	var zero_pose: Dictionary = poses["zero"]
+	var zero_frames: Dictionary = zero_pose["frame_transforms"]
+	var zero_transforms := {}
+	for frame_name in MotionProtocol.FRAME_NAMES:
+		zero_transforms[frame_name] = MotionProtocol.rows_to_transform(zero_frames[frame_name])
+	for pose_name in ["zero", "swing_positive_90", "asymmetric"]:
+		var pose: Dictionary = poses[pose_name]
+		if _check(presentation.apply_pose_for_test(pose), "%s parity pose applies" % pose_name) != 0:
+			instance.queue_free()
+			return 1
+		var frame_transforms: Dictionary = pose["frame_transforms"]
+		for frame_name in MotionProtocol.FRAME_NAMES:
+			var expected_delta: Transform3D = (
+				MotionProtocol.rows_to_transform(frame_transforms[frame_name])
+				* (zero_transforms[frame_name] as Transform3D).affine_inverse()
+			)
+			var actual_delta: Transform3D = (
+				(presentation.get_frame_node(frame_name).global_transform as Transform3D)
+				* (rest_globals[frame_name] as Transform3D).affine_inverse()
+			)
+			if _check(actual_delta.is_equal_approx(expected_delta), "%s pose parity matches %s" % [pose_name, frame_name]) != 0:
+				instance.queue_free()
+				return 1
+		var bucket_frame := presentation.get_frame_node("bucket_link")
+		var expected_tooth: Vector3 = bucket_frame.global_transform * excavation.local_tooth_offset
+		var actual_tooth: Variant = excavation._bucket_tooth_world()
+		if _check(actual_tooth is Vector3, "%s pose exposes a bucket tooth proxy" % pose_name) != 0:
+			instance.queue_free()
+			return 1
+		if _check((actual_tooth as Vector3).is_equal_approx(expected_tooth), "%s bucket tooth proxy follows the corrected bucket frame" % pose_name) != 0:
+			instance.queue_free()
+			return 1
+	if _check(presentation.apply_pose_for_test(zero_pose), "zero pose reapplies after motion") != 0:
 		instance.queue_free()
 		return 1
-	if _check(presentation.get_frame_node("arm_link").global_transform.is_equal_approx(rest_transform), "zero pose preserves calibrated rest transform") != 0:
-		instance.queue_free()
-		return 1
-	if _check(presentation.apply_pose_for_test(asymmetric_pose), "asymmetric parity pose applies") != 0:
-		instance.queue_free()
-		return 1
-	if _check(not presentation.get_frame_node("arm_link").global_transform.is_equal_approx(rest_transform), "asymmetric pose moves the visual arm") != 0:
-		instance.queue_free()
-		return 1
+	for frame_name in MotionProtocol.FRAME_NAMES:
+		if _check(
+			(presentation.get_frame_node(frame_name).global_transform as Transform3D).is_equal_approx(
+				rest_globals[frame_name] as Transform3D
+			),
+			"zero pose restores %s rest transform" % frame_name
+		) != 0:
+			instance.queue_free()
+			return 1
 	instance.queue_free()
 	await process_frame
-	print("Motion presentation parity contract passed.")
+	print("Motion presentation five-frame parity contract passed.")
 	return 0
 
 

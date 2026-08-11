@@ -56,13 +56,23 @@ static func hello_message() -> Dictionary:
 
 
 static func rows_to_transform(rows: Array) -> Transform3D:
-	var frame_basis := Basis(
+	# Python/Pinocchio publishes right-handed world matrices in a Z-up basis.
+	# The imported glTF scene is right-handed Y-up. Convert the complete frame
+	# transform at this single boundary; consumers must never repeat this swap.
+	var python_basis := Basis(
 		Vector3(float(rows[0][0]), float(rows[1][0]), float(rows[2][0])),
 		Vector3(float(rows[0][1]), float(rows[1][1]), float(rows[2][1])),
 		Vector3(float(rows[0][2]), float(rows[1][2]), float(rows[2][2]))
 	)
-	var origin := Vector3(float(rows[0][3]), float(rows[1][3]), float(rows[2][3]))
-	return Transform3D(frame_basis, origin)
+	var python_transform := Transform3D(
+		python_basis,
+		Vector3(float(rows[0][3]), float(rows[1][3]), float(rows[2][3]))
+	)
+	var python_to_godot := Transform3D(
+		Basis(Vector3(1.0, 0.0, 0.0), Vector3(0.0, 0.0, -1.0), Vector3(0.0, 1.0, 0.0)),
+		Vector3.ZERO
+	)
+	return python_to_godot * python_transform * python_to_godot.affine_inverse()
 
 
 static func decode_text(raw: String) -> Dictionary:

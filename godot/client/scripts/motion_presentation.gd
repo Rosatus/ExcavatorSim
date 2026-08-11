@@ -1,9 +1,10 @@
 class_name MotionPresentation
 extends Node3D
 
-## Applies Python's named-frame transforms to the imported SY205 visual skin.
-## The calibration offset keeps the imported GLB rest pose while Python remains
-## the only owner of the world-space link transforms.
+## Applies converted Python named-frame transforms to the imported SY205 visual
+## skin. MotionProtocol owns the Python Z-up -> Godot Y-up conversion. The
+## calibration offset keeps the imported GLB rest pose while Python remains the
+## only owner of the world-space link transforms.
 
 const MANIFEST_PATH := "res://resources/visual/sy205_visual_manifest.json"
 const PARITY_FIXTURE_PATH := "res://tests/fixtures/sy205_frame_parity_cases.json"
@@ -94,8 +95,8 @@ func _load_mapping_contract() -> bool:
 			return false
 		_frame_nodes[frame_name] = frame_node
 		_rest_globals[frame_name] = frame_node.global_transform
-		var authority_zero := MotionProtocol.rows_to_transform(zero_frames[frame_name])
-		_calibration_offsets[frame_name] = authority_zero.affine_inverse() * frame_node.global_transform
+		var authority_zero_godot := MotionProtocol.rows_to_transform(zero_frames[frame_name])
+		_calibration_offsets[frame_name] = authority_zero_godot.affine_inverse() * frame_node.global_transform
 	return true
 
 
