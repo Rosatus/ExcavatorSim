@@ -96,6 +96,15 @@ direct native height edits are not gameplay mutation paths. If its GDExtension,
 map import, or collision mode is unavailable, the custom mesh/collider path
 continues to provide the fail-open fallback.
 
+The production Terrain3D presentation does not consume addon demo scenes or
+`res://demo/data/assets.tres`. A project-owned
+`ConstructionSiteTerrainProfile` builds a 64 m × 64 m derived height/control
+map around the accepted 20 m logical patch and creates four deterministic
+material roles: disturbed soil, compacted haul track, grass edge, and damp
+soil. Logical grid points are copied exactly; spoil piles, berms, access
+grading, drainage ground, and outer vegetation zones exist only outside that
+patch as disposable visual context.
+
 When enabled, Terrain3D may generate static collision shapes. Jolt remains the
 Godot 3D physics backend that queries and solves against those shapes; it does
 not become an authority for terrain deformation, excavator motion, bucket

@@ -64,6 +64,13 @@ func _test_scene_adapter_seam() -> int:
 	if not adapter.get_status_snapshot().has_all(["queued_generation", "queued_revision", "applied_generation", "applied_revision"]):
 		scene.queue_free()
 		return _fail("adapter reports generation-gated status")
+	var status := adapter.get_status_snapshot()
+	if String(status["assets_source"]) != "generated:construction-site":
+		scene.queue_free()
+		return _fail("adapter uses project-owned construction-site assets")
+	if int(status["presentation_rows"]) != 129 or int(status["presentation_columns"]) != 129:
+		scene.queue_free()
+		return _fail("adapter materializes the medium construction-site grid")
 	scene.queue_free()
 	await process_frame
 	return 0

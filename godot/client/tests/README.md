@@ -21,6 +21,8 @@ The release-candidate matrix is:
 foundation_scene_test.gd
 sy205_glb_test.gd
 motion_client_test.gd
+construction_site_terrain_test.gd
+terrain3d_adapter_test.gd
 terrain_state_test.gd
 excavation_gameplay_test.gd
 visual_pass_test.gd

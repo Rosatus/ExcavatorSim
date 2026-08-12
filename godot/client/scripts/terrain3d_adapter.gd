@@ -12,8 +12,9 @@ signal backend_changed(active: bool)
 const TERRAIN_CLASS := "Terrain3D"
 
 @export var enabled := true
-@export var region_size := 1024
-@export var assets_path := "res://demo/data/assets.tres"
+@export var region_size := 128
+@export var construction_site_enabled := true
+@export var assets_path := ""
 @export_enum("Disabled:0", "Dynamic Game:1", "Dynamic Editor:2", "Full Game:3", "Full Editor:4") var native_collision_mode := 0
 
 var available := false
@@ -30,6 +31,10 @@ var _applied_generation := -1
 var _applied_revision := -1
 var _retired_epochs: Dictionary = {}
 var _ready_complete := false
+var _site_profile := ConstructionSiteTerrainProfile.new()
+var _presentation_rows := 0
+var _presentation_columns := 0
+var _assets_source := "none"
 
 
 func _ready() -> void:
@@ -131,6 +136,11 @@ func get_status_snapshot() -> Dictionary:
 		"applied_epoch": _applied_epoch,
 		"applied_generation": _applied_generation,
 		"applied_revision": _applied_revision,
+		"presentation_rows": _presentation_rows,
+		"presentation_columns": _presentation_columns,
+		"site_extent_m": ConstructionSiteTerrainProfile.SITE_EXTENT_M if construction_site_enabled else 0.0,
+		"material_roles": _site_profile.get_material_roles() if construction_site_enabled else PackedStringArray(),
+		"assets_source": _assets_source,
 	}
 
 
@@ -155,17 +165,36 @@ func _ensure_terrain_node() -> bool:
 	_set_property_if_present(_terrain_node, "collision_mask", 1)
 	var assets: Variant = load(assets_path) if not assets_path.is_empty() and ResourceLoader.exists(assets_path) else null
 	if assets != null:
+		_assets_source = assets_path
+	elif construction_site_enabled:
+		assets = _site_profile.create_assets()
+		_assets_source = "generated:construction-site" if assets != null else "none"
+	if assets != null:
 		_set_property_if_present(_terrain_node, "assets", assets)
+	_configure_material()
 	return true
 
 
 func _materialize_snapshot(snapshot: Dictionary) -> bool:
-	var rows := int(snapshot["rows"])
-	var columns := int(snapshot["columns"])
-	var spacing := float(snapshot["spacing_m"])
-	var origin: Vector2 = snapshot["origin_xz"]
-	var surface: PackedFloat32Array = snapshot["surface"]
-	var bytes: PackedByteArray = snapshot["surface_bytes"]
+	var presentation := _site_profile.build_maps(snapshot) if construction_site_enabled else {
+		"rows": int(snapshot["rows"]),
+		"columns": int(snapshot["columns"]),
+		"spacing_m": float(snapshot["spacing_m"]),
+		"origin_xz": snapshot["origin_xz"],
+		"surface": snapshot["surface"],
+		"height_bytes": snapshot["surface_bytes"],
+		"control_bytes": PackedByteArray(),
+	}
+	if presentation.is_empty():
+		_set_error("Terrain3D construction-site presentation could not be built")
+		return false
+	var rows := int(presentation["rows"])
+	var columns := int(presentation["columns"])
+	var spacing := float(presentation["spacing_m"])
+	var origin: Vector2 = presentation["origin_xz"]
+	var surface: PackedFloat32Array = presentation["surface"]
+	var bytes: PackedByteArray = presentation["height_bytes"]
+	var control_bytes: PackedByteArray = presentation["control_bytes"]
 	if rows < 2 or columns < 2 or spacing <= 0.0 or surface.size() != rows * columns or bytes.size() != surface.size() * 4:
 		_set_error("Terrain3D snapshot dimensions or bytes are invalid")
 		return false
@@ -182,7 +211,13 @@ func _materialize_snapshot(snapshot: Dictionary) -> bool:
 	if height_image == null or height_image.is_empty():
 		_set_error("Terrain3D height image could not be created")
 		return false
-	var maps: Array = [height_image, null, null]
+	var control_image: Image = null
+	if control_bytes.size() == surface.size() * 4:
+		control_image = Image.create_from_data(columns, rows, false, Image.FORMAT_RF, control_bytes)
+		if control_image == null or control_image.is_empty():
+			_set_error("Terrain3D control image could not be created")
+			return false
+	var maps: Array = [height_image, control_image, null]
 	# Terrain3D uses world X/Z for import position. The logical digest remains
 	# the original row-major TerrainState bytes, independent of this conversion.
 	data_object.call("import_images", maps, Vector3(origin.x, 0.0, origin.y), 0.0, 1.0)
@@ -193,9 +228,24 @@ func _materialize_snapshot(snapshot: Dictionary) -> bool:
 		if regions is Array and (regions as Array).is_empty():
 			_set_error("Terrain3D imported no active regions")
 			return false
+	_presentation_rows = rows
+	_presentation_columns = columns
 	_configure_collision()
 	last_error = ""
 	return true
+
+
+func _configure_material() -> void:
+	if _terrain_node == null:
+		return
+	var material: Variant = _terrain_node.get("material")
+	if not (material is Object):
+		return
+	_set_property_if_present(material as Object, "show_checkered", false)
+	_set_property_if_present(material as Object, "auto_shader", false)
+	_set_property_if_present(material as Object, "world_background", 0)
+	if (material as Object).has_method("set_shader_param"):
+		(material as Object).call("set_shader_param", "blend_sharpness", 0.92)
 
 
 func _configure_collision() -> void:

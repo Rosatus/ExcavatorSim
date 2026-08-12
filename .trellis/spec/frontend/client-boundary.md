@@ -71,6 +71,67 @@ Wrong: bucket contact -> Terrain3D editor sculpt -> infer bucket volume later
 Correct: bucket command -> BucketSoilState/TerrainState -> copied snapshot -> Terrain3D
 ```
 
+## Scenario: Construction-site Terrain3D presentation
+
+### 1. Scope / Trigger
+
+Use this contract when a Terrain3D presentation is larger or visually richer
+than the authoritative `TerrainState` grid.
+
+### 2. Signatures
+
+```text
+ConstructionSiteTerrainProfile.build_maps(snapshot: Dictionary) -> Dictionary
+ConstructionSiteTerrainProfile.create_assets() -> Object
+```
+
+`Terrain3DAdapter` remains the only runtime consumer that imports these maps
+into Terrain3D.
+
+### 3. Contracts
+
+- The default presentation is 129 × 129 samples at 0.5 m spacing (64 m × 64 m).
+- Every central logical-grid sample is copied exactly from the accepted
+  `TerrainState.surface`.
+- Presentation-only height shaping may occur outside the logical rectangle and
+  must never be written back to `TerrainState` or `BucketSoilState`.
+- Control-map material IDs are project-owned: 0 disturbed soil, 1 compacted
+  haul track, 2 grass edge, 3 damp soil.
+- Production runtime resources must not reference `res://demo/**`.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Invalid/incomplete logical snapshot | Return an empty presentation; adapter stays fail-open |
+| Terrain3D asset classes unavailable | Return no native assets; retain custom renderer |
+| Logical grid point sampled in presentation | Height is bit-for-bit equal to the logical surface value |
+| Point outside logical rectangle | May receive deterministic presentation shaping/materials only |
+| New material role added | Add one project-owned texture slot and a control-map regression |
+
+### 5. Good/Base/Bad Cases
+
+- Good: accepted snapshot → exact central patch + derived spoil piles/track/grass.
+- Base: native backend unavailable → unchanged custom renderer/collider path.
+- Bad: editor painting or Terrain3D height queries update logical terrain or
+  bucket inventory.
+
+### 6. Tests Required
+
+- `construction_site_terrain_test.gd` asserts 64 m dimensions, exact logical
+  patch parity, four control-map zones, and four generated texture assets.
+- `terrain3d_adapter_test.gd` asserts the project-owned asset source,
+  presentation dimensions, snapshot guards, fallback, and Jolt collision seam.
+- The full standalone matrix must keep terrain/excavation/release-candidate
+  contracts green.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: Terrain3D editor/runtime maps -> infer logical surface and bucket volume
+Correct: TerrainState snapshot -> exact logical patch + disposable site context -> Terrain3D
+```
+
 The M6 visual layer (`VisualEnvironment`, `CameraRig`, `VisualQualityController`
 and bounded `SoilEffects`) is presentation-only. Quality changes may adjust
 lighting, camera range, shadow flags and particle budgets, but may not change
