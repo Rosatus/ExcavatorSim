@@ -71,7 +71,7 @@ async def _probe(port: int, process: subprocess.Popen[str]) -> None:
             await websocket.send_json(
                 {
                     "type": "hello",
-                    "protocol_version": "babylon-sim-v3",
+                    "protocol_version": "godot-pinocchio-v3",
                     "capabilities": [
                         "input_snapshot",
                         "commands",
@@ -85,7 +85,7 @@ async def _probe(port: int, process: subprocess.Popen[str]) -> None:
             first = await websocket.receive_str(timeout=3.0)
             message = json.loads(first)
             protocol_version = message.get("versions", {}).get("protocol_version")
-            if message.get("type") != "hello_ack" or protocol_version != "babylon-sim-v3":
+            if message.get("type") != "hello_ack" or protocol_version != "godot-pinocchio-v3":
                 raise RuntimeError(f"unexpected WebSocket handshake response: {message}")
             session_id = message.get("session_id")
             if not isinstance(session_id, str):
@@ -132,13 +132,13 @@ async def _probe(port: int, process: subprocess.Popen[str]) -> None:
             async with session.get(
                 f"{base_url}/api/terrain/snapshot",
                 params=query,
-                headers={"X-BabylonSim-Session": session_id},
+                headers={"X-Godot-Pinocchio-Session": session_id},
             ) as response:
                 snapshot = await response.read()
                 if (
                     response.status != 200
                     or response.headers.get("Content-Type")
-                    != "application/vnd.babylon-sim.terrain-f32le"
+                    != "application/vnd.godot-pinocchio.terrain-f32le"
                     or len(snapshot) != rows * columns * 4
                     or hashlib.sha256(snapshot).hexdigest() != snapshot_sha256
                 ):

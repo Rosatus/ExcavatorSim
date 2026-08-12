@@ -1,4 +1,4 @@
-"""BabylonSim RRD profile writer and contained experimental reader."""
+"""Godot/Pinocchio RRD profile writer and contained experimental reader."""
 
 from __future__ import annotations
 
@@ -24,15 +24,15 @@ from .replay_contract import (
     SourceMode,
 )
 
-METADATA_ENTITY = "/babylon_sim/metadata"
-SIMULATION_TIME_ENTITY = "/babylon_sim/signals/simulation_time"
-SOURCE_SEQUENCE_ENTITY = "/babylon_sim/state/source_sequence"
-LAST_INPUT_SEQUENCE_ENTITY = "/babylon_sim/state/last_input_sequence"
-SIMULATION_EPOCH_ENTITY = "/babylon_sim/events/simulation_epoch"
-LIFECYCLE_ENTITY = "/babylon_sim/events/lifecycle"
-QUALITY_ENTITY = "/babylon_sim/events/quality"
+METADATA_ENTITY = "/godot_pinocchio/metadata"
+SIMULATION_TIME_ENTITY = "/godot_pinocchio/signals/simulation_time"
+SOURCE_SEQUENCE_ENTITY = "/godot_pinocchio/state/source_sequence"
+LAST_INPUT_SEQUENCE_ENTITY = "/godot_pinocchio/state/last_input_sequence"
+SIMULATION_EPOCH_ENTITY = "/godot_pinocchio/events/simulation_epoch"
+LIFECYCLE_ENTITY = "/godot_pinocchio/events/lifecycle"
+QUALITY_ENTITY = "/godot_pinocchio/events/quality"
 ALLOWED_IMPLICIT_ENTITIES = frozenset({"/__properties"})
-RRD_ACCEPTED_PROTOCOL_VERSIONS = frozenset({"babylon-sim-v2", "babylon-sim-v3"})
+RRD_ACCEPTED_PROTOCOL_VERSIONS = frozenset({"godot-pinocchio-v2", "godot-pinocchio-v3"})
 
 
 class RrdProfileError(ValueError):
@@ -60,7 +60,7 @@ class ImportedRecording:
 
 
 def joint_entity(joint_name: str, quantity: str) -> str:
-    return f"/babylon_sim/signals/joints/{joint_name}/{quantity}"
+    return f"/godot_pinocchio/signals/joints/{joint_name}/{quantity}"
 
 
 def required_entities() -> frozenset[str]:
@@ -113,7 +113,7 @@ def export_rrd(
         "source_mode": source_mode.value,
         "simulation_epochs": json.dumps(data.simulation_epochs, separators=(",", ":")),
     }
-    recording = rr.RecordingStream("babylon_sim", recording_id=snapshot.recording_epoch)
+    recording = rr.RecordingStream("godot_pinocchio", recording_id=snapshot.recording_epoch)
     with recording:
         recording.save(path)
         rr.log(

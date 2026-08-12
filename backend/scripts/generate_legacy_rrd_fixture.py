@@ -44,7 +44,7 @@ def main() -> None:
             last_input_sequence=None,
             monotonic_ns=10_000 + sequence * 10_000_001,
         )
-    producer_manifest = replace(load_version_manifest(), protocol_version="babylon-sim-v2")
+    producer_manifest = replace(load_version_manifest(), protocol_version="godot-pinocchio-v2")
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     with patch("babylon_sim.rrd.load_version_manifest", return_value=producer_manifest):
         export_rrd(

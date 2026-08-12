@@ -6,11 +6,11 @@ generator and terrain-history authority; the browser must not regenerate a heigh
 
 ## Preview lifecycle
 
-- `POST /api/terrain/preview` requires `X-BabylonSim-Session` and the current
+- `POST /api/terrain/preview` requires `X-Godot-Pinocchio-Session` and the current
   `expected_recording_epoch`, `expected_terrain_epoch`, and strict TerrainSpec. It returns a
   session-bound token that expires after five minutes. A session holds at most four previews.
 - `GET /api/terrain/preview/{token}/snapshot` returns that session's candidate as
-  `application/vnd.babylon-sim.terrain-f32le`.
+  `application/vnd.godot-pinocchio.terrain-f32le`.
 - `DELETE /api/terrain/preview/{token}` consumes staging without mutating active terrain.
 - WebSocket `terrain_command` action `apply_preview` consumes the token under recording/terrain
   epoch compare-and-swap. It creates a new terrain epoch at revision zero and preserves the motion
@@ -60,7 +60,7 @@ terrain revision, and a request id. Response headers repeat those identities, ro
 SHA-256. Payload is the derived surface only, row-major Float32 little-endian, exactly
 `rows * columns * 4` bytes, finite, and bounded to 50,000 points / 200,000 bytes. Canonical layer
 arrays never cross this API. The client rejects stale identities, media type, length, digest, or
-non-finite values before replacing the Babylon mesh.
+non-finite values before replacing the Godot terrain mesh.
 
 `terrain_view` is sent immediately after its aligned `view_state`; it identifies the terrain active
 at `selected_sample_sequence`. Terrain state is separate from the RRD v1 motion entities.
@@ -71,7 +71,7 @@ current authority; its originating sample may be earlier when later motion sampl
 same terrain revision. Cell indexes are strictly increasing, bounded by the grid, and encoded
 messages are limited to 256 KiB. Any gap, seek, reconnect, epoch change, or stale completion causes a
 generation-gated full snapshot request instead of speculative repair. The frontend cache is bounded
-to 32 MiB and Babylon updates only dirty positions plus the one-cell-expanded normal region.
+to 32 MiB and Godot updates only dirty positions plus the one-cell-expanded normal region.
 
 `pixi run benchmark` records maximum-grid snapshot/apply latency, continuous visible edit latency,
 25 Hz edit input rate, patch sizes, history use, and runtime rates under edit/snapshot/seek workloads

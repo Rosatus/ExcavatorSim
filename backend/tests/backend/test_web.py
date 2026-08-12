@@ -54,7 +54,7 @@ async def test_motion_only_negotiates_capabilities_and_rejects_optional_routes(
         await ws.send_json(
             {
                 "type": "hello",
-                "protocol_version": "babylon-sim-v3",
+                "protocol_version": "godot-pinocchio-v3",
                 "capabilities": ["input_snapshot", "commands", "playback", "recording", "terrain"],
             }
         )
@@ -143,7 +143,7 @@ async def test_health_model_and_realtime_round_trip(
         await ws.send_json(
             {
                 "type": "hello",
-                "protocol_version": "babylon-sim-v3",
+                "protocol_version": "godot-pinocchio-v3",
                 "capabilities": [
                     "input_snapshot", "commands", "latency", "playback", "recording", "terrain"
                 ],
@@ -164,7 +164,7 @@ async def test_health_model_and_realtime_round_trip(
         assert terrain["terrain_revision"] == 0
         assert terrain["rows"] == terrain["columns"] == 81
 
-        terrain_headers = {"X-BabylonSim-Session": hello["session_id"]}
+        terrain_headers = {"X-Godot-Pinocchio-Session": hello["session_id"]}
         preview = await client.post(
             "/api/terrain/preview",
             headers=terrain_headers,
@@ -193,13 +193,13 @@ async def test_health_model_and_realtime_round_trip(
         )
         assert preview_snapshot.status == 200
         assert preview_snapshot.headers["Content-Type"] == (
-            "application/vnd.babylon-sim.terrain-f32le"
+            "application/vnd.godot-pinocchio.terrain-f32le"
         )
         assert len(await preview_snapshot.read()) == staged["snapshot_bytes"]
         assert (
             await client.get(
                 f"/api/terrain/preview/{staged['token']}/snapshot",
-                headers={"X-BabylonSim-Session": "other-session"},
+                headers={"X-Godot-Pinocchio-Session": "other-session"},
             )
         ).status == 404
 
@@ -315,7 +315,7 @@ async def test_rrd_http_validate_commit_and_export(
     runtime = RuntimeController(model, calibration)
     client = TestClient(TestServer(create_app(runtime, frontend_dir=frontend)))
     await client.start_server()
-    session_headers = {"X-BabylonSim-Session": "http-session"}
+    session_headers = {"X-Godot-Pinocchio-Session": "http-session"}
     try:
         epoch = runtime.recording.recording_epoch
         export = await client.get("/api/recording/export", headers=session_headers)
@@ -331,7 +331,7 @@ async def test_rrd_http_validate_commit_and_export(
         )
         assert validate.status == 200
         summary = await validate.json()
-        assert summary["profile"] == "babylon-sim/rrd-v1"
+        assert summary["profile"] == "godot-pinocchio/rrd-v1"
         assert summary["sample_count"] >= 1
 
         commit = await client.post(

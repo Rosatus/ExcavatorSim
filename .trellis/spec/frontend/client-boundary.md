@@ -2,8 +2,8 @@
 
 The future client owns Godot scene composition, GLB visual transforms, desktop Forward+ rendering, camera/UI, derived terrain mesh, particles, and optional local static colliders/contact probes.
 
-The client consumes Python pose/state and lifecycle messages. In legacy BabylonSim
-compatibility mode it may also consume terrain views, snapshots, patches and
+The client consumes Python pose/state and lifecycle messages. In legacy Python
+terrain/replay compatibility mode it may also consume terrain views, snapshots, patches and
 replay lifecycle messages. In the approved Godot-first local-world profile,
 `TerrainState` is the sole local terrain authority and the client must not mirror
 Python terrain messages into a second store. It must treat missing physics, stale

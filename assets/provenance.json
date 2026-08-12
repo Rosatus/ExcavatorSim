@@ -119,7 +119,7 @@
         }
       ],
       "destination_path": "src/babylon_sim/constants.py",
-      "destination_sha256": "97497d54d4ec4de9a82e7cbb27eefdcf334caa72890489a16298e05fbb9e3377",
+      "destination_sha256": "7e773d8f9ab4dbcf788ec7f8763de5e4d07bb1d448c76fb6322f2fe211edfd7c",
       "destination_symbols": [{ "name": "motion and runtime constants", "lines": "1-29" }],
       "license": "AGPL-3.0-only",
       "modified_at": "2026-07-29",

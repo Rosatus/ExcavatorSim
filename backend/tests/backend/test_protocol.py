@@ -35,6 +35,20 @@ def test_manifest_matches_schema_and_hello_decodes() -> None:
     assert message.capabilities == ("input_snapshot", "commands", "latency")
 
 
+def test_legacy_babylon_protocol_identifier_is_rejected() -> None:
+    with pytest.raises(ProtocolError) as rejected:
+        decode_client_message(
+            json.dumps(
+                {
+                    "type": "hello",
+                    "protocol_version": "babylon-sim-v3",
+                    "capabilities": ["input_snapshot", "commands"],
+                }
+            )
+        )
+    assert rejected.value.code == "schema_validation_failed"
+
+
 def test_recording_http_schema_is_valid_draft_2020_12() -> None:
     root = Path(__file__).resolve().parents[3]
     schema = json.loads(

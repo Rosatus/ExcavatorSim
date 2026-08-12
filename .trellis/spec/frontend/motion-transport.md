@@ -28,7 +28,7 @@ state, lifecycle, terrain, recording, and replay.
 - The hello request is exactly:
 
   ```json
-  {"type":"hello","protocol_version":"babylon-sim-v3",
+  {"type":"hello","protocol_version":"godot-pinocchio-v3",
    "capabilities":["input_snapshot","commands"]}
   ```
 

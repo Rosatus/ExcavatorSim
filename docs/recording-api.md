@@ -6,7 +6,7 @@ timestamps are monotonic elapsed nanoseconds inside one `recording_epoch`; they 
 - `GET /api/recording/series` accepts an allowlisted comma-separated `fields`, ordered `from_ns` /
   `to_ns`, and `max_points` from 1 through 4096. Results are clipped to a stable buffer snapshot and
   carry recording, buffer, and end-sample identities. Each numeric curve is a min/max envelope.
-- `GET /api/recording/export` requires `X-BabylonSim-Session` and returns the finalized retained
+- `GET /api/recording/export` requires `X-Godot-Pinocchio-Session` and returns the finalized retained
   timeline as `application/octet-stream` with a `.rrd` attachment. Only one exchange operation runs
   at once.
 - `POST /api/recording/import/validate?expected_recording_epoch=...` requires the same session

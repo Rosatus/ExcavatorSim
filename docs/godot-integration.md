@@ -6,7 +6,7 @@ The future client targets Windows desktop with Godot Forward+. It should load th
 
 ## Transport
 
-The first Godot adapter should consume the existing BabylonSim HTTP/WebSocket contracts rather than inventing a second authority protocol. It needs equivalents of:
+The first Godot adapter should consume the Godot/Pinocchio HTTP/WebSocket contracts rather than inventing a second authority protocol. It needs equivalents of:
 
 - realtime state handshake and state snapshots;
 - input command validation and acknowledgements;
@@ -35,7 +35,7 @@ converted frame relations provide only the local single-axis joint rotations.
 ## Authority boundary
 
 Python remains authoritative for joint state, input safety and lifecycle in every
-profile. The legacy BabylonSim profile also remains authoritative for terrain
+profile. The Godot/Pinocchio profile remains authoritative for terrain
 layers, bucket inventory, events, recording and replay. The approved Godot-first
 local-world profile used by the realistic client instead keeps deterministic
 terrain/world and convenience bucket state in Godot; it does not mirror Python

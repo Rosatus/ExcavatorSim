@@ -14,7 +14,10 @@ Terrain edits must be deterministic for identical baseline, input, and sample se
 - Do not add a second terrain state store in the client.
 - Do not create one rigid body per sand grain.
 - Do not import from `E:/projects/BabylonSim`, use sibling paths, symlinks, editable installs, or copied frontend build output.
-- Do not silently rename `babylon-sim-*` protocol/version identifiers.
+- Keep active protocol/version identifiers aligned with the canonical
+  `godot-pinocchio-*` family. Any future wire-name change must be an explicit,
+  cross-layer, versioned protocol task; do not change it silently in one
+  consumer.
 - Do not broaden stale-port cleanup to terminate unverified processes.
 
 ## Tests

@@ -1,6 +1,6 @@
 {
-  "protocol_version": "babylon-sim-v3",
-  "state_schema_version": "babylon-sim-state-v2",
+  "protocol_version": "godot-pinocchio-v3",
+  "state_schema_version": "godot-pinocchio-state-v2",
   "model_version": "sy205-glb-urdf-v4",
   "calibration_version": "machine-calibration-v2",
   "software_version": "0.1.0",

@@ -343,10 +343,10 @@ async def _recording_series(request: web.Request) -> web.Response:
 
 
 def _session_id(request: web.Request) -> str:
-    session_id = request.headers.get("X-BabylonSim-Session", "")
+    session_id = request.headers.get("X-Godot-Pinocchio-Session", "")
     if not session_id or len(session_id) > 128:
         raise web.HTTPUnauthorized(
-            text="a valid BabylonSim session header is required",
+            text="a valid Godot/Pinocchio session header is required",
             content_type="application/problem+json",
         )
     return session_id
@@ -366,7 +366,7 @@ async def _recording_export(request: web.Request) -> web.StreamResponse:
         status=200,
         headers={
             "Content-Type": "application/octet-stream",
-            "Content-Disposition": 'attachment; filename="babylon-sim-recording.rrd"',
+            "Content-Disposition": 'attachment; filename="godot-pinocchio-recording.rrd"',
             "Content-Length": str(path.stat().st_size),
         },
     )
@@ -531,7 +531,7 @@ async def _terrain_preview_snapshot(request: web.Request) -> web.Response:
     return web.Response(
         body=payload,
         headers={
-            "Content-Type": "application/vnd.babylon-sim.terrain-f32le",
+            "Content-Type": "application/vnd.godot-pinocchio.terrain-f32le",
             "Cache-Control": "no-store",
             "X-Terrain-Rows": str(preview.baseline.domain.rows),
             "X-Terrain-Columns": str(preview.baseline.domain.columns),
@@ -576,7 +576,7 @@ async def _terrain_snapshot(request: web.Request) -> web.Response:
     return web.Response(
         body=payload,
         headers={
-            "Content-Type": "application/vnd.babylon-sim.terrain-f32le",
+            "Content-Type": "application/vnd.godot-pinocchio.terrain-f32le",
             "Cache-Control": "no-store",
             "X-Terrain-Recording-Epoch": view.recording_epoch,
             "X-Terrain-Epoch": view.terrain_epoch,

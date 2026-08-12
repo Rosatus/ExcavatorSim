@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://babylon-sim.local/protocol/terrain-http-v1.schema.json",
+  "$id": "https://godot-pinocchio.local/protocol/terrain-http-v1.schema.json",
   "title": "TerrainHttpV1",
   "oneOf": [
     { "$ref": "#/$defs/PreviewRequest" },
@@ -15,7 +15,7 @@
         "expected_recording_epoch": { "type": "string", "minLength": 1 },
         "expected_terrain_epoch": { "type": "string", "minLength": 1 },
         "spec": {
-          "$ref": "https://babylon-sim.local/protocol/terrain-spec-v1.schema.json"
+          "$ref": "https://godot-pinocchio.local/protocol/terrain-spec-v1.schema.json"
         }
       }
     },

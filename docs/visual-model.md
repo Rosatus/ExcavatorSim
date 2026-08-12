@@ -1,6 +1,6 @@
 # Visual Model Contract
 
-BabylonSim's authoritative motion model remains
+The Godot/Pinocchio service's authoritative motion model remains
 `assets/model/kinematic_excavator.urdf`. The `original-skin-v1` visual model is
 a separate five-link appearance layer driven by the same backend-authored world
 frame matrices.
@@ -35,7 +35,7 @@ missing, corrupt, or mismatched assets fail instead of falling through to the
 SPA or producing a partial visual model.
 
 The frontend validates the public manifest, fetches all five assets, verifies
-their SHA-256 values with Web Crypto, and stages Babylon `AssetContainer`s.
+their SHA-256 values with Web Crypto, and stages the Godot visual scene.
 Only after all five loads succeed does `VisualModelController` attach them to
 the existing pose nodes and disable the corresponding primitive visuals. A
 failure disposes staged resources and is surfaced as a model readiness error.
@@ -58,4 +58,4 @@ conversion environment are never accessed by production or a clean build.
 Open the application with `?visual=primitives` to render the unchanged
 schematic URDF visuals. Production does not silently use that fallback after a
 GLB error. Removing the manifest/assets/routes/loader integration restores the
-previous renderer without changing motion, protocol v3, authoritative terrain, recording, or RRD v1.
+previous renderer without changing motion, the Godot/Pinocchio protocol v3, authoritative terrain, recording, or RRD v1.

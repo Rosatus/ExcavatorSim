@@ -22,7 +22,7 @@ license is asserted.
 
 RRD exchange uses the exact locked `rerun-sdk` 0.35.0 Python package. Its version, package source,
 integrity hash, and declared license are included in `assets/licenses/third-party-dependencies.json`.
-Rerun's experimental RRD reader is contained behind the migrated `babylon-sim/rrd-v1` adapter and is
+Rerun's experimental RRD reader is contained behind the migrated `godot-pinocchio/rrd-v1` adapter and is
 not sourced from an adjacent checkout.
 
 `assets/licenses/third-party-dependencies.json` inventories the locked Pixi/conda packages and

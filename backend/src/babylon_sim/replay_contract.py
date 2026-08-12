@@ -27,7 +27,7 @@ RECORDING_UPLOAD_MAX_BYTES = 256 * 1024 * 1024
 IMPORT_TOKEN_TTL_SECONDS = 5 * 60
 REPLAY_VIEW_HZ = 30
 
-RRD_PROFILE = "babylon-sim/rrd-v1"
+RRD_PROFILE = "godot-pinocchio/rrd-v1"
 RRD_SDK_VERSION = "0.35.0"
 RRD_RECORDING_TIMELINE = "recording_time"
 RRD_SAMPLE_TIMELINE = "sample_sequence"

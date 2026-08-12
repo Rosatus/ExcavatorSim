@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://babylon-sim.local/protocol/recording-http-v1.schema.json",
-  "title": "BabylonSim Recording HTTP API v1",
+  "$id": "https://godot-pinocchio.local/protocol/recording-http-v1.schema.json",
+  "title": "Godot/Pinocchio Recording HTTP API v1",
   "oneOf": [
     { "$ref": "#/$defs/seriesResponse" },
     { "$ref": "#/$defs/importSummary" },
@@ -75,7 +75,7 @@
       "properties": {
         "token": { "type": "string", "minLength": 1 },
         "digest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-        "profile": { "const": "babylon-sim/rrd-v1" },
+        "profile": { "const": "godot-pinocchio/rrd-v1" },
         "sample_count": { "type": "integer", "minimum": 1, "maximum": 360000 },
         "start_ns": { "$ref": "#/$defs/nonNegativeInteger" },
         "end_ns": { "$ref": "#/$defs/nonNegativeInteger" },

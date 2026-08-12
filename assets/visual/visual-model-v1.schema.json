@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://babylon-sim.local/schema/visual-model-v1.json",
+  "$id": "https://godot-pinocchio.local/schema/visual-model-v1.json",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "visual_model_version", "source_model", "entries"],

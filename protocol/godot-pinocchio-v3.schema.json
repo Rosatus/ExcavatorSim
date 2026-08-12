@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://babylon-sim.local/protocol/babylon-sim-v3.schema.json",
-  "title": "BabylonSimMessage",
+  "$id": "https://godot-pinocchio.local/protocol/godot-pinocchio-v3.schema.json",
+  "title": "GodotPinocchioMessage",
   "oneOf": [
     { "$ref": "#/$defs/Hello" },
     { "$ref": "#/$defs/InputSnapshot" },
@@ -25,7 +25,7 @@
   "$defs": {
     "ProtocolVersion": {
       "type": "string",
-      "const": "babylon-sim-v3"
+      "const": "godot-pinocchio-v3"
     },
     "Lifecycle": {
       "type": "string",
@@ -52,7 +52,7 @@
       ],
       "properties": {
         "protocol_version": { "$ref": "#/$defs/ProtocolVersion" },
-        "state_schema_version": { "type": "string", "const": "babylon-sim-state-v2" },
+        "state_schema_version": { "type": "string", "const": "godot-pinocchio-state-v2" },
         "model_version": { "type": "string", "const": "sy205-glb-urdf-v4" },
         "calibration_version": { "type": "string", "const": "machine-calibration-v2" },
         "software_version": { "type": "string", "const": "0.1.0" },
