@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 16
-- **Last Active**: 2026-08-11
+- **Total Sessions**: 17
+- **Last Active**: 2026-08-12
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~553 | Active |
+| `journal-1.md` | ~586 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 17 | 2026-08-12 | Fix Godot terrain winding | `4c7eb94` | `main` |
 | 16 | 2026-08-11 | Activate GLB-derived SY205 URDF v4 | `e78a3c8`, `020d82e`, `55bbee9`, `c9759a9` | `main` |
 | 15 | 2026-08-11 | 建立机械 GLB 到 Godot 适配 Skill | `e96d03e` | `main` |
 | 14 | 2026-08-11 | 修复 SY205 局部枢轴运动链 | `72374da` | `main` |

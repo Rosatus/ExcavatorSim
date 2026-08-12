@@ -551,3 +551,36 @@ Generated the deterministic SY205 URDF and evidence, preserved the old model as 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 17: Fix Godot terrain winding
+
+**Date**: 2026-08-12
+**Task**: Fix Godot terrain winding
+**Branch**: `main`
+
+### Summary
+
+Corrected generated terrain triangle winding for Godot back-face culling, added mesh index/normal regression coverage, and verified the brown terrain at runtime with CULL_BACK.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4c7eb94` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
