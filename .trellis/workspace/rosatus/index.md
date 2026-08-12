@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 19
-- **Last Active**: 2026-08-12
+- **Total Sessions**: 20
+- **Last Active**: 2026-08-13
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~653 | Active |
+| `journal-1.md` | ~686 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 20 | 2026-08-13 | Terrain3D official demo visual baseline | `dcc9e66` | `main` |
 | 19 | 2026-08-12 | Integrate Terrain3D terrain backend | `75bdd09`, `e0230a2` | `main` |
 | 18 | 2026-08-12 | Refresh stale project documentation | `a5b797b` | `main` |
 | 17 | 2026-08-12 | Fix Godot terrain winding | `4c7eb94` | `main` |

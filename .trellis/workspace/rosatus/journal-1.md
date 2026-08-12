@@ -651,3 +651,36 @@ Integrated Terrain3D as a snapshot-driven presentation backend while preserving 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 20: Terrain3D official demo visual baseline
+
+**Date**: 2026-08-13
+**Task**: Terrain3D official demo visual baseline
+**Branch**: `main`
+
+### Summary
+
+Adopted the official Terrain3D demo material stack as a minimal production asset closure, kept a flat deterministic excavation pad and stable/loose authority, added bounded rocks and grass exclusion, and verified Godot plus project quality gates.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `dcc9e66` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
