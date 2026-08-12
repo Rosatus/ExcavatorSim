@@ -28,6 +28,48 @@ inventory or local terrain edits to Python. `TerrainCollider` is an optional
 generation-gated static derivative, disabled/fail-open by default. Missing or
 failed local physics cannot block terrain edits or motion presentation.
 
+### Terrain3D derived-backend contract
+
+`Terrain3DAdapter` is an optional presentation/collision backend, not a second
+authority. Its public seam is:
+
+```text
+queue_snapshot(snapshot: Dictionary) -> bool
+apply_pending() -> bool
+get_status_snapshot() -> Dictionary
+```
+
+The snapshot must contain `terrain_epoch`, `terrain_revision`,
+`world_generation`, `rows`, `columns`, `spacing_m`, `origin_xz`, `surface`, and
+`surface_bytes`. The adapter deep-copies `surface` and `surface_bytes`, rejects
+older `(epoch, generation, revision)` work, and only marks `available=true`
+after `Terrain3DData.import_images` successfully materializes the accepted
+height map. `TerrainState.surface_bytes` and its digest remain the parity oracle;
+Terrain3D's internal maps never replace them.
+
+Terrain3D can create static collision shapes, while the project-selected Jolt
+backend answers Godot raycasts and contacts. Collision is disabled/fail-open by
+default (`terrain3d/collision_mode=0`); enabling it must not change logical
+excavation or motion behavior. A missing GDExtension, failed map update, or
+failed collision setup keeps `TerrainRenderer`/`TerrainCollider` usable.
+
+#### Validation & error matrix
+
+| Condition | Required behavior |
+|---|---|
+| Native class unavailable | `available=false`; retain custom renderer |
+| Invalid dimensions/bytes | reject snapshot without mutating authority |
+| Stale epoch/generation/revision | reject queue; preserve newer pending work |
+| Map import succeeds | hide custom mesh only after native snapshot is applied |
+| Collision disabled or fails | `collision_available=false`; excavation/motion continue |
+
+#### Wrong vs correct
+
+```text
+Wrong: bucket contact -> Terrain3D editor sculpt -> infer bucket volume later
+Correct: bucket command -> BucketSoilState/TerrainState -> copied snapshot -> Terrain3D
+```
+
 The M6 visual layer (`VisualEnvironment`, `CameraRig`, `VisualQualityController`
 and bounded `SoilEffects`) is presentation-only. Quality changes may adjust
 lighting, camera range, shadow flags and particle budgets, but may not change

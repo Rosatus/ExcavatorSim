@@ -12,6 +12,7 @@
 [ext_resource type="Script" path="res://scripts/camera_rig.gd" id="10_camera_rig"]
 [ext_resource type="Script" path="res://scripts/visual_quality_controller.gd" id="11_visual_quality"]
 [ext_resource type="Script" path="res://scripts/soil_effects.gd" id="12_soil_effects"]
+[ext_resource type="Script" path="res://scripts/terrain3d_adapter.gd" id="13_terrain3d_adapter"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_sgp6g"]
 size = Vector3(1.2, 0.8, 0.9)
@@ -97,6 +98,9 @@ script = ExtResource("5_terrain_world")
 
 [node name="TerrainMesh" type="MeshInstance3D" parent="TerrainRoot/TerrainWorld"]
 script = ExtResource("6_terrain_renderer")
+
+[node name="Terrain3DAdapter" type="Node3D" parent="TerrainRoot"]
+script = ExtResource("13_terrain3d_adapter")
 
 [node name="TerrainCollider" type="Node3D" parent="TerrainRoot"]
 script = ExtResource("7_terrain_collider")

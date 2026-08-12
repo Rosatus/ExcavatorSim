@@ -86,6 +86,25 @@ Godot builds a derived render mesh from its selected local surface snapshot.
 is generation-gated, stale-safe, and disabled/fail-open by default. A disabled
 or failed physics backend must leave the Python service and visual state usable.
 
+The optional `Terrain3DAdapter` is another derived backend. It receives copied
+`TerrainState.surface_snapshot()` data only after the fixed-step logical edit has
+been accepted. `TerrainState` keeps the stable/loose Float32 layers, revision
+and generation guards, while `BucketSoilState` remains responsible for bucket
+capacity and grid-cell volume accounting. Terrain3D is therefore a rendering,
+heightmap materialization, and optional collision provider; editor sculpting or
+direct native height edits are not gameplay mutation paths. If its GDExtension,
+map import, or collision mode is unavailable, the custom mesh/collider path
+continues to provide the fail-open fallback.
+
+When enabled, Terrain3D may generate static collision shapes. Jolt remains the
+Godot 3D physics backend that queries and solves against those shapes; it does
+not become an authority for terrain deformation, excavator motion, bucket
+inventory, or Python state. The data flow is one-way:
+
+```text
+fixed-step command -> TerrainState/BucketSoilState -> snapshot -> Terrain3D -> Jolt query
+```
+
 The first soil presentation is not a per-grain rigid-body simulation. It combines the authoritative stable/loose heightfield and bucket volume with bounded visual particles or clumps. Those effects are disposable presentation state and must clear on historical seek, reset, reconnect, and authority-generation changes.
 
 ## Deferred model decisions

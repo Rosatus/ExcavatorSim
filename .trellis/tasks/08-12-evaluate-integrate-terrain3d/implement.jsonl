@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Godot client maturity, transport boundary, and pre-development routing."}
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"TerrainState ownership, derived renderer/collider rules, fail-open physics, and no reverse authority flow."}
+{"file":".trellis/spec/frontend/godot-mcp.md","reason":"Safe Godot addon/scene authoring and standalone validation boundaries."}
+{"file":".trellis/spec/backend/runtime-profiles.md","reason":"Legacy versus motion-only service composition and optional terrain/replay capabilities."}
+{"file":".trellis/tasks/08-12-evaluate-integrate-terrain3d/research/terrain3d-evaluation.md","reason":"Local addon audit and official Terrain3D capability/risk evidence."}

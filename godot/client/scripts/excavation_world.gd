@@ -123,6 +123,7 @@ func get_status_snapshot() -> Dictionary:
 	status["authority_generation"] = authority_generation
 	status["collider_available"] = terrain_collider != null and terrain_collider.available
 	status["collider_enabled"] = terrain_collider != null and terrain_collider.enabled
+	status["terrain3d"] = terrain_world.terrain3d_adapter.get_status_snapshot() if terrain_world != null and terrain_world.terrain3d_adapter != null else {"enabled": false, "available": false}
 	status["physics_fail_open"] = true
 	return status
 

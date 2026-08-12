@@ -32,7 +32,12 @@ project/assembly_name="ExcavatorSim"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg")
+enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg", "res://addons/terrain_3d/plugin.cfg")
+
+[terrain3d]
+
+runtime_enabled=true
+collision_mode=0
 
 [physics]
 
