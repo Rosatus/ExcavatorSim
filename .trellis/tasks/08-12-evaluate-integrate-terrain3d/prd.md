@@ -74,10 +74,10 @@ behavior.
       independent of Terrain3D mesh/collision availability.
 - [x] Runtime edit tests prove snapshot generation/revision guards reject stale
       Terrain3D work and preserve newer terrain state.
-- [ ] Jolt collision tests prove the selected Terrain3D collision mode produces
+- [x] Jolt collision tests prove the selected Terrain3D collision mode produces
       usable local queries when available and that disabling/failing it leaves
       motion and logical excavation usable.
-- [ ] Existing standalone terrain, excavation, release-candidate, backend
+- [x] Existing standalone terrain, excavation, release-candidate, backend
       verify, and provenance gates remain green where applicable.
 - [x] Addon packaging has an explicit decision for binaries, demo resources,
       the temporary-looking tilde DLL, third-party scripts, and MIT license

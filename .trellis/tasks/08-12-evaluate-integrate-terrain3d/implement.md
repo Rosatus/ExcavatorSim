@@ -54,10 +54,11 @@ git diff --check
   and the custom mesh stayed hidden only while the native backend was active.
 - `pixi run verify`, `pixi run backend-smoke`, `git diff --check`, and task
   context validation passed.
-- The standalone PowerShell matrix could not be run from this shell because
-  no command-line `godot.exe` is installed/exposed; the connected editor smoke
-  covered the same scene-loading path and the adapter contract was also
-  exercised through `game_eval`.
-- Native collision was intentionally left at `terrain3d/collision_mode=0`;
-  Jolt remains configured globally, and a later collision spike must enable
-  Dynamic/Game only after query/fail-open evidence is collected.
+- The full standalone PowerShell matrix passed with all eight SceneTree scripts
+  in an isolated project copy. The isolation excludes Terrain3D's Windows
+  hot-reload `~libterrain...dll`, which is locked by the connected editor and
+  is not a source/package artifact.
+- Terrain3D Dynamic/Game collision was enabled in a smoke, and a Jolt raycast
+  hit the native `Terrain3D` collider at the logical surface. Returning to
+  Disabled removed the collision without changing logical terrain bytes or
+  revision. The committed production default remains `collision_mode=0`.

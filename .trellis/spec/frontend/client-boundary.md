@@ -36,6 +36,7 @@ authority. Its public seam is:
 ```text
 queue_snapshot(snapshot: Dictionary) -> bool
 apply_pending() -> bool
+set_collision_mode(mode: int) -> bool
 get_status_snapshot() -> Dictionary
 ```
 

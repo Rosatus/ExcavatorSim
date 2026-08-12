@@ -112,6 +112,12 @@ func is_native_mesh_active() -> bool:
 	return available
 
 
+func set_collision_mode(mode: int) -> bool:
+	native_collision_mode = clampi(mode, 0, 4)
+	_configure_collision()
+	return collision_available
+
+
 func get_status_snapshot() -> Dictionary:
 	return {
 		"enabled": enabled,
@@ -194,11 +200,12 @@ func _materialize_snapshot(snapshot: Dictionary) -> bool:
 
 func _configure_collision() -> void:
 	collision_available = false
-	if native_collision_mode <= 0 or _terrain_node == null:
+	if _terrain_node == null:
 		return
 	var collision: Variant = _terrain_node.get("collision")
 	if not (collision is Object):
-		_set_error("Terrain3D collision object is unavailable")
+		if native_collision_mode > 0:
+			_set_error("Terrain3D collision object is unavailable")
 		return
 	var collision_object := collision as Object
 	if collision_object.has_method("set_mode"):
@@ -206,9 +213,10 @@ func _configure_collision() -> void:
 	elif _has_property(collision_object, "mode"):
 		collision_object.set("mode", native_collision_mode)
 	else:
-		_set_error("Terrain3D collision mode API is unavailable")
+		if native_collision_mode > 0:
+			_set_error("Terrain3D collision mode API is unavailable")
 		return
-	collision_available = true
+	collision_available = native_collision_mode > 0
 
 
 func _set_native_active(active: bool) -> void:

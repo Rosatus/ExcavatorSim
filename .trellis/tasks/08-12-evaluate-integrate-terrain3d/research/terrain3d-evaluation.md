@@ -121,5 +121,12 @@ copies and generation/epoch/revision-gates snapshots, attempts
 `Terrain3DData.import_images`, and hides the custom mesh only after a successful
 native materialization. The custom renderer remains visible on native load,
 map-import, or collision configuration failure. The adapter test is included in
-`tests/run_standalone_matrix.ps1`; the Godot-specific smoke is still pending
-because this workspace does not currently expose a `godot.exe` executable.
+`tests/run_standalone_matrix.ps1`.
+
+The executable was subsequently resolved from the connected editor process and
+the eight-script standalone matrix passed in an isolated project copy. A live
+Jolt smoke enabled Terrain3D Dynamic/Game collision, hit its native collider
+with a downward ray, then returned to Disabled without mutating the logical
+terrain snapshot. The isolation was necessary because a second Godot process
+cannot overwrite Terrain3D's editor-held Windows `~libterrain...dll`; that file
+is a hot-reload runtime copy and remains excluded from source/package scope.
