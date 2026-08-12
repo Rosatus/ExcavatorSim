@@ -3,7 +3,7 @@ extends RefCounted
 
 ## Godot-owned, deterministic terrain authority.  Meshes are always derived
 ## from snapshots of these two Float32 layers.
-const ALGORITHM_VERSION := "godot-terrain-state-v1"
+const ALGORITHM_VERSION := "godot-terrain-state-v2-flat"
 const DEFAULT_SEED := 24681357
 const DEFAULT_ROWS := 41
 const DEFAULT_COLUMNS := 41
@@ -165,11 +165,6 @@ func get_last_enqueued_sequence() -> int:
 func _generate_baseline() -> void:
 	_baseline_stable = PackedFloat32Array()
 	_baseline_stable.resize(rows * columns)
-	for row in rows:
-		for column in columns:
-			var index := row * columns + column
-			var mixed := (seed + column * 374761393 + row * 668265263 + column * row * 127) % 104729
-			_baseline_stable[index] = float((mixed % 2001) - 1000) / 10000.0
 	stable_heights = _baseline_stable.duplicate()
 	loose_depth = PackedFloat32Array()
 	loose_depth.resize(_baseline_stable.size())

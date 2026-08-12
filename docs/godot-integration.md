@@ -96,14 +96,21 @@ direct native height edits are not gameplay mutation paths. If its GDExtension,
 map import, or collision mode is unavailable, the custom mesh/collider path
 continues to provide the fail-open fallback.
 
-The production Terrain3D presentation does not consume addon demo scenes or
-`res://demo/data/assets.tres`. A project-owned
-`ConstructionSiteTerrainProfile` builds a 64 m × 64 m derived height/control
-map around the accepted 20 m logical patch and creates four deterministic
-material roles: disturbed soil, compacted haul track, grass edge, and damp
-soil. Logical grid points are copied exactly; spoil piles, berms, access
-grading, drainage ground, and outer vegetation zones exist only outside that
-patch as disposable visual context.
+The current temporary Terrain3D visual baseline intentionally reuses a minimal
+production extraction of the official Terrain3D demo assets and material
+configuration. A project-owned
+`ConstructionSiteTerrainProfile` still builds the 64 m × 64 m derived
+height/control map around the accepted 20 m logical patch, but its two material
+IDs select the demo cliff/bare-ground and grass slots. The adapter loads the
+extracted demo `Terrain3DMaterial`, including projection, dual scaling, macro
+variation, auto-shader, and world-background parameters.
+
+`TerrainState` algorithm `godot-terrain-state-v2-flat` initializes the logical
+patch as a true zero-height plane, so the excavator starts on flat ground.
+Official RockA/B/C meshes are placed outside that patch through bounded
+`MultiMeshInstance3D` layers. The official grass particle scene is retained
+outside a 12 m central exclusion radius. Demo height maps are never imported as
+logical state, and these presentation objects add no collision authority.
 
 When enabled, Terrain3D may generate static collision shapes. Jolt remains the
 Godot 3D physics backend that queries and solves against those shapes; it does

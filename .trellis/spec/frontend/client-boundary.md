@@ -83,6 +83,7 @@ than the authoritative `TerrainState` grid.
 ```text
 ConstructionSiteTerrainProfile.build_maps(snapshot: Dictionary) -> Dictionary
 ConstructionSiteTerrainProfile.create_assets() -> Object
+ConstructionSiteTerrainProfile.build_dressing(maps: Dictionary) -> Dictionary
 ```
 
 `Terrain3DAdapter` remains the only runtime consumer that imports these maps
@@ -95,9 +96,17 @@ into Terrain3D.
   `TerrainState.surface`.
 - Presentation-only height shaping may occur outside the logical rectangle and
   must never be written back to `TerrainState` or `BucketSoilState`.
-- Control-map material IDs are project-owned: 0 disturbed soil, 1 compacted
-  haul track, 2 grass edge, 3 damp soil.
-- Production runtime resources must not reference `res://demo/**`.
+- Temporary control-map IDs match official demo assets: 0 cliff/bare ground and
+  1 grass. The central logical patch and access path use ID 0.
+- The adapter may load a minimal extracted copy of the official demo
+  `Terrain3DMaterial`/texture assets and reuse RockA/B/C meshes plus its particle
+  scene as an explicitly reviewed temporary visual baseline; demo height data is
+  never logical input.
+- `godot-terrain-state-v2-flat` initializes the logical surface at zero height.
+  Stable/loose edits and reset semantics remain unchanged after initialization.
+- Site dressing is bounded to 18 official rocks outside the logical rectangle;
+  official grass particles use a 12 m central exclusion radius. Dressing adds
+  no collision objects.
 
 ### 4. Validation & Error Matrix
 
@@ -107,7 +116,8 @@ into Terrain3D.
 | Terrain3D asset classes unavailable | Return no native assets; retain custom renderer |
 | Logical grid point sampled in presentation | Height is bit-for-bit equal to the logical surface value |
 | Point outside logical rectangle | May receive deterministic presentation shaping/materials only |
-| New material role added | Add one project-owned texture slot and a control-map regression |
+| Official demo visual resource unavailable | Adapter stays fail-open and keeps the custom renderer |
+| Native Terrain3D backend inactive | Hide the dressing layer with the native terrain |
 
 ### 5. Good/Base/Bad Cases
 
@@ -119,9 +129,10 @@ into Terrain3D.
 ### 6. Tests Required
 
 - `construction_site_terrain_test.gd` asserts 64 m dimensions, exact logical
-  patch parity, four control-map zones, and four generated texture assets.
+  patch parity, demo material IDs, demo assets, and bounded dressing.
 - `terrain3d_adapter_test.gd` asserts the project-owned asset source,
-  presentation dimensions, snapshot guards, fallback, and Jolt collision seam.
+  presentation dimensions, dressing layers, snapshot guards, fallback, and
+  Jolt collision seam.
 - The full standalone matrix must keep terrain/excavation/release-candidate
   contracts green.
 

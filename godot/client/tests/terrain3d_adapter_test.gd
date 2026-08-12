@@ -32,6 +32,8 @@ func _test_snapshot_guards_without_native_backend() -> int:
 	var status: Dictionary = adapter.get_status_snapshot()
 	if int(status["queued_generation"]) != int(baseline["world_generation"]) or int(status["queued_revision"]) != int(baseline["terrain_revision"]):
 		return _fail("adapter exposes queued generation and revision")
+	if int(status["rock_count"]) != 0 or int(status["tree_count"]) != 0:
+		return _fail("disabled native backend creates no site dressing")
 	if not state.enqueue_brush(1, Vector2.ZERO, 1.0, 0.2) or not state.step_fixed():
 		return _fail("test edit changes the logical source")
 	var newer := state.surface_snapshot()
@@ -65,12 +67,32 @@ func _test_scene_adapter_seam() -> int:
 		scene.queue_free()
 		return _fail("adapter reports generation-gated status")
 	var status := adapter.get_status_snapshot()
-	if String(status["assets_source"]) != "generated:construction-site":
+	if String(status["assets_source"]) != "demo:terrain3d-official":
 		scene.queue_free()
-		return _fail("adapter uses project-owned construction-site assets")
+		return _fail("adapter uses the official Terrain3D demo assets")
 	if int(status["presentation_rows"]) != 129 or int(status["presentation_columns"]) != 129:
 		scene.queue_free()
 		return _fail("adapter materializes the medium construction-site grid")
+	if int(status["rock_count"]) != 18 or int(status["tree_count"]) != 0 or not bool(status["grass_enabled"]):
+		scene.queue_free()
+		return _fail("adapter reports official demo rocks and grass")
+	var dressing := scene.get_node_or_null("TerrainRoot/Terrain3DAdapter/ConstructionSiteDressing")
+	if dressing == null:
+		scene.queue_free()
+		return _fail("adapter owns a disposable construction-site dressing layer")
+	for layer_name in ["Rocks1", "Rocks2", "Rocks3"]:
+		var layer := dressing.get_node_or_null(layer_name) as MultiMeshInstance3D
+		if layer == null or layer.multimesh == null:
+			scene.queue_free()
+			return _fail("site dressing uses three bounded scanned-rock MultiMesh layers")
+	var particles := dressing.get_node_or_null("Terrain3DParticles")
+	var process_material := particles.get("process_material") as ShaderMaterial if particles != null else null
+	if process_material == null or float(process_material.get_shader_parameter("exclusion_radius")) != 12.0:
+		scene.queue_free()
+		return _fail("official demo grass excludes the central flat work pad")
+	if dressing.find_children("*", "CollisionObject3D", true, false).size() != 0:
+		scene.queue_free()
+		return _fail("site dressing does not add physics authority")
 	scene.queue_free()
 	await process_frame
 	return 0

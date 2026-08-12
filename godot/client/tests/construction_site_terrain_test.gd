@@ -24,9 +24,15 @@ func _run() -> int:
 	var zone_error := _check_material_zones(maps)
 	if zone_error != "":
 		return _fail(zone_error)
+	var dressing_error := _check_dressing(profile, maps)
+	if dressing_error != "":
+		return _fail(dressing_error)
 	var assets := profile.create_assets()
-	if assets == null or not assets.has_method("get_texture_count") or int(assets.call("get_texture_count")) != 4:
-		return _fail("construction site creates four project-owned Terrain3D texture assets")
+	if assets == null or not assets.has_method("get_texture_count") or int(assets.call("get_texture_count")) != 2:
+		return _fail("construction site loads the two official Terrain3D demo texture assets")
+	var texture_error := _check_texture_detail(assets)
+	if texture_error != "":
+		return _fail(texture_error)
 	print("Construction-site terrain profile contracts passed.")
 	return 0
 
@@ -58,14 +64,11 @@ func _check_material_zones(maps: Dictionary) -> String:
 	if int(center["base_id"]) != 0 or int(center["overlay_id"]) != 0:
 		return "logical work pad uses disturbed soil"
 	var haul := _control_at(maps, Vector2(23.0, 14.0))
-	if int(haul["overlay_id"]) != 1 or float(haul["blend"]) < 0.5:
-		return "access corridor uses compacted haul-track material"
+	if int(haul["base_id"]) != 0 or int(haul["overlay_id"]) != 0:
+		return "access corridor keeps the demo bare-ground material"
 	var grass := _control_at(maps, Vector2(-29.0, 0.0))
-	if int(grass["overlay_id"]) != 2 or float(grass["blend"]) < 0.7:
-		return "outer undisturbed edge uses grass material"
-	var damp := _control_at(maps, Vector2(15.0, 16.0))
-	if int(damp["overlay_id"]) != 3 or float(damp["blend"]) < 0.8:
-		return "drainage low point uses damp-soil material"
+	if int(grass["base_id"]) != 1 or int(grass["overlay_id"]) != 1:
+		return "outer terrain uses the official demo grass material"
 	return ""
 
 
@@ -77,6 +80,35 @@ func _control_at(maps: Dictionary, position: Vector2) -> Dictionary:
 	var row := roundi((position.y - origin.y) / spacing)
 	var code := (maps["control_bytes"] as PackedByteArray).decode_u32((row * columns + column) * 4)
 	return ConstructionSiteTerrainProfile.decode_control(code)
+
+
+func _check_dressing(profile: ConstructionSiteTerrainProfile, maps: Dictionary) -> String:
+	var dressing := profile.build_dressing(maps)
+	var rocks: Array = dressing.get("rocks", [])
+	if rocks.size() != 18:
+		return "site dressing uses 18 official demo rocks"
+	var logical_minimum: Vector2 = maps["logical_origin_xz"]
+	var logical_maximum: Vector2 = maps["logical_max_xz"]
+	for entry in rocks:
+		var position: Vector3 = entry["position"]
+		if not is_finite(position.y):
+			return "site dressing samples finite presentation heights"
+		if position.x >= logical_minimum.x and position.x <= logical_maximum.x \
+			and position.z >= logical_minimum.y and position.z <= logical_maximum.y:
+			return "site dressing remains outside the logical excavation patch"
+	return ""
+
+
+func _check_texture_detail(assets: Object) -> String:
+	if not assets.has_method("get_texture"):
+		return "Terrain3D assets expose generated texture slots"
+	var texture: Variant = assets.call("get_texture", 0)
+	if not (texture is Object):
+		return "disturbed-soil texture asset is available"
+	var albedo: Variant = (texture as Object).get("albedo_texture")
+	if not (albedo is Texture2D) or (albedo as Texture2D).get_size() != Vector2(1024.0, 1024.0):
+		return "official demo PBR texture detail remains available"
+	return ""
 
 
 func _fail(message: String) -> int:

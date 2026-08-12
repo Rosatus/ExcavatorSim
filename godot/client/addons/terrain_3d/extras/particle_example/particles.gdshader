@@ -37,6 +37,7 @@ group_uniforms filtering;
 uniform float condition_dither_range : hint_range(0.0, 1.0, 0.01) = 0.15;
 uniform float surface_slope_min : hint_range(0.0, 1.0, 0.01) = 0.87;
 uniform float distance_fade_ammount : hint_range(0.0, 1.0, 0.01) = 0.5;
+uniform float exclusion_radius : hint_range(0.0, 128.0, 0.5) = 0.0;
 
 group_uniforms private;
 uniform float max_dist = 1.;
@@ -240,6 +241,10 @@ void start() {
 
 	// Hardcoded example, hand painted texture id 0 is filtered out.
 	if (!auto && ((base == 0 && blend < 0.7) || (over == 0 && blend >= 0.3))) {
+		pos.y = 0. / 0.;
+		pos.xz = vec2(100000.0);
+	}
+	if (exclusion_radius > 0.0 && length(pos.xz) < exclusion_radius) {
 		pos.y = 0. / 0.;
 		pos.xz = vec2(100000.0);
 	}

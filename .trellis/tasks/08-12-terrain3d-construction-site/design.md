@@ -37,14 +37,23 @@ The palette contains four Terrain3D texture slots:
 2. grass / undisturbed outer ground,
 3. darker damp soil in the drainage low point.
 
-Project-owned deterministic code generates same-sized albedo-height and
-normal-roughness textures. A control image encodes base/overlay/blend fields and
-is imported alongside every derived height image. No production resource points
-to `res://demo/**`.
+The temporary visual baseline extracts the official demo's two texture assets
+and `Terrain3DMaterial` into minimal production resources under
+`res://assets/terrain/`. Projection, dual-scale, macro variation, auto-shader,
+and world-background parameters retain their official values. The local control
+map uses demo material ID 0 on the central pad/access route and ID 1 on the
+surrounding ground.
+
+The adapter reuses the official RockA/B/C meshes across three bounded
+`MultiMeshInstance3D` layers. It also instantiates the official grass particle
+scene with a project extension parameter, `exclusion_radius = 12.0`, so the
+central work pad remains clear. None of these presentation objects add collision
+or feed state back to `TerrainState`.
 
 ## Logical patch vs visible site
 
-The central disturbed-soil work pad is the interaction affordance. The outer
+`TerrainState` algorithm `godot-terrain-state-v2-flat` initializes the central
+logical surface at zero height. The flat work pad is the interaction affordance. The outer
 haul track, piles, damp ground, and grass are visual context only. Their heights
 are rebuilt from the accepted snapshot plus deterministic presentation
 functions and are never copied back into `TerrainState`.

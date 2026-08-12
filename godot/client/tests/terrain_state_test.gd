@@ -21,6 +21,11 @@ func _run() -> void:
 func _test_repeatability_and_layers() -> int:
 	var first := TerrainState.new(77)
 	var second := TerrainState.new(77)
+	if String(first.surface_snapshot()["algorithm_version"]) != "godot-terrain-state-v2-flat":
+		return _fail("flat construction-pad baseline advances the terrain algorithm identity")
+	for height in first.stable_heights:
+		if height != 0.0:
+			return _fail("initial logical terrain is a level construction pad")
 	for state in [first, second]:
 		if not state.enqueue_brush(1, Vector2(0.0, 0.0), 1.5, 0.25):
 			return _fail("valid fill command queues")

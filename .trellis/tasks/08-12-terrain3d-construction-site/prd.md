@@ -7,16 +7,15 @@ the excavator into a medium-scale earthwork site, with terrain forms and
 surface materials appropriate for a soil-moving construction environment.
 
 The desired outcome is a realistic, readable construction-site terrain that
-uses Terrain3D for project-owned presentation assets and material distribution,
-while preserving `TerrainState` and `BucketSoilState` as the logical
-excavation authority.
+temporarily uses the official Terrain3D demo visual stack while preserving
+`TerrainState` and `BucketSoilState` as the logical excavation authority.
 
 ## Background and confirmed facts
 
 - Terrain3D is already enabled in `godot/client/project.godot` and the main
   scene already includes a `Terrain3DAdapter`.
-- The current adapter still defaults to `res://demo/data/assets.tres`, which
-  couples runtime terrain materials to the vendored demo dataset.
+- The adapter intentionally uses an extracted minimal copy of the official demo
+  assets and material parameters as the current reviewed visual baseline.
 - Existing docs/specs already define Terrain3D as a derived presentation and
   optional collision backend, not a logical terrain authority.
 - The current logical terrain is a small deterministic heightfield owned by
@@ -27,8 +26,8 @@ excavation authority.
 
 ## Requirements
 
-- R1 — Replace demo-coupled Terrain3D materials/assets with project-owned,
-  deterministic construction-site terrain assets.
+- R1 — Reuse the official Terrain3D demo materials, shader configuration,
+  macro background, grass particles, and rock assets as a bounded visual layer.
 - R2 — Keep `TerrainState` and `BucketSoilState` as the only logical owners of
   terrain deformation and bucket volume. Terrain3D remains derived.
 - R3 — Define the target site composition for a medium earthwork setting:
@@ -37,9 +36,8 @@ excavation authority.
 - R4 — Define a Terrain3D material palette and placement strategy appropriate
   for the site, including at minimum disturbed soil and grass/undisturbed edge
   conditions; additional materials must justify their value.
-- R5 — Replace dependence on addon demo assets where they currently leak into
-  the runtime path, or make any retained third-party asset dependency explicit
-  and intentional.
+- R5 — Keep the retained demo dependency explicit, intentional, and covered by
+  provenance and runtime tests.
 - R6 — Preserve current runtime authority boundaries, snapshot gating, and Jolt
   collision semantics.
 - R7 — Define how the production terrain remains compatible with the current
@@ -51,31 +49,45 @@ excavation authority.
   The central 20 m × 20 m logical patch must reproduce the accepted
   `TerrainState` surface exactly; the surrounding terrain is disposable visual
   context and may not become excavatable authority.
-- R10 — Use four bounded material roles: disturbed soil, compacted haul track,
-  grass/undisturbed edge, and damp soil. Generate their textures from
-  project-owned deterministic code so runtime no longer depends on demo assets.
+- R10 — Temporarily use the official Terrain3D demo assets and material stack
+  as the reviewed visual baseline instead of maintaining custom procedural
+  construction textures.
+- R11 — Keep the official demo grass particles outside a 12 m central exclusion
+  radius so the excavator starts on a clear work pad.
+- R12 — Reuse the official demo RockA/B/C assets as bounded, collision-free
+  presentation outside the logical excavation rectangle.
+- R13 — Initialize the logical `TerrainState` baseline as a true zero-height
+  plane while preserving stable/loose editing, reset, and volume contracts.
 
 ## Acceptance Criteria
 
 - [x] The running main scene presents a medium construction site with a central
-      work pad, spoil piles/berms, a compacted access track, damp low ground,
-      and grass at undisturbed outer edges.
-- [x] Terrain3D exposes the four project-owned material roles and applies them
-      through a deterministic control map.
-- [x] Production runtime has no `res://demo/**` dependency.
+      flat work pad, surrounding earth forms, an access route, official rocks,
+      and demo grass outside the protected work area.
+- [x] Terrain3D loads the official demo bare-ground and grass texture roles and
+      applies them through a deterministic control map.
+- [x] The intentional official demo production dependencies are reduced to the
+      required textures and rocks, documented, and regression-tested.
 - [x] The central logical patch matches accepted `TerrainState` samples while
       the surrounding site remains derived and non-authoritative.
 - [x] Terrain snapshot guards, fallback rendering, bucket-volume accounting,
       and optional Jolt collision behavior remain green.
-- [x] Procedural asset ownership and Terrain3D MIT provenance are documented.
+- [x] Terrain3D and official demo asset provenance are documented.
+- [x] The running main scene uses the official Terrain3D demo assets, material
+      configuration, macro terrain background, grass particles, and rocks.
+- [x] The excavator starts on a flat logical pad with a 12 m grass exclusion
+      radius; official rocks remain outside the logical excavation rectangle.
 
 ## Key decisions
 
 - The visible site is 64 m × 64 m; only the central logical patch is excavatable.
-- The material palette is disturbed soil, compacted haul track, grass edge, and
-  damp soil.
-- Terrain textures and control maps are generated deterministically by
-  project-owned code. Addon demo textures and scenes are not runtime inputs.
+- The active material palette is the official demo bare-ground and grass pair;
+  deterministic control-map placement keeps the logical pad and access route bare.
+- The official Terrain3D demo visual stack is an intentional temporary baseline;
+  production packaging retains only the required textures, rocks, and extracted
+  material parameters until a separately approved art pass replaces it.
+- Demo terrain heights are never imported as logical state; only its assets,
+  material configuration, rocks, particles, and macro background are reused.
 
 ## Out of scope
 

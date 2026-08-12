@@ -8,12 +8,10 @@ extends RefCounted
 ## TerrainState or used for BucketSoilState volume accounting.
 
 const SITE_EXTENT_M := 64.0
-const TEXTURE_SIZE := 128
+const DEMO_ASSETS_PATH := "res://assets/terrain/terrain3d_demo_assets.tres"
 
-const MATERIAL_DISTURBED_SOIL := 0
-const MATERIAL_COMPACTED_TRACK := 1
-const MATERIAL_GRASS_EDGE := 2
-const MATERIAL_DAMP_SOIL := 3
+const MATERIAL_BARE_GROUND := 0
+const MATERIAL_GRASS := 1
 
 
 func build_maps(snapshot: Dictionary) -> Dictionary:
@@ -77,26 +75,30 @@ func build_maps(snapshot: Dictionary) -> Dictionary:
 
 
 func create_assets() -> Object:
-	if not ClassDB.class_exists("Terrain3DAssets") or not ClassDB.class_exists("Terrain3DTextureAsset"):
-		return null
-	var assets: Object = ClassDB.instantiate("Terrain3DAssets")
-	if not (assets is Object) or not (assets as Object).has_method("set_texture"):
-		return null
-	for material_id in range(4):
-		var texture_asset := _create_texture_asset(material_id)
-		if texture_asset == null:
-			return null
-		(assets as Object).call("set_texture", material_id, texture_asset)
-	return assets as Object
+	return load(DEMO_ASSETS_PATH) if ResourceLoader.exists(DEMO_ASSETS_PATH) else null
 
 
 func get_material_roles() -> PackedStringArray:
 	return PackedStringArray([
-		"Disturbed Soil",
-		"Compacted Haul Track",
-		"Grass Edge",
-		"Damp Soil",
+		"Terrain3D Demo Cliff / Bare Ground",
+		"Terrain3D Demo Grass",
 	])
+
+
+func build_dressing(maps: Dictionary) -> Dictionary:
+	if not maps.has_all(["rows", "columns", "spacing_m", "origin_xz", "surface", "logical_origin_xz", "logical_max_xz"]):
+		return {}
+	var rock_layout := [
+		Vector2(-21.0, -16.0), Vector2(-18.5, -18.0), Vector2(-15.5, -15.5),
+		Vector2(-22.0, -10.5), Vector2(-18.0, 7.0), Vector2(-20.5, 12.0),
+		Vector2(-17.5, 16.0), Vector2(13.0, -15.0), Vector2(16.0, -14.0),
+		Vector2(19.5, -10.0), Vector2(22.0, -6.5), Vector2(18.0, 24.0),
+		Vector2(23.5, 25.5), Vector2(-25.0, 22.0), Vector2(-28.0, 17.0),
+		Vector2(27.0, -23.0), Vector2(-24.0, -25.0), Vector2(4.0, -27.0),
+	]
+	return {
+		"rocks": _dressing_entries(rock_layout, maps, 701, Vector2(0.12, 0.26)),
+	}
 
 
 static func decode_control(code: int) -> Dictionary:
@@ -148,90 +150,11 @@ func _context_height_offset(position: Vector2) -> float:
 func _control_code(position: Vector2, logical_origin: Vector2, logical_max: Vector2) -> int:
 	if position.x >= logical_origin.x and position.x <= logical_max.x \
 		and position.y >= logical_origin.y and position.y <= logical_max.y:
-		return _encode_control(MATERIAL_DISTURBED_SOIL, MATERIAL_DISTURBED_SOIL, 0.0)
-	var radial := position.length()
-	var grass_blend := _smoothstep(22.0, 29.0, radial)
+		return _encode_control(MATERIAL_BARE_GROUND, MATERIAL_BARE_GROUND, 0.0)
 	var haul_distance := _distance_to_segment(position, Vector2(8.0, 4.0), Vector2(31.0, 20.0))
-	var haul_blend := 1.0 - _smoothstep(2.2, 4.2, haul_distance)
-	var damp_blend := 1.0 - _smoothstep(4.0, 8.5, position.distance_to(Vector2(15.0, 16.0)))
-	var overlay_id := MATERIAL_DISTURBED_SOIL
-	var blend := 0.0
-	if grass_blend > blend:
-		overlay_id = MATERIAL_GRASS_EDGE
-		blend = grass_blend
-	if haul_blend > 0.08 and haul_blend >= grass_blend * 0.65:
-		overlay_id = MATERIAL_COMPACTED_TRACK
-		blend = haul_blend
-	if damp_blend > 0.12:
-		overlay_id = MATERIAL_DAMP_SOIL
-		blend = damp_blend
-	return _encode_control(MATERIAL_DISTURBED_SOIL, overlay_id, blend)
-
-
-func _create_texture_asset(material_id: int) -> Object:
-	var texture_asset: Object = ClassDB.instantiate("Terrain3DTextureAsset")
-	if not (texture_asset is Object):
-		return null
-	var definition := _material_definition(material_id)
-	var albedo_image := Image.create_empty(TEXTURE_SIZE, TEXTURE_SIZE, false, Image.FORMAT_RGBA8)
-	var normal_image := Image.create_empty(TEXTURE_SIZE, TEXTURE_SIZE, false, Image.FORMAT_RGBA8)
-	for y in TEXTURE_SIZE:
-		for x in TEXTURE_SIZE:
-			var noise := _texture_noise(x, y, int(definition["seed"]))
-			var left := _texture_noise(posmod(x - 1, TEXTURE_SIZE), y, int(definition["seed"]))
-			var right := _texture_noise((x + 1) % TEXTURE_SIZE, y, int(definition["seed"]))
-			var up := _texture_noise(x, posmod(y - 1, TEXTURE_SIZE), int(definition["seed"]))
-			var down := _texture_noise(x, (y + 1) % TEXTURE_SIZE, int(definition["seed"]))
-			var base: Color = definition["color"]
-			var variation := (noise - 0.5) * float(definition["variation"])
-			var albedo := Color(
-				clampf(base.r + variation, 0.0, 1.0),
-				clampf(base.g + variation, 0.0, 1.0),
-				clampf(base.b + variation, 0.0, 1.0),
-				clampf(0.35 + noise * 0.3, 0.0, 1.0)
-			)
-			var normal_strength := float(definition["normal_strength"])
-			var nx := clampf(0.5 + (left - right) * normal_strength, 0.0, 1.0)
-			var ny := clampf(0.5 + (up - down) * normal_strength, 0.0, 1.0)
-			albedo_image.set_pixel(x, y, albedo)
-			normal_image.set_pixel(x, y, Color(nx, ny, 1.0, float(definition["roughness"])))
-	albedo_image.generate_mipmaps()
-	normal_image.generate_mipmaps()
-	_set_property(texture_asset as Object, "name", String(definition["name"]))
-	_set_property(texture_asset as Object, "albedo_texture", ImageTexture.create_from_image(albedo_image))
-	_set_property(texture_asset as Object, "normal_texture", ImageTexture.create_from_image(normal_image))
-	_set_property(texture_asset as Object, "uv_scale", float(definition["uv_scale"]))
-	_set_property(texture_asset as Object, "detiling_rotation", float(definition["detiling_rotation"]))
-	_set_property(texture_asset as Object, "normal_depth", float(definition["normal_depth"]))
-	_set_property(texture_asset as Object, "ao_strength", float(definition["ao_strength"]))
-	return texture_asset as Object
-
-
-func _material_definition(material_id: int) -> Dictionary:
-	match material_id:
-		MATERIAL_COMPACTED_TRACK:
-			return _definition("Compacted Haul Track", "#71604b", 0.12, 0.82, 0.22, 0.12, 0.08, 0.65, 1.0, 211)
-		MATERIAL_GRASS_EDGE:
-			return _definition("Grass Edge", "#53633b", 0.16, 0.92, 0.34, 0.16, 0.14, 0.9, 1.25, 307)
-		MATERIAL_DAMP_SOIL:
-			return _definition("Damp Soil", "#40362d", 0.09, 0.68, 0.25, 0.11, 0.06, 0.75, 1.4, 401)
-		_:
-			return _definition("Disturbed Soil", "#6b4e35", 0.15, 0.94, 0.38, 0.1, 0.1, 1.0, 1.55, 101)
-
-
-func _definition(name: String, color: String, variation: float, roughness: float, normal_strength: float, uv_scale: float, detiling_rotation: float, normal_depth: float, ao_strength: float, seed: int) -> Dictionary:
-	return {
-		"name": name,
-		"color": Color(color),
-		"variation": variation,
-		"roughness": roughness,
-		"normal_strength": normal_strength,
-		"uv_scale": uv_scale,
-		"detiling_rotation": detiling_rotation,
-		"normal_depth": normal_depth,
-		"ao_strength": ao_strength,
-		"seed": seed,
-	}
+	if haul_distance < 3.2:
+		return _encode_control(MATERIAL_BARE_GROUND, MATERIAL_BARE_GROUND, 0.0)
+	return _encode_control(MATERIAL_GRASS, MATERIAL_GRASS, 0.0)
 
 
 func _sample_bilinear(surface: PackedFloat32Array, rows: int, columns: int, spacing: float, origin: Vector2, position: Vector2) -> float:
@@ -293,11 +216,29 @@ func _texture_noise(x: int, y: int, seed: int) -> float:
 	return float(value & 0xffff) / 65535.0
 
 
-func _set_property(object: Object, property_name: String, value: Variant) -> void:
-	for property in object.get_property_list():
-		if String(property.get("name", "")) == property_name:
-			object.set(property_name, value)
-			return
+func _dressing_entries(layout: Array, maps: Dictionary, seed: int, scale_range: Vector2) -> Array[Dictionary]:
+	var entries: Array[Dictionary] = []
+	for index in layout.size():
+		var xz: Vector2 = layout[index]
+		var scale_noise := _texture_noise(index, seed, seed + 31)
+		var yaw_noise := _texture_noise(index, seed + 1, seed + 47)
+		entries.append({
+			"position": Vector3(xz.x, _sample_map_height(maps, xz), xz.y),
+			"yaw": yaw_noise * TAU,
+			"scale": lerpf(scale_range.x, scale_range.y, scale_noise),
+		})
+	return entries
+
+
+func _sample_map_height(maps: Dictionary, position: Vector2) -> float:
+	return _sample_bilinear(
+		maps["surface"] as PackedFloat32Array,
+		int(maps["rows"]),
+		int(maps["columns"]),
+		float(maps["spacing_m"]),
+		maps["origin_xz"] as Vector2,
+		position
+	)
 
 
 func _is_snapshot_valid(snapshot: Dictionary) -> bool:
