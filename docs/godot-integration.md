@@ -1,18 +1,27 @@
 # Godot Integration Boundary
 
-## Intended client
+## Implemented client baseline
 
-The future client targets Windows desktop with Godot Forward+. It should load the five-part excavator GLB visual skin and apply the authoritative named-frame transforms received from Python.
+The current client targets Windows desktop with Godot Forward+. It loads the
+combined SY205 excavator GLB visual skin and applies the authoritative
+named-frame transforms received from Python through the Godot-Pinocchio motion
+transport.
 
 ## Transport
 
-The first Godot adapter should consume the Godot/Pinocchio HTTP/WebSocket contracts rather than inventing a second authority protocol. It needs equivalents of:
+The Godot client consumes the existing Godot-Pinocchio HTTP/WebSocket contracts
+rather than inventing a second authority protocol. The implemented motion slice
+covers:
 
-- realtime state handshake and state snapshots;
-- input command validation and acknowledgements;
-- terrain view snapshots and absolute-height patches;
-- terrain epoch/revision identity and stale/gap recovery;
-- recording/replay and Return-to-Live lifecycle semantics.
+- the realtime state handshake and authoritative motion snapshots;
+- input sequence safety, command validation, acknowledgements, and lifecycle
+  state;
+- session, simulation-epoch, view-revision, reconnect, and stale-state guards.
+
+The Godot-first client owns its local terrain and bucket-soil state, so it does
+not mirror legacy Python terrain packets or recording/replay cursors. Those
+terrain, recording, replay, and Return-to-Live contracts remain available only
+where the legacy Python runtime profile is selected.
 
 ### Frame coordinate conversion
 
@@ -34,13 +43,14 @@ converted frame relations provide only the local single-axis joint rotations.
 
 ## Authority boundary
 
-Python remains authoritative for joint state, input safety and lifecycle in every
-profile. The Godot/Pinocchio profile remains authoritative for terrain
-layers, bucket inventory, events, recording and replay. The approved Godot-first
-local-world profile used by the realistic client instead keeps deterministic
-terrain/world and convenience bucket state in Godot; it does not mirror Python
-terrain packets or publish local terrain, physics transforms or replay cursors
-back to Python. The two profiles coexist until the integration release-candidate
+Python remains authoritative for joint state, input safety and lifecycle in
+every profile. The `legacy` Python runtime profile remains authoritative for
+terrain layers, bucket inventory, events, recording and replay. The
+`motion-only` backend profile supplies the motion/input contract to the
+Godot-first local-world client, which keeps deterministic-enough terrain/world
+and convenience bucket state in Godot; it does not mirror Python terrain
+packets or publish local terrain, physics transforms or replay cursors back to
+Python. The two profiles coexist until the integration release-candidate
 review selects one runtime contract.
 
 The M5 excavation path keeps `BucketSoilState` as the one local inventory owner:
@@ -71,10 +81,16 @@ that changes the parent-local pin positions and detaches boom/arm/bucket joints.
 
 ## Terrain and physics seam
 
-Godot should build a derived render mesh from the selected surface snapshot. A later physics adapter may maintain chunked static terrain colliders and local probes. Collider updates must be generation-gated and stale-safe; a disabled or failed physics backend must leave the Python service and visual state usable.
+Godot builds a derived render mesh from its selected local surface snapshot.
+`TerrainCollider` provides the optional chunked static-collider/contact seam and
+is generation-gated, stale-safe, and disabled/fail-open by default. A disabled
+or failed physics backend must leave the Python service and visual state usable.
 
 The first soil presentation is not a per-grain rigid-body simulation. It combines the authoritative stable/loose heightfield and bucket volume with bounded visual particles or clumps. Those effects are disposable presentation state and must clear on historical seek, reset, reconnect, and authority-generation changes.
 
 ## Deferred model decisions
 
-The current GLBs are visual assets. URDF collision geometry, mass/inertia, hydraulic forces, material contact parameters, bucket cavity calibration, and a fully dynamic articulated excavator require a separate model contract and are not part of this bootstrap.
+The current GLBs remain visual assets. URDF collision geometry, mass/inertia,
+hydraulic forces, material contact parameters, bucket cavity calibration, and a
+fully dynamic articulated excavator require a separate model contract and remain
+deferred from this release candidate.

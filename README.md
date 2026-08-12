@@ -1,19 +1,28 @@
 # ExcavatorSim
 
-ExcavatorSim is the planned desktop excavator simulator built around a Godot Forward+ client and a Python authority migrated from BabylonSim.
+ExcavatorSim is a Windows desktop excavator simulator built around a Godot
+Forward+ client and a Python motion/input authority migrated from BabylonSim.
 
-## Current bootstrap state
+## Current state
 
-This repository currently contains the Trellis/CodeGraph project foundation and migration plan. The Godot scene and client are intentionally deferred to a later implementation task.
+The repository contains the completed M1–M7 Godot vertical slice: a real SY205
+GLB presentation, Godot-Pinocchio WebSocket motion transport, a Godot-owned
+deterministic-enough terrain and excavation loop, visual presentation systems,
+and standalone release-candidate checks. Trellis remains the source of project
+plans, implementation decisions, and session history.
 
-The first architecture keeps Python authoritative for:
+Python remains authoritative for:
 
 - Pinocchio excavator kinematics and input safety;
-- deterministic terrain generation and layered stable/loose soil;
-- bucket volume, excavation/deposition, replay, reset, seek, and lifecycle state;
-- HTTP/WebSocket state and terrain contracts.
+- lifecycle state and the Godot-Pinocchio HTTP/WebSocket motion contract;
+- the legacy terrain, bucket-volume, recording, and replay services exposed by
+  the legacy runtime profile.
 
-Godot will later own desktop rendering, GLB scene assembly, UI, visual terrain, particles, and optional local collision/contact presentation. Godot physics must not write authoritative transforms, terrain heights, bucket volume, or replay state back to Python in the first release.
+In the Godot-first profile, Godot owns desktop rendering, GLB scene assembly,
+UI, local terrain and excavation state, and bucket-soil convenience state. The
+bounded particles and optional local collision/contact layer are derived
+presentation state. None of these client-owned systems may write authoritative
+transforms, terrain heights, bucket inventory, or replay cursors back to Python.
 
 ## Repository map
 
@@ -22,17 +31,22 @@ Godot will later own desktop rendering, GLB scene assembly, UI, visual terrain, 
 - `backend/` — migrated Python authority (created during migration execution).
 - `protocol/` — shared JSON schemas and version manifest.
 - `assets/` — visual GLBs, calibration, provenance, and notices.
-- `docs/` — migration and future Godot integration notes.
-- `godot/` — reserved for the future Godot client.
+- `docs/` — integration, release-candidate, migration, and asset notes.
+- `godot/` — the current Godot Forward+ client, scripts, assets, addons, and
+  standalone contract tests.
 
-## Development direction
+## Verification and development direction
 
-1. Complete the reusable backend and asset migration.
-2. Build a Godot visual vertical slice that consumes the existing protocol.
-3. Add Godot terrain rendering and static collider synchronization.
-4. Add bucket-load visuals and bounded soil presentation.
-5. Evaluate Jolt/Godot Physics integration without changing Python authority.
-6. Consider C++ only after profiling identifies a Python bottleneck.
+1. Run `pixi run verify` for the backend lint, type, test, provenance, and
+   standalone-path gates.
+2. Run `pixi run backend-smoke` and the Godot standalone matrix when changing
+   transport, terrain, or client behavior.
+3. Keep the legacy and Godot-first runtime profiles compatible until an
+   approved integration release-candidate decision selects a migration path.
+4. Treat production-grade hydraulics, dynamic rigid-body authority, contact
+   calibration, and per-grain soil as deferred model work; evaluate C++ only
+   after profiling identifies a measured Python bottleneck.
 
-See `.trellis/tasks/08-06-excavator-sim-bootstrap/` for the authoritative bootstrap requirements and execution plan.
-
+See `.trellis/` for the current task history and project specifications,
+`docs/godot-integration.md` for the client boundary, and
+`docs/release-candidate.md` for the cross-layer verification sequence.
