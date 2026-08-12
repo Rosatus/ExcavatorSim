@@ -584,3 +584,36 @@ Corrected generated terrain triangle winding for Godot back-face culling, added 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 18: Refresh stale project documentation
+
+**Date**: 2026-08-12
+**Task**: Refresh stale project documentation
+**Branch**: `main`
+
+### Summary
+
+Updated README, frontend spec index, and Godot integration boundary to reflect the completed M1-M7 Godot vertical slice, explicit legacy and motion-only runtime profiles, and current verification paths. pixi run verify passed with 145 backend tests; archived the Trellis task.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a5b797b` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
