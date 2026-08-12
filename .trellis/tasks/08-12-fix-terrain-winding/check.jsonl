@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Godot client quality-check requirements."}
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Verify terrain rendering remains inside the client authority boundary."}
+{"file":".trellis/spec/frontend/godot-mcp.md","reason":"Verify Godot tests and runtime behavior through the connected editor."}

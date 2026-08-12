@@ -83,11 +83,11 @@ func _build_mesh(snapshot: Dictionary) -> ArrayMesh:
 			var top_left := row * columns + column
 			var bottom_left := top_left + columns
 			indices[write_index] = top_left
-			indices[write_index + 1] = bottom_left
-			indices[write_index + 2] = top_left + 1
+			indices[write_index + 1] = top_left + 1
+			indices[write_index + 2] = bottom_left
 			indices[write_index + 3] = top_left + 1
-			indices[write_index + 4] = bottom_left
-			indices[write_index + 5] = bottom_left + 1
+			indices[write_index + 4] = bottom_left + 1
+			indices[write_index + 5] = bottom_left
 			write_index += 6
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)

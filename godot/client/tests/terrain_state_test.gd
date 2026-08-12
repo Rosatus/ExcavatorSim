@@ -69,6 +69,8 @@ func _test_reset_and_renderer_generation() -> int:
 	var renderer := TerrainRenderer.new()
 	if not renderer.queue_snapshot(state.surface_snapshot()) or not renderer.apply_pending():
 		return _fail("renderer applies a copied current snapshot")
+	if not _terrain_mesh_front_faces_up(renderer):
+		return 1
 	var old_snapshot := state.surface_snapshot()
 	state.reset()
 	if state.world_generation != 1 or state.terrain_revision != 2 or state.surface_snapshot()["surface_bytes"] != baseline:
@@ -81,6 +83,32 @@ func _test_reset_and_renderer_generation() -> int:
 	if renderer.queue_snapshot(old_snapshot):
 		return _fail("stale renderer snapshot is rejected")
 	return 0
+
+
+func _terrain_mesh_front_faces_up(renderer: TerrainRenderer) -> bool:
+	var terrain_mesh := renderer.mesh as ArrayMesh
+	if terrain_mesh == null or terrain_mesh.get_surface_count() != 1:
+		return _fail("renderer produces one terrain mesh surface") == 0
+	var arrays := terrain_mesh.surface_get_arrays(0)
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+	if indices.size() < 6 or vertices.is_empty() or normals.size() != vertices.size():
+		return _fail("terrain mesh exposes indexed vertices and normals") == 0
+	var expected := PackedInt32Array([0, 1, TerrainState.DEFAULT_COLUMNS, 1, TerrainState.DEFAULT_COLUMNS + 1, TerrainState.DEFAULT_COLUMNS])
+	for index in expected.size():
+		if indices[index] != expected[index]:
+			return _fail("terrain indices use Godot top-facing winding") == 0
+	for triangle_start in [0, 3]:
+		var first := vertices[indices[triangle_start]]
+		var second := vertices[indices[triangle_start + 1]]
+		var third := vertices[indices[triangle_start + 2]]
+		if (second - first).cross(third - first).dot(Vector3.UP) >= 0.0:
+			return _fail("terrain triangle winding is front-facing from above") == 0
+	for normal_index in expected:
+		if normals[normal_index].y <= 0.0:
+			return _fail("terrain vertex normals remain upward") == 0
+	return true
 
 
 func _test_scene_integration() -> int:
