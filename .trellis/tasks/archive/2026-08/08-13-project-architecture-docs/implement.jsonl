@@ -1,0 +1,6 @@
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"架构文档跨越输入、后端、协议、Godot 派生层，需要按边界和数据流组织事实。"}
+{"file":".trellis/spec/backend/index.md","reason":"确认 Python authority、runtime profile 与后端规范入口。"}
+{"file":".trellis/spec/frontend/index.md","reason":"确认 Godot client boundary、motion transport 和 MCP 开发工具规范入口。"}
+{"file":"README.md","reason":"项目总览、当前状态、运行方向与架构导航的现状来源。"}
+{"file":"docs/godot-integration.md","reason":"Godot-first authority、GLB、Terrain3D/Jolt、坐标和视觉边界。"}
+{"file":"docs/release-candidate.md","reason":"profile 共存、验证矩阵与发布边界。"}
