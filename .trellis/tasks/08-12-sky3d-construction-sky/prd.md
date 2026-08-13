@@ -51,19 +51,49 @@ existing scene/test seams.
   Sky3D and the chosen project-owned asset scope.
 - R7 — Avoid direct dependence on addon demo scenes in production scene data.
 
+## Approved integration decision
+
+- Adopt Sky3D 2.1 as the production `WorldEnvironment` implementation under
+  the existing project-owned `VisualEnvironment` and
+  `VisualQualityController` wrappers.
+- Keep the root node name `WorldEnvironment`, attach `Sky3D.gd`, and retain the
+  legacy root `KeyLight` as a disabled compatibility seam. Sky3D's `SunLight`
+  is the only active daytime directional light.
+- Use a fixed construction-workday presentation at 10:30 in Sky3D SIMPLE
+  celestial mode. Disable editor/game time progression, cloud wind, moon/deep
+  space calculations, and system-clock synchronization; Sky3D time is visual
+  configuration, never simulation or replay state.
+- Keep Sky3D sky and sun active in all profiles. Map low/balanced/high to
+  bounded fog/cloud/light settings: low disables clouds and Sky3D fog,
+  balanced enables restrained clouds and fog, and high increases atmosphere
+  quality without changing any simulation cadence.
+- Package the locally supplied addon directly, not its demo scenes. Record MIT,
+  moon-map MIT, and ESO/S. Brunier CC BY 4.0 attribution obligations, including
+  a user-visible in-game credit for the packaged Milky Way textures.
+- Disable Terrain3D's infinite cliff background so the Sky3D horizon remains
+  visible; retain the bounded construction-site terrain and dressing.
+
 ## Acceptance Criteria
 
-- [ ] A written decision states whether Sky3D is adopted for the main excavator
+- [x] A written decision states whether Sky3D is adopted for the main excavator
       scene, and at what integration depth.
-- [ ] The chosen plan preserves or explicitly replaces the current
+- [x] The chosen plan preserves or explicitly replaces the current
       `WorldEnvironment` / `KeyLight` / `VisualEnvironment` /
       `VisualQualityController` contract with stable runtime seams.
-- [ ] Quality-profile behavior remains presentation-only and testable.
-- [ ] Any Sky3D-specific time, fog, light, or cloud behavior is bounded and
+- [x] Quality-profile behavior remains presentation-only and testable.
+- [x] Any Sky3D-specific time, fog, light, or cloud behavior is bounded and
       documented as visual-only.
-- [ ] Licensing/provenance requirements for shipped Sky3D assets are recorded.
-- [ ] The task ends with an implementation-ready plan rather than an ad hoc demo
+- [x] Licensing/provenance requirements for shipped Sky3D assets are recorded.
+- [x] The task ends with an implementation-ready plan rather than an ad hoc demo
       splice.
+- [x] The main scene runs with the fixed Sky3D daytime environment and a single
+      active directional-light authority.
+- [x] Low/balanced/high profiles apply the documented Sky3D settings and retain
+      existing camera/effects budgets.
+- [x] Standalone visual/release tests pass.
+- [x] Full project verification passes. Two earlier runs exposed the existing
+      flaky backend reset/terrain hash race, but the final full gate passed all
+      145 backend tests without changing backend semantics.
 
 ## Key decisions to resolve
 
@@ -86,6 +116,5 @@ existing scene/test seams.
 
 - Complex task: `prd.md`, `design.md`, and `implement.md` required before
   activation.
-- Blocking open questions: none for planning; the task's purpose is to converge
-  the Sky3D integration shape before implementation.
-
+- Blocking open questions: none. The project-wrapper integration is approved
+  for implementation.

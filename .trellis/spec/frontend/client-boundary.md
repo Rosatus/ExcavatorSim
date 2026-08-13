@@ -48,6 +48,15 @@ after `Terrain3DData.import_images` successfully materializes the accepted
 height map. `TerrainState.surface_bytes` and its digest remain the parity oracle;
 Terrain3D's internal maps never replace them.
 
+Terrain3D initializes native rendering when the node enters the scene tree.
+Configure non-null `assets` and `material` before `add_child()` so the first
+Forward+ initialization never observes an incomplete resource graph. Configure
+`region_size` and `collision_mask` immediately after `add_child()`: Terrain3D
+1.0.2 restores those scalar defaults during enter-tree initialization, so a
+pre-tree write may appear accepted and then be overwritten. The production
+adapter keeps `region_size=128`; do not infer supported values from a pre-tree
+readback.
+
 Terrain3D can create static collision shapes, while the project-selected Jolt
 backend answers Godot raycasts and contacts. Collision is disabled/fail-open by
 default (`terrain3d/collision_mode=0`); enabling it must not change logical
@@ -61,7 +70,8 @@ failed collision setup keeps `TerrainRenderer`/`TerrainCollider` usable.
 | Native class unavailable | `available=false`; retain custom renderer |
 | Invalid dimensions/bytes | reject snapshot without mutating authority |
 | Stale epoch/generation/revision | reject queue; preserve newer pending work |
-| Map import succeeds | hide custom mesh only after native snapshot is applied |
+| Map import succeeds | hide custom mesh and foundation ground only after native snapshot is applied |
+| Native work becomes pending/fails | restore custom mesh and foundation ground immediately |
 | Collision disabled or fails | `collision_available=false`; excavation/motion continue |
 
 #### Wrong vs correct
@@ -147,6 +157,79 @@ The M6 visual layer (`VisualEnvironment`, `CameraRig`, `VisualQualityController`
 and bounded `SoilEffects`) is presentation-only. Quality changes may adjust
 lighting, camera range, shadow flags and particle budgets, but may not change
 simulation cadence, pose transforms, terrain bytes or bucket inventory.
+
+### Sky3D presentation contract
+
+#### 1. Scope / Trigger
+
+Use this contract for the production sky, atmosphere, fog, cloud, and daylight
+configuration in the main Godot scene.
+
+#### 2. Signatures
+
+```text
+VisualEnvironment.apply_profile(profile_name: String) -> bool
+VisualEnvironment.get_visual_snapshot() -> Dictionary
+VisualQualityController.apply_profile(profile_name: String) -> bool
+```
+
+#### 3. Contracts
+
+- The root node remains named `WorldEnvironment` and uses Sky3D 2.1, a
+  `WorldEnvironment` subtype. Project code must not instantiate addon demo
+  scenes or replace Sky3D's shader with a second procedural sky.
+- `VisualEnvironment` is the only production profile/configuration owner.
+  Sky3D uses `TimeOfDay.CelestialMode.SIMPLE` at 10:30 with UTC +7, longitude
+  108 degrees and latitude 16 degrees. The resulting SkyDome polar angle is
+  19.5 degrees, or about 70.5 degrees solar elevation. Editor/game time,
+  system sync, moon/deep-space calculations, and cloud wind remain disabled.
+- Sky3D's `SunLight` is the only active daytime directional light. The root
+  `KeyLight` path remains as a disabled compatibility seam and may not cast a
+  second shadow or contribute energy.
+- Low disables Sky3D clouds, screen-space fog, and sun shadows; balanced and
+  high enable bounded atmosphere settings. All profiles preserve the existing
+  camera/effect budgets and target FPS contract.
+- `VisualQualityController` must return `false` and expose an explicit error if
+  `VisualEnvironment` cannot apply the requested Sky3D profile. Camera/effect
+  budgets may not be reported as applied after that failure.
+- Missing Sky3D runtime resources are a project import/verification failure,
+  not a reason to silently create a second environment implementation.
+- Terrain3D's infinite world background remains disabled while Sky3D owns the
+  horizon; the bounded construction terrain and authority seam are unchanged.
+- The running client keeps a user-visible credit for the packaged ESO/S.
+  Brunier Milky Way textures. Full source/license links remain in `NOTICE.md`
+  and the adjacent third-party license file.
+
+#### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Unknown profile | Return `false`; preserve the previous profile |
+| Sky3D/environment unavailable | Return `false`; report profile failure |
+| Low profile | Disable clouds, Sky3D fog, and sun shadows |
+| Balanced/high profile | Enable bounded clouds/fog without time progression |
+| Runtime starts | One visible sun, 10:30 SIMPLE daytime, legacy key light inactive |
+
+#### 5. Good / Base / Bad Cases
+
+- Good: project profile -> `VisualEnvironment` -> fixed Sky3D presentation.
+- Base: missing Sky3D resource -> explicit import/test failure.
+- Bad: quality controller reports success after Sky3D rejected the profile.
+
+#### 6. Tests Required
+
+- `visual_pass_test.gd` asserts SIMPLE 10:30 daylight, high/low profiles,
+  disabled time authority, failure propagation, the single sun, horizon, and
+  user-visible attribution seam.
+- A real Forward+ smoke must inspect the running frame and current-run logs;
+  headless state tests do not prove shader, cloud, or horizon rendering.
+
+#### 7. Wrong vs Correct
+
+```text
+Wrong: quality profile -> silently skip missing Sky3D -> report success
+Correct: quality profile -> VisualEnvironment -> Sky3D or explicit failure
+```
 
 The M7 release candidate retains the legacy Python terrain/recording/replay
 profile for compatibility; removal or deprecation requires a separate approved

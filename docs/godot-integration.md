@@ -59,10 +59,27 @@ the changed grid-cell volume. `TerrainCollider` is a copied, generation-gated
 static derivative and is disabled/fail-open when local physics is unavailable;
 its failure cannot stop motion or terrain presentation.
 
-The realistic visual pass uses a procedural sky/ambient environment, a
-generation-gated soil particle emitter and a bounded camera/quality controller.
-These are disposable presentation resources; changing their profile cannot
-alter motion cadence, terrain snapshots, bucket volume or any Python message.
+The realistic visual pass uses Sky3D 2.1 behind the project-owned
+`VisualEnvironment` seam, plus a generation-gated soil particle emitter and a
+bounded camera/quality controller. The root node keeps the stable
+`WorldEnvironment` path while Sky3D owns the actual sky shader, SunLight,
+SkyDome, fog, and cloud resources. The scene is fixed at 10:30 using Sky3D's
+SIMPLE celestial mode (19.5-degree polar angle, approximately 70.5-degree solar
+elevation) with editor/game time progression, system synchronization, moon/deep
+space calculations, and cloud wind disabled. The legacy root
+`KeyLight` remains present but inactive so Sky3D's SunLight is the only daytime
+directional light. Low disables clouds/fog/shadows, balanced restores restrained
+atmosphere, and high raises the same visual features without altering the 60 Hz
+simulation/transport contracts. These are disposable presentation resources;
+changing their profile cannot alter motion cadence, terrain snapshots, bucket
+volume, replay state, or any Python message. Profile-application failure is
+propagated through `VisualQualityController`, and the running UI retains the
+required ESO/S. Brunier Milky Way attribution.
+
+Terrain3D's optional infinite world background is disabled in this composition;
+its generated cliff shell would otherwise cover the Sky3D horizon. The bounded
+64 m site terrain, official surface assets, rocks, grass, and logical excavation
+contracts remain unchanged.
 
 ### SY205 passive four-bar linkage
 
@@ -95,6 +112,13 @@ heightmap materialization, and optional collision provider; editor sculpting or
 direct native height edits are not gameplay mutation paths. If its GDExtension,
 map import, or collision mode is unavailable, the custom mesh/collider path
 continues to provide the fail-open fallback.
+
+Terrain3D 1.0.2 performs native setup on enter-tree. The adapter assigns
+non-null assets/material before adding the node, then assigns `region_size=128`
+and collision mask after it enters the tree because native initialization
+restores those scalar defaults. Native activation hides both the custom terrain
+mesh and `FoundationGround`; queued or failed native work restores both fallback
+layers immediately.
 
 The current temporary Terrain3D visual baseline intentionally reuses a minimal
 production extraction of the official Terrain3D demo assets and material

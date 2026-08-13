@@ -44,6 +44,16 @@ sources are ambientCG assets supplied under CC0 1.0 Universal as recorded in
 `godot/client/demo/assets/textures/asset_licenses.txt`. ExcavatorSim still owns
 the logical height/control maps; demo terrain heights are not authoritative.
 
+The Godot client also vendors Sky3D 2.1 under
+`godot/client/addons/sky_3d/`. Sky3D is Copyright © 2023-2026 Cory Petkovsek
+and Contributors and © 2021 J. Cuéllar, and is provided under the MIT License
+retained at `godot/client/addons/sky_3d/LICENSE.txt`. Its Milky Way and star
+field textures use “The Milky Way panorama” by ESO/S. Brunier under CC BY 4.0;
+the moon map is Copyright © 2019 GPoSM under MIT. Detailed source and license
+links are retained beside those assets and summarized in
+`godot/client/addons/sky_3d/EXCAVATORSIM-PROVENANCE.md`. Sky3D is a fixed-time,
+presentation-only environment and is not simulation or replay authority.
+
 ExcavatorSim is licensed under `AGPL-3.0-only`. Technical provenance review is
 complete, but external distribution still requires owner/legal approval of the
 source-offer process, UI notice, and machine calibration rights. Visual asset rights were confirmed
