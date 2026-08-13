@@ -684,3 +684,37 @@ Adopted the official Terrain3D demo material stack as a minimal production asset
 ### Next Steps
 
 - None - task complete
+
+
+## Session 21: Integrate Sky3D construction sky
+
+**Date**: 2026-08-13
+**Task**: Integrate Sky3D construction sky
+**Branch**: `main`
+
+### Summary
+
+Integrated fixed-day Sky3D environment, corrected Terrain3D initialization and fallback behavior, added attribution, and passed full verification.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `559b2c6abcc6af50e4726fbfef667e0a6bfb50ab` | (see git log) |
+| `c2cac52a4727c90c20eb886d9e337ff2ca7b4964` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

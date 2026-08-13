@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 20
+- **Total Sessions**: 21
 - **Last Active**: 2026-08-13
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~686 | Active |
+| `journal-1.md` | ~720 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 21 | 2026-08-13 | Integrate Sky3D construction sky | `559b2c6abcc6af50e4726fbfef667e0a6bfb50ab`, `c2cac52a4727c90c20eb886d9e337ff2ca7b4964` | `main` |
 | 20 | 2026-08-13 | Terrain3D official demo visual baseline | `dcc9e66` | `main` |
 | 19 | 2026-08-12 | Integrate Terrain3D terrain backend | `75bdd09`, `e0230a2` | `main` |
 | 18 | 2026-08-12 | Refresh stale project documentation | `a5b797b` | `main` |
