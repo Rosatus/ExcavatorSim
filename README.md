@@ -31,9 +31,19 @@ transforms, terrain heights, bucket inventory, or replay cursors back to Python.
 - `backend/` — migrated Python authority (created during migration execution).
 - `protocol/` — shared JSON schemas and version manifest.
 - `assets/` — visual GLBs, calibration, provenance, and notices.
-- `docs/` — integration, release-candidate, migration, and asset notes.
+- `docs/` — concept/engineering architecture, integration, release-candidate, migration, and asset notes.
 - `godot/` — the current Godot Forward+ client, scripts, assets, addons, and
   standalone contract tests.
+
+Architecture reading order:
+
+1. [Conceptual architecture](docs/architecture/conceptual.md) — one-page
+   explanation for non-technical collaborators.
+2. [Engineering architecture](docs/architecture/engineering.md) — components,
+   interfaces, authority, signals, timing, assets, tests, and planned hardware.
+3. [Specialized contracts](docs/godot-integration.md),
+   [release-candidate checks](docs/release-candidate.md), protocol schemas, and
+   the relevant Trellis specs.
 
 ## Verification and development direction
 
@@ -47,6 +57,7 @@ transforms, terrain heights, bucket inventory, or replay cursors back to Python.
    calibration, and per-grain soil as deferred model work; evaluate C++ only
    after profiling identifies a measured Python bottleneck.
 
-See `.trellis/` for the current task history and project specifications,
-`docs/godot-integration.md` for the client boundary, and
-`docs/release-candidate.md` for the cross-layer verification sequence.
+See `.trellis/` for the current task history and project specifications. Start
+with the [conceptual architecture](docs/architecture/conceptual.md), then the
+[engineering architecture](docs/architecture/engineering.md), before reading
+the specialized client boundary and release-candidate contracts.

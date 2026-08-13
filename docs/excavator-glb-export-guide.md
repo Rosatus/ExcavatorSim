@@ -2,6 +2,12 @@
 
 ## Purpose
 
+> **Historical/reference scope (2026-08-13):** This guide retains BabylonSim
+> export terminology for asset provenance and migration work. It is not the
+> current Godot runtime import contract; the current SY205 baseline is the
+> committed Godot GLB plus [`docs/godot-integration.md`](godot-integration.md)
+> and [`docs/visual-model.md`](visual-model.md).
+
 This guide describes how to produce a BabylonSim-ready excavator GLB from either:
 
 1. the original SOLIDWORKS assembly, which is the preferred source; or

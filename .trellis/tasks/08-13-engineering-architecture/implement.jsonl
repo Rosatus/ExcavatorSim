@@ -1,0 +1,8 @@
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"按跨层数据流、边界和坐标转换原则组织工程视图。"}
+{"file":".trellis/spec/backend/runtime-profiles.md","reason":"工程图和接口矩阵必须准确区分两个 runtime profile。"}
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"核对 Godot terrain、bucket、Terrain3D/Jolt、passive linkage 和派生规则。"}
+{"file":".trellis/spec/frontend/motion-transport.md","reason":"核对协议边界、generation guards 与早期 wording 风险。"}
+{"file":"README.md","reason":"工程架构的总览、运行方向和延后项来源。"}
+{"file":"docs/godot-integration.md","reason":"Godot scene/visual/terrain/coordinate boundary 的稳定导航。"}
+{"file":"docs/terrain-api.md","reason":"legacy terrain API scope 和数据约束来源。"}
+{"file":"docs/release-candidate.md","reason":"验证矩阵、MCP 与发布拓扑来源。"}

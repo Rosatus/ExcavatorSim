@@ -1,5 +1,12 @@
 # Authoritative Terrain API V1
 
+> **Profile scope (2026-08-13):** This document describes the Python
+> `legacy` terrain preview/snapshot/patch authority. The `motion-only`
+> Godot-first profile does not emit or consume these terrain messages; its
+> local `TerrainState` and `BucketSoilState` own the local world and expose
+> only derived rendering/collision state. Do not read this API as a global
+> authority rule for both profiles.
+
 `protocol/terrain-spec-v1.schema.json` owns deterministic Flat, Slope, Trench, and Profile inputs.
 `protocol/terrain-http-v1.schema.json` owns preview requests and metadata. The backend is the only
 generator and terrain-history authority; the browser must not regenerate a heightfield from a spec.

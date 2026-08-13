@@ -4,6 +4,15 @@
 
 This contract applies to Godot product code that consumes the Python `GET /ws`
 motion service. It was established by the M2 connected motion vertical slice.
+
+> **Profile scope (2026-08-13):** The authority sentence below describes the
+> original M2/legacy contract. In the current approved `motion-only`
+> Godot-first profile, Python remains authoritative for joint state, input
+> safety and lifecycle, while Godot owns its local `TerrainState` and
+> `BucketSoilState`; Python terrain, recording and replay remain only in the
+> `legacy` compatibility profile. See [`runtime-profiles.md`](../backend/runtime-profiles.md)
+> and [`client-boundary.md`](client-boundary.md).
+
 The client is a presentation consumer: Python remains authoritative for joint
 state, lifecycle, terrain, recording, and replay.
 

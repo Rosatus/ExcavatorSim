@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/index.md","reason":"概念图需遵循 Godot client 的已实现边界与阅读入口。"}
+{"file":"README.md","reason":"概念文档需准确反映当前状态和未来方向。"}
+{"file":"docs/godot-integration.md","reason":"提取 Python/Godot 权责和 Godot-first 业务语言。"}
+{"file":".trellis/tasks/08-13-project-architecture-docs/prd.md","reason":"父任务统一状态图例、目标硬件范围和验收标准。"}

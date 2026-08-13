@@ -1,0 +1,5 @@
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"检查图文是否遗漏跨层数据流、坐标转换或第二权威。"}
+{"file":".trellis/spec/backend/runtime-profiles.md","reason":"核对 motion-only/legacy 能力和接口 scope。"}
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"核对 Godot terrain/bucket/visual 派生边界。"}
+{"file":".trellis/spec/frontend/motion-transport.md","reason":"识别早期 wording 与当前 profile 事实的冲突并防止误导。"}
+{"file":"docs/release-candidate.md","reason":"核对测试、MCP 和兼容发布语义。"}

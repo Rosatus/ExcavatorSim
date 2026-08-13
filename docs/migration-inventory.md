@@ -1,5 +1,11 @@
 # BabylonSim Migration Inventory
 
+> **Historical reference (2026-08-13):** This is the original BabylonSim
+> migration checklist, not a list of backend files still missing from the
+> current repository. For the current architecture, read
+> [`docs/architecture/engineering.md`](architecture/engineering.md) and the
+> release/profile contracts first.
+
 ## Migrate into `backend/`
 
 - `src/babylon_sim/calibration.py`
@@ -49,4 +55,3 @@ Also migrate the backend tests, fixtures, protocol schemas, and backend-only ver
 - dynamic articulated rigid-body excavator authority;
 - C++ rewrite or GDExtension optimization;
 - per-grain granular soil simulation.
-
