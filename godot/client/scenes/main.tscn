@@ -1,18 +1,119 @@
-[gd_scene load_steps=19 format=3 uid="uid://bt370y5j1aq7a"]
+[gd_scene format=3 uid="uid://bt370y5j1aq7a"]
 
-[ext_resource type="PackedScene" path="res://assets/visual/SY205_excavator_godot.glb" id="1_sy205"]
-[ext_resource type="Script" path="res://scripts/motion_client.gd" id="2_motion_client"]
-[ext_resource type="Script" path="res://scripts/motion_presentation.gd" id="3_motion_presentation"]
-[ext_resource type="Script" path="res://scripts/operator_ui.gd" id="4_operator_ui"]
-[ext_resource type="Script" path="res://scripts/terrain_world.gd" id="5_terrain_world"]
-[ext_resource type="Script" path="res://scripts/terrain_renderer.gd" id="6_terrain_renderer"]
-[ext_resource type="Script" path="res://scripts/terrain_collider.gd" id="7_terrain_collider"]
-[ext_resource type="Script" path="res://scripts/excavation_world.gd" id="8_excavation_world"]
-[ext_resource type="Script" path="res://scripts/visual_environment.gd" id="9_visual_environment"]
-[ext_resource type="Script" path="res://scripts/camera_rig.gd" id="10_camera_rig"]
-[ext_resource type="Script" path="res://scripts/visual_quality_controller.gd" id="11_visual_quality"]
-[ext_resource type="Script" path="res://scripts/soil_effects.gd" id="12_soil_effects"]
-[ext_resource type="Script" path="res://scripts/terrain3d_adapter.gd" id="13_terrain3d_adapter"]
+[ext_resource type="Shader" uid="uid://cvd0x7lon1ur6" path="res://addons/sky_3d/shaders/SkyMaterial.gdshader" id="1_pm3ni"]
+[ext_resource type="PackedScene" uid="uid://7oyt2ryn4oiy" path="res://assets/visual/SY205_excavator_godot.glb" id="1_sy205"]
+[ext_resource type="Script" uid="uid://b5bdgxlnxonou" path="res://scripts/motion_client.gd" id="2_motion_client"]
+[ext_resource type="Texture2D" uid="uid://cfqk60lpl5ljv" path="res://addons/sky_3d/assets/resources/SNoise.tres" id="2_y6deb"]
+[ext_resource type="Script" uid="uid://v3q4b1d01uc0" path="res://scripts/motion_presentation.gd" id="3_motion_presentation"]
+[ext_resource type="Texture2D" uid="uid://cecwdqjol0ckd" path="res://addons/sky_3d/assets/textures/noiseClouds.png" id="3_og1vs"]
+[ext_resource type="Texture2D" uid="uid://2r8ylu6rg5dp" path="res://addons/sky_3d/assets/thirdparty/textures/moon/MoonMap.png" id="4_2wyq8"]
+[ext_resource type="Script" uid="uid://dm3i07xgta4w8" path="res://scripts/operator_ui.gd" id="4_operator_ui"]
+[ext_resource type="Script" uid="uid://cvhxrbvtyh8rs" path="res://scripts/terrain_world.gd" id="5_terrain_world"]
+[ext_resource type="Texture2D" uid="uid://djpfuyxkryegn" path="res://addons/sky_3d/assets/textures/noise.jpg" id="5_vxglm"]
+[ext_resource type="Texture2D" uid="uid://bm7dot7t7u1q4" path="res://addons/sky_3d/assets/thirdparty/textures/milkyway/StarField.jpg" id="6_2f3dj"]
+[ext_resource type="Script" uid="uid://du3lfqcnu05gj" path="res://scripts/terrain_renderer.gd" id="6_terrain_renderer"]
+[ext_resource type="Script" uid="uid://5qsl42ckpsic" path="res://scripts/terrain_collider.gd" id="7_terrain_collider"]
+[ext_resource type="Texture2D" uid="uid://c1vwcdcdvb74a" path="res://addons/sky_3d/assets/thirdparty/textures/milkyway/Milkyway.jpg" id="7_yq6so"]
+[ext_resource type="Script" uid="uid://ckwl4sd8pas24" path="res://scripts/excavation_world.gd" id="8_excavation_world"]
+[ext_resource type="Script" uid="uid://b4tkplvh7fq40" path="res://addons/sky_3d/src/SkyDome.gd" id="9_fv21b"]
+[ext_resource type="Script" uid="uid://cefdgjoxeten2" path="res://scripts/visual_environment.gd" id="9_visual_environment"]
+[ext_resource type="Script" uid="uid://c5206qwvtw1ux" path="res://scripts/camera_rig.gd" id="10_camera_rig"]
+[ext_resource type="Script" uid="uid://cjmkcj8hwm7ts" path="res://addons/sky_3d/src/TimeOfDay.gd" id="10_tel4y"]
+[ext_resource type="Script" uid="uid://y4arme8i53ul" path="res://scripts/visual_quality_controller.gd" id="11_visual_quality"]
+[ext_resource type="Script" uid="uid://dna82nsfu1gwe" path="res://scripts/soil_effects.gd" id="12_soil_effects"]
+[ext_resource type="Script" uid="uid://b4kidhr20qmau" path="res://scripts/terrain3d_adapter.gd" id="13_terrain3d_adapter"]
+[ext_resource type="Script" uid="uid://deo0gxkmk2ahd" path="res://addons/sky_3d/src/Sky3D.gd" id="14_sky3d"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_qkpxi"]
+shader = ExtResource("1_pm3ni")
+shader_parameter/sky_visible = true
+shader_parameter/color_correction = Vector2(0, 1)
+shader_parameter/ground_color = Color(0.3, 0.3, 0.3, 1)
+shader_parameter/horizon_offset = 0.0
+shader_parameter/atm_darkness = 0.5
+shader_parameter/atm_sun_intensity = 18.0
+shader_parameter/atm_day_tint = Color(0.807843, 0.909804, 1, 1)
+shader_parameter/atm_horizon_light_tint = Color(0.980392, 0.635294, 0.462745, 1)
+shader_parameter/atm_night_tint = Color(0.168627, 0.2, 0.25098, 1)
+shader_parameter/atm_level_params = Vector3(1, 0, 0)
+shader_parameter/atm_thickness = 0.7
+shader_parameter/atm_beta_ray = Vector3(5.804544e-06, 1.3562913e-05, 3.311258e-05)
+shader_parameter/atm_beta_mie = Vector3(3.038e-08, 3.038e-08, 3.038e-08)
+shader_parameter/sun_light_color = Color(0.98, 0.523, 0.294, 1)
+shader_parameter/sun_disk_color = Color(0.996094, 0.541334, 0.140076, 1)
+shader_parameter/sun_disk_intensity = 30.0
+shader_parameter/sun_disk_size = 0.02
+shader_parameter/atm_sun_mie_tint = Color(1, 1, 1, 1)
+shader_parameter/atm_sun_mie_intensity = 1.0
+shader_parameter/atm_sun_partial_mie_phase = Vector3(0.36, 1.64, 1.6)
+shader_parameter/moon_color = Color(1, 1, 1, 1)
+shader_parameter/moon_texture = ExtResource("4_2wyq8")
+shader_parameter/moon_texture_alignment = Vector3(7, 1.4, 4.8)
+shader_parameter/moon_texture_flip_u = false
+shader_parameter/moon_texture_flip_v = false
+shader_parameter/moon_size = 0.07
+shader_parameter/atm_moon_mie_tint = Color(0.137255, 0.184314, 0.292196, 1)
+shader_parameter/atm_moon_mie_intensity = 0.0
+shader_parameter/atm_moon_partial_mie_phase = Vector3(0.36, 1.64, 1.6)
+shader_parameter/starmap_color = Color(0.709804, 0.709804, 0.709804, 0.854902)
+shader_parameter/starmap_texture = ExtResource("7_yq6so")
+shader_parameter/starmap_flip_u = false
+shader_parameter/starmap_flip_v = false
+shader_parameter/starmap_alignment = Vector3(2.68288, -0.25891, 0.40101)
+shader_parameter/star_rotation_offset = 9.38899
+shader_parameter/star_rotation = -14.228712563022551
+shader_parameter/star_tilt = -1.2915436464758039
+shader_parameter/star_field_color = Color(1, 1, 1, 1)
+shader_parameter/star_field_texture = ExtResource("6_2f3dj")
+shader_parameter/star_scintillation = 0.75
+shader_parameter/star_scintillation_speed = 0.01
+shader_parameter/noise_tex = ExtResource("5_vxglm")
+shader_parameter/clouds_night_color = Color(0.090196, 0.094118, 0.129412, 1)
+shader_parameter/cirrus_visible = true
+shader_parameter/cirrus_intensity = 2.0
+shader_parameter/cirrus_coverage = 0.5
+shader_parameter/cirrus_thickness = 1.7
+shader_parameter/cirrus_absorption = 2.0
+shader_parameter/cirrus_sky_tint_fade = 0.5
+shader_parameter/cirrus_size = 1.0
+shader_parameter/cirrus_uv = Vector2(0.16, 0.11)
+shader_parameter/cirrus_position1 = Vector2(0.81891185, 0.81891185)
+shader_parameter/cirrus_position2 = Vector2(0.81891185, 0.81891185)
+shader_parameter/cirrus_texture = ExtResource("2_y6deb")
+shader_parameter/cumulus_visible = true
+shader_parameter/cumulus_intensity = 0.6
+shader_parameter/cumulus_coverage = 0.55
+shader_parameter/cumulus_thickness = 0.0243
+shader_parameter/cumulus_absorption = 2.0
+shader_parameter/cumulus_noise_freq = 2.7
+shader_parameter/cumulus_sky_tint_fade = 0.0
+shader_parameter/cumulus_size = 0.5
+shader_parameter/cumulus_position = Vector2(4.0950665, 4.0950665)
+shader_parameter/cumulus_texture = ExtResource("3_og1vs")
+shader_parameter/cumulus_partial_mie_phase = Vector3(0.957564, 1.042436, 0.412)
+shader_parameter/cumulus_mie_intensity = 1.0
+shader_parameter/show_azimuthal_grid = false
+shader_parameter/azimuthal_grid_color = Color(0.87058824, 0.72156864, 0.5294118, 1)
+shader_parameter/azimuthal_grid_rotation_offset = 0.03
+shader_parameter/show_equatorial_grid = false
+shader_parameter/equatorial_grid_color = Color(0, 0.75, 1, 1)
+shader_parameter/equatorial_grid_rotation_offset = 0.03
+shader_parameter/moon_matrix = Basis(-0.83161134, 0.5338445, 0.15307745, -0.21726394, -0.059066065, -0.9743242, -0.51109594, -0.84351724, 0.16510518)
+
+[sub_resource type="Sky" id="Sky_5q0nq"]
+sky_material = SubResource("ShaderMaterial_qkpxi")
+
+[sub_resource type="Environment" id="Environment_dgi5k"]
+background_mode = 2
+sky = SubResource("Sky_5q0nq")
+ambient_light_source = 3
+ambient_light_color = Color(0.23515604, 0.27890667, 0.35, 1)
+ambient_light_sky_contribution = 0.7
+reflected_light_source = 2
+tonemap_mode = 3
+tonemap_white = 6.0
+
+[sub_resource type="CameraAttributesPractical" id="CameraAttributesPractical_j8jky"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_sgp6g"]
 size = Vector3(1.2, 0.8, 0.9)
@@ -35,24 +136,53 @@ size = Vector3(20, 0.2, 20)
 [node name="Main" type="Node3D" unique_id=615713361]
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1005988133]
+environment = SubResource("Environment_dgi5k")
+camera_attributes = SubResource("CameraAttributesPractical_j8jky")
+script = ExtResource("14_sky3d")
+current_time = 23.358746666669727
+wind_direction = 2.35619451204804
+
+[node name="SunLight" type="DirectionalLight3D" parent="WorldEnvironment" unique_id=1271245286]
+transform = Transform3D(0.709426, -0.69418347, -0.1217543, 0, 0.17275506, -0.98496485, 0.7047799, 0.6987597, 0.12255693, -0.121754296, -0.9849648, 0.122556925)
+light_color = Color(0.98, 0.523, 0.294, 1)
+light_energy = 0.0
+
+[node name="MoonLight" type="DirectionalLight3D" parent="WorldEnvironment" unique_id=526965036]
+transform = Transform3D(0, -0.85952365, -0.5110959, 0.19208913, 0.501578, -0.8435172, 0.9813774, -0.09817596, 0.16510516, -0.5110959, -0.8435172, 0.16510516)
+light_color = Color(0.572549, 0.776471, 0.956863, 1)
+light_energy = 0.0
+
+[node name="SkyDome" type="Node" parent="WorldEnvironment" unique_id=1193753276]
+script = ExtResource("9_fv21b")
+sun_azimuth = -3.9237056
+sun_altitude = -2.9679666
+moon_azimuth = -4.3999295
+moon_altitude = -2.5745947
+wind_direction = 2.35619451204804
+
+[node name="TimeOfDay" type="Node" parent="WorldEnvironment" unique_id=1869329603]
+script = ExtResource("10_tel4y")
+dome_path = NodePath("../SkyDome")
+current_time = 23.358746666669727
 
 [node name="KeyLight" type="DirectionalLight3D" parent="." unique_id=1459257187]
 transform = Transform3D(0.7960838, 0.4546647, -0.3994128, 0, 0.6599831, 0.7512804, 0.6051864, -0.5980822, 0.52540183, 0, 0, 0)
-light_energy = 1.2
+visible = false
+light_energy = 0.0
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=759888586]
-transform = Transform3D(0.71091354, -0.24115296, 0.66064143, 0, 0.9393727, 0.3428978, -0.7032794, -0.24377069, 0.66781276, 10, 6, 10)
+transform = Transform3D(-0.9402287, -0.1167717, 0.31989756, 3.711504e-09, 0.9393728, 0.34289774, -0.3405438, 0.3224023, -0.8832252, 0.971653, 3.315454, 1.1439075)
 current = true
 fov = 55.0
 script = ExtResource("10_camera_rig")
 
-[node name="VisualEnvironment" type="Node" parent="."]
+[node name="VisualEnvironment" type="Node" parent="." unique_id=2112857557]
 script = ExtResource("9_visual_environment")
 
-[node name="VisualQualityController" type="Node" parent="."]
+[node name="VisualQualityController" type="Node" parent="." unique_id=289718322]
 script = ExtResource("11_visual_quality")
 
-[node name="SoilEffects" type="Node3D" parent="."]
+[node name="SoilEffects" type="Node3D" parent="." unique_id=608950151]
 script = ExtResource("12_soil_effects")
 
 [node name="ExcavatorRig" type="Node3D" parent="." unique_id=1680409432]
@@ -93,78 +223,112 @@ mesh = SubResource("BoxMesh_jyhfs")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
 mesh = SubResource("BoxMesh_tbgi4")
 
-[node name="TerrainWorld" type="Node3D" parent="TerrainRoot"]
+[node name="TerrainWorld" type="Node3D" parent="TerrainRoot" unique_id=1022451405]
 script = ExtResource("5_terrain_world")
 
-[node name="TerrainMesh" type="MeshInstance3D" parent="TerrainRoot/TerrainWorld"]
+[node name="TerrainMesh" type="MeshInstance3D" parent="TerrainRoot/TerrainWorld" unique_id=805860116]
 script = ExtResource("6_terrain_renderer")
 
-[node name="Terrain3DAdapter" type="Node3D" parent="TerrainRoot"]
+[node name="Terrain3DAdapter" type="Node3D" parent="TerrainRoot" unique_id=255875373]
 script = ExtResource("13_terrain3d_adapter")
 
-[node name="TerrainCollider" type="Node3D" parent="TerrainRoot"]
+[node name="TerrainCollider" type="Node3D" parent="TerrainRoot" unique_id=1878975737]
 script = ExtResource("7_terrain_collider")
 
-[node name="ExcavationWorld" type="Node3D" parent="TerrainRoot"]
+[node name="ExcavationWorld" type="Node3D" parent="TerrainRoot" unique_id=325026376]
 script = ExtResource("8_excavation_world")
 
 [node name="PresentationRoot" type="Node3D" parent="." unique_id=1465378192]
 
-[node name="SY205Excavator" parent="PresentationRoot" instance=ExtResource("1_sy205")]
+[node name="SY205Excavator" parent="PresentationRoot" unique_id=202503536 instance=ExtResource("1_sy205")]
 
-[node name="MotionClient" type="Node" parent="." node_paths=PackedStringArray()]
+[node name="MotionClient" type="Node" parent="." unique_id=358783374]
 script = ExtResource("2_motion_client")
 
-[node name="MotionPresentation" type="Node3D" parent="." node_paths=PackedStringArray()]
+[node name="MotionPresentation" type="Node3D" parent="." unique_id=2082115328]
 script = ExtResource("3_motion_presentation")
 
-[node name="OperatorUI" type="CanvasLayer" parent="." unique_id=232332145 node_paths=PackedStringArray()]
+[node name="OperatorUI" type="CanvasLayer" parent="." unique_id=232332145]
 script = ExtResource("4_operator_ui")
 
-[node name="StatusPanel" type="PanelContainer" parent="OperatorUI"]
+[node name="StatusPanel" type="PanelContainer" parent="OperatorUI" unique_id=1551506648]
 offset_left = 16.0
 offset_top = 16.0
 offset_right = 430.0
 offset_bottom = 250.0
 
-[node name="Margin" type="MarginContainer" parent="OperatorUI/StatusPanel"]
+[node name="Margin" type="MarginContainer" parent="OperatorUI/StatusPanel" unique_id=2021519112]
+layout_mode = 2
 theme_override_constants/margin_left = 12
 theme_override_constants/margin_top = 10
 theme_override_constants/margin_right = 12
 theme_override_constants/margin_bottom = 10
 
-[node name="VBox" type="VBoxContainer" parent="OperatorUI/StatusPanel/Margin"]
+[node name="VBox" type="VBoxContainer" parent="OperatorUI/StatusPanel/Margin" unique_id=107301372]
+layout_mode = 2
 theme_override_constants/separation = 5
 
-[node name="Connection" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
+[node name="Connection" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=1573557741]
+layout_mode = 2
 text = "Connection: disconnected"
 
-[node name="Authority" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
+[node name="Authority" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=1315170415]
+layout_mode = 2
 text = "Authority: waiting for Python"
 
-[node name="Lifecycle" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
+[node name="Lifecycle" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=1302050459]
+layout_mode = 2
 text = "Lifecycle: stopped"
 
-[node name="Diagnostics" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
+[node name="Diagnostics" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=119507650]
+layout_mode = 2
 text = "Input ACK: —"
 
-[node name="BucketVolume" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
+[node name="BucketVolume" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=2114908316]
+layout_mode = 2
 text = "Bucket soil: 0.000 / 0.35 m³"
 
-[node name="Buttons" type="HBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox"]
+[node name="Buttons" type="HBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=764035980]
+layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="Start" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Buttons"]
+[node name="Start" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Buttons" unique_id=1851800208]
+layout_mode = 2
 text = "Start (F6)"
 
-[node name="Pause" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Buttons"]
+[node name="Pause" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Buttons" unique_id=1445076987]
+layout_mode = 2
 text = "Pause (F7)"
 
-[node name="Reset" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Buttons"]
+[node name="Reset" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Buttons" unique_id=87408431]
+layout_mode = 2
 text = "Reset (F8)"
 
-[node name="Dig" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Buttons"]
+[node name="Dig" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Buttons" unique_id=940323166]
+layout_mode = 2
 text = "Dig (F9)"
 
-[node name="Deposit" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Buttons"]
+[node name="Deposit" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Buttons" unique_id=1218320392]
+layout_mode = 2
 text = "Deposit (F10)"
+
+[node name="SkyAttribution" type="Label" parent="OperatorUI" unique_id=25095541]
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -430.0
+offset_top = -48.0
+offset_right = -12.0
+offset_bottom = -10.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 1, 1, 0.82)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.8)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 12
+text = "The Milky Way panorama by ESO/S. Brunier
+CC BY 4.0, original and modified forms"
+horizontal_alignment = 2
+vertical_alignment = 2

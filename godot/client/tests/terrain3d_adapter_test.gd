@@ -57,7 +57,8 @@ func _test_scene_adapter_seam() -> int:
 	var adapter := scene.get_node_or_null("TerrainRoot/Terrain3DAdapter") as Terrain3DAdapter
 	var terrain_world := scene.get_node_or_null("TerrainRoot/TerrainWorld") as TerrainWorld
 	var fallback := scene.get_node_or_null("TerrainRoot/TerrainWorld/TerrainMesh") as TerrainRenderer
-	if adapter == null or terrain_world == null or fallback == null:
+	var foundation := scene.get_node_or_null("TerrainRoot/FoundationGround") as MeshInstance3D
+	if adapter == null or terrain_world == null or fallback == null or foundation == null:
 		scene.queue_free()
 		return _fail("scene keeps adapter and custom renderer seams")
 	if terrain_world.terrain_state == null:
@@ -76,6 +77,27 @@ func _test_scene_adapter_seam() -> int:
 	if int(status["rock_count"]) != 18 or int(status["tree_count"]) != 0 or not bool(status["grass_enabled"]):
 		scene.queue_free()
 		return _fail("adapter reports official demo rocks and grass")
+	var native_terrain := scene.get_node_or_null("TerrainRoot/Terrain3DAdapter/Terrain3DNative") as Terrain3D
+	if native_terrain == null or native_terrain.assets == null or native_terrain.material == null:
+		scene.queue_free()
+		return _fail("Terrain3D enters the scene with assets and material configured")
+	if native_terrain.region_size != adapter.region_size or native_terrain.collision_mask != 1:
+		scene.queue_free()
+		return _fail("Terrain3D enters the scene with stable region and collision settings")
+	if native_terrain.material.world_background != Terrain3DMaterial.NONE:
+		scene.queue_free()
+		return _fail("Terrain3D keeps its infinite background disabled so Sky3D owns the horizon")
+	if fallback.visible or foundation.visible:
+		scene.queue_free()
+		return _fail("native Terrain3D hides both legacy ground presentation layers")
+	var queued_snapshot := terrain_world.terrain_state.surface_snapshot()
+	queued_snapshot["terrain_revision"] = int(queued_snapshot["terrain_revision"]) + 1
+	if not adapter.queue_snapshot(queued_snapshot) or not fallback.visible or not foundation.visible:
+		scene.queue_free()
+		return _fail("pending native rebuild restores both fail-open ground layers")
+	if not adapter.apply_pending() or fallback.visible or foundation.visible:
+		scene.queue_free()
+		return _fail("successful native rebuild hides both fail-open ground layers again")
 	var dressing := scene.get_node_or_null("TerrainRoot/Terrain3DAdapter/ConstructionSiteDressing")
 	if dressing == null:
 		scene.queue_free()

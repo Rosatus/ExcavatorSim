@@ -23,11 +23,17 @@ func apply_profile(profile_name: String) -> bool:
 	if not PROFILES.has(profile_name):
 		last_error = "unknown_quality_profile"
 		return false
-	profile = profile_name
 	var settings: Dictionary = PROFILES[profile_name]
 	var environment := get_node_or_null("../VisualEnvironment") as VisualEnvironment
-	if environment != null:
-		environment.apply_profile(profile_name)
+	if is_inside_tree() and environment == null:
+		_applied = false
+		last_error = "visual_environment_unavailable"
+		return false
+	if environment != null and not environment.apply_profile(profile_name):
+		_applied = false
+		last_error = "visual_environment_profile_failed"
+		return false
+	profile = profile_name
 	var camera := get_node_or_null("../Camera3D") as CameraRig
 	if camera != null:
 		camera.far = float(settings["camera_far"])
@@ -35,9 +41,6 @@ func apply_profile(profile_name: String) -> bool:
 	var effects := get_node_or_null("../SoilEffects") as SoilEffects
 	if effects != null:
 		effects.set_budget(int(settings["particles"]))
-	var key_light := get_node_or_null("../KeyLight") as DirectionalLight3D
-	if key_light != null:
-		key_light.shadow_enabled = bool(settings["shadows"])
 	Engine.max_fps = target_fps
 	_applied = true
 	last_error = ""

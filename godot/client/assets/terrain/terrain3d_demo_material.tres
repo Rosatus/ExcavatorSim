@@ -58,6 +58,6 @@ _shader_parameters = {
 "world_noise_region_blend": 0.33,
 "world_noise_scale": 9.85
 }
-world_background = 2
+world_background = 0
 auto_shader = true
 dual_scaling = true

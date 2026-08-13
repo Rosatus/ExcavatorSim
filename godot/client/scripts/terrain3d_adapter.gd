@@ -175,9 +175,6 @@ func _ensure_terrain_node() -> bool:
 		return false
 	_terrain_node = instance as Node3D
 	_terrain_node.name = "Terrain3DNative"
-	add_child(_terrain_node, true)
-	_set_property_if_present(_terrain_node, "region_size", region_size)
-	_set_property_if_present(_terrain_node, "collision_mask", 1)
 	var assets: Variant = load(assets_path) if not assets_path.is_empty() and ResourceLoader.exists(assets_path) else null
 	if assets != null:
 		_assets_source = assets_path
@@ -187,6 +184,12 @@ func _ensure_terrain_node() -> bool:
 	if assets != null:
 		_set_property_if_present(_terrain_node, "assets", assets)
 	_configure_material()
+	# Terrain3D initializes as soon as it enters the tree. Assets and material
+	# must exist for that first pass, while size settings must follow it because
+	# native initialization restores their defaults.
+	add_child(_terrain_node, true)
+	_set_property_if_present(_terrain_node, "region_size", region_size)
+	_set_property_if_present(_terrain_node, "collision_mask", 1)
 	_ensure_dressing_root()
 	return true
 
@@ -253,7 +256,7 @@ func _materialize_snapshot(snapshot: Dictionary) -> bool:
 
 
 func _configure_material() -> void:
-	if _terrain_node == null or DisplayServer.get_name() == "headless":
+	if _terrain_node == null:
 		return
 	if construction_site_enabled:
 		var demo_material := _load_demo_material()

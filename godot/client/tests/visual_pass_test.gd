@@ -10,9 +10,11 @@ func _init() -> void:
 func _run() -> void:
 	var result := _test_quality_profiles()
 	if result == 0:
+		result = await _test_quality_failure_propagation()
+	if result == 0:
 		result = _test_effect_budget()
 	if result == 0:
-		result = _test_scene_visual_nodes()
+		result = await _test_scene_visual_nodes()
 	if result == 0:
 		print("Realistic visual contracts passed.")
 	quit(result)
@@ -26,6 +28,24 @@ func _test_quality_profiles() -> int:
 		return _fail("high profile applies far distance")
 	if quality.apply_profile("unsupported") or quality.last_error != "unknown_quality_profile":
 		return _fail("unsupported profile is mutation-free")
+	return 0
+
+
+func _test_quality_failure_propagation() -> int:
+	var container := Node.new()
+	var environment := VisualEnvironment.new()
+	environment.name = "VisualEnvironment"
+	var quality := VisualQualityController.new()
+	quality.name = "VisualQualityController"
+	container.add_child(environment)
+	container.add_child(quality)
+	root.add_child(container)
+	await process_frame
+	if quality.apply_profile("high") or quality.last_error != "visual_environment_profile_failed":
+		container.queue_free()
+		return _fail("quality controller propagates a missing Sky3D backend")
+	container.queue_free()
+	await process_frame
 	return 0
 
 
@@ -46,8 +66,38 @@ func _test_scene_visual_nodes() -> int:
 	if packed == null:
 		return _fail("main scene loads")
 	var scene := packed.instantiate()
-	if scene.get_node_or_null("VisualEnvironment") == null or scene.get_node_or_null("VisualQualityController") == null or scene.get_node_or_null("SoilEffects") == null:
+	root.add_child(scene)
+	await process_frame
+	var visual_environment := scene.get_node_or_null("VisualEnvironment") as VisualEnvironment
+	var quality := scene.get_node_or_null("VisualQualityController") as VisualQualityController
+	if visual_environment == null or quality == null or scene.get_node_or_null("SoilEffects") == null:
 		return _fail("visual environment, quality and effects nodes exist")
+	var attribution := scene.get_node_or_null("OperatorUI/SkyAttribution") as Label
+	if attribution == null or "ESO/S. Brunier" not in attribution.text or "CC BY 4.0" not in attribution.text:
+		return _fail("running client exposes the required Milky Way attribution")
+	var sky := scene.get_node_or_null("WorldEnvironment") as Sky3D
+	if sky == null or sky.sun == null or sky.tod == null:
+		return _fail("root WorldEnvironment uses the initialized Sky3D backend")
+	var snapshot := visual_environment.get_visual_snapshot()
+	if snapshot["backend"] != "Sky3D" or not is_equal_approx(float(snapshot["fixed_time"]), 10.5) or bool(snapshot["time_progression"]):
+		return _fail("Sky3D stays at the fixed construction-workday time")
+	if sky.tod.celestials_calculations != TimeOfDay.CelestialMode.SIMPLE or not sky.is_day():
+		return _fail("Sky3D uses deterministic simple daytime celestial positioning")
+	if not is_equal_approx(sky.sky.sun_altitude, deg_to_rad(19.5)):
+		return _fail("fixed Sky3D time resolves to the calibrated high daytime sun")
+	if sky.sky.wind_speed != 0.0 or sky.sky.ground_color != VisualEnvironment.HORIZON_GROUND_COLOR:
+		return _fail("Sky3D keeps a deterministic construction-site horizon")
+	var legacy_light := scene.get_node_or_null("KeyLight") as DirectionalLight3D
+	if legacy_light == null or legacy_light.visible or legacy_light.light_energy != 0.0:
+		return _fail("legacy key-light seam stays present but inactive")
+	if visual_environment.get_active_sun() != sky.sun or not sky.sun.visible:
+		return _fail("Sky3D SunLight is the single active daytime light")
+	if not quality.apply_profile("low") or sky.clouds_enabled or sky.fog_enabled or sky.sun.shadow_enabled:
+		return _fail("low quality disables clouds, fog, and sun shadows")
+	if not quality.apply_profile("high") or not sky.clouds_enabled or not sky.fog_enabled or not sky.sun.shadow_enabled:
+		return _fail("high quality restores bounded Sky3D atmosphere and shadows")
+	if sky.game_time_enabled or sky.tod.system_sync:
+		return _fail("quality changes never enable Sky3D time authority")
 	var camera := scene.get_node_or_null("Camera3D") as CameraRig
 	if camera == null:
 		return _fail("camera uses the presentation rig")

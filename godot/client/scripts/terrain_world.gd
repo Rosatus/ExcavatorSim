@@ -6,10 +6,12 @@ extends Node3D
 @export var terrain_columns := TerrainState.DEFAULT_COLUMNS
 @export var terrain_spacing_m := TerrainState.DEFAULT_SPACING_M
 @export var terrain3d_adapter_path := NodePath("../Terrain3DAdapter")
+@export var foundation_ground_path := NodePath("../FoundationGround")
 
 var terrain_state: TerrainState
 @onready var terrain_renderer := get_node_or_null("TerrainMesh") as TerrainRenderer
 @onready var terrain3d_adapter := get_node_or_null(terrain3d_adapter_path) as Terrain3DAdapter
+@onready var foundation_ground := get_node_or_null(foundation_ground_path) as MeshInstance3D
 
 
 func _ready() -> void:
@@ -61,3 +63,5 @@ func rebuild_mesh() -> bool:
 func _on_terrain3d_backend_changed(active: bool) -> void:
 	if terrain_renderer != null:
 		terrain_renderer.visible = not active
+	if foundation_ground != null:
+		foundation_ground.visible = not active
