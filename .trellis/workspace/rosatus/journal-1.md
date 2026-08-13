@@ -718,3 +718,36 @@ Integrated fixed-day Sky3D environment, corrected Terrain3D initialization and f
 ### Next Steps
 
 - None - task complete
+
+
+## Session 22: 建立项目概念与工程架构文档
+
+**Date**: 2026-08-13
+**Task**: 建立项目概念与工程架构文档
+**Branch**: `main`
+
+### Summary
+
+新增面向非技术人员的概念架构图（Mermaid 与内嵌 SVG）及面向工程协作的详细架构地图，覆盖 Python/Pinocchio、Godot-first 与 legacy profile、协议/时序、权威边界、坐标资产、测试发布和未来座舱/CAN 目标；README 增加阅读入口，并为历史专项文档补充 profile scope 注记。相关 Trellis 任务已归档。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `746e880` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
