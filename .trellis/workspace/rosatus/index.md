@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 22
-- **Last Active**: 2026-08-13
+- **Total Sessions**: 23
+- **Last Active**: 2026-08-15
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~753 | Active |
+| `journal-1.md` | ~786 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 23 | 2026-08-15 | Add SY135 model switching | `4a3fe56` | `main` |
 | 22 | 2026-08-13 | 建立项目概念与工程架构文档 | `746e880` | `main` |
 | 21 | 2026-08-13 | Integrate Sky3D construction sky | `559b2c6abcc6af50e4726fbfef667e0a6bfb50ab`, `c2cac52a4727c90c20eb886d9e337ff2ca7b4964` | `main` |
 | 20 | 2026-08-13 | Terrain3D official demo visual baseline | `dcc9e66` | `main` |

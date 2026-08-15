@@ -751,3 +751,36 @@ Integrated fixed-day Sky3D environment, corrected Terrain3D initialization and f
 ### Next Steps
 
 - None - task complete
+
+
+## Session 23: Add SY135 model switching
+
+**Date**: 2026-08-15
+**Task**: Add SY135 model switching
+**Branch**: `main`
+
+### Summary
+
+Imported the SY135 articulated GLB, added reviewed model registries and fresh-session SY205/SY135 switching across Python and Godot, isolated replay/recording/model identity, and verified backend plus Godot runtime behavior.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4a3fe56` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
