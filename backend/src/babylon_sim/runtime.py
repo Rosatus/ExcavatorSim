@@ -157,7 +157,13 @@ class RuntimeController:
         if self.recording is not None and self.terrain is not None:
             self.replay = ReplayWorker(
                 self.recording,
-                ExcavatorModel.from_urdf(model.urdf_path),
+                # Preserve the selected descriptor identity for replay.  Loading
+                # the same URDF without its explicit version silently applies
+                # the SY205 compatibility default to SY135 recordings.
+                ExcavatorModel.from_urdf(
+                    model.urdf_path,
+                    model_version=model.model_version,
+                ),
                 self.latest.read,
                 clock=clock,
             )
@@ -165,7 +171,25 @@ class RuntimeController:
                 self.recording,
                 self.replay,
                 calibration_version=calibration.calibration_version,
+                model_version=model.model_version,
             )
+
+    @property
+    def model_id(self) -> str:
+        """Compatibility identity; session manager provides the reviewed stable ID."""
+        return self.model.model_version
+
+    @property
+    def model_version(self) -> str:
+        return self.model.model_version
+
+    @property
+    def visual_model_version(self) -> str:
+        return (
+            "original-skin-v1"
+            if self.model.model_version == "sy205-glb-urdf-v4"
+            else "sy135-combined-glb-v1"
+        )
 
     @property
     def stream_epoch(self) -> str:

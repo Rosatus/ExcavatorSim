@@ -37,6 +37,7 @@ EXPECTED_VERBATIM = {
 EXPECTED_GENERATED = {
     "assets/model/kinematic_excavator.urdf",
     "backend/tests/fixtures/frame-parity/baseline.json",
+    "godot/client/tests/fixtures/sy135_frame_parity_cases.json",
 }
 HEX_40 = re.compile(r"^[0-9a-f]{40}$")
 HEX_64 = re.compile(r"^[0-9a-f]{64}$")
@@ -240,6 +241,37 @@ def _verify_visual_assets(errors: list[str]) -> None:
         errors.append("NOTICE.md does not reference the visual rights record")
 
 
+def _verify_user_supplied_assets(root: dict[str, Any], errors: list[str]) -> None:
+    raw_assets = root.get("user_supplied_assets", [])
+    if not isinstance(raw_assets, list):
+        errors.append("user_supplied_assets must be an array")
+        return
+    for index, raw_asset in enumerate(raw_assets):
+        label = f"user_supplied_assets[{index}]"
+        asset = _mapping(raw_asset, label, errors)
+        source = asset.get("source_path")
+        destination = _safe_destination(asset.get("destination_path"), label, errors)
+        digest = asset.get("sha256")
+        if not isinstance(source, str) or not source:
+            errors.append(f"{label}.source_path is required")
+        if not isinstance(digest, str) or HEX_64.fullmatch(digest) is None:
+            errors.append(f"{label}.sha256 must be 64 lowercase hex characters")
+        elif (
+            destination is not None
+            and (ROOT / destination).is_file()
+            and _raw_sha256(ROOT / destination) != digest
+        ):
+            errors.append(f"{destination}: user-supplied SHA-256 mismatch")
+        byte_size = asset.get("byte_size")
+        if not isinstance(byte_size, int) or byte_size <= 0:
+            errors.append(f"{label}.byte_size must be positive")
+        elif destination is not None and (ROOT / destination).stat().st_size != byte_size:
+            errors.append(f"{destination}: user-supplied byte size mismatch")
+        for field in ("hash_mode", "relationship", "imported_at"):
+            if not isinstance(asset.get(field), str) or not asset.get(field):
+                errors.append(f"{label}.{field} is required")
+
+
 def verify() -> list[str]:
     errors: list[str] = []
     try:
@@ -247,6 +279,7 @@ def verify() -> list[str]:
     except (OSError, json.JSONDecodeError) as exc:
         return [f"cannot read {MANIFEST_PATH.relative_to(ROOT)}: {exc}"]
     root = _mapping(manifest, "manifest", errors)
+    _verify_user_supplied_assets(root, errors)
     if root.get("schema_version") != 1:
         errors.append("schema_version must equal 1")
     if root.get("hash_canonicalization") != "text-crlf-to-lf":
@@ -274,9 +307,10 @@ def verify() -> list[str]:
             errors.append(f"{label}.source_commit does not match source_baseline")
         if not isinstance(entry.get("source_path"), str) or not entry.get("source_path"):
             errors.append(f"{label}.source_path is required")
-        if not isinstance(entry.get("source_blob"), str) or HEX_40.fullmatch(
-            entry.get("source_blob", "")
-        ) is None:
+        if (
+            not isinstance(entry.get("source_blob"), str)
+            or HEX_40.fullmatch(entry.get("source_blob", "")) is None
+        ):
             errors.append(f"{label}.source_blob must be 40 lowercase hex characters")
         destination = _safe_destination(entry.get("destination_path"), label, errors)
         _verify_hash(entry, label, destination, errors)

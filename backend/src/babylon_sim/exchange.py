@@ -54,11 +54,13 @@ class RecordingExchange:
         replay: ReplayWorker,
         *,
         calibration_version: str,
+        model_version: str,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.recording = recording
         self.replay = replay
         self.calibration_version = calibration_version
+        self.model_version = model_version
         self._clock = clock
         self._temporary = tempfile.TemporaryDirectory(prefix="babylon-sim-rrd-")
         self.root = Path(self._temporary.name)
@@ -88,7 +90,7 @@ class RecordingExchange:
                 )
             digest = _sha256(path)
             try:
-                imported = import_rrd(path)
+                imported = import_rrd(path, expected_model_version=self.model_version)
             except RrdProfileError as exc:
                 raise ExchangeError("invalid_rrd", str(exc)) from exc
             if imported.calibration_version != self.calibration_version:
@@ -184,6 +186,7 @@ class RecordingExchange:
                 path,
                 calibration_version=self.calibration_version,
                 source_mode=source_mode,
+                model_version=self.model_version,
             )
             return path
         except RrdProfileError as exc:

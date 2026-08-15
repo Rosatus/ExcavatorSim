@@ -23,3 +23,22 @@ Reference files:
 - `backend/src/babylon_sim/terrain_excavation.py`
 - `.trellis/tasks/08-06-excavator-sim-bootstrap/docs/godot-integration.md`
 
+## Reviewed model session identity
+
+When more than one reviewed excavator is selectable, `RuntimeSessionManager`
+is the lifecycle boundary. A model switch must construct a fresh
+`RuntimeController` from one immutable descriptor and must not mutate the
+active controller in place. The descriptor's `model_id`, `model_version`,
+URDF, visual manifest, replay model, recording exchange, and RRD metadata are
+one identity.
+
+The WebSocket hello may request a model ID. The manager must reject an unknown
+or unavailable ID, and must return `model_switch_busy` while an established
+peer still owns the current session. Replay model construction must pass the
+selected descriptor's explicit `model_version`; loading the same URDF without
+that argument silently restores the SY205 compatibility identity.
+
+Good: resolve every endpoint and replay worker through the selected descriptor
+and create new queues/epochs on a successful switch. Bad: relabel a fixed
+SY205 visual manifest as another model, or hot-reload a URDF underneath an
+existing peer.

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from itertools import pairwise
 from typing import Any, Literal, TypeAlias, cast
@@ -75,10 +75,25 @@ class VersionManifest:
             "visual_model_version": self.visual_model_version,
         }
 
+    def for_model(
+        self,
+        *,
+        model_version: str,
+        visual_model_version: str,
+        calibration_version: str | None = None,
+    ) -> VersionManifest:
+        return replace(
+            self,
+            model_version=model_version,
+            visual_model_version=visual_model_version,
+            calibration_version=calibration_version or self.calibration_version,
+        )
+
 
 @dataclass(frozen=True)
 class HelloMessage:
     capabilities: tuple[str, ...]
+    requested_model_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -171,6 +186,7 @@ def _hello_ack_probe(manifest: VersionManifest) -> dict[str, object]:
         "session_id": "manifest-check",
         "simulation_epoch": "manifest-check",
         "recording_epoch": "manifest-check",
+        "model_id": "sy205",
         "versions": manifest.as_dict(),
         "model_url": "/api/model",
         "lifecycle": "stopped",
@@ -232,7 +248,12 @@ def decode_client_message(raw: str | bytes, *, max_bytes: int = MAX_MESSAGE_BYTE
                 "client protocol version is incompatible",
                 recoverable=False,
             )
-        return HelloMessage(tuple(cast(list[str], payload["capabilities"])))
+        return HelloMessage(
+            tuple(cast(list[str], payload["capabilities"])),
+            str(payload["requested_model_id"])
+            if payload.get("requested_model_id") is not None
+            else None,
+        )
     if message_type == "input_snapshot":
         sequence = payload["client_sequence"]
         if (

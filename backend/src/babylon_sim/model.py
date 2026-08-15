@@ -40,12 +40,17 @@ class ExcavatorModel:
     pin_data: Any
     active_joints: tuple[JointDefinition, ...]
     frame_names: tuple[str, ...]
+    model_version: str = MODEL_VERSION
 
     @classmethod
-    def from_urdf(cls, urdf_path: str | Path) -> ExcavatorModel:
+    def from_urdf(
+        cls, urdf_path: str | Path, *, model_version: str = MODEL_VERSION
+    ) -> ExcavatorModel:
         path = Path(urdf_path)
         if not path.is_file():
             raise ModelValidationError(f"URDF file does not exist: {path}")
+        if not model_version:
+            raise ModelValidationError("model version must not be empty")
         try:
             root = ET.parse(path).getroot()
         except ET.ParseError as exc:
@@ -123,6 +128,7 @@ class ExcavatorModel:
             pin_data=pin_model.createData(),
             active_joints=tuple(joints[name] for name in ACTIVE_JOINT_NAMES),
             frame_names=REQUIRED_FRAME_NAMES,
+            model_version=model_version,
         )
 
     def configuration_from_angles(self, joint_angles: Iterable[float]) -> np.ndarray:
@@ -176,7 +182,7 @@ class ExcavatorModel:
             timestamp=timestamp,
             sequence_number=sequence_number,
             source=source,
-            model_version=MODEL_VERSION,
+            model_version=self.model_version,
             calibration_version=calibration_version,
             joint_position=angles,
             joint_velocity=velocities,

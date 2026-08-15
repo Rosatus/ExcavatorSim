@@ -1,0 +1,30 @@
+{
+  "schema_version": "excavator-model-catalog-v1",
+  "default_model_id": "sy205",
+  "models": [
+    {
+      "model_id": "sy205",
+      "display_name": "SANY SY205",
+      "model_version": "sy205-glb-urdf-v4",
+      "visual_model_version": "original-skin-v1",
+      "glb_path": "res://assets/visual/SY205_excavator_godot.glb",
+      "glb_sha256": "cf95534b31bcc156980afefef0a9f273e5c6f727547b3db1e9062ca5619b495a",
+      "manifest_path": "res://resources/visual/sy205_visual_manifest.json",
+      "manifest_sha256": "e307f0473de1501663d79a1e60adfb48da600270de6963b077c77d45faa08e4c",
+      "parity_fixture_path": "res://tests/fixtures/sy205_frame_parity_cases.json",
+      "parity_fixture_sha256": "873c06951ca317b6e4205b867e7c475eb924374a59b2d21dda87e65bb340d738"
+    },
+    {
+      "model_id": "sy135",
+      "display_name": "SANY SY135",
+      "model_version": "sy135-reference-urdf-v1",
+      "visual_model_version": "sy135-combined-glb-v1",
+      "glb_path": "res://assets/visual/SY135_excavator_godot.glb",
+      "glb_sha256": "8e0f478b265bb0f32f7736a0e388f5bb812b7f36c143edeb1553ff86d2d960c9",
+      "manifest_path": "res://resources/visual/sy135_visual_manifest.json",
+      "manifest_sha256": "6c3e05ea796f94909d022d64047cfe0f822ea7644f22022db95e714b166d1717",
+      "parity_fixture_path": "res://tests/fixtures/sy135_frame_parity_cases.json",
+      "parity_fixture_sha256": "0e7879b4c3e6218e352f4659bd46602f21326676a1dea64a990431cb919997b9"
+    }
+  ]
+}

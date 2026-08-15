@@ -131,6 +131,9 @@ func _test_motion_client() -> int:
 	if _check(client.get_connection_state() == MotionClient.STATE_READY, "hello_ack moves client to ready") != 0:
 		client.queue_free()
 		return 1
+	if _check(client.request_model_switch("sy205") and client.get_connection_state() == MotionClient.STATE_READY, "selecting the active model is a no-op") != 0:
+		client.queue_free()
+		return 1
 	for action in [
 		"motion_swing_positive", "motion_swing_negative",
 		"motion_boom_positive", "motion_boom_negative",
@@ -247,6 +250,24 @@ func _test_motion_client() -> int:
 		client.queue_free()
 		return 1
 	client.queue_free()
+	await process_frame
+
+	var draining_client := MotionClient.new()
+	draining_client.auto_connect = false
+	draining_client.auto_reconnect = false
+	root.add_child(draining_client)
+	await process_frame
+	var draining_transport := FakeTransport.new()
+	draining_client.set_transport_factory_for_test(func() -> FakeTransport: return draining_transport)
+	draining_client.model_changed.connect(func(_model_id: String) -> void: draining_client.disconnect_from_service())
+	draining_client.connect_to_service()
+	draining_client.process_for_test(0.01)
+	draining_transport.enqueue(_hello_ack("session-drain", "epoch-drain", "stopped"))
+	draining_client.process_for_test(0.01)
+	if _check(draining_client.get_connection_state() == MotionClient.STATE_DISCONNECTED, "packet draining tolerates a signal callback closing the transport") != 0:
+		draining_client.queue_free()
+		return 1
+	draining_client.queue_free()
 	await process_frame
 	print("Motion client transport contract passed.")
 	return 0

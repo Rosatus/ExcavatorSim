@@ -47,11 +47,12 @@ const IGNORED_SERVER_MESSAGE_TYPES := [
 const MAX_SAFE_JSON_INTEGER := 9_007_199_254_740_991
 
 
-static func hello_message() -> Dictionary:
+static func hello_message(requested_model_id: String = "sy205") -> Dictionary:
 	return {
 		"type": "hello",
 		"protocol_version": PROTOCOL_VERSION,
 		"capabilities": CAPABILITIES.duplicate(),
+		"requested_model_id": requested_model_id,
 	}
 
 
@@ -117,6 +118,7 @@ static func _normalize_hello_ack(payload: Dictionary) -> Dictionary:
 	var recording_epoch: Variant = _string_field(payload, "recording_epoch", true)
 	var model_url: Variant = _string_field(payload, "model_url", false)
 	var lifecycle: Variant = _string_field(payload, "lifecycle", false)
+	var model_id: Variant = _string_field(payload, "model_id", true)
 	if session_id == null or simulation_epoch == null or recording_epoch == null:
 		return _fail("schema_validation_failed", "hello_ack is missing an epoch or session")
 	if model_url == null or String(model_url) != "/api/model":
@@ -135,6 +137,8 @@ static func _normalize_hello_ack(payload: Dictionary) -> Dictionary:
 	normalized["recording_epoch"] = recording_epoch
 	normalized["model_url"] = model_url
 	normalized["lifecycle"] = lifecycle
+	if model_id != null:
+		normalized["model_id"] = model_id
 	normalized["versions"] = versions
 	normalized["capabilities"] = capabilities
 	return _ok("hello_ack", normalized)
@@ -315,16 +319,17 @@ static func _normalize_versions(value: Variant) -> Variant:
 	var expected := {
 		"protocol_version": PROTOCOL_VERSION,
 		"state_schema_version": STATE_SCHEMA_VERSION,
-		"model_version": MODEL_VERSION,
 		"calibration_version": CALIBRATION_VERSION,
 		"software_version": SOFTWARE_VERSION,
 		"terrain_spec_version": TERRAIN_SPEC_VERSION,
 		"terrain_algorithm_version": TERRAIN_ALGORITHM_VERSION,
-		"visual_model_version": VISUAL_MODEL_VERSION,
 	}
 	var versions: Dictionary = value
 	for key in expected:
 		if versions.get(key) != expected[key]:
+			return null
+	for key in ["model_version", "visual_model_version"]:
+		if not versions.has(key) or not versions[key] is String or String(versions[key]).is_empty():
 			return null
 	return versions.duplicate(true)
 

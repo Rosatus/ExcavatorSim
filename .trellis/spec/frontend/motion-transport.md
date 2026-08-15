@@ -196,3 +196,19 @@ For each child, compute `R0 = parent_zero^-1 * child_zero`,
 `Delta = R0^-1 * Rq` to the imported local basis while preserving the local
 origin. Reject non-rigid, non-finite, origin-drifting or materially non-axis
 authority relations and retain the last valid local pose with a diagnostic.
+
+## 10. Model activation and fail-closed switching
+
+`MotionClient` sends `hello.requested_model_id` and remains not-ready until
+the server's `hello_ack.model_id` equals the requested ID and its descriptor
+versions pass the normal compatibility checks. A model change is a fresh
+transport/session boundary: clear accepted poses, pending commands, input
+generation, bucket-tooth history, particles, and camera target caches before
+reconnecting. Preserve the logical local `TerrainState` heightfield.
+
+`MotionPresentation` loads the selected catalog entry and validates its GLB,
+manifest, parity fixture, frame parents, local origins/scales, and contact
+contract before removing the previous visual. If validation or loading fails,
+hide both candidate and previous visuals, clear the active frame/pose state,
+and expose a contract error. Never leave the previous model visible as an
+implicit cross-model fallback.

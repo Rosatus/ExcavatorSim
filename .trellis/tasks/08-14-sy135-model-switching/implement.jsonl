@@ -1,0 +1,8 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/backend/authority-and-concurrency.md", "reason": "Fresh model sessions must preserve fixed-rate single-writer lifecycle and close every worker."}
+{"file": ".trellis/spec/backend/runtime-profiles.md", "reason": "Model session construction must preserve legacy versus motion-only optional worker composition."}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Selection and asset failures require typed stable boundary errors without partial mutation."}
+{"file": ".trellis/spec/frontend/client-boundary.md", "reason": "Dynamic visuals and excavation proxies remain derived from Python motion and Godot terrain authorities."}
+{"file": ".trellis/spec/frontend/motion-transport.md", "reason": "Reconnect, strict version validation, single coordinate conversion, and local pivot rules own the client change."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "One selected model identity crosses assets, backend, wire protocol, Godot, replay, and UI."}
+{"file": ".trellis/tasks/08-14-sy135-model-switching/research/evidence.md", "reason": "Task-specific GLB, URDF, lifecycle, and hard-coded single-model evidence."}

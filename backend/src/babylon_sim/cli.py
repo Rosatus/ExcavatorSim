@@ -13,10 +13,8 @@ from pathlib import Path
 
 from aiohttp import web
 
-from .calibration import MachineCalibration
-from .model import ExcavatorModel
-from .paths import CALIBRATION_PATH, FRONTEND_DIST_PATH, URDF_PATH
-from .runtime import RuntimeController
+from .paths import FRONTEND_DIST_PATH
+from .session_manager import RuntimeSessionManager, SessionSelectionError
 from .web import create_app
 
 
@@ -38,6 +36,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument("--frontend-dir", type=Path, default=FRONTEND_DIST_PATH)
+    parser.add_argument(
+        "--model",
+        default="sy205",
+        help="model registry ID to run (default: sy205)",
+    )
     parser.add_argument(
         "--runtime-profile",
         choices=("legacy", "motion-only"),
@@ -73,10 +76,11 @@ def main() -> int:
     frontend_dir = args.frontend_dir.resolve()
     if not (frontend_dir / "index.html").is_file():
         raise SystemExit("frontend build is missing; run 'pixi run build' first")
-    model = ExcavatorModel.from_urdf(URDF_PATH)
-    calibration = MachineCalibration.from_json(CALIBRATION_PATH)
-    runtime = RuntimeController(model, calibration, profile=args.runtime_profile)
-    application = create_app(runtime, frontend_dir=frontend_dir)
+    try:
+        manager = RuntimeSessionManager(model_id=args.model, profile=args.runtime_profile)
+    except SessionSelectionError as exc:
+        raise SystemExit(f"{exc.code}: {exc}") from exc
+    application = create_app(manager, frontend_dir=frontend_dir)
     url = _application_url(args.host, args.port)
     if not args.no_browser:
         opener = threading.Thread(

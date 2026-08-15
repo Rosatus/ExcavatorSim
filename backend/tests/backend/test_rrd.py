@@ -84,12 +84,22 @@ def test_corrupt_rrd_is_rejected(tmp_path: Path) -> None:
         import_rrd(path)
 
 
+def test_cross_model_rrd_is_rejected(tmp_path: Path) -> None:
+    output = tmp_path / "sy135-recording.rrd"
+    export_rrd(
+        _recording().snapshot(),
+        output,
+        calibration_version="m1-provisional-2",
+        source_mode=SourceMode.LIVE,
+        model_version="sy135-reference-urdf-v1",
+    )
+    with pytest.raises(RrdProfileError, match="model_version"):
+        import_rrd(output, expected_model_version="sy205-glb-urdf-v4")
+
+
 def test_motion_only_protocol_v2_rrd_remains_importable() -> None:
     fixture = (
-        Path(__file__).resolve().parents[1]
-        / "fixtures"
-        / "rrd"
-        / "motion-only-protocol-v2.rrd"
+        Path(__file__).resolve().parents[1] / "fixtures" / "rrd" / "motion-only-protocol-v2.rrd"
     )
     imported = import_rrd(fixture)
 

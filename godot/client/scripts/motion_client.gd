@@ -8,6 +8,7 @@ signal pose_cleared(generation: int, reason: String)
 signal input_acknowledged(ack: Dictionary)
 signal command_acknowledged(ack: Dictionary)
 signal diagnostics_changed(diagnostics: Dictionary)
+signal model_changed(model_id: String)
 
 const STATE_DISCONNECTED := "disconnected"
 const STATE_CONNECTING := "connecting"
@@ -37,6 +38,7 @@ const COMMAND_ACTIONS := {"motion_start": KEY_F6, "motion_pause": KEY_F7, "motio
 @export var auto_connect := true
 @export var auto_reconnect := true
 @export var interpolation_enabled := false
+@export var desired_model_id := "sy205"
 
 var connection_state := STATE_DISCONNECTED
 var session_id := ""
@@ -44,6 +46,7 @@ var simulation_epoch := ""
 var recording_epoch := ""
 var lifecycle := "stopped"
 var capabilities: Array[String] = []
+var active_model_id := ""
 var last_error: Dictionary = {}
 var last_input_ack: Dictionary = {}
 var confirmed_lifecycle := "stopped"
@@ -116,6 +119,28 @@ func connect_to_service() -> void:
 	if connection_state == STATE_CONNECTING or connection_state == STATE_AWAITING_HELLO_ACK:
 		return
 	_begin_connection()
+
+
+func request_model_switch(model_id: String) -> bool:
+	if model_id.is_empty():
+		_set_error("unknown_model", "model ID must not be empty", true)
+		return false
+	if model_id == desired_model_id and active_model_id == model_id and (
+		connection_state == STATE_READY or connection_state == STATE_STALE
+	):
+		return true
+	desired_model_id = model_id
+	if connection_state != STATE_DISCONNECTED:
+		auto_reconnect = true
+		_close_transport()
+		_handle_disconnected(true)
+	else:
+		connect_to_service()
+	return true
+
+
+func get_desired_model_id() -> String:
+	return desired_model_id
 
 
 func disconnect_from_service() -> void:
@@ -247,6 +272,8 @@ func get_status_snapshot() -> Dictionary:
 		"generation": _generation,
 		"lifecycle": confirmed_lifecycle,
 		"capabilities": capabilities.duplicate(),
+		"desired_model_id": desired_model_id,
+		"active_model_id": active_model_id,
 		"last_input_ack": last_input_ack.duplicate(true),
 		"last_error": last_error.duplicate(true),
 		"pending_commands": _pending_commands.size(),
@@ -342,7 +369,7 @@ func _on_transport_open() -> void:
 		return
 	_hello_sent = true
 	_hello_elapsed = 0.0
-	if not _send_payload(MotionProtocol.hello_message()):
+	if not _send_payload(MotionProtocol.hello_message(desired_model_id)):
 		_close_transport()
 		_handle_disconnected(true)
 		return
@@ -350,11 +377,12 @@ func _on_transport_open() -> void:
 
 
 func _drain_packets() -> void:
-	if not _transport.has_method("get_available_packet_count"):
+	var transport: Variant = _transport
+	if transport == null or not transport.has_method("get_available_packet_count"):
 		return
-	while int(_transport.get_available_packet_count()) > 0:
-		var packet: Variant = _transport.get_packet()
-		if _transport.has_method("was_string_packet") and not _transport.was_string_packet():
+	while _transport == transport and int(transport.get_available_packet_count()) > 0:
+		var packet: Variant = transport.get_packet()
+		if transport.has_method("was_string_packet") and not transport.was_string_packet():
 			_set_error("binary_not_supported", "binary WebSocket messages are ignored", true)
 			continue
 		var raw: String = packet.get_string_from_utf8() if packet is PackedByteArray else String(packet)
@@ -399,6 +427,12 @@ func _accept_hello_ack(payload: Dictionary) -> void:
 		_set_error("duplicate_hello_ack", "hello_ack may only be accepted once per socket", true)
 		return
 	var negotiated_capabilities: Array = payload.get("capabilities", [])
+	var negotiated_model_id := String(payload.get("model_id", desired_model_id))
+	if negotiated_model_id != desired_model_id:
+		_set_error("model_contract_mismatch", "server selected an unexpected model", false)
+		_set_connection_state(STATE_FAULT)
+		return
+	active_model_id = negotiated_model_id
 	for required_capability in MotionProtocol.CAPABILITIES:
 		if not negotiated_capabilities.has(required_capability):
 			_set_error("capability_unavailable", "server does not support required motion capability", false)
@@ -423,6 +457,7 @@ func _accept_hello_ack(payload: Dictionary) -> void:
 	_retry_delay = RECONNECT_INITIAL_SECONDS
 	_retry_elapsed = 0.0
 	_set_connection_state(STATE_READY)
+	model_changed.emit(active_model_id)
 	authority_changed.emit(session_id, simulation_epoch, _generation)
 	pose_cleared.emit(_generation, "hello_ack")
 	_send_input(Vector4.ZERO, true, true)

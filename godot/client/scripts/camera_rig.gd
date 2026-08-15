@@ -2,6 +2,7 @@ class_name CameraRig
 extends Camera3D
 
 @export var target_path := NodePath("../PresentationRoot/SY205Excavator/CTRL_EXCAVATOR_ROOT")
+@export var motion_presentation_path := NodePath("../MotionPresentation")
 @export var distance_m := 12.0
 @export var min_distance_m := 6.0
 @export var max_distance_m := 24.0
@@ -16,6 +17,11 @@ var _dragging := false
 
 func _ready() -> void:
 	_target = get_node_or_null(target_path) as Node3D
+	var presentation := get_node_or_null(motion_presentation_path) as MotionPresentation
+	if presentation != null:
+		presentation.model_activated.connect(_on_model_activated)
+		if presentation.get_frame_node("base_link") != null:
+			_target = presentation.get_frame_node("base_link")
 	_apply_transform()
 
 
@@ -46,7 +52,14 @@ func set_quality_distance_for_test(max_distance: float) -> void:
 
 
 func _apply_transform() -> void:
+	if _target == null:
+		return
 	var focus := _target.global_position + Vector3.UP * focus_height_m
 	var horizontal := cos(_pitch) * distance_m
 	global_position = focus + Vector3(sin(_yaw) * horizontal, sin(_pitch) * distance_m, cos(_yaw) * horizontal)
 	look_at(focus, Vector3.UP)
+
+
+func _on_model_activated(_model_id: String, _asset_root: Node3D) -> void:
+	var presentation := get_node_or_null(motion_presentation_path) as MotionPresentation
+	_target = presentation.get_frame_node("base_link") if presentation != null else null

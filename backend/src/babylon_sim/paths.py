@@ -7,6 +7,8 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 ASSETS_ROOT = PROJECT_ROOT / "assets"
 URDF_PATH = ASSETS_ROOT / "model" / "kinematic_excavator.urdf"
+MODEL_REGISTRY_PATH = ASSETS_ROOT / "model" / "model-registry-v1.json"
+MODEL_REGISTRY_SCHEMA_PATH = ASSETS_ROOT / "model" / "model-registry-v1.schema.json"
 CALIBRATION_PATH = ASSETS_ROOT / "calibration" / "m1_provisional_calibration.json"
 VISUAL_ASSETS_ROOT = ASSETS_ROOT / "visual" / "original"
 VISUAL_MODEL_MANIFEST_PATH = VISUAL_ASSETS_ROOT / "visual-model-v1.json"

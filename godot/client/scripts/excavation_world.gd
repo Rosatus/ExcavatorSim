@@ -145,6 +145,9 @@ func _bucket_tooth_world() -> Variant:
 	var presentation := get_node_or_null(motion_presentation_path) as MotionPresentation
 	if presentation == null:
 		return null
+	var contract_contact: Variant = presentation.get_bucket_contact_world()
+	if contract_contact != null:
+		return contract_contact
 	var bucket_frame := presentation.get_frame_node("bucket_link")
 	if bucket_frame == null:
 		return null

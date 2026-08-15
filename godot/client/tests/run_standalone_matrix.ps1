@@ -10,6 +10,7 @@ $tests = @(
     "foundation_scene_test.gd",
     "sy205_glb_test.gd",
     "motion_client_test.gd",
+    "model_switch_test.gd",
     "construction_site_terrain_test.gd",
     "terrain3d_adapter_test.gd",
     "terrain_state_test.gd",

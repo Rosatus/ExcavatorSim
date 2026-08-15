@@ -53,12 +53,12 @@
       "properties": {
         "protocol_version": { "$ref": "#/$defs/ProtocolVersion" },
         "state_schema_version": { "type": "string", "const": "godot-pinocchio-state-v2" },
-        "model_version": { "type": "string", "const": "sy205-glb-urdf-v4" },
+        "model_version": { "type": "string", "minLength": 1 },
         "calibration_version": { "type": "string", "const": "machine-calibration-v2" },
         "software_version": { "type": "string", "const": "0.1.0" },
         "terrain_spec_version": { "type": "string", "const": "terrain-spec-v1" },
         "terrain_algorithm_version": { "type": "string", "const": "terrain-algorithm-v2" },
-        "visual_model_version": { "type": "string", "const": "original-skin-v1" }
+        "visual_model_version": { "type": "string", "minLength": 1 }
       }
     },
     "AxisVector": {
@@ -96,7 +96,8 @@
           "type": "array",
           "uniqueItems": true,
           "items": { "type": "string", "enum": ["input_snapshot", "commands", "latency", "playback", "recording", "terrain"] }
-        }
+        },
+        "requested_model_id": { "type": ["string", "null"], "minLength": 1 }
       }
     },
     "InputSnapshot": {
@@ -175,12 +176,13 @@
     "HelloAck": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "session_id", "simulation_epoch", "recording_epoch", "versions", "model_url", "lifecycle", "capabilities"],
+      "required": ["type", "session_id", "simulation_epoch", "recording_epoch", "model_id", "versions", "model_url", "lifecycle", "capabilities"],
       "properties": {
         "type": { "const": "hello_ack" },
         "session_id": { "type": "string", "minLength": 1 },
         "simulation_epoch": { "type": "string", "minLength": 1 },
         "recording_epoch": { "type": "string", "minLength": 1 },
+        "model_id": { "type": "string", "minLength": 1 },
         "versions": { "$ref": "#/$defs/VersionManifest" },
         "model_url": { "type": "string", "const": "/api/model" },
         "lifecycle": { "$ref": "#/$defs/Lifecycle" },

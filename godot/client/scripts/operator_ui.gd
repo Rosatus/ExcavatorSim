@@ -6,6 +6,7 @@ extends CanvasLayer
 
 var _motion_client: MotionClient
 var _excavation_world: ExcavationWorld
+var _model_selector: OptionButton
 @onready var _connection_label: Label = $StatusPanel/Margin/VBox/Connection
 @onready var _authority_label: Label = $StatusPanel/Margin/VBox/Authority
 @onready var _lifecycle_label: Label = $StatusPanel/Margin/VBox/Lifecycle
@@ -21,6 +22,17 @@ var _excavation_world: ExcavationWorld
 func _ready() -> void:
 	_motion_client = get_node_or_null(motion_client_path) as MotionClient
 	_excavation_world = get_node_or_null(excavation_world_path) as ExcavationWorld
+	_model_selector = get_node_or_null("StatusPanel/Margin/VBox/ModelSelector") as OptionButton
+	if _model_selector == null:
+		_model_selector = OptionButton.new()
+		_model_selector.name = "ModelSelector"
+		_model_selector.tooltip_text = "Select the excavator model for a fresh session"
+		$StatusPanel/Margin/VBox.add_child(_model_selector)
+	_model_selector.add_item("SANY SY205", 0)
+	_model_selector.set_item_metadata(0, "sy205")
+	_model_selector.add_item("SANY SY135", 1)
+	_model_selector.set_item_metadata(1, "sy135")
+	_model_selector.item_selected.connect(_on_model_selected)
 	_start_button.pressed.connect(_on_start_pressed)
 	_pause_button.pressed.connect(_on_pause_pressed)
 	_reset_button.pressed.connect(_on_reset_pressed)
@@ -38,6 +50,7 @@ func _ready() -> void:
 	_motion_client.input_acknowledged.connect(_on_input_acknowledged)
 	_motion_client.command_acknowledged.connect(_on_command_acknowledged)
 	_refresh()
+	_refresh_model_selector()
 
 
 func _on_start_pressed() -> void:
@@ -97,6 +110,23 @@ func _on_command_acknowledged(_ack: Dictionary) -> void:
 	_refresh()
 
 
+func _on_model_selected(index: int) -> void:
+	if _motion_client == null or _model_selector == null:
+		return
+	var model_id := String(_model_selector.get_item_metadata(index))
+	_motion_client.request_model_switch(model_id)
+
+
+func _refresh_model_selector() -> void:
+	if _model_selector == null or _motion_client == null:
+		return
+	var selected := _motion_client.active_model_id if not _motion_client.active_model_id.is_empty() else _motion_client.desired_model_id
+	for index in range(_model_selector.item_count):
+		if String(_model_selector.get_item_metadata(index)) == selected:
+			_model_selector.select(index)
+			return
+
+
 func _on_excavation_changed(_status: Dictionary) -> void:
 	_refresh_bucket_volume()
 
@@ -125,6 +155,7 @@ func _refresh() -> void:
 		diagnostics += "   Error: %s" % String(last_error.get("code", "unknown"))
 	_diagnostics_label.text = diagnostics
 	_refresh_bucket_volume()
+	_refresh_model_selector()
 
 
 func _refresh_bucket_volume() -> void:

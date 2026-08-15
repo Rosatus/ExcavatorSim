@@ -1,0 +1,7 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Defines deterministic cross-layer tests, provenance, and full verification gates."}
+{"file": ".trellis/spec/backend/authority-and-concurrency.md", "reason": "Verify no runtime or legacy worker survives model-session replacement."}
+{"file": ".trellis/spec/frontend/client-boundary.md", "reason": "Verify model switching does not alter terrain, bucket, physics, or presentation authority boundaries."}
+{"file": ".trellis/spec/frontend/motion-transport.md", "reason": "Verify reconnect clearing, model identity, pivot parity, coordinate conversion, and contact proxy behavior."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Audit every producer and consumer of the selected model contract."}
+{"file": ".trellis/tasks/08-14-sy135-model-switching/research/evidence.md", "reason": "Check every observed/declared/validated/decision boundary and deferred import gate."}

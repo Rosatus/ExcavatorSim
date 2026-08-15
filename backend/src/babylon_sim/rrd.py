@@ -45,6 +45,7 @@ class ImportedRecording:
     profile: str
     source_mode: SourceMode
     calibration_version: str
+    model_version: str
 
     @property
     def sample_count(self) -> int:
@@ -89,6 +90,7 @@ def export_rrd(
     *,
     calibration_version: str,
     source_mode: SourceMode,
+    model_version: str | None = None,
 ) -> None:
     if snapshot.sample_count == 0:
         raise RrdProfileError("cannot export an empty recording")
@@ -98,7 +100,7 @@ def export_rrd(
         "profile": RRD_PROFILE,
         "protocol_version": manifest.protocol_version,
         "state_schema_version": manifest.state_schema_version,
-        "model_version": manifest.model_version,
+        "model_version": model_version or manifest.model_version,
         "calibration_schema_version": manifest.calibration_version,
         "calibration_version": calibration_version,
         "software_version": manifest.software_version,
@@ -176,7 +178,7 @@ def export_rrd(
         )
 
 
-def import_rrd(path: Path) -> ImportedRecording:
+def import_rrd(path: Path, *, expected_model_version: str | None = None) -> ImportedRecording:
     try:
         reader = RrdReader(path)
         stores = reader.recordings()
@@ -210,7 +212,9 @@ def import_rrd(path: Path) -> ImportedRecording:
         raise RrdProfileError("RRD static/temporal entity profile is invalid")
 
     metadata = _read_metadata(batches[METADATA_ENTITY])
-    source_mode, calibration_version = _validate_metadata(metadata)
+    source_mode, calibration_version = _validate_metadata(
+        metadata, expected_model_version=expected_model_version
+    )
     times, sequences, simulation_time = _read_scalars(
         batches[SIMULATION_TIME_ENTITY], SIMULATION_TIME_ENTITY
     )
@@ -286,7 +290,13 @@ def import_rrd(path: Path) -> ImportedRecording:
         events=events,
     )
     _validate_materialized_profile(data, metadata)
-    return ImportedRecording(data, RRD_PROFILE, source_mode, calibration_version)
+    return ImportedRecording(
+        data,
+        RRD_PROFILE,
+        source_mode,
+        calibration_version,
+        metadata["model_version"],
+    )
 
 
 def _indexes(data: MaterializedRecording) -> list[Any]:
@@ -373,12 +383,14 @@ def _read_metadata(batches: list[pa.RecordBatch]) -> dict[str, str]:
     return result
 
 
-def _validate_metadata(metadata: dict[str, str]) -> tuple[SourceMode, str]:
+def _validate_metadata(
+    metadata: dict[str, str], *, expected_model_version: str | None = None
+) -> tuple[SourceMode, str]:
     manifest = load_version_manifest()
     expected = {
         "profile": RRD_PROFILE,
         "state_schema_version": manifest.state_schema_version,
-        "model_version": manifest.model_version,
+        "model_version": expected_model_version or manifest.model_version,
         "calibration_schema_version": manifest.calibration_version,
         "software_version": manifest.software_version,
         "rerun_sdk_version": RRD_SDK_VERSION,

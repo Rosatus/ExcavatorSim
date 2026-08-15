@@ -28,11 +28,13 @@ def test_manifest_matches_schema_and_hello_decodes() -> None:
                 "type": "hello",
                 "protocol_version": manifest.protocol_version,
                 "capabilities": ["input_snapshot", "commands", "latency"],
+                "requested_model_id": "sy135",
             }
         )
     )
     assert isinstance(message, HelloMessage)
     assert message.capabilities == ("input_snapshot", "commands", "latency")
+    assert message.requested_model_id == "sy135"
 
 
 def test_legacy_babylon_protocol_identifier_is_rejected() -> None:
@@ -87,6 +89,8 @@ def test_terrain_http_and_spec_schemas_are_valid_and_linked() -> None:
             },
         }
     )
+
+
 def test_input_and_command_decode_to_typed_messages() -> None:
     input_message = decode_client_message(
         json.dumps(

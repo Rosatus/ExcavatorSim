@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import time
 import uuid
 from collections import deque
@@ -42,6 +43,7 @@ from .replay import AuthoritativeViewState, PlaybackApplied, ReplayCommandError
 from .replay_contract import RECORDING_UPLOAD_MAX_BYTES
 from .runtime import CommandResult, RuntimeCommandError, RuntimeController
 from .series import SeriesQueryError, project_series
+from .session_manager import ModelSelectionError, RuntimeSessionManager
 from .terrain import TerrainSpecError, terrain_snapshot_bytes
 from .terrain_controller import TerrainCommandError
 from .visual_assets import VisualModelManifest, load_visual_model_manifest
@@ -56,7 +58,7 @@ MAX_PROTOCOL_VIOLATIONS = 3
 # A sender still emits only new ReplayWorker revisions, capped by DISPLAY_HZ.
 VIEW_POLL_HZ = 200
 
-RUNTIME_KEY = web.AppKey("runtime", RuntimeController)
+RUNTIME_KEY = web.AppKey("runtime", RuntimeSessionManager)
 FRONTEND_DIR_KEY = web.AppKey("frontend_dir", Path)
 MODEL_PATH_KEY = web.AppKey("model_path", Path)
 VISUAL_MODEL_KEY = web.AppKey("visual_model", VisualModelManifest)
@@ -90,7 +92,17 @@ class SlidingWindowRateLimiter:
         return True
 
 
-def _state_message(view: AuthoritativeViewState, emitted_sequence: int) -> dict[str, object]:
+def _state_message(
+    view: AuthoritativeViewState,
+    emitted_sequence: int,
+    runtime: RuntimeSessionManager | RuntimeController,
+) -> dict[str, object]:
+    model_version = runtime.model_version
+    visual_model_version = runtime.visual_model_version
+    versions = load_version_manifest().for_model(
+        model_version=model_version,
+        visual_model_version=visual_model_version,
+    )
     return {
         "type": "view_state",
         "emitted_sequence": emitted_sequence,
@@ -108,7 +120,7 @@ def _state_message(view: AuthoritativeViewState, emitted_sequence: int) -> dict[
         "selected_sample_sequence": view.selected_sample_sequence,
         "simulation_time_s": view.simulation_time_s,
         "lifecycle": view.lifecycle,
-        "versions": load_version_manifest().as_dict(),
+        "versions": versions.as_dict(),
         "joint_names": list(ACTIVE_JOINT_NAMES),
         "joint_position": list(view.joint_position),
         "joint_velocity": list(view.joint_velocity),
@@ -216,7 +228,7 @@ async def _send_playback_result(
 
 
 def create_app(
-    runtime: RuntimeController,
+    runtime: RuntimeController | RuntimeSessionManager,
     *,
     frontend_dir: Path = FRONTEND_DIST_PATH,
     model_path: Path = URDF_PATH,
@@ -226,8 +238,11 @@ def create_app(
     allowed_origins: Iterable[str] = (),
     allow_missing_origin: bool = False,
 ) -> web.Application:
+    manager = (
+        runtime if isinstance(runtime, RuntimeSessionManager) else RuntimeSessionManager(runtime)
+    )
     app = web.Application(client_max_size=RECORDING_UPLOAD_MAX_BYTES)
-    app[RUNTIME_KEY] = runtime
+    app[RUNTIME_KEY] = manager
     app[FRONTEND_DIR_KEY] = frontend_dir.resolve()
     app[MODEL_PATH_KEY] = model_path.resolve()
     app[VISUAL_MODEL_KEY] = load_visual_model_manifest(
@@ -266,7 +281,9 @@ def create_app(
     return app
 
 
-def _require_capability(runtime: RuntimeController, capability: str) -> None:
+def _require_capability(
+    runtime: RuntimeController | RuntimeSessionManager, capability: str
+) -> None:
     if capability not in runtime.capabilities:
         raise web.HTTPConflict(
             text=f"capability_unavailable: {capability} is not available",
@@ -275,30 +292,63 @@ def _require_capability(runtime: RuntimeController, capability: str) -> None:
 
 
 async def _health(request: web.Request) -> web.Response:
-    runtime = request.app[RUNTIME_KEY]
+    manager = request.app[RUNTIME_KEY]
+    runtime = manager.runtime
     snapshot = runtime.latest.read()
+    versions = load_version_manifest().for_model(
+        model_version=manager.model_version,
+        visual_model_version=manager.visual_model_version,
+    )
     return web.json_response(
         {
             "status": "ok" if runtime.is_running() else "starting",
             "lifecycle": snapshot.lifecycle,
             "stream_epoch": snapshot.stream_epoch,
-            "versions": load_version_manifest().as_dict(),
+            "model_id": manager.model_id,
+            "versions": versions.as_dict(),
         }
     )
 
 
 async def _model(request: web.Request) -> web.StreamResponse:
-    model_path = request.app[MODEL_PATH_KEY]
+    model_path = request.app[RUNTIME_KEY].descriptor.urdf_path
     if not model_path.is_file():
         raise web.HTTPServiceUnavailable(text="vendored model is unavailable")
     return web.FileResponse(model_path, headers={"Content-Type": "application/xml; charset=utf-8"})
 
 
 async def _visual_model(request: web.Request) -> web.Response:
-    return web.json_response(request.app[VISUAL_MODEL_KEY].as_public_dict())
+    manager = request.app[RUNTIME_KEY]
+    if manager.model_id == manager.registry.default_model_id:
+        payload = request.app[VISUAL_MODEL_KEY].as_public_dict()
+    else:
+        # The combined SY135 contract has a different manifest shape from the
+        # legacy segmented SY205 visual-assets manifest.  Never relabel the
+        # latter with SY135 versions; expose the selected manifest as-is.
+        try:
+            raw = json.loads(manager.descriptor.visual_manifest_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise web.HTTPServiceUnavailable(text="selected visual model is unavailable") from exc
+        if not isinstance(raw, dict):
+            raise web.HTTPServiceUnavailable(text="selected visual model contract is invalid")
+        payload = raw
+    payload.update(
+        {
+            "model_id": manager.model_id,
+            "model_version": manager.model_version,
+            "selected_visual_model_version": manager.visual_model_version,
+        }
+    )
+    return web.json_response(payload)
 
 
 async def _visual_asset(request: web.Request) -> web.StreamResponse:
+    manager = request.app[RUNTIME_KEY]
+    if manager.model_id != manager.registry.default_model_id:
+        raise web.HTTPConflict(
+            text="model_contract_mismatch: selected model has no segmented visual assets",
+            content_type="application/problem+json",
+        )
     result = request.app[VISUAL_MODEL_KEY].asset(request.match_info["asset_id"])
     if result is None:
         raise web.HTTPNotFound(text="unknown visual asset")
@@ -601,7 +651,8 @@ def _origin_allowed(request: web.Request) -> bool:
 async def _websocket(request: web.Request) -> web.StreamResponse:
     if not _origin_allowed(request):
         raise web.HTTPForbidden(text="WebSocket origin is not allowed")
-    runtime = request.app[RUNTIME_KEY]
+    manager = request.app[RUNTIME_KEY]
+    runtime: RuntimeController | None = None
     session_id = uuid.uuid4().hex
     ws = web.WebSocketResponse(max_msg_size=64 * 1024, heartbeat=10.0, autoping=True)
     await ws.prepare(request)
@@ -646,13 +697,34 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
             raise ProtocolError(
                 "hello_required", "first WebSocket message must be hello", recoverable=False
             )
+        try:
+
+            def session_is_closed() -> bool:
+                transport = request.transport
+                return ws.closed or transport is None or transport.is_closing()
+
+            runtime = manager.acquire(
+                session_id,
+                hello.requested_model_id,
+                session_is_closed=session_is_closed,
+            )
+        except ModelSelectionError as exc:
+            await send(error_message(ProtocolError(exc.code, str(exc), recoverable=False)))
+            await ws.close(code=1008, message=exc.code.encode("ascii", "replace"))
+            return ws
+        assert runtime is not None
+        versions = load_version_manifest().for_model(
+            model_version=manager.model_version,
+            visual_model_version=manager.visual_model_version,
+        )
         await send(
             {
                 "type": "hello_ack",
                 "session_id": session_id,
+                "model_id": manager.model_id,
                 "simulation_epoch": runtime.latest.read().stream_epoch,
                 "recording_epoch": runtime.recording_epoch,
-                "versions": load_version_manifest().as_dict(),
+                "versions": versions.as_dict(),
                 "model_url": "/api/model",
                 "lifecycle": runtime.latest.read().lifecycle,
                 "capabilities": sorted(set(hello.capabilities) & runtime.capabilities),
@@ -768,7 +840,11 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
                                 # A stopped runtime may not publish another replay revision. Emit
                                 # the exact state/terrain pair used as the mutation boundary so the
                                 # client can accept the new terrain view immediately.
-                                await send(_state_message(current_view, current_view.view_revision))
+                                await send(
+                                    _state_message(
+                                        current_view, current_view.view_revision, manager
+                                    )
+                                )
                                 await send(
                                     runtime.terrain.view_for(
                                         current_view.recording_epoch,
@@ -777,9 +853,7 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
                                     ).as_message()
                                 )
                         except TerrainCommandError as exc:
-                            raise ProtocolError(
-                                exc.code, str(exc), request_id=message.id
-                            ) from exc
+                            raise ProtocolError(exc.code, str(exc), request_id=message.id) from exc
                     elif isinstance(message, PingMessage):
                         await send(
                             {
@@ -833,9 +907,11 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
         )
         if close_tasks:
             await asyncio.gather(*close_tasks, return_exceptions=True)
-        runtime.disconnect_client(session_id)
-        if runtime.exchange is not None:
-            runtime.exchange.cancel_session(session_id)
+        if runtime is not None:
+            runtime.disconnect_client(session_id)
+            if runtime.exchange is not None:
+                runtime.exchange.cancel_session(session_id)
+        manager.release(session_id)
     return ws
 
 
@@ -889,7 +965,7 @@ async def _state_sender(
                 continue
             view_revision = view.view_revision
             if "terrain" not in runtime.capabilities:
-                await send(_state_message(view, emitted))
+                await send(_state_message(view, emitted, runtime))
                 emitted += 1
                 continue
             assert runtime.terrain is not None
@@ -898,7 +974,7 @@ async def _state_sender(
                 view.selected_sample_sequence,
                 view.source_mode,
             )
-            await send(_state_message(view, emitted))
+            await send(_state_message(view, emitted, runtime))
             await send(terrain_view.as_message())
             patch = runtime.terrain.patch_for(
                 terrain_view.terrain_epoch, terrain_view.terrain_revision
@@ -907,9 +983,7 @@ async def _state_sender(
                 patch is not None
                 and patch.selected_sample_sequence <= view.selected_sample_sequence
             ):
-                await send(
-                    patch.as_message(view.recording_epoch, terrain_view.terrain_epoch)
-                )
+                await send(patch.as_message(view.recording_epoch, terrain_view.terrain_epoch))
         emitted += 1
 
 

@@ -43,6 +43,17 @@
       "locally_modified": false
     }
   ],
+  "user_supplied_assets": [
+    {
+      "source_path": "E:/projects/blender/Excavator/SY135/export/godot/SY135_excavator_godot.glb",
+      "destination_path": "godot/client/assets/visual/SY135_excavator_godot.glb",
+      "byte_size": 5613436,
+      "sha256": "8e0f478b265bb0f32f7736a0e388f5bb812b7f36c143edeb1553ff86d2d960c9",
+      "hash_mode": "raw",
+      "relationship": "user-supplied-articulated-visual-model",
+      "imported_at": "2026-08-14"
+    }
+  ],
   "generated_assets": [
     {
       "destination_path": "assets/model/kinematic_excavator.urdf",
@@ -80,10 +91,10 @@
     },
     {
       "destination_path": "backend/tests/fixtures/frame-parity/baseline.json",
-      "destination_sha256": "49c66a79f3e7a335ad68fe16b125e1522c61f6633f1d217d9ce17fc80f4965de",
+      "destination_sha256": "28513ddf1b71408c3191a49ce14c83694befb2f2252a38c106e81b9f20c29af5",
       "generator": {
         "path": "backend/src/babylon_sim/model.py",
-        "sha256": "2592487b6fd1019a0b144d0d12ece3d5cc3e5b2f905f54b0be484e5c07679eb1"
+        "sha256": "e6b71dd96e60c1deda7d78e4a126123cfec236e259dc6cf505ab7fa50940b911"
       },
       "inputs": [
         {
@@ -98,6 +109,31 @@
       "license": "AGPL-3.0-only",
       "generated_at": "2026-08-11",
       "relationship": "active-model-frame-parity-fixture"
+    },
+    {
+      "destination_path": "godot/client/tests/fixtures/sy135_frame_parity_cases.json",
+      "destination_sha256": "0e7879b4c3e6218e352f4659bd46602f21326676a1dea64a990431cb919997b9",
+      "generator": {
+        "path": "backend/scripts/generate_frame_parity_fixture.py",
+        "sha256": "14558c303d3f1a0f4b73334fd1f8eb4c0ebb7fa93202fd9aaf6de75467ae1059"
+      },
+      "inputs": [
+        {
+          "path": "assets/model/library/sy135_reference.urdf",
+          "sha256": "2f32a9f635f6fb1b43da9fb624612ade5b7a7b7d2d84f5eed401ffb414afc485"
+        },
+        {
+          "path": "backend/src/babylon_sim/model.py",
+          "sha256": "e6b71dd96e60c1deda7d78e4a126123cfec236e259dc6cf505ab7fa50940b911"
+        },
+        {
+          "path": "pixi.lock",
+          "sha256": "b9b2ac7f544150626b7d63f04cd6643a0276f2f563b055dad0e3d0821e8610b8"
+        }
+      ],
+      "license": "project-owned-source-assets",
+      "generated_at": "2026-08-14",
+      "relationship": "sy135-model-frame-parity-fixture"
     }
   ],
   "conceptual_derivations": [
@@ -153,7 +189,7 @@
         "symbols": [{ "name": "ExcavatorModel", "lines": "33-262" }]
       }],
       "destination_path": "src/babylon_sim/model.py",
-      "destination_sha256": "2592487b6fd1019a0b144d0d12ece3d5cc3e5b2f905f54b0be484e5c07679eb1",
+      "destination_sha256": "e6b71dd96e60c1deda7d78e4a126123cfec236e259dc6cf505ab7fa50940b911",
       "destination_symbols": [{ "name": "ExcavatorModel", "lines": "19-186" }],
       "license": "AGPL-3.0-only",
       "modified_at": "2026-07-29",
@@ -236,7 +272,7 @@
         "symbols": [{ "name": "StateContractTests", "lines": "8-48" }]
       }],
       "destination_path": "tests/backend/test_state.py",
-      "destination_sha256": "e56205840558a41d3aaf154dcd0bdea2ae564bdc83a03ef5dac8b656e2610108",
+      "destination_sha256": "802e57a4f7c5f4f6b63bb6589aa9104e828bee45746e6fa54c1e66db0bedb505",
       "destination_symbols": [{ "name": "SimulationState contract tests", "lines": "1-39" }],
       "license": "AGPL-3.0-only", "modified_at": "2026-07-29", "relationship": "adapted-test", "locally_modified": true,
       "tests": ["tests/backend/test_state.py"]
@@ -272,7 +308,7 @@
         "symbols": [{ "name": "ControlTests", "lines": "8-43" }]
       }],
       "destination_path": "tests/backend/test_control.py",
-      "destination_sha256": "9f6cb963723cad045dcdabf3aae27757c4cd21121342c70b86f12575c04fd94d",
+      "destination_sha256": "3bde43974513b89883dc45acf6fb2fd49a3d1c57c40dc9b270f5cc4244491f68",
       "destination_symbols": [{ "name": "control tests", "lines": "1-30" }],
       "license": "AGPL-3.0-only", "modified_at": "2026-07-29", "relationship": "adapted-test", "locally_modified": true,
       "tests": ["tests/backend/test_control.py"]

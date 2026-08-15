@@ -1,22 +1,26 @@
 class_name MotionPresentation
 extends Node3D
 
-## Applies converted Python named-frame transforms to the imported SY205 visual
+## Applies converted Python named-frame transforms to the selected imported visual
 ## skin. MotionProtocol owns the one Python Z-up -> Godot Y-up conversion. The
 ## imported GLB owns pivot origins; adjacent authority frames provide only the
 ## clean local joint rotations while Python remains the motion authority.
 
-const MANIFEST_PATH := "res://resources/visual/sy205_visual_manifest.json"
-const PARITY_FIXTURE_PATH := "res://tests/fixtures/sy205_frame_parity_cases.json"
+const MODEL_CATALOG_PATH := "res://resources/models/model_catalog.json"
 const RIGID_BASIS_TOLERANCE := 0.001
 const JOINT_ORIGIN_TOLERANCE_M := 0.002
 const JOINT_AXIS_RESIDUAL_TOLERANCE := 0.001
 
 @export var motion_client_path := NodePath("../MotionClient")
-@export var asset_root_path := NodePath("../PresentationRoot/SY205Excavator")
+@export var presentation_root_path := NodePath("../PresentationRoot")
 
 var _motion_client: MotionClient
+var _presentation_root: Node3D
 var _asset_root: Node3D
+var _manifest: Dictionary = {}
+var _active_model_id := ""
+var _manifest_path := ""
+var _parity_fixture_path := ""
 var _frame_nodes: Dictionary = {}
 var _authority_zero_globals: Dictionary = {}
 var _frame_parent_names: Dictionary = {}
@@ -55,16 +59,18 @@ var _linkage_reachable := false
 var _linkage_reason := "uninitialized"
 var _linkage_last_warning_reason := ""
 var _linkage_initialized := false
+signal model_activated(model_id: String, asset_root: Node3D)
 
 
 func _ready() -> void:
 	_motion_client = get_node_or_null(motion_client_path) as MotionClient
-	_asset_root = get_node_or_null(asset_root_path) as Node3D
-	if _motion_client == null or _asset_root == null:
-		_contract_error = "MotionPresentation requires MotionClient and imported SY205 asset"
+	_presentation_root = get_node_or_null(presentation_root_path) as Node3D
+	if _motion_client == null or _presentation_root == null:
+		_contract_error = "MotionPresentation requires MotionClient and PresentationRoot"
 		push_warning(_contract_error)
 		return
-	if not _load_mapping_contract():
+	_motion_client.model_changed.connect(_on_model_changed)
+	if not _activate_model(_motion_client.get_desired_model_id()):
 		return
 	_motion_client.pose_accepted.connect(_on_pose_accepted)
 	_motion_client.pose_cleared.connect(_on_pose_cleared)
@@ -91,6 +97,25 @@ func get_frame_node(frame_name: String) -> Node3D:
 	return _frame_nodes.get(frame_name) as Node3D
 
 
+func get_active_model_id() -> String:
+	return _active_model_id
+
+
+func get_bucket_contact_world() -> Variant:
+	var contact: Dictionary = _manifest.get("excavation_contact", {})
+	var mode := String(contact.get("mode", ""))
+	if mode == "node":
+		var path := String(contact.get("node_path", ""))
+		var node := _asset_root.get_node_or_null(NodePath(path)) as Node3D if _asset_root != null else null
+		return node.global_position if node != null else null
+	if mode == "frame_offset":
+		var frame := get_frame_node(String(contact.get("frame", "bucket_link")))
+		var raw_offset: Variant = contact.get("offset_godot", [0.0, 0.0, 0.0])
+		if frame != null and raw_offset is Array and (raw_offset as Array).size() == 3:
+			return frame.global_transform * Vector3(float(raw_offset[0]), float(raw_offset[1]), float(raw_offset[2]))
+	return null
+
+
 func get_pivot_diagnostics_for_test() -> Dictionary:
 	return _pivot_reasons.duplicate(true)
 
@@ -114,21 +139,106 @@ func restore_rest_pose_for_test() -> void:
 	_restore_rest_pose()
 
 
-func _load_mapping_contract() -> bool:
-	var manifest := _read_json(MANIFEST_PATH)
-	var fixture := _read_json(PARITY_FIXTURE_PATH)
+func _activate_model(model_id: String) -> bool:
+	var catalog := _read_json(MODEL_CATALOG_PATH)
+	var entries: Array = catalog.get("models", [])
+	var entry: Dictionary = {}
+	for candidate in entries:
+		if candidate is Dictionary and String(candidate.get("model_id", "")) == model_id:
+			entry = candidate
+			break
+	if entry.is_empty():
+		_contract_error = "unknown_model: %s" % model_id
+		push_error(_contract_error)
+		return false
+	var glb_path := String(entry.get("glb_path", ""))
+	_manifest_path = String(entry.get("manifest_path", ""))
+	_parity_fixture_path = String(entry.get("parity_fixture_path", ""))
+	if glb_path.is_empty() or _manifest_path.is_empty() or _parity_fixture_path.is_empty():
+		_contract_error = "model_contract_mismatch: incomplete catalog entry for %s" % model_id
+		push_error(_contract_error)
+		return false
+	var previous := _asset_root
+	var candidate_root: Node3D = null
+	var candidate_is_new := false
+	if model_id == "sy205":
+		candidate_root = _presentation_root.get_node_or_null("SY205Excavator") as Node3D
+	if candidate_root == null:
+		var packed := load(glb_path) as PackedScene
+		if packed == null:
+			_contract_error = "model_unavailable: %s" % glb_path
+			push_error(_contract_error)
+			return false
+		candidate_root = packed.instantiate() as Node3D
+		if candidate_root == null:
+			_contract_error = "model_contract_mismatch: %s is not a Node3D scene" % model_id
+			return false
+		candidate_root.name = "ActiveExcavator"
+		_presentation_root.add_child(candidate_root)
+		candidate_root.owner = _presentation_root.owner
+		candidate_is_new = true
+	_asset_root = candidate_root
+	_asset_root.visible = true
+	_clear_contract_state()
+	if not _load_mapping_contract(model_id):
+		_asset_root.visible = false
+		# A failed candidate must not leave the old model visible as an implicit
+		# cross-model fallback.  Keep the presentation owner empty until a
+		# matching contract can be activated.
+		if previous != null:
+			previous.visible = false
+		if candidate_is_new and is_instance_valid(_asset_root):
+			_asset_root.queue_free()
+		_asset_root = null
+		_frame_nodes.clear()
+		_has_pose = false
+		return false
+	if previous != null and previous != _asset_root:
+		previous.visible = false
+		if previous.name == "ActiveExcavator":
+			previous.queue_free()
+	_active_model_id = model_id
+	_restore_rest_pose()
+	model_activated.emit(model_id, _asset_root)
+	return true
+
+
+func _clear_contract_state() -> void:
+	_frame_nodes.clear()
+	_authority_zero_globals.clear()
+	_frame_parent_names.clear()
+	_frame_runtime_axes.clear()
+	_rest_locals.clear()
+	_rest_globals.clear()
+	_pivot_reasons.clear()
+	_pivot_last_warning_reasons.clear()
+	_linkage_initialized = false
+	_linkage_reachable = false
+	_linkage_reason = "uninitialized"
+	_contract_error = ""
+
+
+func _on_model_changed(model_id: String) -> void:
+	if model_id != _active_model_id:
+		_activate_model(model_id)
+
+
+func _load_mapping_contract(model_id: String) -> bool:
+	var manifest := _read_json(_manifest_path)
+	var fixture := _read_json(_parity_fixture_path)
+	_manifest = manifest
 	if manifest.is_empty() or fixture.is_empty():
-		_contract_error = "SY205 mapping or parity fixture could not be loaded"
+		_contract_error = "%s mapping or parity fixture could not be loaded" % model_id
 		push_error(_contract_error)
 		return false
 	var frame_map: Dictionary = manifest.get("frame_map", {})
 	var local_kinematics: Dictionary = manifest.get("local_kinematics", {})
 	if local_kinematics.get("mode", "") != "adjacent_frame_local_rotation_delta":
-		_contract_error = "SY205 local kinematics mode is missing or unsupported"
+		_contract_error = "%s local kinematics mode is missing or unsupported" % model_id
 		push_error(_contract_error)
 		return false
 	if local_kinematics.get("base_frame", "") != "base_link":
-		_contract_error = "SY205 local kinematics must use base_link as the whole-machine base"
+		_contract_error = "%s local kinematics must use base_link as the whole-machine base" % model_id
 		push_error(_contract_error)
 		return false
 	var frame_contracts: Dictionary = local_kinematics.get("frame_contracts", {})
@@ -140,7 +250,7 @@ func _load_mapping_contract() -> bool:
 		var node_path := String(mapping.get("node_path", ""))
 		var frame_node := _asset_root.get_node_or_null(NodePath(node_path)) as Node3D
 		if frame_node == null or not zero_frames.has(frame_name):
-			_contract_error = "SY205 mapping is missing %s" % frame_name
+			_contract_error = "%s mapping is missing %s" % [model_id, frame_name]
 			push_error(_contract_error)
 			return false
 		_frame_nodes[frame_name] = frame_node
@@ -157,7 +267,7 @@ func _load_mapping_contract() -> bool:
 			or not expected_scale is Array
 			or (expected_scale as Array).size() != 3
 		):
-			_contract_error = "SY205 local pivot contract is missing position/scale for %s" % frame_name
+			_contract_error = "%s local pivot contract is missing position/scale for %s" % [model_id, frame_name]
 			push_error(_contract_error)
 			return false
 		var expected_position_vector := Vector3(
@@ -171,31 +281,31 @@ func _load_mapping_contract() -> bool:
 			float((expected_scale as Array)[2])
 		)
 		if frame_node.position.distance_to(expected_position_vector) > JOINT_ORIGIN_TOLERANCE_M:
-			_contract_error = "SY205 imported local pivot origin drifted for %s" % frame_name
+			_contract_error = "%s imported local pivot origin drifted for %s" % [model_id, frame_name]
 			push_error(_contract_error)
 			return false
 		if not frame_node.scale.is_equal_approx(expected_scale_vector):
-			_contract_error = "SY205 imported local pivot scale drifted for %s" % frame_name
+			_contract_error = "%s imported local pivot scale drifted for %s" % [model_id, frame_name]
 			push_error(_contract_error)
 			return false
 		if frame_name == "base_link":
 			if not parent_frame.is_empty() or runtime_axis != "none":
-				_contract_error = "SY205 base_link must be a whole-machine base, not a slew joint"
+				_contract_error = "%s base_link must be a whole-machine base, not a slew joint" % model_id
 				push_error(_contract_error)
 				return false
 		else:
 			if not _frame_nodes.has(parent_frame) or not ["X", "Y"].has(runtime_axis):
-				_contract_error = "SY205 local kinematics contract is invalid for %s" % frame_name
+				_contract_error = "%s local kinematics contract is invalid for %s" % [model_id, frame_name]
 				push_error(_contract_error)
 				return false
 			if frame_node.get_parent() != _frame_nodes.get(parent_frame):
-				_contract_error = "SY205 imported pivot parent drifted for %s" % frame_name
+				_contract_error = "%s imported pivot parent drifted for %s" % [model_id, frame_name]
 				push_error(_contract_error)
 				return false
 		_frame_parent_names[frame_name] = parent_frame
 		_frame_runtime_axes[frame_name] = runtime_axis
 	var passive_linkage: Dictionary = manifest.get("passive_linkage", {})
-	return _load_passive_linkage_contract(passive_linkage)
+	return _load_passive_linkage_contract(passive_linkage, model_id)
 
 
 func _on_pose_accepted(_pose: Dictionary) -> void:
@@ -270,9 +380,14 @@ func get_passive_linkage_snapshot_for_test() -> Dictionary:
 	}
 
 
-func _load_passive_linkage_contract(passive_linkage: Dictionary) -> bool:
+func _load_passive_linkage_contract(passive_linkage: Dictionary, model_id: String) -> bool:
+	if passive_linkage.get("mode", "") == "none":
+		_linkage_initialized = false
+		_linkage_reachable = true
+		_linkage_reason = "not_applicable"
+		return true
 	if passive_linkage.get("mode", "") != "godot_visual_four_bar":
-		_contract_error = "SY205 passive linkage mode is missing or unsupported"
+		_contract_error = "%s passive linkage mode is missing or unsupported" % model_id
 		push_error(_contract_error)
 		return false
 	if passive_linkage.get("solver_plane", "") != "arm_link_local_yz":
