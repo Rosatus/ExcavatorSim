@@ -232,13 +232,35 @@ func _test_motion_client() -> int:
 		client.queue_free()
 		return 1
 	client.set_transport_factory_for_test(Callable(self, "_new_reconnect_transport"))
+	client.set_preflight_optional_capabilities_for_test(["bucket_load_feedback_v1"])
 	client.reconnect_now()
 	client.process_for_test(0.01)
 	if _check(_reconnect_transport != null and _reconnect_transport.sent.size() == 1 and client.get_pending_command_count() == 0 and client.get_pose_buffer_size() == 0, "reconnect creates a fresh socket and clears pending state") != 0:
 		client.queue_free()
 		return 1
+	var optional_hello: Dictionary = JSON.parse_string(_reconnect_transport.sent[0])
+	if _check(optional_hello.get("optional_capabilities", []) == ["bucket_load_feedback_v1"], "optional capability is offered only after preflight") != 0:
+		client.queue_free()
+		return 1
+	_reconnect_transport.enqueue(_hello_ack("session-feedback", "epoch-feedback", "stopped", true))
+	client.process_for_test(0.01)
+	if _check(client.negotiated_optional_capabilities == ["bucket_load_feedback_v1"], "positive optional negotiation is recorded") != 0:
+		client.queue_free()
+		return 1
+	if _check(client.queue_bucket_load_feedback({"world_generation": 0, "authority_generation": 1, "payload_mass_kg": 40.0, "center_of_mass_local": Vector3(0.0, -0.1, 0.2), "fill_ratio": 0.25, "resistance": 0.1, "quality": "balanced"}), "negotiated feedback is queued") != 0:
+		client.queue_free()
+		return 1
+	client.process_for_test(1.0 / MotionClient.BUCKET_FEEDBACK_HZ)
+	var feedback_sent := false
+	for raw in _reconnect_transport.sent:
+		var decoded: Variant = JSON.parse_string(raw)
+		if decoded is Dictionary and decoded.get("type", "") == "bucket_load_feedback":
+			feedback_sent = true
+	if _check(feedback_sent, "queued feedback is sent on its own bounded cadence") != 0:
+		client.queue_free()
+		return 1
 	client.set_focused(false)
-	if _check(_reconnect_transport.sent.size() == 2, "focus loss sends a safety snapshot") != 0:
+	if _check(_reconnect_transport.sent.size() > 2, "focus loss sends a safety snapshot") != 0:
 		client.queue_free()
 		return 1
 	var focus_loss_snapshot: Dictionary = JSON.parse_string(_reconnect_transport.sent.back())
@@ -533,8 +555,8 @@ func _new_initial_transport() -> FakeTransport:
 	return _initial_transport
 
 
-func _hello_ack(session: String, epoch: String, lifecycle: String) -> Dictionary:
-	return {
+func _hello_ack(session: String, epoch: String, lifecycle: String, optional: bool = false) -> Dictionary:
+	var payload := {
 		"type": "hello_ack",
 		"session_id": session,
 		"simulation_epoch": epoch,
@@ -544,6 +566,9 @@ func _hello_ack(session: String, epoch: String, lifecycle: String) -> Dictionary
 		"lifecycle": lifecycle,
 		"capabilities": ["commands", "input_snapshot"],
 	}
+	if optional:
+		payload["negotiated_optional_capabilities"] = ["bucket_load_feedback_v1"]
+	return payload
 
 
 func _view_state(pose: Dictionary, epoch: String, revision: int, source_sequence: int, buffer_generation: int) -> Dictionary:

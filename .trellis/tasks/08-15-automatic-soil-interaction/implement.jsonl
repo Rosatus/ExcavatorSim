@@ -1,0 +1,10 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Load Godot client authority and MCP development requirements."}
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Keep terrain, bucket, Terrain3D, Jolt, and effects ownership explicit."}
+{"file":".trellis/spec/frontend/motion-transport.md","reason":"Preserve generation/reconnect semantics while adding aggregate feedback."}
+{"file":".trellis/spec/backend/index.md","reason":"Load backend protocol/runtime pre-development guidance."}
+{"file":".trellis/spec/backend/runtime-profiles.md","reason":"Extend motion-only capability without instantiating legacy terrain authority."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Design the aggregate feedback path end to end."}
+{"file":".trellis/tasks/08-15-automatic-soil-interaction/research/granular-soil-options.md","reason":"Follow the reviewed hybrid soil decision and rejected alternatives."}
+{"file":".trellis/tasks/archive/2026-08/08-15-tracked-chassis-locomotion/design.md","reason":"Consume the archived composed chassis pose, reset, and model lifecycle contracts."}
+{"file":"godot/client/scripts/excavation_world.gd","reason":"Replace direct per-step terrain rebuild and command-driven contact with the planned fixed-step lifecycle."}
+{"file":"godot/client/scripts/motion_presentation.gd","reason":"Define the bucket pose snapshot after chassis and articulation composition."}

@@ -254,7 +254,9 @@ def test_motion_only_profile_has_no_optional_workers(
     assert runtime.terrain is None
     assert runtime.replay is None
     assert runtime.exchange is None
-    assert runtime.capabilities == frozenset({"input_snapshot", "commands"})
+    assert runtime.capabilities == frozenset(
+        {"input_snapshot", "commands", "bucket_load_feedback_v1"}
+    )
     runtime.start()
     try:
         first = runtime.latest_view.read()

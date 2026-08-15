@@ -31,6 +31,7 @@ var _jolt_hint_status := "unavailable"
 
 
 func _ready() -> void:
+	process_physics_priority = -20
 	_ensure_input_actions()
 	call_deferred("_connect_runtime")
 

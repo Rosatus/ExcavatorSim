@@ -53,6 +53,10 @@ func enqueue_brush(sequence: int, center_xz: Vector2, radius_m: float, delta_m: 
 	return true
 
 
+func next_brush_sequence() -> int:
+	return _last_enqueued_sequence + 1
+
+
 func step_fixed() -> bool:
 	if _pending_brushes.is_empty():
 		return false

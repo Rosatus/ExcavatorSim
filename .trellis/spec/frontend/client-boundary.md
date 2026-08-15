@@ -21,12 +21,17 @@ loose Float32 layers; `TerrainRenderer` only consumes copied snapshots and is
 generation-gated. This profile is opt-in and coexists with the legacy Python
 terrain/replay service until the integration release candidate is reviewed.
 
-`BucketSoilState` is the single local bucket-inventory owner in this profile. It
-applies explicit, monotonic cut/deposit commands at fixed steps and accounts for
-the exact grid-cell volume changed by `TerrainState`; it never publishes that
-inventory or local terrain edits to Python. `TerrainCollider` is an optional
-generation-gated static derivative, disabled/fail-open by default. Missing or
-failed local physics cannot block terrain edits or motion presentation.
+`BucketSoilState` is the single local bucket-inventory owner in this profile. In
+production, `ExcavationWorld` derives cut, carry, spill, and dump from swept
+articulated bucket proxies; direct monotonic cut/deposit queues are test/debug
+seams only. The cellular occupancy derives volume, mass, fill, and center of
+mass, while `TerrainCommitScheduler` is the sole runtime owner of coarse
+`TerrainState` deltas and derived mesh/collider updates. The client may publish
+only the optional, latest-value `bucket_load_feedback_v1` observation after
+positive capability negotiation; it never publishes terrain edits or replay
+authority to Python. `TerrainCollider` is an optional generation-gated static
+derivative, disabled/fail-open by default. Missing or failed local physics
+cannot block terrain edits or motion presentation.
 
 ## Scenario: Godot-local tracked chassis locomotion
 

@@ -1,0 +1,48 @@
+{
+  "schema_version": "excavator-soil-contract-v1",
+  "model_id": "sy205",
+  "material_density_kg_m3": 1650.0,
+  "nominal_capacity_m3": 0.93,
+  "heaped_capacity_m3": 1.08,
+  "cell_grid": [8, 5, 6],
+  "interaction": {
+    "contact_tolerance_m": 0.12,
+    "maximum_cut_depth_m": 0.08,
+    "minimum_sweep_m": 0.004,
+    "cut_radius_m": 0.62,
+    "deposit_radius_m": 0.9,
+    "spill_opening_down_dot": -0.1,
+    "dump_opening_down_dot": 0.15
+  },
+  "proxies": {
+    "cutting_edge": {
+      "frame": "bucket_link",
+      "center_godot": [0.0, -1.0, -1.04],
+      "direction_godot": [0.0, -0.35, -0.93675],
+      "half_width_m": 0.62
+    },
+    "top_edge": {
+      "frame": "bucket_link",
+      "center_godot": [0.0, -0.38, 0.2],
+      "half_width_m": 0.62
+    },
+    "opening": {
+      "frame": "bucket_link",
+      "center_godot": [0.0, -0.7, -0.5],
+      "normal_godot": [0.0, 0.707107, 0.707107],
+      "up_godot": [0.0, 0.707107, 0.707107],
+      "size_m": [1.24, 1.02]
+    },
+    "cavity": {
+      "frame": "bucket_link",
+      "center_godot": [0.0, 0.32, -0.52],
+      "up_godot": [0.0, 0.707107, 0.707107],
+      "size_m": [1.12, 0.48, 0.72]
+    },
+    "rear_support": {
+      "frame": "bucket_link",
+      "center_godot": [0.0, -0.3, 0.2],
+      "radius_m": 0.28
+    }
+  }
+}

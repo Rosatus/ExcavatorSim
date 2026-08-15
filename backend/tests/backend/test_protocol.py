@@ -8,6 +8,7 @@ from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
 from babylon_sim.protocol import (
+    BucketLoadFeedbackMessage,
     CommandMessage,
     HelloMessage,
     InputMessage,
@@ -35,6 +36,48 @@ def test_manifest_matches_schema_and_hello_decodes() -> None:
     assert isinstance(message, HelloMessage)
     assert message.capabilities == ("input_snapshot", "commands", "latency")
     assert message.requested_model_id == "sy135"
+    assert message.optional_capabilities is None
+
+
+def test_optional_feedback_offer_and_sample_decode_without_changing_required_capabilities() -> None:
+    manifest = load_version_manifest()
+    hello = decode_client_message(
+        json.dumps(
+            {
+                "type": "hello",
+                "protocol_version": manifest.protocol_version,
+                "capabilities": ["input_snapshot", "commands"],
+                "optional_capabilities": ["bucket_load_feedback_v1"],
+            }
+        )
+    )
+    assert isinstance(hello, HelloMessage)
+    assert hello.capabilities == ("input_snapshot", "commands")
+    assert hello.optional_capabilities == ("bucket_load_feedback_v1",)
+
+    feedback = decode_client_message(
+        json.dumps(
+            {
+                "type": "bucket_load_feedback",
+                "protocol_version": manifest.protocol_version,
+                "session_id": "session",
+                "simulation_epoch": "epoch",
+                "model_id": "sy205",
+                "model_version": "sy205-glb-urdf-v4",
+                "world_generation": 2,
+                "authority_generation": 3,
+                "client_sequence": 4,
+                "payload_mass_kg": 125.0,
+                "center_of_mass_local": [0.0, 0.1, -0.2],
+                "fill_ratio": 0.5,
+                "resistance": 0.25,
+                "quality": "balanced",
+                "client_sent_ms": 10.0,
+            }
+        )
+    )
+    assert isinstance(feedback, BucketLoadFeedbackMessage)
+    assert feedback.center_of_mass_local == (0.0, 0.1, -0.2)
 
 
 def test_legacy_babylon_protocol_identifier_is_rejected() -> None:

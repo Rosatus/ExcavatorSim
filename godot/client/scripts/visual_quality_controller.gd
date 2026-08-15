@@ -2,9 +2,9 @@ class_name VisualQualityController
 extends Node
 
 const PROFILES := {
-	"low": {"particles": 32, "camera_far": 80.0, "shadows": false},
-	"balanced": {"particles": 96, "camera_far": 140.0, "shadows": true},
-	"high": {"particles": 160, "camera_far": 220.0, "shadows": true},
+	"low": {"particles": 500, "camera_far": 80.0, "shadows": false},
+	"balanced": {"particles": 1800, "camera_far": 140.0, "shadows": true},
+	"high": {"particles": 4200, "camera_far": 220.0, "shadows": true},
 }
 
 @export var profile := "balanced"

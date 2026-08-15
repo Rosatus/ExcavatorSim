@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from typing import Any
@@ -86,6 +87,90 @@ async def test_motion_only_negotiates_capabilities_and_rejects_optional_routes(
         assert error["code"] == "capability_unavailable"
         assert error["request_id"] == "unsupported-terrain"
         await ws.close()
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_bucket_feedback_requires_negotiation_and_expires_with_session(
+    model: ExcavatorModel, calibration: MachineCalibration, tmp_path: Path
+) -> None:
+    frontend = tmp_path / "dist"
+    frontend.mkdir()
+    (frontend / "index.html").write_text("<html></html>", encoding="utf-8")
+    runtime = RuntimeController(model, calibration, profile="motion-only")
+    client = TestClient(TestServer(create_app(runtime, frontend_dir=frontend)))
+    await client.start_server()
+    try:
+        capabilities = await client.get("/api/capabilities")
+        assert capabilities.status == 200
+        assert (await capabilities.json())["optional_capabilities"] == [
+            "bucket_load_feedback_v1"
+        ]
+        origin = str(client.make_url("/")).rstrip("/")
+        ws = await client.ws_connect("/ws", headers={"Origin": origin})
+        await ws.send_json(
+            {
+                "type": "hello",
+                "protocol_version": "godot-pinocchio-v3",
+                "capabilities": ["input_snapshot", "commands"],
+                "optional_capabilities": ["bucket_load_feedback_v1"],
+            }
+        )
+        hello = await _receive_type(ws, "hello_ack")
+        assert hello["negotiated_optional_capabilities"] == [
+            "bucket_load_feedback_v1"
+        ]
+        feedback = {
+            "type": "bucket_load_feedback",
+            "protocol_version": "godot-pinocchio-v3",
+            "session_id": hello["session_id"],
+            "simulation_epoch": hello["simulation_epoch"],
+            "model_id": "sy205",
+            "model_version": model.model_version,
+            "world_generation": 1,
+            "authority_generation": 2,
+            "client_sequence": 0,
+            "payload_mass_kg": 120.0,
+            "center_of_mass_local": [0.0, 0.1, -0.2],
+            "fill_ratio": 0.4,
+            "resistance": 0.2,
+            "quality": "balanced",
+            "client_sent_ms": 12.0,
+        }
+        await ws.send_json(feedback)
+        await asyncio.sleep(0)
+        health = await (await client.get("/health")).json()
+        assert health["bucket_load_feedback"]["client_sequence"] == 0
+        await ws.send_json(feedback)
+        error = await _receive_type(ws, "error")
+        assert error["code"] == "stale_feedback"
+        await ws.close()
+        cleared = False
+        for _ in range(20):
+            await asyncio.sleep(0.05)
+            if (await (await client.get("/health")).json())["bucket_load_feedback"] is None:
+                cleared = True
+                break
+        assert cleared
+
+        unnegotiated = await client.ws_connect("/ws", headers={"Origin": origin})
+        await unnegotiated.send_json(
+            {
+                "type": "hello",
+                "protocol_version": "godot-pinocchio-v3",
+                "capabilities": ["input_snapshot", "commands"],
+            }
+        )
+        legacy_hello = await _receive_type(unnegotiated, "hello_ack")
+        assert "negotiated_optional_capabilities" not in legacy_hello
+        feedback["session_id"] = legacy_hello["session_id"]
+        feedback["simulation_epoch"] = legacy_hello["simulation_epoch"]
+        feedback["client_sequence"] = 1
+        await unnegotiated.send_json(feedback)
+        error = await _receive_type(unnegotiated, "error")
+        assert error["code"] == "capability_unavailable"
+        await unnegotiated.close()
     finally:
         await client.close()
 

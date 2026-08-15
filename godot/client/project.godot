@@ -34,11 +34,6 @@ project/assembly_name="ExcavatorSim"
 
 enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg", "res://addons/terrain_3d/plugin.cfg")
 
-[terrain3d]
-
-runtime_enabled=true
-collision_mode=0
-
 [physics]
 
 3d/physics_engine="Jolt Physics"
@@ -46,3 +41,8 @@ collision_mode=0
 [rendering]
 
 rendering_device/driver.windows="d3d12"
+
+[terrain3d]
+
+runtime_enabled=true
+collision_mode=0

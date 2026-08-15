@@ -8,6 +8,7 @@
     { "$ref": "#/$defs/Command" },
     { "$ref": "#/$defs/PlaybackCommand" },
     { "$ref": "#/$defs/TerrainCommand" },
+    { "$ref": "#/$defs/BucketLoadFeedback" },
     { "$ref": "#/$defs/Ping" },
     { "$ref": "#/$defs/HelloAck" },
     { "$ref": "#/$defs/InputAck" },
@@ -97,6 +98,11 @@
           "uniqueItems": true,
           "items": { "type": "string", "enum": ["input_snapshot", "commands", "latency", "playback", "recording", "terrain"] }
         },
+        "optional_capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["bucket_load_feedback_v1"] }
+        },
         "requested_model_id": { "type": ["string", "null"], "minLength": 1 }
       }
     },
@@ -163,6 +169,36 @@
         }
       ]
     },
+    "BucketLoadFeedback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type", "protocol_version", "session_id", "simulation_epoch", "model_id",
+        "model_version", "world_generation", "authority_generation", "client_sequence",
+        "payload_mass_kg", "center_of_mass_local", "fill_ratio", "resistance",
+        "quality", "client_sent_ms"
+      ],
+      "properties": {
+        "type": { "const": "bucket_load_feedback" },
+        "protocol_version": { "$ref": "#/$defs/ProtocolVersion" },
+        "session_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "simulation_epoch": { "type": "string", "minLength": 1 },
+        "model_id": { "type": "string", "minLength": 1 },
+        "model_version": { "type": "string", "minLength": 1 },
+        "world_generation": { "type": "integer", "minimum": 0 },
+        "authority_generation": { "type": "integer", "minimum": 0 },
+        "client_sequence": { "type": "integer", "minimum": 0 },
+        "payload_mass_kg": { "type": "number", "minimum": 0, "maximum": 100000 },
+        "center_of_mass_local": {
+          "type": "array", "minItems": 3, "maxItems": 3,
+          "items": { "type": "number", "minimum": -10, "maximum": 10 }
+        },
+        "fill_ratio": { "type": "number", "minimum": 0, "maximum": 1.5 },
+        "resistance": { "type": "number", "minimum": 0, "maximum": 1 },
+        "quality": { "type": "string", "enum": ["low", "balanced", "high"] },
+        "client_sent_ms": { "type": "number", "minimum": 0 }
+      }
+    },
     "Ping": {
       "type": "object",
       "additionalProperties": false,
@@ -190,6 +226,11 @@
           "type": "array",
           "uniqueItems": true,
           "items": { "type": "string", "enum": ["input_snapshot", "commands", "latency", "playback", "recording", "terrain"] }
+        },
+        "negotiated_optional_capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["bucket_load_feedback_v1"] }
         }
       }
     },

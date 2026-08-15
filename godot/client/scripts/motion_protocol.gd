@@ -20,6 +20,7 @@ const CAPABILITIES := [
 	"input_snapshot",
 	"commands",
 ]
+const OPTIONAL_CAPABILITIES := ["bucket_load_feedback_v1"]
 const FRAME_NAMES := [
 	"base_link",
 	"upper_structure_link",
@@ -47,12 +48,43 @@ const IGNORED_SERVER_MESSAGE_TYPES := [
 const MAX_SAFE_JSON_INTEGER := 9_007_199_254_740_991
 
 
-static func hello_message(requested_model_id: String = "sy205") -> Dictionary:
-	return {
+static func hello_message(requested_model_id: String = "sy205", optional_capabilities: Array[String] = []) -> Dictionary:
+	var payload := {
 		"type": "hello",
 		"protocol_version": PROTOCOL_VERSION,
 		"capabilities": CAPABILITIES.duplicate(),
 		"requested_model_id": requested_model_id,
+	}
+	if not optional_capabilities.is_empty():
+		payload["optional_capabilities"] = optional_capabilities.duplicate()
+	return payload
+
+
+static func bucket_load_feedback_message(
+	session_id: String,
+	simulation_epoch: String,
+	model_id: String,
+	model_version: String,
+	client_sequence: int,
+	sample: Dictionary
+) -> Dictionary:
+	var center := sample.get("center_of_mass_local", Vector3.ZERO) as Vector3
+	return {
+		"type": "bucket_load_feedback",
+		"protocol_version": PROTOCOL_VERSION,
+		"session_id": session_id,
+		"simulation_epoch": simulation_epoch,
+		"model_id": model_id,
+		"model_version": model_version,
+		"world_generation": int(sample.get("world_generation", 0)),
+		"authority_generation": int(sample.get("authority_generation", 0)),
+		"client_sequence": client_sequence,
+		"payload_mass_kg": float(sample.get("payload_mass_kg", 0.0)),
+		"center_of_mass_local": [center.x, center.y, center.z],
+		"fill_ratio": float(sample.get("fill_ratio", 0.0)),
+		"resistance": float(sample.get("resistance", 0.0)),
+		"quality": String(sample.get("quality", "balanced")),
+		"client_sent_ms": Time.get_ticks_msec(),
 	}
 
 
@@ -141,6 +173,11 @@ static func _normalize_hello_ack(payload: Dictionary) -> Dictionary:
 		normalized["model_id"] = model_id
 	normalized["versions"] = versions
 	normalized["capabilities"] = capabilities
+	if payload.has("negotiated_optional_capabilities"):
+		var optional: Variant = _normalize_optional_capabilities(payload.get("negotiated_optional_capabilities"))
+		if optional == null:
+			return _fail("schema_validation_failed", "hello_ack optional capabilities are malformed")
+		normalized["negotiated_optional_capabilities"] = optional
 	return _ok("hello_ack", normalized)
 
 
@@ -340,6 +377,17 @@ static func _normalize_capabilities(value: Variant) -> Variant:
 	var result: Array[String] = []
 	for capability in value as Array:
 		if not capability is String or not CAPABILITIES.has(capability) or result.has(capability):
+			return null
+		result.append(capability)
+	return result
+
+
+static func _normalize_optional_capabilities(value: Variant) -> Variant:
+	if value == null or not value is Array:
+		return null
+	var result: Array[String] = []
+	for capability in value as Array:
+		if not capability is String or not OPTIONAL_CAPABILITIES.has(capability) or result.has(capability):
 			return null
 		result.append(capability)
 	return result

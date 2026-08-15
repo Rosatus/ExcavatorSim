@@ -21,6 +21,8 @@ var _manifest: Dictionary = {}
 var _active_model_id := ""
 var _manifest_path := ""
 var _parity_fixture_path := ""
+var _soil_contract_path := ""
+var _soil_contract: Dictionary = {}
 var _frame_nodes: Dictionary = {}
 var _authority_zero_globals: Dictionary = {}
 var _frame_parent_names: Dictionary = {}
@@ -33,6 +35,9 @@ var _pivot_last_warning_reasons: Dictionary = {}
 var _has_pose := false
 var _last_render_revision := -1
 var _contract_error := ""
+var _previous_bucket_proxies: Dictionary = {}
+var _previous_bucket_identity := ""
+var _soil_debug_root: Node3D
 
 # The imported GLB intentionally contains no Blender drivers or animation
 # tracks. These nodes are the Godot-only passive four-bar presentation seam
@@ -102,13 +107,87 @@ func get_active_model_id() -> String:
 	return _active_model_id
 
 
+func get_soil_contract() -> Dictionary:
+	return _soil_contract.duplicate(true)
+
+
+func sample_bucket_pose_fixed(world_generation: int, authority_generation: int) -> Dictionary:
+	if not _has_pose or _soil_contract.is_empty() or _motion_client == null:
+		return {"valid": false, "reason": "pose_unavailable"}
+	var accepted_pose := _motion_client.get_latest_accepted_pose()
+	if not accepted_pose.is_empty():
+		_apply_render_pose(accepted_pose)
+	var current := {}
+	for proxy_name in ["cutting_edge", "top_edge", "opening", "cavity", "rear_support"]:
+		var proxy_transform: Variant = _soil_proxy_transform(proxy_name)
+		if not proxy_transform is Transform3D:
+			clear_bucket_pose_history()
+			return {"valid": false, "reason": "proxy_unavailable", "proxy": proxy_name}
+		current[proxy_name] = proxy_transform
+	var status := _motion_client.get_status_snapshot()
+	var session_id := String(status.get("session_id", ""))
+	var simulation_epoch := String(status.get("simulation_epoch", ""))
+	var model_id := _active_model_id
+	var identity := "%s|%s|%s|%d|%d" % [model_id, session_id, simulation_epoch, world_generation, authority_generation]
+	var reason := "ok"
+	var valid := not _previous_bucket_proxies.is_empty() and identity == _previous_bucket_identity
+	if not valid:
+		reason = "history_unavailable"
+	else:
+		var previous_cutting: Transform3D = _previous_bucket_proxies["cutting_edge"]
+		var current_cutting: Transform3D = current["cutting_edge"]
+		if previous_cutting.origin.distance_to(current_cutting.origin) > 2.0:
+			valid = false
+			reason = "discontinuous_pose"
+	var proxies := _soil_contract.get("proxies", {}) as Dictionary
+	var cutting_contract := proxies.get("cutting_edge", {}) as Dictionary
+	var opening_contract := proxies.get("opening", {}) as Dictionary
+	var cutting_direction_world := (current["cutting_edge"] as Transform3D).basis * _vector3_from_array(cutting_contract.get("direction_godot", []))
+	var opening_normal_world := (current["opening"] as Transform3D).basis * _vector3_from_array(opening_contract.get("normal_godot", []))
+	var snapshot := {
+		"valid": valid,
+		"reason": reason,
+		"model_id": model_id,
+		"session_id": session_id,
+		"simulation_epoch": simulation_epoch,
+		"world_generation": world_generation,
+		"authority_generation": authority_generation,
+		"identity": identity,
+		"previous": _previous_bucket_proxies.duplicate(true),
+		"current": current.duplicate(true),
+		"cutting_direction_world": cutting_direction_world.normalized(),
+		"opening_normal_world": opening_normal_world.normalized(),
+		"contract": _soil_contract.duplicate(true),
+	}
+	_previous_bucket_proxies = current.duplicate(true)
+	_previous_bucket_identity = identity
+	_update_soil_debug_proxies(current)
+	return snapshot
+
+
+func clear_bucket_pose_history() -> void:
+	_previous_bucket_proxies.clear()
+	_previous_bucket_identity = ""
+
+
+func set_soil_debug_visible(value: bool) -> void:
+	_ensure_soil_debug_root()
+	_soil_debug_root.visible = value
+	if value and not _previous_bucket_proxies.is_empty():
+		_update_soil_debug_proxies(_previous_bucket_proxies)
+
+
 func get_bucket_contact_world() -> Variant:
 	var contact: Dictionary = _manifest.get("excavation_contact", {})
 	var mode := String(contact.get("mode", ""))
 	if mode == "node":
 		var path := String(contact.get("node_path", ""))
-		var node := _asset_root.get_node_or_null(NodePath(path)) as Node3D if _asset_root != null else null
-		return node.global_position if node != null else null
+		var node: Node3D = null
+		if _asset_root != null:
+			node = _asset_root.get_node_or_null(NodePath(path)) as Node3D
+		if node != null:
+			return node.global_position
+		return null
 	if mode == "frame_offset":
 		var frame := get_frame_node(String(contact.get("frame", "bucket_link")))
 		var raw_offset: Variant = contact.get("offset_godot", [0.0, 0.0, 0.0])
@@ -133,6 +212,7 @@ func apply_pose_for_test(pose: Dictionary) -> bool:
 			return false
 		converted[frame_name] = MotionProtocol.rows_to_transform(transforms[frame_name])
 	_apply_render_pose({"transforms": converted, "view_revision": 0})
+	_has_pose = true
 	return true
 
 
@@ -155,7 +235,8 @@ func _activate_model(model_id: String) -> bool:
 	var glb_path := String(entry.get("glb_path", ""))
 	_manifest_path = String(entry.get("manifest_path", ""))
 	_parity_fixture_path = String(entry.get("parity_fixture_path", ""))
-	if glb_path.is_empty() or _manifest_path.is_empty() or _parity_fixture_path.is_empty():
+	_soil_contract_path = String(entry.get("soil_contract_path", ""))
+	if glb_path.is_empty() or _manifest_path.is_empty() or _parity_fixture_path.is_empty() or _soil_contract_path.is_empty():
 		_contract_error = "model_contract_mismatch: incomplete catalog entry for %s" % model_id
 		push_error(_contract_error)
 		return false
@@ -212,6 +293,8 @@ func _clear_contract_state() -> void:
 	_rest_locals.clear()
 	_rest_globals.clear()
 	_rest_presentation_locals.clear()
+	_soil_contract.clear()
+	clear_bucket_pose_history()
 	_pivot_reasons.clear()
 	_pivot_last_warning_reasons.clear()
 	_linkage_initialized = false
@@ -308,7 +391,9 @@ func _load_mapping_contract(model_id: String) -> bool:
 		_frame_parent_names[frame_name] = parent_frame
 		_frame_runtime_axes[frame_name] = runtime_axis
 	var passive_linkage: Dictionary = manifest.get("passive_linkage", {})
-	return _load_passive_linkage_contract(passive_linkage, model_id)
+	if not _load_passive_linkage_contract(passive_linkage, model_id):
+		return false
+	return _load_soil_contract(model_id)
 
 
 func _on_pose_accepted(_pose: Dictionary) -> void:
@@ -320,7 +405,178 @@ func _on_pose_accepted(_pose: Dictionary) -> void:
 func _on_pose_cleared(_generation: int, _reason: String) -> void:
 	_has_pose = false
 	_last_render_revision = -1
+	clear_bucket_pose_history()
 	_restore_rest_pose()
+
+
+func _load_soil_contract(model_id: String) -> bool:
+	var contract := _read_json(_soil_contract_path)
+	if contract.get("schema_version", "") != "excavator-soil-contract-v1" or contract.get("model_id", "") != model_id:
+		_contract_error = "%s soil contract identity is invalid" % model_id
+		push_error(_contract_error)
+		return false
+	for scalar_name in ["material_density_kg_m3", "nominal_capacity_m3", "heaped_capacity_m3"]:
+		var scalar := float(contract.get(scalar_name, 0.0))
+		if scalar <= 0.0 or is_nan(scalar) or is_inf(scalar):
+			_contract_error = "%s soil contract has invalid %s" % [model_id, scalar_name]
+			push_error(_contract_error)
+			return false
+	if float(contract["heaped_capacity_m3"]) < float(contract["nominal_capacity_m3"]):
+		_contract_error = "%s heaped capacity is below nominal capacity" % model_id
+		push_error(_contract_error)
+		return false
+	var grid: Variant = contract.get("cell_grid", [])
+	if not grid is Array or (grid as Array).size() != 3:
+		_contract_error = "%s soil cell grid is invalid" % model_id
+		push_error(_contract_error)
+		return false
+	var proxies: Dictionary = contract.get("proxies", {})
+	for proxy_name in ["cutting_edge", "top_edge", "opening", "cavity", "rear_support"]:
+		var proxy: Dictionary = proxies.get(proxy_name, {})
+		var frame_name := String(proxy.get("frame", ""))
+		if not _frame_nodes.has(frame_name) or not _valid_vector3_array(proxy.get("center_godot", [])):
+			_contract_error = "%s soil proxy is invalid: %s" % [model_id, proxy_name]
+			push_error(_contract_error)
+			return false
+	if not _valid_vector3_array((proxies["cutting_edge"] as Dictionary).get("direction_godot", [])):
+		_contract_error = "%s cutting direction is invalid" % model_id
+		return false
+	if not _valid_vector3_array((proxies["opening"] as Dictionary).get("normal_godot", [])):
+		_contract_error = "%s opening normal is invalid" % model_id
+		return false
+	for oriented_proxy_name in ["opening", "cavity"]:
+		var oriented_proxy := proxies[oriented_proxy_name] as Dictionary
+		if not _valid_direction_array(oriented_proxy.get("up_godot", [])):
+			_contract_error = "%s %s orientation is invalid" % [model_id, oriented_proxy_name]
+			return false
+	for edge_name in ["cutting_edge", "top_edge"]:
+		if float((proxies[edge_name] as Dictionary).get("half_width_m", 0.0)) <= 0.0:
+			_contract_error = "%s %s width is invalid" % [model_id, edge_name]
+			return false
+	var opening_size: Variant = (proxies["opening"] as Dictionary).get("size_m", [])
+	if not _valid_positive_array(opening_size, 2):
+		_contract_error = "%s opening size is invalid" % model_id
+		return false
+	if not _valid_positive_array((proxies["cavity"] as Dictionary).get("size_m", []), 3):
+		_contract_error = "%s cavity size is invalid" % model_id
+		return false
+	if float((proxies["rear_support"] as Dictionary).get("radius_m", 0.0)) <= 0.0:
+		_contract_error = "%s rear support radius is invalid" % model_id
+		return false
+	var interaction := contract.get("interaction", {}) as Dictionary
+	var spill_threshold := float(interaction.get("spill_opening_down_dot", -2.0))
+	var dump_threshold := float(interaction.get("dump_opening_down_dot", -2.0))
+	if spill_threshold < -1.0 or dump_threshold > 1.0 or spill_threshold >= dump_threshold:
+		_contract_error = "%s spill/dump thresholds are invalid" % model_id
+		return false
+	_soil_contract = contract
+	return true
+
+
+func _soil_proxy_transform(proxy_name: String) -> Variant:
+	var proxies: Dictionary = _soil_contract.get("proxies", {})
+	var proxy: Dictionary = proxies.get(proxy_name, {})
+	var frame := get_frame_node(String(proxy.get("frame", "")))
+	if frame == null:
+		return null
+	var center := _vector3_from_array(proxy.get("center_godot", []))
+	var local_basis := Basis.IDENTITY
+	if proxy.has("up_godot"):
+		var local_up := _vector3_from_array(proxy.get("up_godot", [])).normalized()
+		var local_width := Vector3.RIGHT
+		var local_depth := local_width.cross(local_up).normalized()
+		local_basis = Basis(local_width, local_up, local_depth).orthonormalized()
+	return frame.global_transform * Transform3D(local_basis, center)
+
+
+func _valid_vector3_array(value: Variant) -> bool:
+	if not value is Array or (value as Array).size() != 3:
+		return false
+	for component in value:
+		var number := float(component)
+		if is_nan(number) or is_inf(number):
+			return false
+	return true
+
+
+func _valid_positive_array(value: Variant, expected_size: int) -> bool:
+	if not value is Array or (value as Array).size() != expected_size:
+		return false
+	for component in value:
+		var number := float(component)
+		if number <= 0.0 or is_nan(number) or is_inf(number):
+			return false
+	return true
+
+
+func _valid_direction_array(value: Variant) -> bool:
+	return _valid_vector3_array(value) and not _vector3_from_array(value).is_zero_approx()
+
+
+func _vector3_from_array(value: Variant) -> Vector3:
+	if not _valid_vector3_array(value):
+		return Vector3.ZERO
+	return Vector3(float(value[0]), float(value[1]), float(value[2]))
+
+
+func _ensure_soil_debug_root() -> void:
+	if _soil_debug_root != null:
+		return
+	_soil_debug_root = Node3D.new()
+	_soil_debug_root.name = "SoilProxyDebug"
+	_soil_debug_root.visible = false
+	add_child(_soil_debug_root)
+	var colors := {
+		"cutting_edge": Color(1.0, 0.2, 0.1, 0.7),
+		"top_edge": Color(1.0, 0.75, 0.1, 0.55),
+		"opening": Color(0.1, 0.8, 1.0, 0.45),
+		"cavity": Color(0.15, 1.0, 0.35, 0.28),
+		"rear_support": Color(0.85, 0.2, 1.0, 0.5),
+	}
+	for proxy_name in ["cutting_edge", "top_edge", "opening", "cavity", "rear_support"]:
+		var mesh_instance := MeshInstance3D.new()
+		mesh_instance.name = proxy_name
+		var proxy_mesh: PrimitiveMesh
+		if proxy_name == "rear_support":
+			proxy_mesh = SphereMesh.new()
+		else:
+			proxy_mesh = BoxMesh.new()
+		var material := StandardMaterial3D.new()
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.albedo_color = colors[proxy_name]
+		proxy_mesh.material = material
+		mesh_instance.mesh = proxy_mesh
+		_soil_debug_root.add_child(mesh_instance)
+
+
+func _update_soil_debug_proxies(current: Dictionary) -> void:
+	if _soil_debug_root == null or not _soil_debug_root.visible:
+		return
+	var proxies: Dictionary = _soil_contract.get("proxies", {})
+	for proxy_name in ["cutting_edge", "top_edge", "opening", "cavity", "rear_support"]:
+		var mesh_instance := _soil_debug_root.get_node_or_null(NodePath(proxy_name)) as MeshInstance3D
+		if mesh_instance == null or not current.has(proxy_name):
+			continue
+		mesh_instance.global_transform = current[proxy_name]
+		var proxy: Dictionary = proxies.get(proxy_name, {})
+		if proxy_name == "rear_support":
+			var diameter := 2.0 * float(proxy.get("radius_m", 0.1))
+			(mesh_instance.mesh as SphereMesh).radius = 0.5
+			(mesh_instance.mesh as SphereMesh).height = 1.0
+			mesh_instance.scale = Vector3.ONE * diameter
+		elif proxy_name == "cavity":
+			var cavity_size := _vector3_from_array(proxy.get("size_m", []))
+			(mesh_instance.mesh as BoxMesh).size = cavity_size
+			mesh_instance.scale = Vector3.ONE
+		elif proxy_name == "opening":
+			var opening_size: Array = proxy.get("size_m", [0.5, 0.5])
+			(mesh_instance.mesh as BoxMesh).size = Vector3(float(opening_size[0]), 0.025, float(opening_size[1]))
+			mesh_instance.scale = Vector3.ONE
+		else:
+			var width := 2.0 * float(proxy.get("half_width_m", 0.25))
+			(mesh_instance.mesh as BoxMesh).size = Vector3(width, 0.035, 0.035)
+			mesh_instance.scale = Vector3.ONE
 
 
 func _apply_render_pose(pose: Dictionary) -> void:
@@ -577,8 +833,8 @@ func _apply_local_joint_transform(frame_name: String, transforms: Dictionary) ->
 		parent_zero as Transform3D,
 		child_zero as Transform3D,
 	]
-	for transform in transforms_to_validate:
-		if not _is_rigid_transform(transform):
+	for candidate_transform in transforms_to_validate:
+		if not _is_rigid_transform(candidate_transform):
 			_pivot_mark_invalid(frame_name, "non_rigid_transform")
 			return
 	var parent_zero_rigid := _rigid_transform(parent_zero as Transform3D)
@@ -613,15 +869,15 @@ func _rigid_transform(value: Transform3D) -> Transform3D:
 func _is_rigid_transform(value: Transform3D) -> bool:
 	if not _finite_transform(value):
 		return false
-	var basis := value.basis
+	var rigid_basis := value.basis
 	return (
-		absf(basis.x.length() - 1.0) <= RIGID_BASIS_TOLERANCE
-		and absf(basis.y.length() - 1.0) <= RIGID_BASIS_TOLERANCE
-		and absf(basis.z.length() - 1.0) <= RIGID_BASIS_TOLERANCE
-		and absf(basis.x.dot(basis.y)) <= RIGID_BASIS_TOLERANCE
-		and absf(basis.x.dot(basis.z)) <= RIGID_BASIS_TOLERANCE
-		and absf(basis.y.dot(basis.z)) <= RIGID_BASIS_TOLERANCE
-		and absf(basis.determinant() - 1.0) <= RIGID_BASIS_TOLERANCE
+		absf(rigid_basis.x.length() - 1.0) <= RIGID_BASIS_TOLERANCE
+		and absf(rigid_basis.y.length() - 1.0) <= RIGID_BASIS_TOLERANCE
+		and absf(rigid_basis.z.length() - 1.0) <= RIGID_BASIS_TOLERANCE
+		and absf(rigid_basis.x.dot(rigid_basis.y)) <= RIGID_BASIS_TOLERANCE
+		and absf(rigid_basis.x.dot(rigid_basis.z)) <= RIGID_BASIS_TOLERANCE
+		and absf(rigid_basis.y.dot(rigid_basis.z)) <= RIGID_BASIS_TOLERANCE
+		and absf(rigid_basis.determinant() - 1.0) <= RIGID_BASIS_TOLERANCE
 	)
 
 
@@ -638,10 +894,10 @@ func _axis_vector(axis_name: String) -> Vector3:
 	return Vector3.UP if axis_name == "Y" else Vector3.RIGHT
 
 
-func _single_axis_angle(basis: Basis, axis_name: String) -> float:
+func _single_axis_angle(rotation_basis: Basis, axis_name: String) -> float:
 	if axis_name == "Y":
-		return atan2(basis.z.x, basis.x.x)
-	return atan2(basis.y.z, basis.y.y)
+		return atan2(rotation_basis.z.x, rotation_basis.x.x)
+	return atan2(rotation_basis.y.z, rotation_basis.y.y)
 
 
 func _basis_max_abs_difference(first: Basis, second: Basis) -> float:

@@ -11,6 +11,7 @@ signal diagnostics_changed(diagnostics: Dictionary)
 signal model_changed(model_id: String)
 
 const STATE_DISCONNECTED := "disconnected"
+const STATE_PREFLIGHTING := "preflighting"
 const STATE_CONNECTING := "connecting"
 const STATE_AWAITING_HELLO_ACK := "awaiting_hello_ack"
 const STATE_READY := "ready"
@@ -19,6 +20,8 @@ const STATE_FAULT := "fault"
 
 const DEFAULT_ENDPOINT := "ws://127.0.0.1:8765/ws"
 const INPUT_HZ := 30.0
+const BUCKET_FEEDBACK_HZ := 10.0
+const PREFLIGHT_TIMEOUT_SECONDS := 1.5
 const HELLO_TIMEOUT_SECONDS := 3.0
 const RECONNECT_INITIAL_SECONDS := 0.25
 const RECONNECT_MAX_SECONDS := 5.0
@@ -46,7 +49,9 @@ var simulation_epoch := ""
 var recording_epoch := ""
 var lifecycle := "stopped"
 var capabilities: Array[String] = []
+var negotiated_optional_capabilities: Array[String] = []
 var active_model_id := ""
+var accepted_versions: Dictionary = {}
 var last_error: Dictionary = {}
 var last_input_ack: Dictionary = {}
 var confirmed_lifecycle := "stopped"
@@ -75,10 +80,17 @@ var _hello_sent := false
 var _pending_inputs := {}
 var _pending_commands := {}
 var _pose_buffer: Array[Dictionary] = []
+var _preflight_request: HTTPRequest
+var _preflight_override: Variant = null
+var _offered_optional_capabilities: Array[String] = []
+var _feedback_elapsed := 0.0
+var _next_feedback_sequence := 0
+var _pending_bucket_feedback: Dictionary = {}
 
 
 func _ready() -> void:
 	_ensure_input_actions()
+	_ensure_preflight_request()
 	endpoint = String(ProjectSettings.get_setting("motion/endpoint", endpoint))
 	auto_reconnect = bool(ProjectSettings.get_setting("motion/auto_reconnect", auto_reconnect))
 	if auto_connect:
@@ -115,10 +127,15 @@ func set_transport_factory_for_test(factory: Callable) -> void:
 	auto_connect = false
 
 
+func set_preflight_optional_capabilities_for_test(optional_capabilities: Array[String]) -> void:
+	_preflight_override = optional_capabilities.duplicate()
+	auto_connect = false
+
+
 func connect_to_service() -> void:
-	if connection_state == STATE_CONNECTING or connection_state == STATE_AWAITING_HELLO_ACK:
+	if connection_state in [STATE_PREFLIGHTING, STATE_CONNECTING, STATE_AWAITING_HELLO_ACK]:
 		return
-	_begin_connection()
+	_start_preflight()
 
 
 func request_model_switch(model_id: String) -> bool:
@@ -145,6 +162,8 @@ func get_desired_model_id() -> String:
 
 func disconnect_from_service() -> void:
 	auto_reconnect = false
+	if _preflight_request != null:
+		_preflight_request.cancel_request()
 	if _is_open():
 		_send_input(Vector4.ZERO, false, false)
 	_close_transport()
@@ -155,7 +174,24 @@ func reconnect_now() -> void:
 	auto_reconnect = true
 	_retry_elapsed = 0.0
 	_retry_delay = RECONNECT_INITIAL_SECONDS
-	_begin_connection()
+	_start_preflight()
+
+
+func queue_bucket_load_feedback(sample: Dictionary) -> bool:
+	if connection_state != STATE_READY:
+		return false
+	if not negotiated_optional_capabilities.has("bucket_load_feedback_v1"):
+		return false
+	if not _valid_bucket_feedback_sample(sample):
+		_set_error("invalid_bucket_feedback", "bucket feedback sample is malformed", true)
+		return false
+	_pending_bucket_feedback = sample.duplicate(true)
+	return true
+
+
+func clear_bucket_load_feedback() -> void:
+	_pending_bucket_feedback.clear()
+	_feedback_elapsed = 0.0
 
 
 func set_focused(focused: bool) -> void:
@@ -233,6 +269,12 @@ func get_accepted_view_revision() -> int:
 	return _accepted_view_revision
 
 
+func get_latest_accepted_pose() -> Dictionary:
+	if _pose_buffer.is_empty():
+		return {}
+	return (_pose_buffer.back() as Dictionary).duplicate(true)
+
+
 func get_pending_command_count() -> int:
 	return _pending_commands.size()
 
@@ -272,13 +314,65 @@ func get_status_snapshot() -> Dictionary:
 		"generation": _generation,
 		"lifecycle": confirmed_lifecycle,
 		"capabilities": capabilities.duplicate(),
+		"negotiated_optional_capabilities": negotiated_optional_capabilities.duplicate(),
 		"desired_model_id": desired_model_id,
 		"active_model_id": active_model_id,
 		"last_input_ack": last_input_ack.duplicate(true),
 		"last_error": last_error.duplicate(true),
 		"pending_commands": _pending_commands.size(),
 		"accepted_view_revision": _accepted_view_revision,
+		"bucket_feedback_pending": not _pending_bucket_feedback.is_empty(),
 	}
+
+
+func _ensure_preflight_request() -> void:
+	if _preflight_request != null:
+		return
+	_preflight_request = HTTPRequest.new()
+	_preflight_request.name = "CapabilityPreflight"
+	_preflight_request.timeout = PREFLIGHT_TIMEOUT_SECONDS
+	add_child(_preflight_request)
+	_preflight_request.request_completed.connect(_on_preflight_completed)
+
+
+func _start_preflight() -> void:
+	if _preflight_override is Array:
+		_offered_optional_capabilities = _filter_optional_capabilities(_preflight_override as Array)
+		_begin_connection()
+		return
+	if _transport_factory.is_valid() or _queued_test_transport != null:
+		_offered_optional_capabilities.clear()
+		_begin_connection()
+		return
+	_ensure_preflight_request()
+	_preflight_request.cancel_request()
+	_set_connection_state(STATE_PREFLIGHTING)
+	var result := _preflight_request.request(_endpoint_origin() + "/api/capabilities")
+	if result != OK:
+		_offered_optional_capabilities.clear()
+		_begin_connection()
+
+
+func _on_preflight_completed(_result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+	if connection_state != STATE_PREFLIGHTING:
+		return
+	_offered_optional_capabilities.clear()
+	if response_code == 200:
+		var parsed: Variant = JSON.parse_string(body.get_string_from_utf8())
+		if parsed is Dictionary and (parsed as Dictionary).get("protocol_version", "") == MotionProtocol.PROTOCOL_VERSION:
+			var advertised: Variant = (parsed as Dictionary).get("optional_capabilities", [])
+			if advertised is Array:
+				_offered_optional_capabilities = _filter_optional_capabilities(advertised as Array)
+	_begin_connection()
+
+
+func _filter_optional_capabilities(values: Array) -> Array[String]:
+	var result: Array[String] = []
+	for value in values:
+		var capability := String(value)
+		if MotionProtocol.OPTIONAL_CAPABILITIES.has(capability) and not result.has(capability):
+			result.append(capability)
+	return result
 
 
 func _begin_connection() -> void:
@@ -286,6 +380,10 @@ func _begin_connection() -> void:
 	_socket_generation += 1
 	_clear_generation("reconnect")
 	_next_client_sequence = 0
+	_next_feedback_sequence = 0
+	clear_bucket_load_feedback()
+	negotiated_optional_capabilities.clear()
+	accepted_versions.clear()
 	_last_acked_input_sequence = -1
 	_zero_armed = false
 	_hello_sent = false
@@ -355,13 +453,18 @@ func _tick(delta: float) -> void:
 	if connection_state == STATE_DISCONNECTED and auto_reconnect:
 		_retry_elapsed += delta
 		if _retry_elapsed >= _retry_delay:
-			_begin_connection()
+			_start_preflight()
 	if connection_state == STATE_READY or connection_state == STATE_STALE:
 		_input_elapsed += delta
 		if _input_elapsed >= 1.0 / INPUT_HZ:
 			_input_elapsed = 0.0
 			_send_current_input()
-		_handle_lifecycle_actions()
+			_handle_lifecycle_actions()
+	if connection_state == STATE_READY and not _pending_bucket_feedback.is_empty():
+		_feedback_elapsed += delta
+		if _feedback_elapsed >= 1.0 / BUCKET_FEEDBACK_HZ:
+			_feedback_elapsed = 0.0
+			_send_pending_bucket_feedback()
 
 
 func _on_transport_open() -> void:
@@ -369,7 +472,7 @@ func _on_transport_open() -> void:
 		return
 	_hello_sent = true
 	_hello_elapsed = 0.0
-	if not _send_payload(MotionProtocol.hello_message(desired_model_id)):
+	if not _send_payload(MotionProtocol.hello_message(desired_model_id, _offered_optional_capabilities)):
 		_close_transport()
 		_handle_disconnected(true)
 		return
@@ -427,6 +530,7 @@ func _accept_hello_ack(payload: Dictionary) -> void:
 		_set_error("duplicate_hello_ack", "hello_ack may only be accepted once per socket", true)
 		return
 	var negotiated_capabilities: Array = payload.get("capabilities", [])
+	var negotiated_optional: Array = payload.get("negotiated_optional_capabilities", [])
 	var negotiated_model_id := String(payload.get("model_id", desired_model_id))
 	if negotiated_model_id != desired_model_id:
 		_set_error("model_contract_mismatch", "server selected an unexpected model", false)
@@ -444,6 +548,8 @@ func _accept_hello_ack(payload: Dictionary) -> void:
 	confirmed_lifecycle = String(payload["lifecycle"])
 	lifecycle = confirmed_lifecycle
 	capabilities = negotiated_capabilities
+	negotiated_optional_capabilities.assign(negotiated_optional)
+	accepted_versions = (payload.get("versions", {}) as Dictionary).duplicate(true)
 	last_error = {}
 	last_input_ack = {}
 	_generation += 1
@@ -452,6 +558,7 @@ func _accept_hello_ack(payload: Dictionary) -> void:
 	_accepted_source_sequence = -1
 	_authoritative_buffer_generation = -1
 	_pending_commands.clear()
+	clear_bucket_load_feedback()
 	_pose_buffer.clear()
 	_zero_armed = false
 	_retry_delay = RECONNECT_INITIAL_SECONDS
@@ -597,6 +704,51 @@ func _send_input(axes: Vector4, connected: bool, focused: bool) -> bool:
 	return true
 
 
+func _send_pending_bucket_feedback() -> void:
+	if _pending_bucket_feedback.is_empty() or connection_state != STATE_READY:
+		return
+	var model_version := String(accepted_versions.get("model_version", ""))
+	if session_id.is_empty() or simulation_epoch.is_empty() or active_model_id.is_empty() or model_version.is_empty():
+		clear_bucket_load_feedback()
+		return
+	var payload := MotionProtocol.bucket_load_feedback_message(
+		session_id,
+		simulation_epoch,
+		active_model_id,
+		model_version,
+		_next_feedback_sequence,
+		_pending_bucket_feedback
+	)
+	if _send_payload(payload):
+		_next_feedback_sequence += 1
+		_pending_bucket_feedback.clear()
+
+
+func _valid_bucket_feedback_sample(sample: Dictionary) -> bool:
+	var center: Variant = sample.get("center_of_mass_local")
+	if not center is Vector3 or not _finite_vector3(center as Vector3):
+		return false
+	for field in ["payload_mass_kg", "fill_ratio", "resistance"]:
+		var value := float(sample.get(field, -1.0))
+		if is_nan(value) or is_inf(value):
+			return false
+	if float(sample.get("payload_mass_kg", -1.0)) < 0.0:
+		return false
+	var fill_ratio := float(sample.get("fill_ratio", -1.0))
+	if fill_ratio < 0.0 or fill_ratio > 1.5:
+		return false
+	var resistance := float(sample.get("resistance", -1.0))
+	if resistance < 0.0 or resistance > 1.0:
+		return false
+	if int(sample.get("world_generation", -1)) < 0 or int(sample.get("authority_generation", -1)) < 0:
+		return false
+	return ["low", "balanced", "high"].has(String(sample.get("quality", "")))
+
+
+func _finite_vector3(value: Vector3) -> bool:
+	return not is_nan(value.x) and not is_inf(value.x) and not is_nan(value.y) and not is_inf(value.y) and not is_nan(value.z) and not is_inf(value.z)
+
+
 func _send_payload(payload: Dictionary) -> bool:
 	if _transport == null or not _is_open():
 		_set_error("not_connected", "cannot send while the WebSocket is closed", true)
@@ -643,6 +795,9 @@ func _handle_disconnected(schedule_retry: bool) -> void:
 	_close_transport()
 	_hello_sent = false
 	_zero_armed = false
+	negotiated_optional_capabilities.clear()
+	accepted_versions.clear()
+	clear_bucket_load_feedback()
 	_clear_generation("disconnect")
 	_set_connection_state(STATE_DISCONNECTED)
 	if schedule_retry and auto_reconnect:

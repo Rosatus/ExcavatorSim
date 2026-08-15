@@ -138,9 +138,12 @@ func _test_jolt_collision_and_disable() -> int:
 	if not adapter.set_collision_mode(1):
 		scene.queue_free()
 		return _fail("Terrain3D Dynamic/Game collision enables")
-	await physics_frame
-	await physics_frame
+	for _frame in 30:
+		if adapter.collision_available:
+			break
+		await physics_frame
 	var query := PhysicsRayQueryParameters3D.create(Vector3(0.0, 5.0, 0.0), Vector3(0.0, -5.0, 0.0))
+	query.collision_mask = 1
 	var hit: Dictionary = scene.get_world_3d().direct_space_state.intersect_ray(query)
 	if hit.is_empty() or not (hit.get("collider") is Terrain3D):
 		scene.queue_free()
@@ -148,8 +151,10 @@ func _test_jolt_collision_and_disable() -> int:
 	if adapter.set_collision_mode(0) or adapter.collision_available:
 		scene.queue_free()
 		return _fail("Terrain3D collision disables fail-open")
-	await physics_frame
-	await physics_frame
+	for _frame in 30:
+		if not adapter.collision_available:
+			break
+		await physics_frame
 	if not scene.get_world_3d().direct_space_state.intersect_ray(query).is_empty():
 		scene.queue_free()
 		return _fail("disabled Terrain3D collision leaves no stale shape")

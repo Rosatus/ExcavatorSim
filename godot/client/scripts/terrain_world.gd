@@ -46,10 +46,31 @@ func reset_for_test() -> void:
 	world_reset.emit(terrain_state.world_generation)
 
 
+func reset_state_for_scheduler() -> bool:
+	if terrain_state == null:
+		return false
+	terrain_state.reset()
+	return true
+
+
+func notify_world_reset_from_scheduler() -> void:
+	if terrain_state != null:
+		world_reset.emit(terrain_state.world_generation)
+
+
 func rebuild_mesh() -> bool:
 	if terrain_state == null:
 		return false
-	var snapshot := terrain_state.surface_snapshot()
+	return rebuild_mesh_from_snapshot(terrain_state.surface_snapshot())
+
+
+func rebuild_mesh_from_snapshot(snapshot: Dictionary) -> bool:
+	if terrain_state == null or snapshot.is_empty():
+		return false
+	if int(snapshot.get("world_generation", -1)) != terrain_state.world_generation:
+		return false
+	if int(snapshot.get("terrain_revision", -1)) != terrain_state.terrain_revision:
+		return false
 	var native_applied := false
 	if terrain3d_adapter != null:
 		terrain3d_adapter.queue_snapshot(snapshot)

@@ -62,11 +62,18 @@ loss, or controller disable clears retained track commands; model/world changes
 also restore the local root to identity. SY205 and SY135 keep separate validated
 track/support descriptors in the Godot model catalog.
 
-The M5 excavation path keeps `BucketSoilState` as the one local inventory owner:
-fixed-step cut/deposit commands use explicit bucket contact proxies and conserve
-the changed grid-cell volume. `TerrainCollider` is a copied, generation-gated
-static derivative and is disabled/fail-open when local physics is unavailable;
-its failure cannot stop motion or terrain presentation.
+The M5 excavation path keeps `BucketSoilState` as the one local inventory owner.
+In production, fixed-step swept bucket proxies classify contact, intake, carry,
+spill, and dump from articulated bucket motion; the visible fill and payload
+aggregates come from the same bounded cellular occupancy. The direct cut/deposit
+queue methods remain test/debug seams only. `TerrainCollider` is a copied,
+generation-gated static derivative and is disabled/fail-open when local physics
+is unavailable; its failure cannot stop motion or terrain presentation.
+
+The optional `bucket_load_feedback_v1` path is default-disabled. When enabled,
+Godot preflights and negotiates it with Python, then sends bounded latest-value
+mass, center-of-mass, fill, and resistance observations. It is observational
+only and never becomes terrain, replay, or articulation authority.
 
 The realistic visual pass uses Sky3D 2.1 behind the project-owned
 `VisualEnvironment` seam, plus a generation-gated soil particle emitter and a

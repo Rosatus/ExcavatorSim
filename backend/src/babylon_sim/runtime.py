@@ -18,6 +18,7 @@ from .constants import DISPLAY_HZ, SIMULATION_DT_SECONDS
 from .exchange import RecordingExchange
 from .input_router import InputRouter, InputSnapshot
 from .model import ExcavatorModel
+from .protocol import BucketLoadFeedbackMessage
 from .recording import ChunkedRecordingBuffer
 from .replay import AuthoritativeViewState, LatestViewSlot, ReplayWorker
 from .replay_contract import PlaybackState, SourceMode
@@ -36,6 +37,8 @@ RuntimeProfile = Literal["legacy", "motion-only"]
 COMMAND_QUEUE_CAPACITY = 32
 COMMANDS_PER_TICK = 8
 COMMAND_CACHE_CAPACITY = 128
+BUCKET_FEEDBACK_TIMEOUT_SECONDS = 0.5
+BUCKET_FEEDBACK_CAPABILITY = "bucket_load_feedback_v1"
 
 
 class RuntimeCommandError(RuntimeError):
@@ -71,6 +74,30 @@ class RuntimeStatus:
     dropped_snapshots: int
     controller_source: str | None
     stale: bool
+
+
+@dataclass(frozen=True)
+class LatestBucketLoadFeedback:
+    sample: BucketLoadFeedbackMessage
+    received_monotonic_s: float
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "session_id": self.sample.session_id,
+            "simulation_epoch": self.sample.simulation_epoch,
+            "model_id": self.sample.model_id,
+            "model_version": self.sample.model_version,
+            "world_generation": self.sample.world_generation,
+            "authority_generation": self.sample.authority_generation,
+            "client_sequence": self.sample.client_sequence,
+            "payload_mass_kg": self.sample.payload_mass_kg,
+            "center_of_mass_local": list(self.sample.center_of_mass_local),
+            "fill_ratio": self.sample.fill_ratio,
+            "resistance": self.sample.resistance,
+            "quality": self.sample.quality,
+            "client_sent_ms": self.sample.client_sent_ms,
+            "received_monotonic_ms": self.received_monotonic_s * 1000.0,
+        }
 
 
 @dataclass(frozen=True)
@@ -141,6 +168,8 @@ class RuntimeController:
         self._cache_lock = threading.Lock()
         self._input_clients: set[str] = set()
         self._input_clients_lock = threading.Lock()
+        self._bucket_feedback: dict[str, LatestBucketLoadFeedback] = {}
+        self._bucket_feedback_lock = threading.Lock()
         self._submit_lock = threading.Lock()
         self._metrics_lock = threading.Lock()
         self._stop_event = threading.Event()
@@ -198,9 +227,17 @@ class RuntimeController:
     @property
     def capabilities(self) -> frozenset[str]:
         if self.profile == "motion-only":
-            return frozenset({"input_snapshot", "commands"})
+            return frozenset({"input_snapshot", "commands", BUCKET_FEEDBACK_CAPABILITY})
         return frozenset(
-            {"input_snapshot", "commands", "latency", "playback", "recording", "terrain"}
+            {
+                "input_snapshot",
+                "commands",
+                "latency",
+                "playback",
+                "recording",
+                "terrain",
+                BUCKET_FEEDBACK_CAPABILITY,
+            }
         )
 
     @property
@@ -242,6 +279,8 @@ class RuntimeController:
         if self.terrain is not None:
             self.terrain.close()
         self._fail_pending(RuntimeCommandError("server_shutting_down", "server is shutting down"))
+        with self._bucket_feedback_lock:
+            self._bucket_feedback.clear()
         if self.profile == "motion-only":
             with self._input_clients_lock:
                 input_clients = tuple(self._input_clients)
@@ -285,6 +324,43 @@ class RuntimeController:
             self.terrain.cancel_session(client_id)
         with self._cache_lock:
             self._command_cache.pop(client_id, None)
+        with self._bucket_feedback_lock:
+            self._bucket_feedback.pop(client_id, None)
+
+    def submit_bucket_load_feedback(
+        self, session_id: str, sample: BucketLoadFeedbackMessage
+    ) -> None:
+        now = self._clock()
+        with self._bucket_feedback_lock:
+            previous = self._bucket_feedback.get(session_id)
+            if previous is not None:
+                if sample.client_sequence <= previous.sample.client_sequence:
+                    raise RuntimeCommandError(
+                        "stale_feedback", "bucket feedback sequence must increase"
+                    )
+                if (
+                    sample.authority_generation < previous.sample.authority_generation
+                    or sample.world_generation < previous.sample.world_generation
+                ):
+                    raise RuntimeCommandError(
+                        "stale_feedback", "bucket feedback generation moved backwards"
+                    )
+            self._bucket_feedback[session_id] = LatestBucketLoadFeedback(sample, now)
+
+    def latest_bucket_load_feedback(self) -> dict[str, object] | None:
+        now = self._clock()
+        with self._bucket_feedback_lock:
+            current = max(
+                self._bucket_feedback.values(),
+                key=lambda value: value.received_monotonic_s,
+                default=None,
+            )
+            if current is None:
+                return None
+            if now - current.received_monotonic_s > BUCKET_FEEDBACK_TIMEOUT_SECONDS:
+                self._bucket_feedback.pop(current.sample.session_id, None)
+                return None
+            return current.as_dict()
 
     def submit_command(
         self, session_id: str, command_id: str, command: LifecycleCommand

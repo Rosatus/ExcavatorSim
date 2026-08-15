@@ -27,6 +27,7 @@ from .paths import (
     VISUAL_MODEL_SCHEMA_PATH,
 )
 from .protocol import (
+    BucketLoadFeedbackMessage,
     CommandMessage,
     HelloMessage,
     InputMessage,
@@ -41,7 +42,12 @@ from .protocol import (
 )
 from .replay import AuthoritativeViewState, PlaybackApplied, ReplayCommandError
 from .replay_contract import RECORDING_UPLOAD_MAX_BYTES
-from .runtime import CommandResult, RuntimeCommandError, RuntimeController
+from .runtime import (
+    BUCKET_FEEDBACK_CAPABILITY,
+    CommandResult,
+    RuntimeCommandError,
+    RuntimeController,
+)
 from .series import SeriesQueryError, project_series
 from .session_manager import ModelSelectionError, RuntimeSessionManager
 from .terrain import TerrainSpecError, terrain_snapshot_bytes
@@ -52,6 +58,7 @@ HELLO_TIMEOUT_SECONDS = 3.0
 INPUT_RATE_LIMIT = 80
 COMMAND_RATE_LIMIT = 20
 PING_RATE_LIMIT = 20
+BUCKET_FEEDBACK_RATE_LIMIT = 20
 RATE_WINDOW_SECONDS = 1.0
 MAX_PROTOCOL_VIOLATIONS = 3
 # Leave headroom for strict JSON encoding/validation after each poll.
@@ -72,6 +79,7 @@ class SlidingWindowRateLimiter:
             "input_snapshot": deque(),
             "command": deque(),
             "terrain_command": deque(),
+            "bucket_load_feedback": deque(),
             "ping": deque(),
         }
 
@@ -80,6 +88,7 @@ class SlidingWindowRateLimiter:
             "input_snapshot": INPUT_RATE_LIMIT,
             "command": COMMAND_RATE_LIMIT,
             "terrain_command": COMMAND_RATE_LIMIT,
+            "bucket_load_feedback": BUCKET_FEEDBACK_RATE_LIMIT,
             "ping": PING_RATE_LIMIT,
         }
         events = self._events[message_type]
@@ -262,6 +271,7 @@ def create_app(
     app.on_startup.append(on_startup)
     app.on_cleanup.append(on_cleanup)
     app.router.add_get("/health", _health)
+    app.router.add_get("/api/capabilities", _capabilities)
     app.router.add_get("/api/model", _model)
     app.router.add_get("/api/visual-model", _visual_model)
     app.router.add_get("/api/visual-assets/{asset_id:[a-z][a-z0-9-]*}", _visual_asset)
@@ -306,6 +316,23 @@ async def _health(request: web.Request) -> web.Response:
             "stream_epoch": snapshot.stream_epoch,
             "model_id": manager.model_id,
             "versions": versions.as_dict(),
+            "capabilities": sorted(runtime.capabilities),
+            "bucket_load_feedback": runtime.latest_bucket_load_feedback(),
+        }
+    )
+
+
+async def _capabilities(request: web.Request) -> web.Response:
+    runtime = request.app[RUNTIME_KEY].runtime
+    optional = (
+        [BUCKET_FEEDBACK_CAPABILITY]
+        if BUCKET_FEEDBACK_CAPABILITY in runtime.capabilities
+        else []
+    )
+    return web.json_response(
+        {
+            "protocol_version": load_version_manifest().protocol_version,
+            "optional_capabilities": optional,
         }
     )
 
@@ -717,8 +744,7 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
             model_version=manager.model_version,
             visual_model_version=manager.visual_model_version,
         )
-        await send(
-            {
+        hello_ack: dict[str, object] = {
                 "type": "hello_ack",
                 "session_id": session_id,
                 "model_id": manager.model_id,
@@ -728,8 +754,16 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
                 "model_url": "/api/model",
                 "lifecycle": runtime.latest.read().lifecycle,
                 "capabilities": sorted(set(hello.capabilities) & runtime.capabilities),
-            }
-        )
+        }
+        negotiated_optional_capabilities: set[str] = set()
+        if hello.optional_capabilities is not None:
+            negotiated_optional_capabilities = (
+                set(hello.optional_capabilities) & runtime.capabilities
+            )
+            hello_ack["negotiated_optional_capabilities"] = sorted(
+                negotiated_optional_capabilities
+            )
+        await send(hello_ack)
         sender_task = asyncio.create_task(
             _state_sender(runtime, ws, send, authority_lock), name=f"state-{session_id}"
         )
@@ -766,6 +800,8 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
                         if isinstance(message, PlaybackMessage)
                         else "terrain_command"
                         if isinstance(message, TerrainMessage)
+                        else "bucket_load_feedback"
+                        if isinstance(message, BucketLoadFeedbackMessage)
                         else "ping"
                     )
                     if not limiter.allow(kind, time.monotonic()):
@@ -854,6 +890,24 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
                                 )
                         except TerrainCommandError as exc:
                             raise ProtocolError(exc.code, str(exc), request_id=message.id) from exc
+                    elif isinstance(message, BucketLoadFeedbackMessage):
+                        if BUCKET_FEEDBACK_CAPABILITY not in negotiated_optional_capabilities:
+                            raise ProtocolError(
+                                "capability_unavailable",
+                                "bucket load feedback was not negotiated",
+                            )
+                        snapshot = runtime.latest.read()
+                        if (
+                            message.session_id != session_id
+                            or message.simulation_epoch != snapshot.stream_epoch
+                            or message.model_id != manager.model_id
+                            or message.model_version != manager.model_version
+                        ):
+                            raise ProtocolError(
+                                "feedback_identity_mismatch",
+                                "bucket feedback identity is not current",
+                            )
+                        runtime.submit_bucket_load_feedback(session_id, message)
                     elif isinstance(message, PingMessage):
                         await send(
                             {

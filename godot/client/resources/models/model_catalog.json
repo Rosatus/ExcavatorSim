@@ -13,6 +13,8 @@
       "manifest_sha256": "e307f0473de1501663d79a1e60adfb48da600270de6963b077c77d45faa08e4c",
       "parity_fixture_path": "res://tests/fixtures/sy205_frame_parity_cases.json",
       "parity_fixture_sha256": "873c06951ca317b6e4205b867e7c475eb924374a59b2d21dda87e65bb340d738",
+      "soil_contract_path": "res://resources/models/sy205_soil_contract.json",
+      "soil_contract_sha256": "7a6f864fa8f2bcce45d4199830c3c753d24061b6f4913831c3d097b95e8c4bd9",
       "tracked_locomotion": {
         "track_gauge_m": 2.2,
         "contact_length_m": 3.4,
@@ -44,6 +46,8 @@
       "manifest_sha256": "6c3e05ea796f94909d022d64047cfe0f822ea7644f22022db95e714b166d1717",
       "parity_fixture_path": "res://tests/fixtures/sy135_frame_parity_cases.json",
       "parity_fixture_sha256": "0e7879b4c3e6218e352f4659bd46602f21326676a1dea64a990431cb919997b9",
+      "soil_contract_path": "res://resources/models/sy135_soil_contract.json",
+      "soil_contract_sha256": "448d5574f52384bfc8166c03e7f12caaed31ba87f33607102bd9d7aeceae3ae3",
       "tracked_locomotion": {
         "track_gauge_m": 1.96,
         "contact_length_m": 2.9,

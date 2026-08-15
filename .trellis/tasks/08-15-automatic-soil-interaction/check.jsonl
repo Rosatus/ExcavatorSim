@@ -1,0 +1,8 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Check coarse terrain, bucket occupancy, GPU effects, and Jolt clod ownership boundaries."}
+{"file":".trellis/spec/frontend/godot-mcp.md","reason":"Require live automatic excavation validation in Godot."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Check strict typing, latest-value feedback tests, and forbidden shortcuts."}
+{"file":".trellis/spec/backend/authority-and-concurrency.md","reason":"Audit feedback ordering, lifecycle, and runtime ownership."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Verify capability negotiation and reset flow across both layers."}
+{"file":".trellis/tasks/08-15-automatic-soil-interaction/research/granular-soil-options.md","reason":"Ensure implementation does not drift into authoritative particles or clods."}
+{"file":".trellis/tasks/archive/2026-08/08-15-tracked-chassis-locomotion/design.md","reason":"Verify soil sampling and cleanup preserve the completed chassis/world-frame contract."}
+{"file":"godot/client/scripts/excavation_world.gd","reason":"Audit terrain rebuild ownership, lifecycle identity, and production/manual control separation."}

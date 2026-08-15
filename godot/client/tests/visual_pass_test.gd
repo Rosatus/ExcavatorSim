@@ -22,7 +22,7 @@ func _run() -> void:
 
 func _test_quality_profiles() -> int:
 	var quality := VisualQualityController.new()
-	if not quality.apply_profile("low") or quality.get_quality_snapshot()["particles"] != 32:
+	if not quality.apply_profile("low") or quality.get_quality_snapshot()["particles"] != 500:
 		return _fail("low profile applies bounded particle budget")
 	if not quality.apply_profile("high") or quality.get_quality_snapshot()["camera_far"] != 220.0:
 		return _fail("high profile applies far distance")

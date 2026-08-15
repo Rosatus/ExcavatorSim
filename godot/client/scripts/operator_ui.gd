@@ -15,8 +15,6 @@ var _model_selector: OptionButton
 @onready var _start_button: Button = $StatusPanel/Margin/VBox/Buttons/Start
 @onready var _pause_button: Button = $StatusPanel/Margin/VBox/Buttons/Pause
 @onready var _reset_button: Button = $StatusPanel/Margin/VBox/Buttons/Reset
-@onready var _dig_button: Button = $StatusPanel/Margin/VBox/Buttons/Dig
-@onready var _deposit_button: Button = $StatusPanel/Margin/VBox/Buttons/Deposit
 
 
 func _ready() -> void:
@@ -36,8 +34,6 @@ func _ready() -> void:
 	_start_button.pressed.connect(_on_start_pressed)
 	_pause_button.pressed.connect(_on_pause_pressed)
 	_reset_button.pressed.connect(_on_reset_pressed)
-	_dig_button.pressed.connect(_on_dig_pressed)
-	_deposit_button.pressed.connect(_on_deposit_pressed)
 	if _excavation_world != null:
 		_excavation_world.excavation_changed.connect(_on_excavation_changed)
 		_refresh_bucket_volume()
@@ -68,26 +64,6 @@ func _on_reset_pressed() -> void:
 		_motion_client.request_reset()
 	if _excavation_world != null:
 		_excavation_world.reset_for_test()
-
-
-func _on_dig_pressed() -> void:
-	if _excavation_world != null:
-		_excavation_world.request_dig()
-
-
-func _on_deposit_pressed() -> void:
-	if _excavation_world != null:
-		_excavation_world.request_deposit()
-
-
-func _unhandled_input(event: InputEvent) -> void:
-	var key_event: InputEventKey = event as InputEventKey
-	if key_event == null or not key_event.pressed or key_event.echo:
-		return
-	if key_event.keycode == KEY_F9:
-		_on_dig_pressed()
-	elif key_event.keycode == KEY_F10:
-		_on_deposit_pressed()
 
 
 func _on_connection_changed(_state: String, _diagnostics: Dictionary) -> void:

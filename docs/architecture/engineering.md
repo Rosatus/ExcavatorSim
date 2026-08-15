@@ -153,7 +153,7 @@ flowchart TB
     glb[SY205 GLB visual skin<br/>5 mapped frames]
     terrain_state[TerrainState<br/>stable/loose Float32 + revision/generation]
     bucket[BucketSoilState<br/>local bucket volume]
-    excavation[ExcavationWorld<br/>fixed-step cut/deposit orchestration]
+    excavation[ExcavationWorld<br/>fixed-step bucket-contact soil orchestration]
     renderer[TerrainRenderer<br/>copy-derived mesh]
     t3d[Terrain3DAdapter<br/>optional derived backend]
     jolt[Jolt / TerrainCollider<br/>optional local contact]
@@ -182,7 +182,7 @@ flowchart TB
 | Camera/UI | `CameraRig`, `OperatorUI`, `VisualQualityController` | 中键绕行、缩放、连接/authority/lifecycle/bucket 状态、质量档位 | Current |
 | Motion | `MotionClient`, `MotionProtocol`, `MotionPresentation` | 接收 Python state、一次性坐标转换、GLB 父局部 pivot 与被动四连杆 | Current |
 | Visual asset | `PresentationRoot/SY205Excavator` | 仅视觉模型；不含运动 authority、animation 或 collision authority | Current / Derived |
-| Logical terrain | `TerrainState`, `TerrainWorld`, `ExcavationWorld` | Godot-first 本地地形快照、cut/deposit、revision/generation | Current authority（local world） |
+| Logical terrain | `TerrainState`, `TerrainWorld`, `ExcavationWorld` | Godot-first 本地地形快照、铲斗接触/铲入/侧漏/卸土、revision/generation | Current authority（local world） |
 | Bucket | `BucketSoilState` | 固定容量 0.35 m³、切削/倾倒和网格体积守恒 | Current authority（local bucket） |
 | Terrain backends | `TerrainRenderer`, `Terrain3DAdapter`, `TerrainCollider`/Jolt | 从 copied snapshot 派生网格、Terrain3D height map 和可选静态接触 | Derived / fail-open |
 | Effects | `SoilEffects` | 订阅 excavation signal，按 generation 清理/生成尘土 | Derived |
@@ -221,7 +221,7 @@ sequenceDiagram
         W-->>G: view_state + status
         G->>V: session/epoch/revision gate
         V->>D: GLB 关节与被动机构画面
-        G->>T: 本地 fixed-step cut/deposit
+        G->>T: 本地 fixed-step bucket contact / soil flow
         T->>D: 地形、斗土、粒子与碰撞派生
     end
 ```

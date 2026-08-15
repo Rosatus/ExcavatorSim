@@ -817,3 +817,31 @@ Implemented default-disabled Godot-local skid-steer locomotion for SY205/SY135 w
 ### Next Steps
 
 - None - task complete
+
+## Session 25: Automatic soil interaction
+
+**Date**: 2026-08-15
+**Task**: Automatic soil interaction
+**Branch**: `main`
+
+### Summary
+
+Replaced production Dig/Deposit interaction with fixed-step articulated bucket
+contact classification and a bounded bucket-local cellular soil lifecycle.
+TerrainState remains the coarse logical terrain owner; Terrain3D, GPU flow, and
+capped Jolt hero clods are presentation/collision consumers. Added model-specific
+SY205/SY135 proxies, automatic cut/carry/spill/dump, transfer cleanup, and an
+optional negotiated `bucket_load_feedback_v1` observation path to Python.
+
+### Validation
+
+- Godot AI MCP live negotiation and payload mirror validated on `client@c72d`.
+- Balanced/high MCP captures recorded in
+  `.trellis/tasks/08-15-automatic-soil-interaction/research/performance-baseline.md`.
+- Godot standalone matrix: 12 scripts passed; automatic gameplay includes 1,800
+  fixed steps per model.
+- Backend: Ruff, mypy, and 153 pytest tests passed.
+
+### Status
+
+[IN PROGRESS] **Implementation complete; awaiting final Trellis quality gate and commit**

@@ -17,7 +17,15 @@ from .terrain_excavation import MAX_PATCH_BYTES
 
 MAX_MESSAGE_BYTES = 64 * 1024
 CLIENT_MESSAGE_TYPES = frozenset(
-    {"hello", "input_snapshot", "command", "playback_command", "terrain_command", "ping"}
+    {
+        "hello",
+        "input_snapshot",
+        "command",
+        "playback_command",
+        "terrain_command",
+        "bucket_load_feedback",
+        "ping",
+    }
 )
 SERVER_MESSAGE_TYPES = frozenset(
     {
@@ -94,6 +102,7 @@ class VersionManifest:
 class HelloMessage:
     capabilities: tuple[str, ...]
     requested_model_id: str | None = None
+    optional_capabilities: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -134,8 +143,31 @@ class PingMessage:
     client_sent_ms: float
 
 
+@dataclass(frozen=True)
+class BucketLoadFeedbackMessage:
+    session_id: str
+    simulation_epoch: str
+    model_id: str
+    model_version: str
+    world_generation: int
+    authority_generation: int
+    client_sequence: int
+    payload_mass_kg: float
+    center_of_mass_local: tuple[float, float, float]
+    fill_ratio: float
+    resistance: float
+    quality: Literal["low", "balanced", "high"]
+    client_sent_ms: float
+
+
 ClientMessage: TypeAlias = (
-    HelloMessage | InputMessage | CommandMessage | PlaybackMessage | TerrainMessage | PingMessage
+    HelloMessage
+    | InputMessage
+    | CommandMessage
+    | PlaybackMessage
+    | TerrainMessage
+    | BucketLoadFeedbackMessage
+    | PingMessage
 )
 
 
@@ -253,6 +285,9 @@ def decode_client_message(raw: str | bytes, *, max_bytes: int = MAX_MESSAGE_BYTE
             str(payload["requested_model_id"])
             if payload.get("requested_model_id") is not None
             else None,
+            tuple(cast(list[str], payload["optional_capabilities"]))
+            if "optional_capabilities" in payload
+            else None,
         )
     if message_type == "input_snapshot":
         sequence = payload["client_sequence"]
@@ -289,6 +324,23 @@ def decode_client_message(raw: str | bytes, *, max_bytes: int = MAX_MESSAGE_BYTE
             payload["expected_terrain_epoch"],
             payload["action"],
             payload.get("preview_token"),
+        )
+    if message_type == "bucket_load_feedback":
+        center = cast(list[float], payload["center_of_mass_local"])
+        return BucketLoadFeedbackMessage(
+            session_id=payload["session_id"],
+            simulation_epoch=payload["simulation_epoch"],
+            model_id=payload["model_id"],
+            model_version=payload["model_version"],
+            world_generation=payload["world_generation"],
+            authority_generation=payload["authority_generation"],
+            client_sequence=payload["client_sequence"],
+            payload_mass_kg=float(payload["payload_mass_kg"]),
+            center_of_mass_local=(float(center[0]), float(center[1]), float(center[2])),
+            fill_ratio=float(payload["fill_ratio"]),
+            resistance=float(payload["resistance"]),
+            quality=payload["quality"],
+            client_sent_ms=float(payload["client_sent_ms"]),
         )
     return PingMessage(payload["id"], float(payload["client_sent_ms"]))
 
