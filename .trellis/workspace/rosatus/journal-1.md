@@ -784,3 +784,36 @@ Imported the SY135 articulated GLB, added reviewed model registries and fresh-se
 ### Next Steps
 
 - None - task complete
+
+
+## Session 24: Tracked chassis locomotion
+
+**Date**: 2026-08-15
+**Task**: Tracked chassis locomotion
+**Branch**: `main`
+
+### Summary
+
+Implemented default-disabled Godot-local skid-steer locomotion for SY205/SY135 with independent track inputs, terrain support, generation-gated Jolt hints, lifecycle resets, tests, and live Godot MCP validation.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `07301c7` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
