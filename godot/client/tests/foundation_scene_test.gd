@@ -13,7 +13,8 @@ const REQUIRED_NODE_PATHS: Array[NodePath] = [
 		"ExcavatorRig/base_link/upper_structure_link/boom_link/arm_link/bucket_link"
 	),
 	NodePath("TerrainRoot"),
-	NodePath("PresentationRoot"),
+	NodePath("ChassisMotionRoot"),
+	NodePath("ChassisMotionRoot/PresentationRoot"),
 	NodePath("OperatorUI"),
 ]
 

@@ -326,14 +326,14 @@ func _validate_main_scene_mount() -> bool:
 	var scene_root := packed_scene.instantiate()
 	var fallback := scene_root.get_node_or_null("ExcavatorRig") as Node3D
 	var mounted_asset := scene_root.get_node_or_null(
-		"PresentationRoot/SY205Excavator/CTRL_EXCAVATOR_ROOT"
+		"ChassisMotionRoot/PresentationRoot/SY205Excavator/CTRL_EXCAVATOR_ROOT"
 	)
 	if fallback == null or fallback.visible:
 		push_error("Placeholder ExcavatorRig must remain present but hidden behind the imported asset.")
 		scene_root.free()
 		return false
 	if mounted_asset == null:
-		push_error("The SY205 GLB is not mounted below PresentationRoot.")
+		push_error("The SY205 GLB is not mounted below ChassisMotionRoot/PresentationRoot.")
 		scene_root.free()
 		return false
 	scene_root.free()

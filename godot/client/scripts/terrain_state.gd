@@ -118,6 +118,24 @@ func sample_surface_at(world_xz: Vector2) -> float:
 	return stable_heights[index] + loose_depth[index]
 
 
+func sample_surface_bilinear_at(world_xz: Vector2) -> float:
+	if not is_inside_grid(world_xz):
+		return NAN
+	var grid_x := (world_xz.x - origin_xz.x) / spacing_m
+	var grid_z := (world_xz.y - origin_xz.y) / spacing_m
+	var column0 := clampi(floori(grid_x), 0, columns - 1)
+	var row0 := clampi(floori(grid_z), 0, rows - 1)
+	var column1 := mini(column0 + 1, columns - 1)
+	var row1 := mini(row0 + 1, rows - 1)
+	var weight_x := clampf(grid_x - float(column0), 0.0, 1.0)
+	var weight_z := clampf(grid_z - float(row0), 0.0, 1.0)
+	var top_left := stable_heights[row0 * columns + column0] + loose_depth[row0 * columns + column0]
+	var top_right := stable_heights[row0 * columns + column1] + loose_depth[row0 * columns + column1]
+	var bottom_left := stable_heights[row1 * columns + column0] + loose_depth[row1 * columns + column0]
+	var bottom_right := stable_heights[row1 * columns + column1] + loose_depth[row1 * columns + column1]
+	return lerpf(lerpf(top_left, top_right, weight_x), lerpf(bottom_left, bottom_right, weight_x), weight_z)
+
+
 func estimate_brush_volume(center_xz: Vector2, radius_m: float, delta_m: float) -> float:
 	if radius_m <= 0.0 or not _is_finite(center_xz.x) or not _is_finite(center_xz.y) or not _is_finite(radius_m) or not _is_finite(delta_m):
 		return 0.0

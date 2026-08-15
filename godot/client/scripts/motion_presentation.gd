@@ -27,6 +27,7 @@ var _frame_parent_names: Dictionary = {}
 var _frame_runtime_axes: Dictionary = {}
 var _rest_locals: Dictionary = {}
 var _rest_globals: Dictionary = {}
+var _rest_presentation_locals: Dictionary = {}
 var _pivot_reasons: Dictionary = {}
 var _pivot_last_warning_reasons: Dictionary = {}
 var _has_pose := false
@@ -210,6 +211,7 @@ func _clear_contract_state() -> void:
 	_frame_runtime_axes.clear()
 	_rest_locals.clear()
 	_rest_globals.clear()
+	_rest_presentation_locals.clear()
 	_pivot_reasons.clear()
 	_pivot_last_warning_reasons.clear()
 	_linkage_initialized = false
@@ -256,6 +258,7 @@ func _load_mapping_contract(model_id: String) -> bool:
 		_frame_nodes[frame_name] = frame_node
 		_rest_locals[frame_name] = frame_node.transform
 		_rest_globals[frame_name] = frame_node.global_transform
+		_rest_presentation_locals[frame_name] = _presentation_root.global_transform.affine_inverse() * frame_node.global_transform
 		_authority_zero_globals[frame_name] = MotionProtocol.rows_to_transform(zero_frames[frame_name])
 		var parent_frame := String(frame_contract.get("parent_frame", ""))
 		var runtime_axis := String(frame_contract.get("runtime_axis", ""))
@@ -522,12 +525,12 @@ func _apply_base_transform(transforms: Dictionary) -> void:
 	var frame_node := _frame_nodes.get(frame_name) as Node3D
 	var incoming: Variant = transforms.get(frame_name)
 	var authority_zero: Variant = _authority_zero_globals.get(frame_name)
-	var rest_global: Variant = _rest_globals.get(frame_name)
+	var rest_presentation_local: Variant = _rest_presentation_locals.get(frame_name)
 	if (
 		frame_node == null
 		or not incoming is Transform3D
 		or not authority_zero is Transform3D
-		or not rest_global is Transform3D
+		or not rest_presentation_local is Transform3D
 	):
 		_pivot_mark_invalid(frame_name, "missing_transform")
 		return
@@ -539,7 +542,7 @@ func _apply_base_transform(transforms: Dictionary) -> void:
 	var current_rigid := Transform3D(current.basis.orthonormalized(), current.origin)
 	var zero_rigid := Transform3D(zero.basis.orthonormalized(), zero.origin)
 	var base_delta := current_rigid * zero_rigid.affine_inverse()
-	var target_global := base_delta * (rest_global as Transform3D)
+	var target_global := _presentation_root.global_transform * base_delta * (rest_presentation_local as Transform3D)
 	if not _finite_transform(target_global):
 		_pivot_mark_invalid(frame_name, "non_finite_base_delta")
 		return

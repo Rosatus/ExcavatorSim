@@ -12,7 +12,26 @@
       "manifest_path": "res://resources/visual/sy205_visual_manifest.json",
       "manifest_sha256": "e307f0473de1501663d79a1e60adfb48da600270de6963b077c77d45faa08e4c",
       "parity_fixture_path": "res://tests/fixtures/sy205_frame_parity_cases.json",
-      "parity_fixture_sha256": "873c06951ca317b6e4205b867e7c475eb924374a59b2d21dda87e65bb340d738"
+      "parity_fixture_sha256": "873c06951ca317b6e4205b867e7c475eb924374a59b2d21dda87e65bb340d738",
+      "tracked_locomotion": {
+        "track_gauge_m": 2.2,
+        "contact_length_m": 3.4,
+        "contact_width_m": 2.8,
+        "support_front_offset_m": 1.55,
+        "support_rear_offset_m": 1.45,
+        "support_left_offset_m": 1.05,
+        "support_right_offset_m": 1.05,
+        "max_speed_mps": 1.45,
+        "acceleration_mps2": 0.85,
+        "service_brake_mps2": 1.8,
+        "coast_drag_mps2": 0.65,
+        "pivot_scale": 0.78,
+        "max_slope_degrees": 30.0,
+        "slope_slip": 0.55,
+        "turn_slip": 0.18,
+        "minimum_traction": 0.18,
+        "support_response_hz": 8.0
+      }
     },
     {
       "model_id": "sy135",
@@ -24,7 +43,26 @@
       "manifest_path": "res://resources/visual/sy135_visual_manifest.json",
       "manifest_sha256": "6c3e05ea796f94909d022d64047cfe0f822ea7644f22022db95e714b166d1717",
       "parity_fixture_path": "res://tests/fixtures/sy135_frame_parity_cases.json",
-      "parity_fixture_sha256": "0e7879b4c3e6218e352f4659bd46602f21326676a1dea64a990431cb919997b9"
+      "parity_fixture_sha256": "0e7879b4c3e6218e352f4659bd46602f21326676a1dea64a990431cb919997b9",
+      "tracked_locomotion": {
+        "track_gauge_m": 1.96,
+        "contact_length_m": 2.9,
+        "contact_width_m": 2.5,
+        "support_front_offset_m": 1.32,
+        "support_rear_offset_m": 1.22,
+        "support_left_offset_m": 0.98,
+        "support_right_offset_m": 0.98,
+        "max_speed_mps": 1.55,
+        "acceleration_mps2": 0.95,
+        "service_brake_mps2": 2.0,
+        "coast_drag_mps2": 0.7,
+        "pivot_scale": 0.82,
+        "max_slope_degrees": 30.0,
+        "slope_slip": 0.5,
+        "turn_slip": 0.16,
+        "minimum_traction": 0.2,
+        "support_response_hz": 8.5
+      }
     }
   ]
 }

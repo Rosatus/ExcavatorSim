@@ -53,6 +53,15 @@ packets or publish local terrain, physics transforms or replay cursors back to
 Python. The two profiles coexist until the integration release-candidate
 review selects one runtime contract.
 
+Crawler travel is a default-disabled Godot-local layer in this milestone.
+`TrackedChassisController` is the sole writer of `ChassisMotionRoot`, while
+Python remains authoritative for the base/joint pose applied below
+`PresentationRoot`. The four local track actions are not added to the Python
+four-axis input vector. Reset, reconnect, model activation, world reset, focus
+loss, or controller disable clears retained track commands; model/world changes
+also restore the local root to identity. SY205 and SY135 keep separate validated
+track/support descriptors in the Godot model catalog.
+
 The M5 excavation path keeps `BucketSoilState` as the one local inventory owner:
 fixed-step cut/deposit commands use explicit bucket contact proxies and conserve
 the changed grid-cell volume. `TerrainCollider` is a copied, generation-gated
@@ -144,6 +153,13 @@ inventory, or Python state. The data flow is one-way:
 ```text
 fixed-step command -> TerrainState/BucketSoilState -> snapshot -> Terrain3D -> Jolt query
 ```
+
+Tracked support follows the same one-way rule. The bilinear `TerrainState`
+surface is authoritative. Optional `TerrainCollider` ray hits are accepted only
+when the collider's applied `(world_generation, terrain_revision)` equals the
+current TerrainState identity and the hit height remains within the configured
+tolerance; every miss, stale collider, or unavailable physics path fails open
+to the heightfield.
 
 The first soil presentation is not a per-grain rigid-body simulation. It combines the authoritative stable/loose heightfield and bucket volume with bounded visual particles or clumps. Those effects are disposable presentation state and must clear on historical seek, reset, reconnect, and authority-generation changes.
 

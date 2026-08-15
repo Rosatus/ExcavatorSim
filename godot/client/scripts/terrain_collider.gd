@@ -107,6 +107,7 @@ func _build_body(snapshot: Dictionary) -> StaticBody3D:
 				continue
 			var collision := CollisionShape3D.new()
 			var shape := ConcavePolygonShape3D.new()
+			shape.backface_collision = true
 			shape.set_faces(faces)
 			collision.shape = shape
 			collision.name = "Chunk_%d_%d" % [row_start, column_start]

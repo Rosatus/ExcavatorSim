@@ -1,6 +1,8 @@
 class_name TerrainWorld
 extends Node3D
 
+signal world_reset(world_generation: int)
+
 @export var terrain_seed := TerrainState.DEFAULT_SEED
 @export var terrain_rows := TerrainState.DEFAULT_ROWS
 @export var terrain_columns := TerrainState.DEFAULT_COLUMNS
@@ -41,6 +43,7 @@ func reset_for_test() -> void:
 		return
 	terrain_state.reset()
 	rebuild_mesh()
+	world_reset.emit(terrain_state.world_generation)
 
 
 func rebuild_mesh() -> bool:

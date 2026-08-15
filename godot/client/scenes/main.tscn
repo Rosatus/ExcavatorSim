@@ -23,6 +23,7 @@
 [ext_resource type="Script" uid="uid://dna82nsfu1gwe" path="res://scripts/soil_effects.gd" id="12_soil_effects"]
 [ext_resource type="Script" uid="uid://b4kidhr20qmau" path="res://scripts/terrain3d_adapter.gd" id="13_terrain3d_adapter"]
 [ext_resource type="Script" uid="uid://deo0gxkmk2ahd" path="res://addons/sky_3d/src/Sky3D.gd" id="14_sky3d"]
+[ext_resource type="Script" path="res://scripts/tracked_chassis_controller.gd" id="15_track_controller"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_qkpxi"]
 shader = ExtResource("1_pm3ni")
@@ -175,6 +176,7 @@ transform = Transform3D(-0.9402287, -0.1167717, 0.31989756, 3.711504e-09, 0.9393
 current = true
 fov = 55.0
 script = ExtResource("10_camera_rig")
+target_path = NodePath("../ChassisMotionRoot/PresentationRoot/SY205Excavator/CTRL_EXCAVATOR_ROOT")
 
 [node name="VisualEnvironment" type="Node" parent="." unique_id=2112857557]
 script = ExtResource("9_visual_environment")
@@ -238,15 +240,19 @@ script = ExtResource("7_terrain_collider")
 [node name="ExcavationWorld" type="Node3D" parent="TerrainRoot" unique_id=325026376]
 script = ExtResource("8_excavation_world")
 
-[node name="PresentationRoot" type="Node3D" parent="." unique_id=1465378192]
+[node name="ChassisMotionRoot" type="Node3D" parent="." unique_id=1336743182]
+script = ExtResource("15_track_controller")
 
-[node name="SY205Excavator" parent="PresentationRoot" unique_id=202503536 instance=ExtResource("1_sy205")]
+[node name="PresentationRoot" type="Node3D" parent="ChassisMotionRoot" unique_id=1465378192]
+
+[node name="SY205Excavator" parent="ChassisMotionRoot/PresentationRoot" unique_id=202503536 instance=ExtResource("1_sy205")]
 
 [node name="MotionClient" type="Node" parent="." unique_id=358783374]
 script = ExtResource("2_motion_client")
 
 [node name="MotionPresentation" type="Node3D" parent="." unique_id=2082115328]
 script = ExtResource("3_motion_presentation")
+presentation_root_path = NodePath("../ChassisMotionRoot/PresentationRoot")
 
 [node name="OperatorUI" type="CanvasLayer" parent="." unique_id=232332145]
 script = ExtResource("4_operator_ui")

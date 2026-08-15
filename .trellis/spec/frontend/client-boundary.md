@@ -28,6 +28,87 @@ inventory or local terrain edits to Python. `TerrainCollider` is an optional
 generation-gated static derivative, disabled/fail-open by default. Missing or
 failed local physics cannot block terrain edits or motion presentation.
 
+## Scenario: Godot-local tracked chassis locomotion
+
+### 1. Scope / Trigger
+
+Use this contract when adding or changing crawler travel without extending the
+Python four-axis articulation protocol.
+
+### 2. Signatures
+
+```text
+TrackedLocomotionState.configure(parameters: Dictionary) -> bool
+TrackedLocomotionState.step_fixed(delta: float, height_sampler: Callable) -> bool
+TrackedChassisController.set_controller_enabled(value: bool) -> void
+TrackedChassisController.get_status_snapshot() -> Dictionary
+```
+
+The local actions are `track_left_forward`, `track_left_reverse`,
+`track_right_forward`, and `track_right_reverse`. They never enter the Python
+`Vector4` articulation snapshot.
+
+### 3. Contracts
+
+- `ChassisMotionRoot` is the only writer of the Godot-local chassis transform.
+  `PresentationRoot`, the active GLB, and all named articulation frames remain
+  below it.
+- `MotionPresentation` composes the Python base delta as
+  `ChassisMotionRoot * base_delta * rest_presentation_local`; it must not write
+  a global base transform that cancels the moving parent.
+- The controller is disabled by default. Disabling it restores
+  `ChassisMotionRoot` to identity and clears track commands and velocities.
+- Each model descriptor must provide track/contact dimensions, independent
+  front/rear/left/right support offsets, speed/acceleration/brake/coast values,
+  pivot scale, slope limits, slip coefficients, minimum traction, and support
+  response rate. An incomplete descriptor rejects that model without fallback.
+- `TerrainState.sample_surface_bilinear_at()` is the support-height authority.
+  A `TerrainCollider` ray hit may refine the same height only when its applied
+  `(world_generation, terrain_revision)` exactly matches `TerrainState` and the
+  hit belongs to that derived collider. A miss, stale identity, unavailable
+  physics, or excessive height mismatch returns the authoritative heightfield.
+- Focus loss, transport pose clear/reconnect, model activation, world reset,
+  controller disable, or invalid terrain stops both tracks. Model/world changes
+  also restore the local chassis transform to identity.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Missing/invalid model field | Reject model; no cross-model parameter fallback |
+| Height sample outside logical grid | Reject fixed step and stop both tracks |
+| Jolt collider disabled/unavailable | Continue from bilinear heightfield |
+| Collider identity is stale | Ignore raycast and continue from heightfield |
+| Matching derived ray hit | Accept only a bounded height-compatible hint |
+| Focus/reconnect/model/world reset | Clear commands and velocities; reset pose where required |
+
+### 5. Good / Base / Bad Cases
+
+- Good: independent track actions -> fixed-step skid steer -> one chassis root ->
+  composed Python articulation.
+- Base: local physics disabled -> identical heightfield-driven locomotion.
+- Bad: track input is added to the Python articulation vector, or a raycast
+  mutates/invents terrain state.
+
+### 6. Tests Required
+
+- Fixed-step tests assert straight, arc, pivot, coast, braking, reversal, slope,
+  out-of-grid stop, and separately validated SY205/SY135 parameters.
+- Scene tests assert the single chassis root and Python base composition.
+- A real Jolt collider test asserts matching-hit use plus disabled and stale
+  identity fallback.
+- Lifecycle tests assert reconnect, model activation, world reset, focus loss,
+  and controller disable clearing behavior.
+- Godot MCP must drive the four actions and switch both production models in a
+  live backend session.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: MotionPresentation writes base_link.global_transform and cancels chassis travel
+Correct: ChassisMotionRoot owns travel; MotionPresentation composes below it
+```
+
 ### Terrain3D derived-backend contract
 
 `Terrain3DAdapter` is an optional presentation/collision backend, not a second

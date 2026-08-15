@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Load the Godot client checklist before modifying scene and runtime behavior."}
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Preserve Python articulation and Godot local-world authority boundaries."}
+{"file":".trellis/spec/frontend/motion-transport.md","reason":"Preserve reconnect, generation, and input-safety semantics."}
+{"file":".trellis/tasks/08-15-tracked-chassis-locomotion/research/locomotion-boundary.md","reason":"Use the selected local-root architecture and known migration boundary."}

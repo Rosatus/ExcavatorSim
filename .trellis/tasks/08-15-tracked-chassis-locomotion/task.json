@@ -1,0 +1,31 @@
+{
+  "id": "tracked-chassis-locomotion",
+  "name": "tracked-chassis-locomotion",
+  "title": "Tracked chassis locomotion",
+  "description": "Add deterministic independent left/right track control and a single Godot-local chassis pose owner.",
+  "status": "in_progress",
+  "dev_type": "feature",
+  "scope": "frontend",
+  "package": "godot",
+  "priority": "P1",
+  "creator": "rosatus",
+  "assignee": "rosatus",
+  "createdAt": "2026-08-15",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "08-15-realistic-excavator-interaction",
+  "relatedFiles": [
+    "godot/client/scenes/main.tscn",
+    "godot/client/scripts/motion_presentation.gd",
+    "godot/client/scripts/motion_client.gd",
+    "godot/client/assets/model/model-registry-v1.json"
+  ],
+  "notes": "First child. Must be completed before automatic soil interaction.",
+  "meta": {}
+}

@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Run the full Godot client quality checklist."}
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Check for transform double writers and derived-physics violations."}
+{"file":".trellis/spec/frontend/godot-mcp.md","reason":"Require live Godot MCP validation after headless checks."}
+{"file":".trellis/tasks/08-15-tracked-chassis-locomotion/research/locomotion-boundary.md","reason":"Audit against the selected locomotion authority boundary."}
