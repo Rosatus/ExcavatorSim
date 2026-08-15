@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 24
+- **Total Sessions**: 25
 - **Last Active**: 2026-08-15
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~819 | Active |
+| `journal-1.md` | ~880 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 25 | 2026-08-15 | Automatic bucket soil interaction | `864bd7e` | `main` |
 | 24 | 2026-08-15 | Tracked chassis locomotion | `07301c7` | `main` |
 | 23 | 2026-08-15 | Add SY135 model switching | `4a3fe56` | `main` |
 | 22 | 2026-08-13 | 建立项目概念与工程架构文档 | `746e880` | `main` |

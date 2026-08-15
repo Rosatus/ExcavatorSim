@@ -845,3 +845,36 @@ optional negotiated `bucket_load_feedback_v1` observation path to Python.
 ### Status
 
 [IN PROGRESS] **Implementation complete; awaiting final Trellis quality gate and commit**
+
+
+## Session 25: Automatic bucket soil interaction
+
+**Date**: 2026-08-15
+**Task**: Automatic bucket soil interaction
+**Branch**: `main`
+
+### Summary
+
+Implemented automatic articulated bucket cut/carry/spill/dump with bounded cellular occupancy, scheduled TerrainState commits, visual flow and pooled clods, model-specific SY205/SY135 contracts, and optional negotiated bucket_load_feedback_v1. Validated with Godot AI MCP, 12 standalone Godot tests, balanced/high captures, backend 153 tests, pixi verify, smoke, provenance, and diff checks. Committed, pushed, and archived 08-15-automatic-soil-interaction.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `864bd7e` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
