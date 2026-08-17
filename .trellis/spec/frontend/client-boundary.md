@@ -1,6 +1,6 @@
 # Godot Client Boundary
 
-The future client owns Godot scene composition, GLB visual transforms, desktop Forward+ rendering, camera/UI, derived terrain mesh, particles, and optional local static colliders/contact probes.
+The client owns Godot scene composition, GLB visual transforms, desktop Forward+ rendering, camera/UI, derived terrain mesh, particles, and profile-selected local physics.
 
 The client consumes Python pose/state and lifecycle messages. In legacy Python
 terrain/replay compatibility mode it may also consume terrain views, snapshots, patches and
@@ -10,12 +10,18 @@ Python terrain messages into a second store. It must treat missing physics, stal
 derived work, reconnect, reset, historical seek, and Return Live as explicit
 state transitions.
 
-Godot physics is local presentation in the first release. It must never become the source of excavator joint state, terrain deformation, bucket inventory, or replay authority. Physics resources require an explicit adapter/lifecycle boundary and must be disposed on authority generation changes.
+In `python_kinematic` and `jolt_shadow`, Godot physics is derived presentation
+and cannot write product pose. In opt-in `jolt_authoritative`, the Phase 1 Jolt
+rig is the sole chassis pose/velocity writer; work-equipment joints remain
+frozen and terrain deformation, bucket inventory, and replay authority remain
+outside Jolt. Physics resources require an explicit adapter/lifecycle boundary
+and must be disposed on authority generation changes.
 
 Phase 0 adds an explicit `jolt_shadow` observer without changing the current
-writer. `SimulationTruthPublisher` is a root sibling observer and its output may
-only enter Python's negotiated diagnostic slot. `jolt_authoritative` is a declared
-future profile, not a fallback and not a currently valid product mode.
+writer. `SimulationTruthPublisher` is a root sibling observer and its shadow
+output may only enter Python's negotiated diagnostic slot. Phase 1 makes
+`jolt_authoritative` a chassis-only, opt-in mode; it produces local truth but
+must not send that truth through the shadow transport.
 
 ## Godot-first local-world profile
 
@@ -38,7 +44,7 @@ authority to Python. `TerrainCollider` is an optional generation-gated static
 derivative, disabled/fail-open by default. Missing or failed local physics
 cannot block terrain edits or motion presentation.
 
-## Scenario: Godot-local tracked chassis locomotion
+## Scenario: Legacy Godot-local tracked chassis locomotion
 
 ### 1. Scope / Trigger
 
@@ -130,6 +136,102 @@ The local actions are `track_left_forward`, `track_left_reverse`,
 ```text
 Wrong: MotionPresentation writes base_link.global_transform and cancels chassis travel
 Correct: ChassisMotionRoot owns travel; MotionPresentation composes below it
+```
+
+## Scenario: Jolt-authoritative chassis and tracks
+
+### 1. Scope / Trigger
+
+Use this contract only when `simulation/authority_profile` is explicitly
+`jolt_authoritative`. The default remains `python_kinematic`; this phase changes
+chassis authority only and freezes boom, arm, bucket, and slew at rest.
+
+### 2. Signatures
+
+```text
+JoltChassisTrackRuntime.configure(descriptor, terrain_world, terrain_collider, spawn_global_transform) -> bool
+JoltChassisTrackRuntime.set_commands(left: float, right: float) -> void
+JoltChassisTrackRuntime.stop_motion() -> void
+JoltChassisTrackRuntime.reset(spawn_global_transform: Transform3D) -> void
+JoltChassisTrackRuntime.teardown() -> void
+JoltChassisTrackRuntime.get_status_snapshot() -> Dictionary
+PhysicsRigDescriptor.is_valid_for(model_id: String, model_version: String) -> bool
+```
+
+`TrackedChassisController` selects this runtime by profile and remains the only
+adapter allowed to copy its body transform onto `ChassisMotionRoot`.
+
+### 3. Contracts
+
+- One `RigidBody3D` owns chassis pose, linear velocity, and angular velocity.
+  The visual GLB follows it; `TrackedLocomotionState` and Python base frames
+  cannot write the same root in this profile.
+- Each model must pass its own hash-bound `physics-rig-v1` descriptor. Phase 1
+  accepts only bounded compound box proxies, positive mass/inertia and finite COM data,
+  explicit damping/CCD/speed limits, collision layers, and complete track tuning.
+- Each track uses four distributed ray contact points. Longitudinal drive,
+  braking, coast, lateral resistance, slip, and differential yaw torque are
+  bounded before forces are applied to the body.
+- Track raycasts may hit only the project `TerrainCollider`, and forces activate
+  only when its applied `(world_generation, terrain_revision)` matches the
+  current `TerrainState`. The heightfield remains the logical terrain authority.
+- `TrackedChassisController` may materialize the collider only during initial
+  rig activation and world reset. `TerrainCommitScheduler` remains the sole
+  normal terrain-revision writer for render/collider derivatives; the Jolt
+  runtime stops forces during any identity gap rather than rebuilding a second
+  collider path.
+- Focus loss, reconnect/pose clear, reset, model switch, invalid rig, invalid
+  terrain identity, profile exit, and tree teardown stop commands/forces and
+  clear or rebuild the body without a same-frame writer handoff.
+- `SimulationTruthPublisher` emits local `simulation-truth-v1` data with actual
+  chassis transform/velocities, contact counts, track speeds/slip/saturation,
+  terrain identity, and quality flags. Ray probes do not expose a Jolt contact
+  manifold, so zero impulse/penetration fields require
+  `jolt_contact_manifold_unavailable`. `transport_publishing` must remain false.
+- SY205/SY135 descriptor values remain provisional tuning evidence. This allows
+  the bounded Phase 1 chassis mode, but does not validate articulated dynamics,
+  excavation coupling, production mass properties, or cutover readiness.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Default/unknown profile | Keep Python path, or fail closed for unknown value; never auto-select Jolt |
+| Missing/hash-mismatched/invalid rig | Reject model and destroy any old dynamic runtime; no cross-model fallback |
+| Collider unavailable or identity stale | Stop track force activation and report quality/identity failure |
+| Python pose arrives in authoritative mode | Reject the pose write and keep frozen rest articulation |
+| Track command outside `[-1,1]` | Clamp before force calculation |
+| Speed/angular limit reached | Clamp body velocity and report a quality flag |
+| Disconnect/reset/model switch/profile exit | Zero commands and teardown or rebuild the body and contact state |
+| Authoritative truth offered to Python shadow decoder | Reject with `shadow_schema_validation_failed` |
+
+### 5. Good / Base / Bad Cases
+
+- Good: explicit profile -> validated model rig -> matching terrain collider ->
+  distributed forces -> one Jolt body -> visual follower and local truth.
+- Base: default profile -> unchanged Python pose writer and no dynamic chassis rig.
+- Bad: apply Python base transform after the Jolt step, accept a stale terrain
+  collider, or relabel authoritative truth as a shadow message.
+
+### 6. Tests Required
+
+- Real Godot 4.7.1/Jolt tests cover both models settling, straight travel,
+  braking, reversing, pivoting, bounded slope/mound traversal, speed/energy
+  bounds, stale terrain rejection, model switch, and teardown.
+- Controller/presentation tests assert exactly one writer and Python pose
+  rejection/frozen articulation in authoritative mode.
+- Truth tests assert body/contact/track/terrain fields, epoch rotation, local
+  publishing, and `transport_publishing=false`.
+- Schema/backend tests assert descriptor strictness and reject
+  `jolt_authoritative` on the negotiated shadow transport.
+- The standalone force step must remain below the 10 ms acceptance budget in
+  the bounded test scene; MCP smoke verifies live rig/contact/model identity.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: Python view_state + Jolt body both write ChassisMotionRoot
+Correct: profile gate selects one writer; Jolt-authoritative ignores Python pose writes
 ```
 
 ### Terrain3D derived-backend contract

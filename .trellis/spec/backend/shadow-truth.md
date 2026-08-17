@@ -6,7 +6,8 @@ Use this contract whenever Godot publishes fixed-tick motion/physics observation
 to Python during the Jolt authority migration. Phase 0 is observational only:
 `python_kinematic` remains the product pose writer and `jolt_shadow` must not feed
 `Simulator`, `AuthoritativeViewState`, `MotionPresentation`, `TerrainState`, or
-`BucketSoilState`.
+`BucketSoilState`. Phase 1 `jolt_authoritative` may produce the same versioned
+truth shape locally, but it is not a valid shadow transport profile.
 
 ## 2. Signatures
 
@@ -29,8 +30,8 @@ to Python during the Jolt authority migration. Phase 0 is observational only:
 The independent `simulation-truth-v1` schema requires profile/authority epoch,
 strictly increasing sequence and physics tick, monotonic nanoseconds, canonical
 right-handed Z-up coordinates, current session/simulation/model/rig/calibration
-identity, terrain generation/revision, body transforms and velocities, joint,
-track, payload, contact, and quality data.
+identity, terrain generation/revision, exactly the five named body transforms
+and four named joints, track, payload, contact, and quality data.
 
 Godot stays right-handed Y-up internally. `MotionProtocol` owns the only export
 conversion: `T_zup = inverse(C) * T_yup * C`; vectors map `(x,y,z)` to
@@ -39,8 +40,9 @@ with `[0,0,0,1]`.
 
 Rig identity comes from `simulation-authority-v1.json` and the model-specific
 `physics-rig-v1` descriptor. Descriptor physical values must declare provenance;
-the current SY205 and SY135 values are provisional and cannot enable
-`jolt_authoritative`.
+the current SY205 and SY135 values are provisional and may enable only the
+bounded Phase 1 chassis profile. They cannot validate articulated equipment,
+excavation coupling, final mass properties, or production cutover.
 
 ## 4. Validation & Error Matrix
 
@@ -49,6 +51,8 @@ the current SY205 and SY135 values are provisional and cannot enable
 | Capability not negotiated | `capability_unavailable` |
 | Outer envelope unknown/oversized/non-finite | Existing v3 protocol error; 64 KiB maximum |
 | Unknown truth version or field/shape violation | `shadow_schema_validation_failed` |
+| Snapshot profile is not exactly `jolt_shadow` | `shadow_schema_validation_failed`; do not store it |
+| Missing/duplicate/unknown five-body or four-joint identity | `shadow_schema_validation_failed` |
 | Session, simulation, model, rig, or calibration mismatch | `shadow_identity_mismatch` |
 | Authority epoch changes inside one simulation epoch | `stale_shadow_epoch` |
 | Sequence or physics tick does not strictly increase | `stale_shadow_tick` |
@@ -72,7 +76,8 @@ shadow stream so the diagnostic cannot silently splice two terrain histories.
 - Base: `python_kinematic` publishes no shadow traffic and behaves exactly as the
   pre-migration product.
 - Bad: copying shadow body transforms into `Simulator`, `_motion_view`, or
-  `MotionPresentation`, or silently substituting another model's rig.
+  `MotionPresentation`, sending `jolt_authoritative` through this transport, or
+  silently substituting another model's rig.
 
 ## 6. Tests Required
 
@@ -82,6 +87,8 @@ shadow stream so the diagnostic cannot silently splice two terrain histories.
 - Negotiation, wrong identity, stale tick/epoch/clock, malformed matrix, size/rate,
   TTL, disconnect, stop, reset, and model-switch cleanup.
 - Explicit assertion that accepted shadow does not change Python joint/frame state.
+- Explicit assertion that an otherwise valid `jolt_authoritative` snapshot is
+  rejected before entering the latest-value slot.
 - Godot 4.7.1 Jolt API/contact/direct-state/cleanup probe and live Godot MCP smoke
   for both model identities.
 
@@ -105,5 +112,6 @@ runtime.submit_shadow_truth(session_id, sample)  # isolated diagnostic slot only
 The truth schema/version family is independent from `view_state`, while its
 transport uses one negotiated optional v3 envelope. This preserves the existing
 Python pose schema and lifecycle while allowing strict shadow validation and a
-one-capability rollback. Jolt authority is a later profile and may be enabled only
-after body/joint/contact and single-writer exit gates pass.
+one-capability rollback. Jolt authority may be enabled only in bounded phases
+after their single-writer and contact exit gates pass. Phase 1 has passed that
+gate for chassis/tracks only; it does not widen this transport.

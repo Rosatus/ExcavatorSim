@@ -14,15 +14,20 @@
 → Godot MotionPresentation / Terrain / UI → Windows 桌面画面
 ```
 
-Jolt 权威迁移的 Phase 0 已加入但默认关闭：`jolt_shadow` 可在同一连接上
-发布 Godot fixed-tick truth 快照到 Python 的隔离 latest-value 诊断槽；它不改变
-上述产品姿态链。项目默认仍是 `python_kinematic`，`jolt_authoritative` 只有合同
-声明，尚未成为可用产品模式。
+Jolt 权威迁移仍默认关闭：`jolt_shadow` 可在同一连接上发布 Godot fixed-tick
+truth 快照到 Python 的隔离 latest-value 诊断槽；它不改变上述产品姿态链。
+项目默认仍是 `python_kinematic`。显式选择 `jolt_authoritative` 时，Phase 1 已由
+Godot/Jolt 独占底盘与履带的姿态/速度，工作装置冻结在安全静止姿态；该模式生成
+本地 authoritative truth，但不会把它作为 shadow 发回 Python。
 
-权威边界只有两条：
+当前权威边界按 profile 切换：
 
-1. Python/Pinocchio 权威维护四关节运动、frame transforms、输入安全和生命周期。
-2. Godot-first 路径中，Godot `TerrainState`/`BucketSoilState` 权威维护本地地形与斗土便利状态；Terrain3D、Jolt、渲染网格、粒子和视觉 GLB 都是派生消费者。
+1. `python_kinematic` / `jolt_shadow`：Python/Pinocchio 权威维护四关节与底盘
+   frame transforms、输入安全和生命周期；Jolt 仅派生/观察。
+2. `jolt_authoritative` Phase 1：Jolt `RigidBody3D` 权威维护底盘姿态/速度，
+   Python pose 写入被拒绝，四个工作装置关节冻结；后续关节动力学尚未实现。
+3. 所有 Godot-first profile 中，Godot `TerrainState`/`BucketSoilState` 权威维护
+   本地地形与斗土状态；Terrain3D、渲染网格、粒子和视觉 GLB 都是派生消费者。
 
 `SimulationTruthPublisher` 是观察者而非第三条写权威；Python 接收的 shadow
 数据不得进入 `Simulator`、`view_state`、地形或斗土状态。
@@ -51,7 +56,7 @@ flowchart LR
 
     subgraph desktop[Windows 桌面主机]
         godot[Godot 4.7 Forward+<br/>Current client]
-        python[Python aiohttp service<br/>Current motion authority]
+        python[Python aiohttp service<br/>Default kinematic authority / gateway]
         mcp[Godot MCP / godot_ai<br/>Dev-only]
     end
 
@@ -164,7 +169,7 @@ flowchart TB
     excavation[ExcavationWorld<br/>fixed-step bucket-contact soil orchestration]
     renderer[TerrainRenderer<br/>copy-derived mesh]
     t3d[Terrain3DAdapter<br/>optional derived backend]
-    jolt[Jolt / TerrainCollider<br/>optional local contact]
+    jolt[Jolt chassis / TerrainCollider<br/>profile-selected physics]
     soil[SoilEffects<br/>bounded particles]
     visual[Sky3D + VisualEnvironment<br/>CameraRig + Quality]
     ui[OperatorUI]
@@ -188,8 +193,8 @@ flowchart TB
 |---|---|---|---|
 | World | `WorldEnvironment`, `SunLight`, `SkyDome`, `TimeOfDay` | Sky3D 天空、固定日照、雾、云和星空 | Current / Derived |
 | Camera/UI | `CameraRig`, `OperatorUI`, `VisualQualityController` | 中键绕行、缩放、连接/authority/lifecycle/bucket 状态、质量档位 | Current |
-| Motion | `MotionClient`, `MotionProtocol`, `MotionPresentation` | 接收 Python state、一次性坐标转换、GLB 父局部 pivot 与被动四连杆 | Current |
-| Authority migration | `SimulationTruthPublisher`, `PhysicsRigDescriptor` | 默认关闭；Y-up 状态转 canonical Z-up 并发布隔离 shadow truth | Current / observational |
+| Motion | `MotionClient`, `MotionProtocol`, `MotionPresentation` | 默认接收 Python state；authoritative profile 拒绝 Python pose 并保持工作装置静止 | Current / profile-selected |
+| Authority migration | `JoltChassisTrackRuntime`, `SimulationTruthPublisher`, `PhysicsRigDescriptor` | 默认关闭；可选 shadow 观察或 Phase 1 Jolt 底盘/履带权威与本地 truth | Current / opt-in |
 | Visual asset | `PresentationRoot/SY205Excavator` | 仅视觉模型；不含运动 authority、animation 或 collision authority | Current / Derived |
 | Logical terrain | `TerrainState`, `TerrainWorld`, `ExcavationWorld` | Godot-first 本地地形快照、铲斗接触/铲入/侧漏/卸土、revision/generation | Current authority（local world） |
 | Bucket | `BucketSoilState` | 固定容量 0.35 m³、切削/倾倒和网格体积守恒 | Current authority（local bucket） |
@@ -242,11 +247,17 @@ publisher 在 fixed tick 后读取五个 frame、履带、terrain identity 和 p
 `simulation-truth-v1`，经协商后写入 Python 独立 slot。拒绝或超时不会影响上图的
 输入、模拟和 `view_state` 循环。
 
+在显式 `jolt_authoritative` profile 中，上图的 Python pose→presentation 写入被
+profile gate 拒绝；四个履带键驱动 Jolt 底盘，GLB 跟随 `ChassisMotionRoot`，工作
+装置保持 rest pose。本地 publisher 仍构造同版 truth 供客户端诊断，但
+`transport_publishing=false`，Python shadow decoder 也拒绝该 profile。
+
 ## 7. Authority、派生状态与失效键
 
 ```mermaid
 flowchart LR
-    py[Python Simulator / Pinocchio<br/>运动 authority]
+    py[Python Simulator / Pinocchio<br/>default pose authority]
+    jolt_auth[Jolt RigidBody3D<br/>opt-in chassis authority]
     view[view_state<br/>session + simulation_epoch + view_revision]
     pose[Godot pose buffer / GLB pivots]
     terrain[Godot TerrainState<br/>terrain_epoch + revision + world_generation]
@@ -254,7 +265,8 @@ flowchart LR
     derived[TerrainRenderer / Terrain3D / Jolt / SoilEffects<br/>Derived]
     reset[reset / reconnect / stale / epoch change]
 
-    py --> view --> pose
+    py -->|default / shadow| view --> pose
+    jolt_auth -->|authoritative only| pose
     pose --> derived
     terrain --> derived
     terrain --> bucket
@@ -282,11 +294,13 @@ flowchart LR
 |---|---|---|---|
 | `python_kinematic` | Python Simulator/Pinocchio | 无 | 默认产品模式 |
 | `jolt_shadow` | Python Simulator/Pinocchio | 只读 shadow | Phase 0 opt-in |
-| `jolt_authoritative` | 目标为 Godot/Jolt | 无 shadow 双写 | 仅声明，后续阶段实现 |
+| `jolt_authoritative` | Godot/Jolt 底盘；工作装置冻结 | 本地 truth；无 shadow transport | Phase 1 opt-in |
 
-SY205/SY135 已有独立 `physics-rig-v1` descriptor，但质量、惯量、collision proxy
-均明确标记为 provisional/unverified，不能据此跳过后续 chassis/articulation 稳定性
-验收。完整边界见 [`shadow-truth.md`](../../.trellis/spec/backend/shadow-truth.md)。
+SY205/SY135 已有独立、hash-bound 的 `physics-rig-v1` descriptor 和 Phase 1
+compound chassis proxy。质量、惯量和碰撞参数仍标记为 provisional/unverified：
+它们只通过了有界底盘/履带验收，不能据此跳过后续 articulation、excavation coupling
+或生产 cutover 验收。完整边界见
+[`shadow-truth.md`](../../.trellis/spec/backend/shadow-truth.md)。
 
 ## 8. 坐标系与资产关系
 
@@ -366,7 +380,7 @@ flowchart TB
     change[代码 / schema / asset change]
     verify[pixi run verify<br/>ruff + mypy + pytest + provenance + standalone path]
     smoke[pixi run backend-smoke<br/>临时 loopback service + health/model/WS/terrain]
-    matrix[Godot standalone matrix<br/>9 headless SceneTree suites]
+    matrix[Godot standalone matrix<br/>15 headless SceneTree suites]
     mcp_smoke[Godot MCP live smoke<br/>editor state / scene / run / UI / tree]
     release[RC evidence<br/>verify + backend-smoke + matrix + MCP]
 
@@ -384,7 +398,7 @@ flowchart TB
 |---|---:|---|---|
 | `pixi run verify` | 否 | backend lint/type/test、provenance、standalone path | [`pixi.toml`](../../pixi.toml#L26-L34) |
 | `pixi run backend-smoke` | 是，临时 loopback port | health、placeholder frontend、URDF、GLB/manifest、WS v3、terrain snapshot | [`production_smoke.py`](../../backend/scripts/production_smoke.py#L19-L181) |
-| Godot standalone matrix | 否，不依赖 Python service | foundation、GLB、motion、terrain、Terrain3D、excavation、visual、RC contract | [`tests/README.md`](../../godot/client/tests/README.md#L5-L44)、[`run_standalone_matrix.ps1`](../../godot/client/tests/run_standalone_matrix.ps1#L9-L35) |
+| Godot standalone matrix | 否，不依赖 Python service | foundation、Jolt capability/chassis、shadow、GLB、motion、terrain、Terrain3D、excavation、visual、RC contract | [`tests/README.md`](../../godot/client/tests/README.md#L5-L48)、[`run_standalone_matrix.ps1`](../../godot/client/tests/run_standalone_matrix.ps1#L9-L39) |
 | Godot MCP live smoke | Godot editor/game 是 | editor readiness、scene tree、UI、运行期节点和 reset/authority generation | [`release-candidate.md`](../release-candidate.md#L20-L56)、[`godot-mcp.md`](../../.trellis/spec/frontend/godot-mcp.md#L1-L30) |
 
 MCP 测试发现只覆盖 `res://tests/test_*.gd` 的 `McpTestSuite`；产品 contract 使用 standalone `SceneTree` 脚本，因此 MCP 不是 CI 或导出运行时依赖。
@@ -396,7 +410,7 @@ MCP 测试发现只覆盖 `res://tests/test_*.gd` 的 `McpTestSuite`；产品 co
 | Current | SY205 GLB、四关节运动、Pinocchio FK、Godot motion transport、Godot terrain/bucket、Terrain3D/Sky3D 视觉、桌面 UI、测试矩阵 | 已有代码、schema 或测试证据 |
 | Legacy | Python terrain、recording、replay、RRD、terrain HTTP/WS、BabylonSim 命名 | 继续兼容；移除前需要独立迁移和回滚决策 [`release-candidate.md`](../release-candidate.md#L3-L14) |
 | Planned | 真实座舱手柄、踏板、按钮面板、中控/触屏、CAN-to-USB/设备适配 | 用户确认目标拓扑；没有驱动、消息协议或硬件验收实现 |
-| Deferred | 生产级液压、动态刚体权威、接触标定、碰撞代理、per-grain soil、C++/GDExtension 优化 | 需要单独模型合同或 profiling 依据 [`README.md`](../../README.md#L46-L48) |
+| Deferred | 工作装置 Jolt 动力学、生产级液压、接触/质量标定、挖掘耦合、per-grain soil、C++/GDExtension 优化 | Phase 1 仅实现 provisional 底盘/履带；其余需要后续模型合同或 profiling 依据 [`README.md`](../../README.md#L46-L48) |
 | No evidence | 真实 CAN/串口/USB HID、ROS client、外部中控闭环、硬件传感器模拟 I/O | 本仓库未声明依赖或实现；不能画成 Current |
 
 ### 11.1 历史文档阅读警告

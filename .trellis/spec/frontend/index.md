@@ -4,9 +4,10 @@ The Godot client has an implemented M1–M7 Forward+ vertical slice under
 `godot/client/`. It includes the documented motion transport, SY205 visual
 presentation, Godot-first deterministic-enough world state, excavation loop,
 local tracked-chassis locomotion, and release-candidate checks. Further
-production physics and model work remains
-separate from the current presentation slice. The client must consume Python
-motion authority through the documented transport boundary.
+articulated physics and model work remains separate from the current Phase 1
+Jolt chassis/track slice. The client consumes Python motion authority in the
+default/shadow profiles and selects the documented single Jolt chassis writer
+only in explicit `jolt_authoritative`.
 
 ## Guideline
 

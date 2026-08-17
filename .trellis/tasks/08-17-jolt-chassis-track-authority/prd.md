@@ -29,19 +29,18 @@ Requires the accepted contracts and local Jolt probe evidence from
 
 ## Acceptance Criteria
 
-- [ ] SY205 and SY135 accelerate, coast, brake, reverse, arc, and pivot from actual
+- [x] SY205 and SY135 accelerate, coast, brake, reverse, arc, and pivot from actual
       Jolt chassis state with bounded speed and slip.
-- [ ] Chassis rests stably on flat/slope/uneven terrain, climbs a bounded obstacle,
+- [x] Chassis rests stably on flat/slope/uneven terrain, climbs a bounded obstacle,
       and does not tunnel or gain unbounded energy in the acceptance scenes.
-- [ ] Exactly one chassis writer exists in Jolt mode; disabling the old kinematic
+- [x] Exactly one chassis writer exists in Jolt mode; disabling the old kinematic
       controller cannot change the dynamic body pose.
-- [ ] Contact/track telemetry reports tick, terrain revision, contact count, speed,
+- [x] Contact/track telemetry reports tick, terrain revision, contact count, speed,
       slip, saturation, and quality.
-- [ ] Lifecycle and model-switch tests leave no body, force, contact, or stale
+- [x] Lifecycle and model-switch tests leave no body, force, contact, or stale
       collider state behind.
 
 ## Out Of Scope
 
 - Moving boom/arm/bucket joints, excavation terrain mutation, individual track
   shoes, rollover damage, or changing the default product profile.
-

@@ -1,7 +1,7 @@
 # ExcavatorSim
 
 ExcavatorSim is a Windows desktop excavator simulator built around a Godot
-Forward+ client and a Python motion/input authority migrated from BabylonSim.
+Forward+ client and a Python motion/input service migrated from BabylonSim.
 
 ## Current state
 
@@ -11,7 +11,7 @@ deterministic-enough terrain and excavation loop, visual presentation systems,
 and standalone release-candidate checks. Trellis remains the source of project
 plans, implementation decisions, and session history.
 
-Python remains authoritative for:
+By default, Python remains authoritative for:
 
 - Pinocchio excavator kinematics and input safety;
 - lifecycle state and the Godot-Pinocchio HTTP/WebSocket motion contract;
@@ -20,9 +20,11 @@ Python remains authoritative for:
 
 In the Godot-first profile, Godot owns desktop rendering, GLB scene assembly,
 UI, local terrain and excavation state, and bucket-soil convenience state. The
-bounded particles and optional local collision/contact layer are derived
-presentation state. None of these client-owned systems may write authoritative
-transforms, terrain heights, bucket inventory, or replay cursors back to Python.
+explicit `jolt_authoritative` Phase 1 profile also makes one Jolt body the sole
+chassis/track pose and velocity writer while the work equipment stays frozen;
+the default remains `python_kinematic`. Terrain3D, bounded particles, and visual
+GLBs remain derived. Godot authoritative truth stays local and is not written
+into Python's shadow diagnostic slot.
 
 ## Repository map
 
@@ -53,9 +55,9 @@ Architecture reading order:
    transport, terrain, or client behavior.
 3. Keep the legacy and Godot-first runtime profiles compatible until an
    approved integration release-candidate decision selects a migration path.
-4. Treat production-grade hydraulics, dynamic rigid-body authority, contact
-   calibration, and per-grain soil as deferred model work; evaluate C++ only
-   after profiling identifies a measured Python bottleneck.
+4. Treat articulated Jolt equipment, production-grade hydraulics, contact/mass
+   calibration, excavation coupling, and per-grain soil as deferred model work;
+   evaluate C++ only after profiling identifies a measured bottleneck.
 
 See `.trellis/` for the current task history and project specifications. Start
 with the [conceptual architecture](docs/architecture/conceptual.md), then the

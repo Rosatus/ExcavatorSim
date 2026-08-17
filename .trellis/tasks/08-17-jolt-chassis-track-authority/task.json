@@ -3,7 +3,7 @@
   "name": "jolt-chassis-track-authority",
   "title": "Jolt chassis and track authority",
   "description": "Make a model-specific Jolt chassis and distributed left/right track force model the sole chassis authority in the new profile.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": "feature",
   "scope": "frontend",
   "package": "godot",

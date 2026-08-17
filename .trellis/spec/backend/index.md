@@ -1,6 +1,10 @@
 # Backend Development Guidelines
 
-The backend is the authoritative Python service migrated from BabylonSim. It owns kinematics, input safety, layered terrain state, bucket volume, replay, and the HTTP/WebSocket contract.
+The backend is the Python service migrated from BabylonSim. It owns input safety,
+the HTTP/WebSocket contract, default-profile kinematics, and legacy-profile
+terrain/bucket/replay services. In `jolt_authoritative` Phase 1, Godot owns
+chassis pose locally; the backend shadow boundary remains observational and
+rejects authoritative-profile truth.
 
 ## Guidelines
 

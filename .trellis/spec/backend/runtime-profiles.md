@@ -99,10 +99,12 @@ Authority selection is separate from backend service composition:
 |---|---|---|---|
 | `python_kinematic` | Python `Simulator`/Pinocchio | off | Default/current |
 | `jolt_shadow` | Python `Simulator`/Pinocchio | Godot observational | Implemented opt-in |
-| `jolt_authoritative` | Godot/Jolt | off | Declared only; fail closed until later phases |
+| `jolt_authoritative` | Godot/Jolt for chassis; work equipment frozen | off; local truth only | Phase 1 opt-in |
 
 Both backend runtime profiles may advertise `simulation_truth_shadow_v1` as an
 optional capability. Negotiation only enables the isolated slot in
 [shadow-truth.md](./shadow-truth.md); it never changes the runtime's pose writer.
 The existing required capability intersection and `view_state` behavior remain
-unchanged.
+unchanged. Python must reject a `simulation_truth_shadow` payload whose
+`authority_profile` is `jolt_authoritative`; authoritative truth is a local
+Godot product snapshot, not a second inbound pose stream.
