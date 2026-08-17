@@ -878,3 +878,36 @@ Implemented automatic articulated bucket cut/carry/spill/dump with bounded cellu
 ### Next Steps
 
 - None - task complete
+
+
+## Session 26: Bucket ground lift reaction
+
+**Date**: 2026-08-17
+**Task**: Bucket ground lift reaction
+**Branch**: `main`
+
+### Summary
+
+Added bounded Godot-local bucket rear/shell support reaction with heave, pitch and roll composition, raw-contact feedback isolation, lifecycle clearing, model coverage, and a reliable Windows Godot standalone matrix runner. Verified pixi checks, 153 backend tests, and 12 Godot headless suites.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `98c0cce` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
