@@ -40,6 +40,47 @@ Initialized E:/projects/ExcavatorSim with Git, Trellis, and CodeGraph; captured 
 - None - task complete
 
 
+## Session 29: Jolt articulated work equipment
+
+**Date**: 2026-08-17
+**Task**: `08-17-jolt-articulated-equipment`
+**Branch**: `main`
+
+### Summary
+
+Implemented the opt-in Phase 2 Jolt-authoritative five-body/four-joint open
+chain for SY205 and SY135. Versioned rig contracts now bind visual rest frames,
+joint anchors, collision policy and actuator shaping. One post-step snapshot
+drives both GLB pivots and local truth, while BucketSoilState payload mass/COM
+is applied through a bounded monotonic tick-boundary adapter.
+
+### Key Contracts
+
+- Jolt owns chassis, upper, boom, arm and bucket state only in
+  `jolt_authoritative`; the default remains `python_kinematic`.
+- Hinge motor velocity is sign-inverted once at the Jolt adapter to match the
+  rig/visual/truth right-handed axis convention.
+- SY205 passive linkage remains visual-only and runs after physical pivots.
+- Legacy `BucketGroundLiftReaction` is disabled in authoritative mode.
+- Terrain mutation and production hydraulic/contact calibration remain deferred.
+- Standalone Godot tests must use the console executable so the runner waits for
+  the real process and propagates its exit code.
+
+### Testing
+
+- Godot 4.7.1 standalone matrix: 16/16 scripts passed, including the new
+  dual-model articulated equipment suite.
+- Godot AI MCP: live SY205/SY135 five-body/four-joint rigs, model/rig truth
+  identity, physical boom command, pivot diagnostics and single runtime checked.
+- `pixi run verify`: Ruff, mypy, 158 backend tests, provenance and path checks passed.
+- `pixi run backend-smoke`: passed.
+- Trellis task validation and `git diff --check`: passed.
+
+### Status
+
+[OK] **Implementation and quality gates complete; awaiting commit/archive request.**
+
+
 ## Session 2: Integrate SY205 GLB into Godot
 
 **Date**: 2026-08-10
@@ -1009,6 +1050,39 @@ Completed and archived Phase 1 Jolt-authoritative chassis/track runtime with ver
 | `ee0f39a` | (see git log) |
 | `fe03ad1` | (see git log) |
 | `c1c1324` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 29: Jolt articulated equipment authority
+
+**Date**: 2026-08-17
+**Task**: Jolt articulated equipment authority
+**Branch**: `main`
+
+### Summary
+
+Implemented and verified the Phase 2 five-body, four-joint Jolt articulated equipment runtime for SY205 and SY135, including bounded actuation, payload coupling, shared post-step truth, visual following, and lifecycle coverage; archived the completed Trellis task.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `88369b8` | (see git log) |
 
 ### Testing
 
