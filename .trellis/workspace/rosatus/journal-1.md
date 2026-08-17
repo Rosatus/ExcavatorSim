@@ -945,3 +945,79 @@ Planned the Jolt authority migration and implemented Phase 0 strict rig/truth co
 ### Next Steps
 
 - None - task complete
+
+
+## Session 28: Jolt chassis and track authority
+
+**Date**: 2026-08-17
+**Task**: `08-17-jolt-chassis-track-authority`
+**Branch**: `main`
+
+### Summary
+
+Implemented the opt-in Phase 1 `jolt_authoritative` chassis/track profile for
+SY205 and SY135 while keeping `python_kinematic` as the default and freezing work
+equipment. Added strict hash-bound rig contracts, one Jolt `RigidBody3D`, compound
+collision, distributed bilateral traction/braking/slip, terrain identity gates,
+local authoritative truth, lifecycle/model-switch cleanup, and architecture/spec
+updates.
+
+### Review Fixes
+
+- Marked ray-probe contacts with `jolt_contact_manifold_unavailable` instead of
+  presenting zero impulse/penetration as measured manifold data.
+- Cleared non-finite rigid-body velocities and exposed quality flags.
+- Prevented failed authoritative model switches from reporting legacy locomotion
+  state as an active Jolt rig.
+- Tightened truth to five unique named bodies/four unique named joints and rig
+  schema body inertia/shape-size bounds; added WebSocket rejection coverage for
+  authoritative truth on the shadow transport.
+- Kept `TerrainCommitScheduler` as the sole normal terrain-revision collider writer;
+  the Jolt runtime stops forces across stale identity gaps.
+
+### Testing
+
+- `pixi run verify`: passed, 158 backend tests.
+- `pixi run backend-smoke`: passed.
+- Godot 4.7.1 standalone matrix: 15/15 scripts passed.
+- `git diff --check`: passed.
+- Godot AI MCP: live SY205/SY135 rig, contact identity, and local-only truth verified.
+
+### Status
+
+[OK] **Implementation and quality gates complete; awaiting commit/archive request.**
+
+
+## Session 28: Jolt chassis and track authority
+
+**Date**: 2026-08-17
+**Task**: Jolt chassis and track authority
+**Branch**: `main`
+
+### Summary
+
+Completed and archived Phase 1 Jolt-authoritative chassis/track runtime with versioned rig and truth contracts, isolated backend validation, lifecycle safety, documentation, and full backend/Godot quality gates.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ee0f39a` | (see git log) |
+| `fe03ad1` | (see git log) |
+| `c1c1324` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

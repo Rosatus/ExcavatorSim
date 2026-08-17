@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 27
+- **Total Sessions**: 28
 - **Last Active**: 2026-08-17
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~947 | Active |
+| `journal-1.md` | ~1023 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 28 | 2026-08-17 | Jolt chassis and track authority | `ee0f39a`, `fe03ad1`, `c1c1324` | `main` |
 | 27 | 2026-08-17 | Authority contract and shadow state | `710eb59`, `823bab7` | `main` |
 | 26 | 2026-08-17 | Bucket ground lift reaction | `98c0cce` | `main` |
 | 25 | 2026-08-15 | Automatic bucket soil interaction | `864bd7e` | `main` |
