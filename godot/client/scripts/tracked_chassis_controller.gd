@@ -21,6 +21,7 @@ const INPUT_ACTIONS := {
 @export var motion_presentation_path := NodePath("../MotionPresentation")
 @export var terrain_world_path := NodePath("../TerrainRoot/TerrainWorld")
 @export var terrain_collider_path := NodePath("../TerrainRoot/TerrainCollider")
+@export var excavation_world_path := NodePath("../TerrainRoot/ExcavationWorld")
 
 var locomotion_state := TrackedLocomotionState.new()
 var ground_lift_reaction := BucketGroundLiftReaction.new()
@@ -30,12 +31,17 @@ var _motion_client: MotionClient
 var _motion_presentation: MotionPresentation
 var _terrain_world: TerrainWorld
 var _terrain_collider: TerrainCollider
+var _excavation_world: ExcavationWorld
 var _input_focused := true
 var _jolt_hint_status := "unavailable"
 var _base_local_transform := Transform3D.IDENTITY
 var _jolt_runtime: JoltChassisTrackRuntime
 var _use_test_commands := false
 var _test_commands := Vector2.ZERO
+var _use_test_equipment_commands := false
+var _test_equipment_commands := Vector4.ZERO
+var _payload_identity := -1
+var _last_payload_sample: Dictionary = {}
 
 
 func _ready() -> void:
@@ -124,6 +130,22 @@ func clear_commands_for_test() -> void:
 		_jolt_runtime.set_commands(0.0, 0.0)
 
 
+func set_equipment_commands_for_test(commands: Vector4) -> void:
+	_use_test_equipment_commands = true
+	_test_equipment_commands = commands if commands.is_finite() else Vector4.ZERO
+	if _jolt_runtime != null:
+		_jolt_runtime.set_equipment_commands(_test_equipment_commands)
+
+
+func clear_equipment_commands_for_test() -> void:
+	_use_test_equipment_commands = false
+	_test_equipment_commands = Vector4.ZERO
+	_payload_identity = -1
+	_last_payload_sample.clear()
+	if _jolt_runtime != null:
+		_jolt_runtime.set_equipment_commands(Vector4.ZERO)
+
+
 func step_fixed_for_test(delta: float, height_sampler: Callable) -> bool:
 	var changed := locomotion_state.step_fixed(delta, height_sampler)
 	_base_local_transform = locomotion_state.chassis_transform
@@ -135,11 +157,17 @@ func step_fixed_for_test(delta: float, height_sampler: Callable) -> bool:
 
 
 func submit_bucket_support_contact(contact: Dictionary) -> void:
+	if AuthorityProfile.writes_product_pose(authority_profile):
+		ground_lift_reaction.reset()
+		return
 	ground_lift_reaction.enabled = ground_lift_enabled
 	ground_lift_reaction.submit_contact(contact, _base_global_transform())
 
 
 func clear_bucket_support_contact() -> void:
+	if AuthorityProfile.writes_product_pose(authority_profile):
+		ground_lift_reaction.reset()
+		return
 	ground_lift_reaction.submit_contact({}, _base_global_transform())
 
 
@@ -172,7 +200,11 @@ func get_status_snapshot() -> Dictionary:
 	status["model_id"] = active_model_id
 	status["contract_error"] = contract_error
 	status["jolt_hint_status"] = _jolt_hint_status
-	status["ground_lift"] = ground_lift_reaction.get_status_snapshot()
+	status["ground_lift"] = (
+		{"enabled": false, "active": false, "reason": "jolt_authoritative_contact_response"}
+		if AuthorityProfile.writes_product_pose(authority_profile)
+		else ground_lift_reaction.get_status_snapshot()
+	)
 	status["authority_profile"] = authority_profile
 	return status
 
@@ -209,6 +241,7 @@ func _connect_runtime() -> void:
 	_motion_presentation = get_node_or_null(motion_presentation_path) as MotionPresentation
 	_terrain_world = get_node_or_null(terrain_world_path) as TerrainWorld
 	_terrain_collider = get_node_or_null(terrain_collider_path) as TerrainCollider
+	_excavation_world = get_node_or_null(excavation_world_path) as ExcavationWorld
 	if _motion_client != null and not _motion_client.pose_cleared.is_connected(_on_pose_cleared):
 		_motion_client.pose_cleared.connect(_on_pose_cleared)
 	if _motion_presentation != null:
@@ -307,6 +340,8 @@ func _reset_motion() -> void:
 	_base_local_transform = Transform3D.IDENTITY
 	_use_test_commands = false
 	_test_commands = Vector2.ZERO
+	_use_test_equipment_commands = false
+	_test_equipment_commands = Vector4.ZERO
 	if AuthorityProfile.writes_product_pose(authority_profile) and _jolt_runtime != null:
 		var descriptor := PhysicsRigDescriptor.load_for_model(active_model_id)
 		var spawn := _authoritative_spawn_transform(descriptor) if descriptor != null else Transform3D.IDENTITY
@@ -349,11 +384,21 @@ func _step_authoritative_chassis() -> void:
 			right = Input.get_action_strength("track_right_forward") - Input.get_action_strength("track_right_reverse")
 	_jolt_runtime.set_enabled(controller_enabled)
 	_jolt_runtime.set_commands(left, right)
-	_sync_visual_to_jolt_body()
+	var equipment_axes := Vector4.ZERO
+	if controller_enabled and _input_focused:
+		equipment_axes = (
+			_test_equipment_commands
+			if _use_test_equipment_commands
+			else (_motion_client.get_authoritative_input_axes() if _motion_client != null else Vector4.ZERO)
+		)
+	_jolt_runtime.set_equipment_commands(equipment_axes, Engine.get_physics_frames())
+	_submit_authoritative_payload()
 
 
 func _configure_jolt_runtime(catalog_entry: Dictionary) -> bool:
 	_destroy_jolt_runtime()
+	_payload_identity = -1
+	_last_payload_sample.clear()
 	if _terrain_world == null or _terrain_world.terrain_state == null or _terrain_collider == null:
 		contract_error = "jolt_authoritative requires TerrainWorld and TerrainCollider"
 		return false
@@ -378,6 +423,8 @@ func _configure_jolt_runtime(catalog_entry: Dictionary) -> bool:
 		_jolt_runtime = null
 		return false
 	parent.add_child(_jolt_runtime)
+	if not _jolt_runtime.post_step_snapshot_captured.is_connected(_on_jolt_post_step_snapshot):
+		_jolt_runtime.post_step_snapshot_captured.connect(_on_jolt_post_step_snapshot)
 	if not _jolt_runtime.configure(
 		descriptor,
 		_terrain_world,
@@ -388,7 +435,7 @@ func _configure_jolt_runtime(catalog_entry: Dictionary) -> bool:
 		_destroy_jolt_runtime()
 		return false
 	_jolt_runtime.set_enabled(controller_enabled)
-	_sync_visual_to_jolt_body()
+	_on_jolt_post_step_snapshot(_jolt_runtime.get_post_step_snapshot())
 	return true
 
 
@@ -429,10 +476,13 @@ func _authoritative_spawn_transform(descriptor: PhysicsRigDescriptor) -> Transfo
 	var data := descriptor.to_dictionary()
 	var dynamics := data.get("chassis_dynamics", {}) as Dictionary
 	var minimum_bottom := 0.0
-	for shape in dynamics.get("compound_shapes", []):
-		var center := _vector3(shape.get("center_m", [0.0, 0.0, 0.0]))
-		var size := _vector3(shape.get("size_m", [1.0, 1.0, 1.0]))
-		minimum_bottom = minf(minimum_bottom, center.y - 0.5 * size.y)
+	for body_value in data.get("bodies", []):
+		if body_value is Dictionary and String((body_value as Dictionary).get("name", "")) == "chassis":
+			var shape := (body_value as Dictionary).get("shape", {}) as Dictionary
+			var center := _vector3(shape.get("center_m", [0.0, 0.0, 0.0]))
+			var size := _vector3(shape.get("size_m", [1.0, 1.0, 1.0]))
+			minimum_bottom = center.y - 0.5 * size.y
+			break
 	spawn.origin.y = surface_y - minimum_bottom + float(dynamics.get("ground_clearance_m", 0.05))
 	return spawn
 
@@ -440,8 +490,37 @@ func _authoritative_spawn_transform(descriptor: PhysicsRigDescriptor) -> Transfo
 func _sync_visual_to_jolt_body() -> void:
 	if _jolt_runtime == null or not _jolt_runtime.has_body():
 		return
-	global_transform = _jolt_runtime.get_body_global_transform()
+	_on_jolt_post_step_snapshot(_jolt_runtime.get_post_step_snapshot())
+
+
+func _on_jolt_post_step_snapshot(snapshot: Dictionary) -> void:
+	var body_transform: Variant = snapshot.get("body_transform")
+	if not body_transform is Transform3D or not (body_transform as Transform3D).is_finite():
+		return
+	global_transform = body_transform as Transform3D
 	_base_local_transform = transform
+	ground_lift_reaction.reset()
+	if _motion_presentation != null:
+		_motion_presentation.apply_physics_snapshot(snapshot)
+
+
+func _submit_authoritative_payload() -> void:
+	if _jolt_runtime == null or _excavation_world == null:
+		return
+	var soil := _excavation_world.get_status_snapshot()
+	var center: Variant = soil.get("center_of_mass_local", Vector3.ZERO)
+	if not center is Vector3:
+		center = Vector3.ZERO
+	var sample := {
+		"mass_kg": float(soil.get("payload_mass_kg", 0.0)),
+		"center_of_mass_local": center as Vector3,
+		"world_generation": int(soil.get("world_generation", 0)),
+	}
+	if sample == _last_payload_sample:
+		return
+	_payload_identity += 1
+	if _jolt_runtime.set_bucket_payload(sample["mass_kg"], sample["center_of_mass_local"], _payload_identity):
+		_last_payload_sample = sample
 
 
 func _vector3(value: Variant) -> Vector3:

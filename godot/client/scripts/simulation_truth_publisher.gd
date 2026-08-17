@@ -104,34 +104,52 @@ func build_snapshot() -> SimulationTruthSnapshot:
 		"arm": "arm_link", "bucket": "bucket_link",
 	}
 	var bodies: Array[Dictionary] = []
-	for body_name in body_frames:
-		var frame := _presentation.get_frame_node(body_frames[body_name])
-		if frame == null:
-			return null
-		var body_transform := frame.global_transform
-		var linear_velocity := Vector3.ZERO
-		var angular_velocity := Vector3.ZERO
-		var sleeping := false
-		if authoritative and body_name == "chassis":
-			body_transform = chassis.get("body_transform", body_transform) as Transform3D
-			linear_velocity = chassis.get("linear_velocity", Vector3.ZERO) as Vector3
-			angular_velocity = chassis.get("angular_velocity", Vector3.ZERO) as Vector3
-			sleeping = bool(chassis.get("sleeping", false))
-		bodies.append({
-			"name": body_name,
-			"transform": MotionProtocol.transform_to_canonical_rows(body_transform),
-			"linear_velocity_m_s": MotionProtocol.vector_to_canonical_array(linear_velocity),
-			"angular_velocity_rad_s": MotionProtocol.vector_to_canonical_array(angular_velocity),
-			"sleeping": sleeping,
-		})
+	if authoritative:
+		for body_value in chassis.get("bodies", []):
+			if not body_value is Dictionary:
+				return null
+			var body := body_value as Dictionary
+			bodies.append({
+				"name": String(body.get("name", "")),
+				"transform": MotionProtocol.transform_to_canonical_rows(body.get("transform", Transform3D.IDENTITY) as Transform3D),
+				"linear_velocity_m_s": MotionProtocol.vector_to_canonical_array(body.get("linear_velocity", Vector3.ZERO) as Vector3),
+				"angular_velocity_rad_s": MotionProtocol.vector_to_canonical_array(body.get("angular_velocity", Vector3.ZERO) as Vector3),
+				"sleeping": bool(body.get("sleeping", false)),
+			})
+	else:
+		for body_name in body_frames:
+			var frame := _presentation.get_frame_node(body_frames[body_name])
+			if frame == null:
+				return null
+			bodies.append({
+				"name": body_name,
+				"transform": MotionProtocol.transform_to_canonical_rows(frame.global_transform),
+				"linear_velocity_m_s": MotionProtocol.vector_to_canonical_array(Vector3.ZERO),
+				"angular_velocity_rad_s": MotionProtocol.vector_to_canonical_array(Vector3.ZERO),
+				"sleeping": false,
+			})
 	var joints: Array[Dictionary] = []
-	for index in MotionProtocol.JOINT_NAMES.size():
-		joints.append({
-			"name": MotionProtocol.JOINT_NAMES[index],
-			"position_rad": float(joint_positions[index]),
-			"velocity_rad_s": float(joint_velocities[index]),
-			"effort_n": 0.0,
-		})
+	if authoritative:
+		for joint_value in chassis.get("joints", []):
+			if not joint_value is Dictionary:
+				return null
+			var joint := joint_value as Dictionary
+			joints.append({
+				"name": String(joint.get("name", "")),
+				"target_position_rad": float(joint.get("target_position_rad", 0.0)),
+				"target_velocity_rad_s": float(joint.get("target_velocity_rad_s", 0.0)),
+				"position_rad": float(joint.get("position_rad", 0.0)),
+				"velocity_rad_s": float(joint.get("velocity_rad_s", 0.0)),
+				"effort_n": float(joint.get("effort_n", 0.0)),
+			})
+	else:
+		for index in MotionProtocol.JOINT_NAMES.size():
+			joints.append({
+				"name": MotionProtocol.JOINT_NAMES[index],
+				"position_rad": float(joint_positions[index]),
+				"velocity_rad_s": float(joint_velocities[index]),
+				"effort_n": 0.0,
+			})
 	var session_id := LOCAL_SESSION_ID
 	var simulation_epoch := _authority_epoch
 	var calibration_version := CALIBRATION_VERSION
@@ -157,15 +175,18 @@ func build_snapshot() -> SimulationTruthSnapshot:
 	for flag in _descriptor.to_dictionary().get("quality_flags", []):
 		quality_flags.append(String(flag))
 	if authoritative:
-		quality_flags.append("jolt_chassis_authority")
-		quality_flags.append("work_equipment_frozen_phase1")
+		quality_flags.append("jolt_articulated_authority")
 		quality_flags.append("jolt_contact_manifold_unavailable")
 		for flag in chassis.get("quality_flags", []):
 			if not quality_flags.has(String(flag)):
 				quality_flags.append(String(flag))
 	else:
 		quality_flags.append_array(["shadow_observation", "kinematic_body_velocity_unavailable", "jolt_contact_manifold_unavailable"])
-	var center := excavation.get("center_of_mass_local", Vector3.ZERO) as Vector3
+	var applied_payload := chassis.get("payload", {}) as Dictionary if authoritative else {}
+	var center := (
+		applied_payload.get("center_of_mass_local", Vector3.ZERO)
+		if authoritative else excavation.get("center_of_mass_local", Vector3.ZERO)
+	) as Vector3
 	var result := {
 		"schema_version": "simulation-truth-v1",
 		"authority_profile": authority_profile,
@@ -204,7 +225,7 @@ func build_snapshot() -> SimulationTruthSnapshot:
 			"terrain_identity_valid": bool(chassis.get("terrain_identity_valid", not authoritative)),
 		},
 		"payload": {
-			"mass_kg": float(excavation.get("payload_mass_kg", 0.0)),
+			"mass_kg": float(applied_payload.get("mass_kg", 0.0)) if authoritative else float(excavation.get("payload_mass_kg", 0.0)),
 			"volume_m3": float(excavation.get("bucket_volume_m3", 0.0)),
 			"fill_ratio": clampf(float(excavation.get("fill_ratio", 0.0)), 0.0, 1.5),
 			"center_of_mass_m": MotionProtocol.vector_to_canonical_array(center),

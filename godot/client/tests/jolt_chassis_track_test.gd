@@ -255,13 +255,20 @@ func _test_controller_authority_lifecycle() -> void:
 	if not is_zero_approx(float(unfocused["left_command"])) or not is_zero_approx(float(unfocused["right_command"])):
 		failures.append("focus loss did not disarm authoritative tracks")
 	chassis.notification(Node.NOTIFICATION_APPLICATION_FOCUS_IN)
+	chassis.set_equipment_commands_for_test(Vector4(0.0, 0.0, 0.0, 1.0))
+	for _frame in 60:
+		await physics_frame
+	chassis.clear_equipment_commands_for_test()
+	var linkage := presentation.get_passive_linkage_snapshot_for_test()
+	if not bool(linkage.get("reachable", false)) or not presentation.get_pivot_diagnostics_for_test().is_empty():
+		failures.append("authoritative SY205 physical bucket broke visual pivot/linkage invariants")
 	if not presentation.activate_model_for_test("sy135"):
 		failures.append("authoritative SY135 model rebuild failed: %s" % chassis.contract_error)
 	else:
 		for _frame in 3:
 			await physics_frame
 		var switched := chassis.get_status_snapshot()
-		if switched.get("model_id") != "sy135" or switched.get("rig_version") != "sy135-jolt-rig-v2":
+		if switched.get("model_id") != "sy135" or switched.get("rig_version") != "sy135-jolt-rig-v3":
 			failures.append("model switch retained the wrong dynamic rig: %s" % switched)
 		var runtime_count := 0
 		for child in host.get_children():
@@ -294,10 +301,17 @@ func _test_controller_authority_lifecycle() -> void:
 		var tracks := truth.get("tracks", {}) as Dictionary
 		if not tracks.has_all(["left_contact_count", "right_contact_count", "left_slip_ratio", "right_slip_ratio", "terrain_identity_valid"]):
 			failures.append("authoritative truth omitted track telemetry")
-		if truth.get("identity", {}).get("rig_version") != "sy135-jolt-rig-v2":
+		if truth.get("identity", {}).get("rig_version") != "sy135-jolt-rig-v3":
 			failures.append("authoritative truth retained stale rig identity")
-		if not (truth.get("quality_flags", []) as Array).has("work_equipment_frozen_phase1"):
-			failures.append("authoritative truth did not declare frozen equipment")
+		if not (truth.get("quality_flags", []) as Array).has("jolt_articulated_authority"):
+			failures.append("authoritative truth did not declare articulated authority")
+		if (truth.get("quality_flags", []) as Array).has("work_equipment_frozen_phase1"):
+			failures.append("authoritative truth retained the Phase 1 frozen-equipment flag")
+		if (truth.get("bodies", []) as Array).size() != 5 or (truth.get("joints", []) as Array).size() != 4:
+			failures.append("authoritative truth omitted articulated body or joint state")
+		for joint_value in truth.get("joints", []):
+			if not (joint_value as Dictionary).has_all(["target_position_rad", "target_velocity_rad_s", "position_rad", "velocity_rad_s", "effort_n"]):
+				failures.append("authoritative truth omitted target/actual/effort joint telemetry")
 		if not (truth.get("quality_flags", []) as Array).has("jolt_contact_manifold_unavailable"):
 			failures.append("authoritative ray contacts did not declare unavailable manifold values")
 	var publisher_status := publisher.get_status_snapshot()

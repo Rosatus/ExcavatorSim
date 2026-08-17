@@ -58,13 +58,14 @@ Crawler travel keeps four Godot-local track actions and never extends the Python
 four-axis articulation vector. In default/shadow profiles,
 `TrackedChassisController` retains the legacy local locomotion layer while
 Python provides the base/joint pose below `PresentationRoot`. In explicit
-`jolt_authoritative`, a model-specific `JoltChassisTrackRuntime` owns one dynamic
-`RigidBody3D`; the controller only copies that body snapshot to
-`ChassisMotionRoot`, `MotionPresentation` rejects Python pose writes, and the
-work equipment remains at rest. Reset, reconnect, model activation, world reset,
-focus loss, invalid rig/terrain, or profile teardown stops forces and clears or
-rebuilds the dynamic state. SY205 and SY135 use separate hash-bound rig and track
-descriptors with no cross-model fallback.
+`jolt_authoritative`, a model-specific `JoltChassisTrackRuntime` owns a five-body
+open chain and four Jolt hinges. The controller applies the captured chassis
+transform to `ChassisMotionRoot`; `MotionPresentation` rejects Python pose writes
+and consumes the same post-step body snapshot used by local truth. Reset,
+reconnect, model activation, world reset, focus loss, invalid rig/terrain, or
+profile teardown stops forces and clears or rebuilds the complete dynamic rig.
+SY205 and SY135 use separate hash-bound rig and track descriptors with no
+cross-model fallback.
 
 The M5 excavation path keeps `BucketSoilState` as the one local inventory owner.
 In production, fixed-step swept bucket proxies classify contact, intake, carry,
@@ -85,9 +86,10 @@ The project setting `simulation/authority_profile` defaults to
 `python_kinematic`. Phase 0 also implements opt-in `jolt_shadow`: Python remains
 the only product pose writer, while the root-level `SimulationTruthPublisher`
 reads post-physics state and queues a negotiated `simulation_truth_shadow_v1`
-observation at no more than 30 Hz. Phase 1 implements opt-in
-`jolt_authoritative` for chassis/tracks only. It creates local
-`simulation-truth-v1` diagnostics from the Jolt body and track contacts, but
+observation at no more than 30 Hz. Phase 2 implements opt-in
+`jolt_authoritative` for chassis, tracks and work equipment. It creates local
+`simulation-truth-v1` diagnostics from one five-body/four-joint post-step
+snapshot and track/equipment contacts, but
 does not queue shadow traffic; Python explicitly rejects authoritative-profile
 snapshots at the shadow boundary.
 
@@ -103,9 +105,10 @@ or model switch; `/health` is its only Phase 0 consumer.
 Both model rig descriptors are validated, versioned, and hash-bound, but their
 physical properties remain provisional. Shadow mode marks unavailable body
 velocity/contact fields through quality flags rather than inventing values;
-authoritative mode reports actual Phase 1 chassis velocity, distributed track
-contact, slip, saturation, and terrain identity. No shadow path calls product
-transform, terrain, bucket, or lifecycle setters.
+authoritative mode reports actual articulated transforms, joint targets,
+positions, velocities and bounded efforts, applied payload identity/COM,
+distributed track contact, slip, saturation, and terrain identity. No shadow
+path calls product transform, terrain, bucket, or lifecycle setters.
 
 The realistic visual pass uses Sky3D 2.1 behind the project-owned
 `VisualEnvironment` seam, plus a generation-gated soil particle emitter and a
@@ -206,8 +209,9 @@ The first soil presentation is not a per-grain rigid-body simulation. It combine
 
 ## Deferred model decisions
 
-The GLBs remain visual assets. Phase 1 adds bounded compound chassis proxies and
-provisional mass/inertia/track tuning for the opt-in Jolt chassis mode. Validated
-production collision geometry and mass properties, hydraulic forces, material
-contact calibration, bucket cavity dynamics, excavation coupling, and a fully
-dynamic articulated excavator remain deferred to later Jolt authority phases.
+The GLBs remain visual assets. Phase 2 adds explicit rest/anchor contracts,
+five provisional body proxies, four bounded hinges, jerk/acceleration-shaped
+motors, and tick-boundary bucket payload mass/COM coupling. Validated production
+collision geometry and mass properties, hydraulic force curves, material
+contact calibration, bucket cavity dynamics, and terrain-mutation coupling
+remain deferred to later Jolt authority phases.

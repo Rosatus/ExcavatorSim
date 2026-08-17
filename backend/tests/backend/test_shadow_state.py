@@ -98,7 +98,7 @@ def _identity(
         model_id="sy205",
         model_version="sy205-glb-urdf-v4",
         rig_id="sy205-jolt-rig",
-        rig_version="sy205-jolt-rig-v2",
+        rig_version="sy205-jolt-rig-v3",
         calibration_version="machine-calibration-v2",
     )
 
@@ -119,6 +119,12 @@ def test_rig_descriptors_match_strict_schema() -> None:
         invalid_descriptor = json.loads(json.dumps(descriptor))
         invalid_descriptor["bodies"][0]["inertia_diagonal_kg_m2"][0] = 0.0
         assert list(validator.iter_errors(invalid_descriptor))
+        invalid_transform = json.loads(json.dumps(descriptor))
+        invalid_transform["bodies"][0]["rest_transform_godot"][3] = [0.0, 0.0, 1.0, 1.0]
+        assert list(validator.iter_errors(invalid_transform))
+        missing_anchor = json.loads(json.dumps(descriptor))
+        del missing_anchor["joints"][0]["parent_anchor_godot"]
+        assert list(validator.iter_errors(missing_anchor))
 
     identity_fixture = json.loads(
         (

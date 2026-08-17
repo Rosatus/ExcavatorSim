@@ -1,11 +1,9 @@
 class_name MotionPresentation
 extends Node3D
 
-## Applies converted Python named-frame transforms to the selected imported visual
-## skin. MotionProtocol owns the one Python Z-up -> Godot Y-up conversion. The
-## imported GLB owns pivot origins; adjacent authority frames provide only the
-## clean local joint rotations. In jolt_authoritative, the imported skin stays
-## at its rest articulation and follows the physics-owned ChassisMotionRoot.
+## Applies named-frame transforms to the selected imported visual skin. Python
+## poses arrive already converted by MotionProtocol. In jolt_authoritative the
+## same post-step physics snapshot drives both the visual pivots and truth output.
 
 const MODEL_CATALOG_PATH := "res://resources/models/model_catalog.json"
 const RIGID_BASIS_TOLERANCE := 0.001
@@ -28,6 +26,7 @@ var _soil_contract_path := ""
 var _soil_contract: Dictionary = {}
 var _frame_nodes: Dictionary = {}
 var _authority_zero_globals: Dictionary = {}
+var _physics_rest_globals: Dictionary = {}
 var _frame_parent_names: Dictionary = {}
 var _frame_runtime_axes: Dictionary = {}
 var _rest_locals: Dictionary = {}
@@ -117,11 +116,14 @@ func get_soil_contract() -> Dictionary:
 
 
 func sample_bucket_pose_fixed(world_generation: int, authority_generation: int) -> Dictionary:
-	if not _has_pose or _soil_contract.is_empty() or _motion_client == null:
+	if not _has_pose or _soil_contract.is_empty():
 		return {"valid": false, "reason": "pose_unavailable"}
-	var accepted_pose := _motion_client.get_latest_accepted_pose()
-	if not accepted_pose.is_empty():
-		_apply_render_pose(accepted_pose)
+	if not AuthorityProfile.writes_product_pose(authority_profile):
+		if _motion_client == null:
+			return {"valid": false, "reason": "motion_client_unavailable"}
+		var accepted_pose := _motion_client.get_latest_accepted_pose()
+		if not accepted_pose.is_empty():
+			_apply_render_pose(accepted_pose)
 	var current := {}
 	for proxy_name in ["cutting_edge", "top_edge", "opening", "cavity", "rear_support"]:
 		var proxy_transform: Variant = _soil_proxy_transform(proxy_name)
@@ -129,7 +131,7 @@ func sample_bucket_pose_fixed(world_generation: int, authority_generation: int) 
 			clear_bucket_pose_history()
 			return {"valid": false, "reason": "proxy_unavailable", "proxy": proxy_name}
 		current[proxy_name] = proxy_transform
-	var status := _motion_client.get_status_snapshot()
+	var status := _motion_client.get_status_snapshot() if _motion_client != null else {}
 	var session_id := String(status.get("session_id", ""))
 	var simulation_epoch := String(status.get("simulation_epoch", ""))
 	var model_id := _active_model_id
@@ -311,6 +313,7 @@ func _activate_model(model_id: String) -> bool:
 func _clear_contract_state() -> void:
 	_frame_nodes.clear()
 	_authority_zero_globals.clear()
+	_physics_rest_globals.clear()
 	_frame_parent_names.clear()
 	_frame_runtime_axes.clear()
 	_rest_locals.clear()
@@ -352,6 +355,14 @@ func _load_mapping_contract(model_id: String) -> bool:
 	var frame_contracts: Dictionary = local_kinematics.get("frame_contracts", {})
 	var zero_pose: Dictionary = fixture.get("poses", {}).get("zero", {})
 	var zero_frames: Dictionary = zero_pose.get("frame_transforms", {})
+	var physics_descriptor := PhysicsRigDescriptor.load_for_model(model_id)
+	if physics_descriptor == null or not physics_descriptor.is_valid_for(model_id, physics_descriptor.model_version()):
+		_contract_error = "%s physics rest contract is unavailable" % model_id
+		push_error(_contract_error)
+		return false
+	for body_value in physics_descriptor.bodies():
+		var body := body_value as Dictionary
+		_physics_rest_globals[String(body["frame"])] = _rows_to_transform(body["rest_transform_godot"])
 	for frame_name in MotionProtocol.FRAME_NAMES:
 		var mapping: Dictionary = frame_map.get(frame_name, {})
 		var frame_contract: Dictionary = frame_contracts.get(frame_name, {})
@@ -421,8 +432,6 @@ func _load_mapping_contract(model_id: String) -> bool:
 
 func _on_pose_accepted(_pose: Dictionary) -> void:
 	if AuthorityProfile.writes_product_pose(authority_profile):
-		_has_pose = false
-		_restore_rest_pose()
 		return
 	_has_pose = true
 	_last_render_revision = -1
@@ -614,6 +623,95 @@ func _apply_render_pose(pose: Dictionary) -> void:
 	for frame_index in range(1, MotionProtocol.FRAME_NAMES.size()):
 		_apply_local_joint_transform(MotionProtocol.FRAME_NAMES[frame_index], transforms)
 	_apply_passive_linkage()
+
+
+func apply_physics_snapshot(snapshot: Dictionary) -> bool:
+	if not AuthorityProfile.writes_product_pose(authority_profile) or _asset_root == null:
+		return false
+	var body_values: Variant = snapshot.get("bodies", [])
+	if not body_values is Array or (body_values as Array).size() != MotionProtocol.FRAME_NAMES.size():
+		return false
+	var body_to_frame := {
+		"chassis": "base_link", "upper": "upper_structure_link", "boom": "boom_link",
+		"arm": "arm_link", "bucket": "bucket_link",
+	}
+	var transforms := {}
+	for body_value in body_values as Array:
+		if not body_value is Dictionary:
+			return false
+		var body := body_value as Dictionary
+		var frame_name := String(body_to_frame.get(String(body.get("name", "")), ""))
+		var transform_value: Variant = body.get("transform")
+		if frame_name.is_empty() or transforms.has(frame_name) or not transform_value is Transform3D:
+			return false
+		if not _is_rigid_transform(transform_value as Transform3D):
+			return false
+		transforms[frame_name] = transform_value
+	if transforms.size() != MotionProtocol.FRAME_NAMES.size():
+		return false
+	var base_node := _frame_nodes.get("base_link") as Node3D
+	var base_rest: Variant = _rest_locals.get("base_link")
+	if base_node == null or not base_rest is Transform3D:
+		return false
+	base_node.transform = base_rest as Transform3D
+	_pivot_reasons.erase("base_link")
+	for frame_index in range(1, MotionProtocol.FRAME_NAMES.size()):
+		_apply_physics_joint_transform(MotionProtocol.FRAME_NAMES[frame_index], transforms)
+	if not _pivot_reasons.is_empty():
+		return false
+	_apply_passive_linkage()
+	_has_pose = true
+	_last_render_revision = int(snapshot.get("physics_tick", _last_render_revision + 1))
+	return true
+
+
+func _apply_physics_joint_transform(frame_name: String, transforms: Dictionary) -> void:
+	var frame_node := _frame_nodes.get(frame_name) as Node3D
+	var parent_name := String(_frame_parent_names.get(frame_name, ""))
+	if _pivot_reasons.has(parent_name):
+		_pivot_mark_invalid(frame_name, "parent_invalid")
+		return
+	var parent_current: Variant = transforms.get(parent_name)
+	var child_current: Variant = transforms.get(frame_name)
+	var parent_rest: Variant = _physics_rest_globals.get(parent_name)
+	var child_rest: Variant = _physics_rest_globals.get(frame_name)
+	var visual_rest: Variant = _rest_locals.get(frame_name)
+	if (
+		frame_node == null or not parent_current is Transform3D or not child_current is Transform3D
+		or not parent_rest is Transform3D or not child_rest is Transform3D
+		or not visual_rest is Transform3D
+	):
+		_pivot_mark_invalid(frame_name, "missing_physics_transform")
+		return
+	for candidate in [parent_current, child_current, parent_rest, child_rest]:
+		if not _is_rigid_transform(candidate as Transform3D):
+			_pivot_mark_invalid(frame_name, "non_rigid_physics_transform")
+			return
+	var rest_relation := (parent_rest as Transform3D).affine_inverse() * (child_rest as Transform3D)
+	var current_relation := (parent_current as Transform3D).affine_inverse() * (child_current as Transform3D)
+	var delta_basis := rest_relation.basis.inverse() * current_relation.basis
+	var runtime_axis := String(_frame_runtime_axes.get(frame_name, ""))
+	var angle := _twist_angle(delta_basis, _axis_vector(runtime_axis))
+	var clean_delta := Basis(_axis_vector(runtime_axis), angle)
+	var target_local := visual_rest as Transform3D
+	target_local.basis = target_local.basis * clean_delta
+	if not _finite_transform(target_local):
+		_pivot_mark_invalid(frame_name, "non_finite_physics_transform")
+		return
+	frame_node.transform = target_local
+	_pivot_mark_valid(frame_name)
+
+
+func _rows_to_transform(value: Variant) -> Transform3D:
+	var rows := value as Array
+	return Transform3D(
+		Basis(
+			Vector3(float(rows[0][0]), float(rows[1][0]), float(rows[2][0])),
+			Vector3(float(rows[0][1]), float(rows[1][1]), float(rows[2][1])),
+			Vector3(float(rows[0][2]), float(rows[1][2]), float(rows[2][2])),
+		),
+		Vector3(float(rows[0][3]), float(rows[1][3]), float(rows[2][3])),
+	)
 
 
 func _restore_rest_pose() -> void:
@@ -927,6 +1025,12 @@ func _single_axis_angle(rotation_basis: Basis, axis_name: String) -> float:
 	if axis_name == "Y":
 		return atan2(rotation_basis.z.x, rotation_basis.x.x)
 	return atan2(rotation_basis.y.z, rotation_basis.y.y)
+
+
+func _twist_angle(rotation_basis: Basis, axis: Vector3) -> float:
+	var rotation := Quaternion(rotation_basis.orthonormalized()).normalized()
+	var projected := Vector3(rotation.x, rotation.y, rotation.z).dot(axis.normalized())
+	return wrapf(2.0 * atan2(projected, rotation.w), -PI, PI)
 
 
 func _basis_max_abs_difference(first: Basis, second: Basis) -> float:

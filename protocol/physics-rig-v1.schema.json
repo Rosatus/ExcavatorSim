@@ -4,7 +4,7 @@
   "title": "Excavator Physics Rig Descriptor v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "rig_id", "rig_version", "model_id", "model_version", "coordinate_basis", "provenance", "collision_layers", "bodies", "joints", "chassis_dynamics", "tracks", "quality_flags"],
+  "required": ["schema_version", "rig_id", "rig_version", "model_id", "model_version", "coordinate_basis", "provenance", "collision_layers", "self_collision_mode", "bodies", "joints", "chassis_dynamics", "tracks", "quality_flags"],
   "properties": {
     "schema_version": {"const": "physics-rig-v1"},
     "rig_id": {"type": "string", "minLength": 1},
@@ -32,6 +32,7 @@
         "payload": {"type": "integer", "minimum": 1, "maximum": 32}
       }
     },
+    "self_collision_mode": {"enum": ["disabled_provisional", "non_adjacent"]},
     "bodies": {
       "type": "array",
       "minItems": 5,
@@ -87,6 +88,21 @@
   "$defs": {
     "vec3": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}},
     "positive_vec3": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number", "exclusiveMinimum": 0}},
+    "row4": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "number"}},
+    "transform_rows": {
+      "type": "array",
+      "prefixItems": [
+        {"$ref": "#/$defs/row4"},
+        {"$ref": "#/$defs/row4"},
+        {"$ref": "#/$defs/row4"},
+        {
+          "type": "array",
+          "prefixItems": [{"const": 0.0}, {"const": 0.0}, {"const": 0.0}, {"const": 1.0}],
+          "items": false
+        }
+      ],
+      "items": false
+    },
     "shape": {
       "type": "object",
       "additionalProperties": false,
@@ -110,10 +126,11 @@
     "body": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "frame", "mass_kg", "center_of_mass_m", "inertia_diagonal_kg_m2", "shape"],
+      "required": ["name", "frame", "rest_transform_godot", "mass_kg", "center_of_mass_m", "inertia_diagonal_kg_m2", "shape"],
       "properties": {
         "name": {"enum": ["chassis", "upper", "boom", "arm", "bucket"]},
         "frame": {"enum": ["base_link", "upper_structure_link", "boom_link", "arm_link", "bucket_link"]},
+        "rest_transform_godot": {"$ref": "#/$defs/transform_rows"},
         "mass_kg": {"type": "number", "exclusiveMinimum": 0},
         "center_of_mass_m": {"$ref": "#/$defs/vec3"},
         "inertia_diagonal_kg_m2": {"$ref": "#/$defs/positive_vec3"},
@@ -132,23 +149,29 @@
     "joint": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "type", "parent_body", "child_body", "frame", "axis", "limit_rad", "actuator"],
+      "required": ["name", "type", "parent_body", "child_body", "frame", "parent_anchor_godot", "child_anchor_godot", "axis", "axis_frame", "limit_rad", "collide_connected", "actuator"],
       "properties": {
         "name": {"enum": ["swing_joint", "boom_joint", "arm_joint", "bucket_joint"]},
         "type": {"enum": ["hinge", "continuous_hinge"]},
         "parent_body": {"enum": ["chassis", "upper", "boom", "arm"]},
         "child_body": {"enum": ["upper", "boom", "arm", "bucket"]},
         "frame": {"type": "string", "minLength": 1},
+        "parent_anchor_godot": {"$ref": "#/$defs/transform_rows"},
+        "child_anchor_godot": {"$ref": "#/$defs/transform_rows"},
         "axis": {"$ref": "#/$defs/vec3"},
+        "axis_frame": {"const": "child_anchor_local"},
         "limit_rad": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number"}},
+        "collide_connected": {"type": "boolean"},
         "actuator": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["mode", "max_force_n", "max_velocity_rad_s", "damping"],
+          "required": ["mode", "max_torque_nm", "max_velocity_rad_s", "max_acceleration_rad_s2", "max_jerk_rad_s3", "damping"],
           "properties": {
             "mode": {"const": "velocity_motor"},
-            "max_force_n": {"type": "number", "exclusiveMinimum": 0},
+            "max_torque_nm": {"type": "number", "exclusiveMinimum": 0},
             "max_velocity_rad_s": {"type": "number", "exclusiveMinimum": 0},
+            "max_acceleration_rad_s2": {"type": "number", "exclusiveMinimum": 0},
+            "max_jerk_rad_s3": {"type": "number", "exclusiveMinimum": 0},
             "damping": {"type": "number", "minimum": 0}
           }
         }

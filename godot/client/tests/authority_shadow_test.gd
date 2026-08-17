@@ -31,11 +31,19 @@ func _run() -> void:
 			return _fail("missing descriptor for %s" % model_id)
 		var catalog: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://resources/models/model_catalog.json"))
 		var model_version := ""
+		var catalog_entry := {}
 		for candidate in catalog.get("models", []):
 			if candidate.get("model_id") == model_id:
+				catalog_entry = candidate
 				model_version = String(candidate.get("model_version", ""))
 		if not descriptor.is_valid_for(model_id, model_version):
 			return _fail("invalid descriptor for %s: %s" % [model_id, descriptor.validation_error()])
+		var manifest: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(String(catalog_entry.get("manifest_path", ""))))
+		var manifest_rests: Dictionary = manifest.get("calibration", {}).get("rest_transforms_godot", {})
+		for body in descriptor.bodies():
+			var frame_name := String(body.get("frame", ""))
+			if not _rows_are_close(body.get("rest_transform_godot", []), manifest_rests.get(frame_name, []), 0.000001):
+				return _fail("%s descriptor rest transform drifted from %s manifest" % [model_id, frame_name])
 	var valid_descriptor := PhysicsRigDescriptor.load_for_model("sy205")
 	if valid_descriptor == null:
 		return _fail("missing sy205 descriptor")
@@ -43,7 +51,14 @@ func _run() -> void:
 		["provenance.notes", _without_nested_field(valid_descriptor.to_dictionary(), ["provenance", "notes"])],
 		["bodies[0].shape.extra", _with_nested_value(valid_descriptor.to_dictionary(), ["bodies", 0, "shape", "extra"], true)],
 		["bodies[0].shape.size_m[1]", _with_nested_value(valid_descriptor.to_dictionary(), ["bodies", 0, "shape", "size_m", 1], 0.0)],
-		["joints[0].actuator.max_force_n", _with_nested_value(valid_descriptor.to_dictionary(), ["joints", 0, "actuator", "max_force_n"], 0.0)],
+		["bodies[0].rest_transform_godot[3]", _with_nested_value(valid_descriptor.to_dictionary(), ["bodies", 0, "rest_transform_godot", 3], [0.0, 0.0, 1.0, 1.0])],
+		["bodies[1].rest_transform_godot", _with_nested_value(valid_descriptor.to_dictionary(), ["bodies", 1, "rest_transform_godot", 0, 0], 2.0)],
+		["joints[0].actuator.max_torque_nm", _with_nested_value(valid_descriptor.to_dictionary(), ["joints", 0, "actuator", "max_torque_nm"], 0.0)],
+		["joints[0].actuator.max_jerk_rad_s3", _with_nested_value(valid_descriptor.to_dictionary(), ["joints", 0, "actuator", "max_jerk_rad_s3"], 0.0)],
+		["joints[0].axis_frame", _with_nested_value(valid_descriptor.to_dictionary(), ["joints", 0, "axis_frame"], "world")],
+		["joints[0].collide_connected", _with_nested_value(valid_descriptor.to_dictionary(), ["joints", 0, "collide_connected"], 1)],
+		["joints[1].parent_anchor_godot", _with_nested_value(valid_descriptor.to_dictionary(), ["joints", 1, "parent_anchor_godot", 0, 3], 2.0)],
+		["self_collision_mode", _with_nested_value(valid_descriptor.to_dictionary(), ["self_collision_mode"], "implicit")],
 		["tracks.traction_points_per_side", _with_nested_value(valid_descriptor.to_dictionary(), ["tracks", "traction_points_per_side"], 1)],
 		["chassis_dynamics.inertia_diagonal_kg_m2", _with_nested_value(valid_descriptor.to_dictionary(), ["chassis_dynamics", "inertia_diagonal_kg_m2"], [1.0, 1.0, 3.0])],
 		["tracks.probe_depth_m", _with_nested_value(valid_descriptor.to_dictionary(), ["tracks", "probe_depth_m"], 0.0)],
@@ -119,6 +134,18 @@ func _with_nested_value(data: Dictionary, path: Array, value: Variant) -> Dictio
 		cursor = cursor[path[index]]
 	cursor[path.back()] = value
 	return data
+
+
+func _rows_are_close(first: Array, second: Array, tolerance: float) -> bool:
+	if first.size() != 4 or second.size() != 4:
+		return false
+	for row in 4:
+		if first[row].size() != 4 or second[row].size() != 4:
+			return false
+		for column in 4:
+			if absf(float(first[row][column]) - float(second[row][column])) > tolerance:
+				return false
+	return true
 
 
 func _fail(message: String) -> void:

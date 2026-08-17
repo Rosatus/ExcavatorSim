@@ -6,7 +6,7 @@ Run the complete standalone matrix from PowerShell (replace the executable
 with the installed Godot 4.7 binary when `godot` is not on `PATH`):
 
 ```powershell
-.\tests\run_standalone_matrix.ps1 -GodotExe "E:\applications\Godot_v4.7.1-stable_mono_win64\Godot_v4.7.1-stable_mono_win64.exe"
+.\tests\run_standalone_matrix.ps1 -GodotExe "E:\applications\Godot_v4.7.1-stable_mono_win64\Godot_v4.7.1-stable_mono_win64_console.exe"
 ```
 
 For one focused contract, run the same executable from `godot/client/`:
@@ -21,6 +21,7 @@ The release-candidate matrix is:
 foundation_scene_test.gd
 jolt_capability_probe.gd
 jolt_chassis_track_test.gd
+jolt_articulated_equipment_test.gd
 authority_shadow_test.gd
 sy205_glb_test.gd
 motion_client_test.gd

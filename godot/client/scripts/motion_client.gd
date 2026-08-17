@@ -325,6 +325,12 @@ func get_render_pose() -> Dictionary:
 	return result
 
 
+func get_authoritative_input_axes() -> Vector4:
+	if not _focused:
+		return Vector4.ZERO
+	return _read_input_axes()
+
+
 func get_status_snapshot() -> Dictionary:
 	return {
 		"connection_state": connection_state,

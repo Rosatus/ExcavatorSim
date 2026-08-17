@@ -5,14 +5,14 @@
       "model_id": "sy205",
       "model_version": "sy205-glb-urdf-v4",
       "rig_id": "sy205-jolt-rig",
-      "rig_version": "sy205-jolt-rig-v2",
+      "rig_version": "sy205-jolt-rig-v3",
       "calibration_version": "machine-calibration-v2"
     },
     {
       "model_id": "sy135",
       "model_version": "sy135-reference-urdf-v1",
       "rig_id": "sy135-jolt-rig",
-      "rig_version": "sy135-jolt-rig-v2",
+      "rig_version": "sy135-jolt-rig-v3",
       "calibration_version": "machine-calibration-v2"
     }
   ],
@@ -22,7 +22,7 @@
       "model_id": "sy135",
       "model_version": "sy135-reference-urdf-v1",
       "rig_id": "sy205-jolt-rig",
-      "rig_version": "sy205-jolt-rig-v2",
+      "rig_version": "sy205-jolt-rig-v3",
       "calibration_version": "machine-calibration-v2"
     },
     {

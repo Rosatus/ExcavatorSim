@@ -3,7 +3,7 @@
   "name": "jolt-articulated-equipment",
   "title": "Jolt articulated work equipment",
   "description": "Add Jolt upper/boom/arm/bucket bodies, physical joints, bounded actuator response, payload coupling, and actual-state visual following.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": "feature",
   "scope": "frontend",
   "package": "godot",

@@ -99,7 +99,7 @@ Authority selection is separate from backend service composition:
 |---|---|---|---|
 | `python_kinematic` | Python `Simulator`/Pinocchio | off | Default/current |
 | `jolt_shadow` | Python `Simulator`/Pinocchio | Godot observational | Implemented opt-in |
-| `jolt_authoritative` | Godot/Jolt for chassis; work equipment frozen | off; local truth only | Phase 1 opt-in |
+| `jolt_authoritative` | Godot/Jolt five-body articulated rig | off; local truth only | Phase 2 opt-in |
 
 Both backend runtime profiles may advertise `simulation_truth_shadow_v1` as an
 optional capability. Negotiation only enables the isolated slot in

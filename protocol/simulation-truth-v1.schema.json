@@ -60,6 +60,8 @@
       "required": ["name", "position_rad", "velocity_rad_s", "effort_n"],
       "properties": {
         "name": {"enum": ["swing_joint", "boom_joint", "arm_joint", "bucket_joint"]},
+        "target_position_rad": {"type": "number"},
+        "target_velocity_rad_s": {"type": "number"},
         "position_rad": {"type": "number"},
         "velocity_rad_s": {"type": "number"},
         "effort_n": {"type": "number"}

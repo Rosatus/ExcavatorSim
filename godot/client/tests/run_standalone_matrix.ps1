@@ -10,6 +10,7 @@ $tests = @(
     "foundation_scene_test.gd",
     "jolt_capability_probe.gd",
     "jolt_chassis_track_test.gd",
+    "jolt_articulated_equipment_test.gd",
     "authority_shadow_test.gd",
     "sy205_glb_test.gd",
     "motion_client_test.gd",
