@@ -911,3 +911,37 @@ Added bounded Godot-local bucket rear/shell support reaction with heave, pitch a
 ### Next Steps
 
 - None - task complete
+
+
+## Session 27: Authority contract and shadow state
+
+**Date**: 2026-08-17
+**Task**: Authority contract and shadow state
+**Branch**: `main`
+
+### Summary
+
+Planned the Jolt authority migration and implemented Phase 0 strict rig/truth contracts, negotiated observational shadow transport, isolated Python diagnostics, SY205/SY135 coverage, and full Godot/backend verification while retaining python_kinematic as the default authority.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `710eb59` | (see git log) |
+| `823bab7` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
