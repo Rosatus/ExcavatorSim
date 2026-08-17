@@ -1,3 +1,4 @@
 {"file":".trellis/spec/frontend/index.md","reason":"Godot quality gate."}
 {"file":".trellis/spec/frontend/client-boundary.md","reason":"Visual/physics authority, model parity, payload, and lifecycle review."}
 {"file":".trellis/tasks/08-17-jolt-authoritative-simulation/research/physics-rig-gaps.md","reason":"Check asset provenance, collision isolation, and four-bar decision."}
+{"file":".trellis/tasks/08-17-jolt-articulated-equipment/research/phase1-handoff-and-rig-gaps.md","reason":"Verify the implementation preserves the accepted Phase 1 owner/lifecycle boundary and closes the identified Phase 2 gaps."}

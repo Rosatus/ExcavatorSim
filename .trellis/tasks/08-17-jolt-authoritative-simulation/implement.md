@@ -4,7 +4,7 @@ This parent owns roadmap and integration acceptance. Implementation occurs in th
 ordered child tasks; do not start the parent as an implementation target.
 
 - [ ] Phase 0: complete `08-17-authority-contract-shadow-state`.
-- [ ] Phase 1: complete `08-17-jolt-chassis-track-authority`.
+- [x] Phase 1: complete `08-17-jolt-chassis-track-authority`.
 - [ ] Phase 2: complete `08-17-jolt-articulated-equipment`.
 - [ ] Phase 3: complete `08-17-jolt-terrain-excavation-coupling`.
 - [ ] Phase 4: complete `08-17-sensor-telemetry-python-gateway`.
@@ -22,4 +22,3 @@ ordered child tasks; do not start the parent as an implementation target.
 
 Until Phase 5 is accepted, `python_kinematic` remains the explicit product-safe
 rollback. No child may silently change the default profile.
-
