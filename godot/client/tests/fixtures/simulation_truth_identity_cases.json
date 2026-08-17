@@ -1,0 +1,37 @@
+{
+  "schema_version": "simulation-truth-identity-fixture-v1",
+  "valid": [
+    {
+      "model_id": "sy205",
+      "model_version": "sy205-glb-urdf-v4",
+      "rig_id": "sy205-jolt-rig",
+      "rig_version": "sy205-jolt-rig-v1",
+      "calibration_version": "machine-calibration-v2"
+    },
+    {
+      "model_id": "sy135",
+      "model_version": "sy135-reference-urdf-v1",
+      "rig_id": "sy135-jolt-rig",
+      "rig_version": "sy135-jolt-rig-v1",
+      "calibration_version": "machine-calibration-v2"
+    }
+  ],
+  "invalid": [
+    {
+      "case": "cross_model_rig",
+      "model_id": "sy135",
+      "model_version": "sy135-reference-urdf-v1",
+      "rig_id": "sy205-jolt-rig",
+      "rig_version": "sy205-jolt-rig-v1",
+      "calibration_version": "machine-calibration-v2"
+    },
+    {
+      "case": "unknown_rig_version",
+      "model_id": "sy205",
+      "model_version": "sy205-glb-urdf-v4",
+      "rig_id": "sy205-jolt-rig",
+      "rig_version": "future-rig-version",
+      "calibration_version": "machine-calibration-v2"
+    }
+  ]
+}

@@ -42,6 +42,10 @@ enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg", "res://addons/terr
 
 rendering_device/driver.windows="d3d12"
 
+[simulation]
+
+authority_profile="python_kinematic"
+
 [terrain3d]
 
 runtime_enabled=true

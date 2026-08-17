@@ -75,6 +75,30 @@ Godot preflights and negotiates it with Python, then sends bounded latest-value
 mass, center-of-mass, fill, and resistance observations. It is observational
 only and never becomes terrain, replay, or articulation authority.
 
+### Authority migration shadow profile
+
+The project setting `simulation/authority_profile` defaults to
+`python_kinematic`. Phase 0 also implements opt-in `jolt_shadow`: Python remains
+the only product pose writer, while the root-level `SimulationTruthPublisher`
+reads post-physics state and queues a negotiated `simulation_truth_shadow_v1`
+observation at no more than 30 Hz. `jolt_authoritative` is declared for later
+phases and is not a valid fallback today.
+
+The independent `simulation-truth-v1` payload carries authority epoch, physics
+tick, monotonic time, session/model/rig/calibration and terrain identity, five
+body transforms, joint/track/payload/contact fields, and quality flags. Godot
+converts complete transforms and vectors from internal right-handed Y-up to
+canonical right-handed Z-up once in `MotionProtocol`. Python validates schema,
+identity, ordering, right-handed rigidity, size, and rate before storing only the
+latest sample. The slot expires after 0.5 seconds and clears on disconnect, stop,
+or model switch; `/health` is its only Phase 0 consumer.
+
+Both model rig descriptors are validated and versioned, but their physical
+properties are provisional. The current shadow marks unavailable body velocity
+and Jolt contact manifold fields through quality flags rather than inventing
+values. No shadow path calls product transform, terrain, bucket, or lifecycle
+setters.
+
 The realistic visual pass uses Sky3D 2.1 behind the project-owned
 `VisualEnvironment` seam, plus a generation-gated soil particle emitter and a
 bounded camera/quality controller. The root node keeps the stable
@@ -152,10 +176,11 @@ Official RockA/B/C meshes are placed outside that patch through bounded
 outside a 12 m central exclusion radius. Demo height maps are never imported as
 logical state, and these presentation objects add no collision authority.
 
-When enabled, Terrain3D may generate static collision shapes. Jolt remains the
-Godot 3D physics backend that queries and solves against those shapes; it does
-not become an authority for terrain deformation, excavator motion, bucket
-inventory, or Python state. The data flow is one-way:
+When enabled, Terrain3D may generate static collision shapes. In the current
+default and shadow profiles, Jolt remains the Godot 3D physics backend that
+queries and solves against those shapes; it does not become an authority for
+terrain deformation, excavator motion, bucket inventory, or Python state. The
+data flow is one-way:
 
 ```text
 fixed-step command -> TerrainState/BucketSoilState -> snapshot -> Terrain3D -> Jolt query
@@ -172,7 +197,7 @@ The first soil presentation is not a per-grain rigid-body simulation. It combine
 
 ## Deferred model decisions
 
-The current GLBs remain visual assets. URDF collision geometry, mass/inertia,
-hydraulic forces, material contact parameters, bucket cavity calibration, and a
-fully dynamic articulated excavator require a separate model contract and remain
-deferred from this release candidate.
+The current GLBs remain visual assets. Phase 0 adds separate provisional physics
+descriptor contracts, but validated collision geometry, mass/inertia, hydraulic
+forces, material contact parameters, bucket cavity calibration, and a fully
+dynamic articulated excavator remain deferred to the later Jolt authority phases.

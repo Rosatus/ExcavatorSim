@@ -105,7 +105,8 @@ async def test_bucket_feedback_requires_negotiation_and_expires_with_session(
         capabilities = await client.get("/api/capabilities")
         assert capabilities.status == 200
         assert (await capabilities.json())["optional_capabilities"] == [
-            "bucket_load_feedback_v1"
+            "bucket_load_feedback_v1",
+            "simulation_truth_shadow_v1",
         ]
         origin = str(client.make_url("/")).rstrip("/")
         ws = await client.ws_connect("/ws", headers={"Origin": origin})

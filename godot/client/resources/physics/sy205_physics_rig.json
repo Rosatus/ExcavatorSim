@@ -1,0 +1,29 @@
+{
+  "schema_version": "physics-rig-v1",
+  "rig_id": "sy205-jolt-rig",
+  "rig_version": "sy205-jolt-rig-v1",
+  "model_id": "sy205",
+  "model_version": "sy205-glb-urdf-v4",
+  "coordinate_basis": "godot-y-up-right-handed-meters",
+  "provenance": {
+    "status": "provisional",
+    "source_paths": ["assets/model/sy205_glb_derived_v4.urdf", "assets/model/sy205_glb_derived_v4.json"],
+    "notes": "Mass, inertia and box proxies are converted from provisional URDF estimates; not validated physical data."
+  },
+  "collision_layers": {"machine": 2, "terrain": 1, "payload": 3},
+  "bodies": [
+    {"name": "chassis", "frame": "base_link", "mass_kg": 9460.0, "center_of_mass_m": [0.0, 0.460282985, -0.014860511], "inertia_diagonal_kg_m2": [14845.229092453, 21243.909972642, 7672.598546474], "shape": {"kind": "box", "center_m": [0.0, 0.46, 0.0], "size_m": [3.067423897, 0.978877971, 4.325371103]}},
+    {"name": "upper", "frame": "upper_structure_link", "mass_kg": 7740.0, "center_of_mass_m": [0.0, 0.759832472, -0.740756452], "inertia_diagonal_kg_m2": [16417.740324169, 18726.633566337, 10560.500332079], "shape": {"kind": "box", "center_m": [0.0, 0.76, -0.74], "size_m": [3.238524036, 2.609148996, 4.445462899]}},
+    {"name": "boom", "frame": "boom_link", "mass_kg": 2150.0, "center_of_mass_m": [0.004933506, 2.159274399, 1.972438484], "inertia_diagonal_kg_m2": [6849.204233219, 3083.87441095, 3895.391951193], "shape": {"kind": "box", "center_m": [0.005, 2.16, 1.97], "size_m": [0.682465004, 4.70371695, 4.184796976]}},
+    {"name": "arm", "frame": "arm_link", "mass_kg": 1290.0, "center_of_mass_m": [-0.000820003, -1.249701738, -0.163279414], "inertia_diagonal_kg_m2": [1737.162788121, 144.704703427, 1617.281393485], "shape": {"kind": "box", "center_m": [0.0, -1.25, -0.16], "size_m": [0.419790009, 3.943809109, 1.189338999]}},
+    {"name": "bucket", "frame": "bucket_link", "mass_kg": 860.0, "center_of_mass_m": [0.005774003, 0.36291647, -0.5036515], "inertia_diagonal_kg_m2": [289.435450706, 230.649756136, 305.273282023], "shape": {"kind": "convex_proxy", "center_m": [0.0, -0.504, 0.363], "size_m": [1.391366022, 1.673720913, 1.30420907]}}
+  ],
+  "joints": [
+    {"name": "swing_joint", "type": "continuous_hinge", "parent_body": "chassis", "child_body": "upper", "frame": "upper_structure_link", "axis": [0.0, 1.0, 0.0], "limit_rad": [-3.141592653589793, 3.141592653589793], "actuator": {"mode": "velocity_motor", "max_force_n": 1200000.0, "max_velocity_rad_s": 0.6, "damping": 80000.0}},
+    {"name": "boom_joint", "type": "hinge", "parent_body": "upper", "child_body": "boom", "frame": "boom_link", "axis": [1.0, 0.0, 0.0], "limit_rad": [-0.2617993877991494, 0.7853981633974483], "actuator": {"mode": "velocity_motor", "max_force_n": 1500000.0, "max_velocity_rad_s": 0.35, "damping": 90000.0}},
+    {"name": "arm_joint", "type": "hinge", "parent_body": "boom", "child_body": "arm", "frame": "arm_link", "axis": [1.0, 0.0, 0.0], "limit_rad": [-0.7853981633974483, 0.5235987755982988], "actuator": {"mode": "velocity_motor", "max_force_n": 1200000.0, "max_velocity_rad_s": 0.45, "damping": 70000.0}},
+    {"name": "bucket_joint", "type": "hinge", "parent_body": "arm", "child_body": "bucket", "frame": "bucket_link", "axis": [1.0, 0.0, 0.0], "limit_rad": [-0.7853981633974483, 0.7853981633974483], "actuator": {"mode": "velocity_motor", "max_force_n": 900000.0, "max_velocity_rad_s": 0.55, "damping": 50000.0}}
+  ],
+  "tracks": {"gauge_m": 2.2, "contact_length_m": 3.4, "contact_width_m": 2.8, "traction_points_per_side": 4, "friction": 1.1, "max_drive_force_n": 180000.0},
+  "quality_flags": ["provisional_mass_properties", "provisional_collision_proxies", "not_for_authoritative_mode"]
+}

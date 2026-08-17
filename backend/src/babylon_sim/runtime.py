@@ -18,10 +18,17 @@ from .constants import DISPLAY_HZ, SIMULATION_DT_SECONDS
 from .exchange import RecordingExchange
 from .input_router import InputRouter, InputSnapshot
 from .model import ExcavatorModel
-from .protocol import BucketLoadFeedbackMessage
+from .protocol import BucketLoadFeedbackMessage, ProtocolError
 from .recording import ChunkedRecordingBuffer
 from .replay import AuthoritativeViewState, LatestViewSlot, ReplayWorker
 from .replay_contract import PlaybackState, SourceMode
+from .shadow_state import (
+    SHADOW_TRUTH_CAPABILITY,
+    SHADOW_TRUTH_TIMEOUT_SECONDS,
+    LatestShadowTruth,
+    ShadowTruthSample,
+    validate_shadow_order,
+)
 from .simulation import SimulationStatus, Simulator
 from .state import SimulationState
 from .terrain_controller import TerrainController
@@ -170,6 +177,8 @@ class RuntimeController:
         self._input_clients_lock = threading.Lock()
         self._bucket_feedback: dict[str, LatestBucketLoadFeedback] = {}
         self._bucket_feedback_lock = threading.Lock()
+        self._shadow_truth: dict[str, LatestShadowTruth] = {}
+        self._shadow_truth_lock = threading.Lock()
         self._submit_lock = threading.Lock()
         self._metrics_lock = threading.Lock()
         self._stop_event = threading.Event()
@@ -227,7 +236,14 @@ class RuntimeController:
     @property
     def capabilities(self) -> frozenset[str]:
         if self.profile == "motion-only":
-            return frozenset({"input_snapshot", "commands", BUCKET_FEEDBACK_CAPABILITY})
+            return frozenset(
+                {
+                    "input_snapshot",
+                    "commands",
+                    BUCKET_FEEDBACK_CAPABILITY,
+                    SHADOW_TRUTH_CAPABILITY,
+                }
+            )
         return frozenset(
             {
                 "input_snapshot",
@@ -237,6 +253,7 @@ class RuntimeController:
                 "recording",
                 "terrain",
                 BUCKET_FEEDBACK_CAPABILITY,
+                SHADOW_TRUTH_CAPABILITY,
             }
         )
 
@@ -281,6 +298,8 @@ class RuntimeController:
         self._fail_pending(RuntimeCommandError("server_shutting_down", "server is shutting down"))
         with self._bucket_feedback_lock:
             self._bucket_feedback.clear()
+        with self._shadow_truth_lock:
+            self._shadow_truth.clear()
         if self.profile == "motion-only":
             with self._input_clients_lock:
                 input_clients = tuple(self._input_clients)
@@ -326,6 +345,8 @@ class RuntimeController:
             self._command_cache.pop(client_id, None)
         with self._bucket_feedback_lock:
             self._bucket_feedback.pop(client_id, None)
+        with self._shadow_truth_lock:
+            self._shadow_truth.pop(client_id, None)
 
     def submit_bucket_load_feedback(
         self, session_id: str, sample: BucketLoadFeedbackMessage
@@ -361,6 +382,32 @@ class RuntimeController:
                 self._bucket_feedback.pop(current.sample.session_id, None)
                 return None
             return current.as_dict()
+
+    def submit_shadow_truth(self, session_id: str, sample: ShadowTruthSample) -> None:
+        now = self._clock()
+        with self._shadow_truth_lock:
+            previous = self._shadow_truth.get(session_id)
+            if previous is not None:
+                try:
+                    validate_shadow_order(previous.sample, sample)
+                except ProtocolError as exc:
+                    raise RuntimeCommandError(exc.code, str(exc)) from exc
+            self._shadow_truth[session_id] = LatestShadowTruth(sample, now)
+
+    def latest_shadow_truth(self) -> dict[str, object] | None:
+        now = self._clock()
+        with self._shadow_truth_lock:
+            current = max(
+                self._shadow_truth.values(),
+                key=lambda value: value.received_monotonic_s,
+                default=None,
+            )
+            if current is None:
+                return None
+            if now - current.received_monotonic_s > SHADOW_TRUTH_TIMEOUT_SECONDS:
+                self._shadow_truth.pop(current.sample.identity.session_id, None)
+                return None
+            return current.as_dict(now)
 
     def submit_command(
         self, session_id: str, command_id: str, command: LifecycleCommand

@@ -24,6 +24,7 @@ CLIENT_MESSAGE_TYPES = frozenset(
         "playback_command",
         "terrain_command",
         "bucket_load_feedback",
+        "simulation_truth_shadow",
         "ping",
     }
 )
@@ -160,6 +161,11 @@ class BucketLoadFeedbackMessage:
     client_sent_ms: float
 
 
+@dataclass(frozen=True)
+class SimulationTruthShadowMessage:
+    snapshot: dict[str, Any]
+
+
 ClientMessage: TypeAlias = (
     HelloMessage
     | InputMessage
@@ -167,6 +173,7 @@ ClientMessage: TypeAlias = (
     | PlaybackMessage
     | TerrainMessage
     | BucketLoadFeedbackMessage
+    | SimulationTruthShadowMessage
     | PingMessage
 )
 
@@ -342,6 +349,8 @@ def decode_client_message(raw: str | bytes, *, max_bytes: int = MAX_MESSAGE_BYTE
             quality=payload["quality"],
             client_sent_ms=float(payload["client_sent_ms"]),
         )
+    if message_type == "simulation_truth_shadow":
+        return SimulationTruthShadowMessage(cast(dict[str, Any], payload["snapshot"]))
     return PingMessage(payload["id"], float(payload["client_sent_ms"]))
 
 

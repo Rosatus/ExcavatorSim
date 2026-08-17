@@ -21,6 +21,7 @@ const STATE_FAULT := "fault"
 const DEFAULT_ENDPOINT := "ws://127.0.0.1:8765/ws"
 const INPUT_HZ := 30.0
 const BUCKET_FEEDBACK_HZ := 10.0
+const SHADOW_TRUTH_HZ := 30.0
 const PREFLIGHT_TIMEOUT_SECONDS := 1.5
 const HELLO_TIMEOUT_SECONDS := 3.0
 const RECONNECT_INITIAL_SECONDS := 0.25
@@ -86,6 +87,8 @@ var _offered_optional_capabilities: Array[String] = []
 var _feedback_elapsed := 0.0
 var _next_feedback_sequence := 0
 var _pending_bucket_feedback: Dictionary = {}
+var _shadow_elapsed := 0.0
+var _pending_shadow_truth: Dictionary = {}
 
 
 func _ready() -> void:
@@ -192,6 +195,23 @@ func queue_bucket_load_feedback(sample: Dictionary) -> bool:
 func clear_bucket_load_feedback() -> void:
 	_pending_bucket_feedback.clear()
 	_feedback_elapsed = 0.0
+
+
+func queue_simulation_truth_shadow(snapshot: Dictionary) -> bool:
+	if connection_state != STATE_READY:
+		return false
+	if not negotiated_optional_capabilities.has("simulation_truth_shadow_v1"):
+		return false
+	if snapshot.get("schema_version") != "simulation-truth-v1":
+		_set_error("invalid_shadow_truth", "shadow truth sample is malformed", true)
+		return false
+	_pending_shadow_truth = snapshot.duplicate(true)
+	return true
+
+
+func clear_simulation_truth_shadow() -> void:
+	_pending_shadow_truth.clear()
+	_shadow_elapsed = 0.0
 
 
 func set_focused(focused: bool) -> void:
@@ -322,6 +342,7 @@ func get_status_snapshot() -> Dictionary:
 		"pending_commands": _pending_commands.size(),
 		"accepted_view_revision": _accepted_view_revision,
 		"bucket_feedback_pending": not _pending_bucket_feedback.is_empty(),
+		"shadow_truth_pending": not _pending_shadow_truth.is_empty(),
 	}
 
 
@@ -465,6 +486,11 @@ func _tick(delta: float) -> void:
 		if _feedback_elapsed >= 1.0 / BUCKET_FEEDBACK_HZ:
 			_feedback_elapsed = 0.0
 			_send_pending_bucket_feedback()
+	if connection_state == STATE_READY and not _pending_shadow_truth.is_empty():
+		_shadow_elapsed += delta
+		if _shadow_elapsed >= 1.0 / SHADOW_TRUTH_HZ:
+			_shadow_elapsed = 0.0
+			_send_pending_shadow_truth()
 
 
 func _on_transport_open() -> void:
@@ -559,6 +585,7 @@ func _accept_hello_ack(payload: Dictionary) -> void:
 	_authoritative_buffer_generation = -1
 	_pending_commands.clear()
 	clear_bucket_load_feedback()
+	clear_simulation_truth_shadow()
 	_pose_buffer.clear()
 	_zero_armed = false
 	_retry_delay = RECONNECT_INITIAL_SECONDS
@@ -724,6 +751,13 @@ func _send_pending_bucket_feedback() -> void:
 		_pending_bucket_feedback.clear()
 
 
+func _send_pending_shadow_truth() -> void:
+	if _pending_shadow_truth.is_empty() or connection_state != STATE_READY:
+		return
+	if _send_payload(MotionProtocol.simulation_truth_shadow_message(_pending_shadow_truth)):
+		_pending_shadow_truth.clear()
+
+
 func _valid_bucket_feedback_sample(sample: Dictionary) -> bool:
 	var center: Variant = sample.get("center_of_mass_local")
 	if not center is Vector3 or not _finite_vector3(center as Vector3):
@@ -798,6 +832,7 @@ func _handle_disconnected(schedule_retry: bool) -> void:
 	negotiated_optional_capabilities.clear()
 	accepted_versions.clear()
 	clear_bucket_load_feedback()
+	clear_simulation_truth_shadow()
 	_clear_generation("disconnect")
 	_set_connection_state(STATE_DISCONNECTED)
 	if schedule_retry and auto_reconnect:

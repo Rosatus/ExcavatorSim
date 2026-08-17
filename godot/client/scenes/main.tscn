@@ -24,6 +24,7 @@
 [ext_resource type="Script" uid="uid://b4kidhr20qmau" path="res://scripts/terrain3d_adapter.gd" id="13_terrain3d_adapter"]
 [ext_resource type="Script" uid="uid://deo0gxkmk2ahd" path="res://addons/sky_3d/src/Sky3D.gd" id="14_sky3d"]
 [ext_resource type="Script" path="res://scripts/tracked_chassis_controller.gd" id="15_track_controller"]
+[ext_resource type="Script" path="res://scripts/simulation_truth_publisher.gd" id="16_truth_publisher"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_qkpxi"]
 shader = ExtResource("1_pm3ni")
@@ -254,6 +255,8 @@ script = ExtResource("2_motion_client")
 script = ExtResource("3_motion_presentation")
 presentation_root_path = NodePath("../ChassisMotionRoot/PresentationRoot")
 
+[node name="SimulationTruthPublisher" type="Node" parent="."]
+script = ExtResource("16_truth_publisher")
 [node name="OperatorUI" type="CanvasLayer" parent="." unique_id=232332145]
 script = ExtResource("4_operator_ui")
 

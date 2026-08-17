@@ -9,6 +9,7 @@
     { "$ref": "#/$defs/PlaybackCommand" },
     { "$ref": "#/$defs/TerrainCommand" },
     { "$ref": "#/$defs/BucketLoadFeedback" },
+    { "$ref": "#/$defs/SimulationTruthShadow" },
     { "$ref": "#/$defs/Ping" },
     { "$ref": "#/$defs/HelloAck" },
     { "$ref": "#/$defs/InputAck" },
@@ -101,7 +102,7 @@
         "optional_capabilities": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "type": "string", "enum": ["bucket_load_feedback_v1"] }
+          "items": { "type": "string", "enum": ["bucket_load_feedback_v1", "simulation_truth_shadow_v1"] }
         },
         "requested_model_id": { "type": ["string", "null"], "minLength": 1 }
       }
@@ -199,6 +200,16 @@
         "client_sent_ms": { "type": "number", "minimum": 0 }
       }
     },
+    "SimulationTruthShadow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "protocol_version", "snapshot"],
+      "properties": {
+        "type": { "const": "simulation_truth_shadow" },
+        "protocol_version": { "$ref": "#/$defs/ProtocolVersion" },
+        "snapshot": { "type": "object" }
+      }
+    },
     "Ping": {
       "type": "object",
       "additionalProperties": false,
@@ -230,7 +241,7 @@
         "negotiated_optional_capabilities": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "type": "string", "enum": ["bucket_load_feedback_v1"] }
+          "items": { "type": "string", "enum": ["bucket_load_feedback_v1", "simulation_truth_shadow_v1"] }
         }
       }
     },

@@ -12,6 +12,11 @@ state transitions.
 
 Godot physics is local presentation in the first release. It must never become the source of excavator joint state, terrain deformation, bucket inventory, or replay authority. Physics resources require an explicit adapter/lifecycle boundary and must be disposed on authority generation changes.
 
+Phase 0 adds an explicit `jolt_shadow` observer without changing the current
+writer. `SimulationTruthPublisher` is a root sibling observer and its output may
+only enter Python's negotiated diagnostic slot. `jolt_authoritative` is a declared
+future profile, not a fallback and not a currently valid product mode.
+
 ## Godot-first local-world profile
 
 For the first realistic Godot product slice, Python owns motion kinematics,

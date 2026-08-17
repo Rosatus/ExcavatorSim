@@ -34,6 +34,7 @@ from .protocol import (
     PingMessage,
     PlaybackMessage,
     ProtocolError,
+    SimulationTruthShadowMessage,
     TerrainMessage,
     decode_client_message,
     encode_server_message,
@@ -50,6 +51,12 @@ from .runtime import (
 )
 from .series import SeriesQueryError, project_series
 from .session_manager import ModelSelectionError, RuntimeSessionManager
+from .shadow_state import (
+    SHADOW_TRUTH_CAPABILITY,
+    ShadowTruthIdentity,
+    decode_shadow_truth,
+    load_authority_manifest,
+)
 from .terrain import TerrainSpecError, terrain_snapshot_bytes
 from .terrain_controller import TerrainCommandError
 from .visual_assets import VisualModelManifest, load_visual_model_manifest
@@ -59,6 +66,7 @@ INPUT_RATE_LIMIT = 80
 COMMAND_RATE_LIMIT = 20
 PING_RATE_LIMIT = 20
 BUCKET_FEEDBACK_RATE_LIMIT = 20
+SHADOW_TRUTH_RATE_LIMIT = 60
 RATE_WINDOW_SECONDS = 1.0
 MAX_PROTOCOL_VIOLATIONS = 3
 # Leave headroom for strict JSON encoding/validation after each poll.
@@ -80,6 +88,7 @@ class SlidingWindowRateLimiter:
             "command": deque(),
             "terrain_command": deque(),
             "bucket_load_feedback": deque(),
+            "simulation_truth_shadow": deque(),
             "ping": deque(),
         }
 
@@ -89,6 +98,7 @@ class SlidingWindowRateLimiter:
             "command": COMMAND_RATE_LIMIT,
             "terrain_command": COMMAND_RATE_LIMIT,
             "bucket_load_feedback": BUCKET_FEEDBACK_RATE_LIMIT,
+            "simulation_truth_shadow": SHADOW_TRUTH_RATE_LIMIT,
             "ping": PING_RATE_LIMIT,
         }
         events = self._events[message_type]
@@ -318,17 +328,18 @@ async def _health(request: web.Request) -> web.Response:
             "versions": versions.as_dict(),
             "capabilities": sorted(runtime.capabilities),
             "bucket_load_feedback": runtime.latest_bucket_load_feedback(),
+            "simulation_truth_shadow": runtime.latest_shadow_truth(),
         }
     )
 
 
 async def _capabilities(request: web.Request) -> web.Response:
     runtime = request.app[RUNTIME_KEY].runtime
-    optional = (
-        [BUCKET_FEEDBACK_CAPABILITY]
-        if BUCKET_FEEDBACK_CAPABILITY in runtime.capabilities
-        else []
-    )
+    optional = [
+        capability
+        for capability in (BUCKET_FEEDBACK_CAPABILITY, SHADOW_TRUTH_CAPABILITY)
+        if capability in runtime.capabilities
+    ]
     return web.json_response(
         {
             "protocol_version": load_version_manifest().protocol_version,
@@ -802,6 +813,8 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
                         if isinstance(message, TerrainMessage)
                         else "bucket_load_feedback"
                         if isinstance(message, BucketLoadFeedbackMessage)
+                        else "simulation_truth_shadow"
+                        if isinstance(message, SimulationTruthShadowMessage)
                         else "ping"
                     )
                     if not limiter.allow(kind, time.monotonic()):
@@ -908,6 +921,25 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
                                 "bucket feedback identity is not current",
                             )
                         runtime.submit_bucket_load_feedback(session_id, message)
+                    elif isinstance(message, SimulationTruthShadowMessage):
+                        if SHADOW_TRUTH_CAPABILITY not in negotiated_optional_capabilities:
+                            raise ProtocolError(
+                                "capability_unavailable",
+                                "simulation truth shadow was not negotiated",
+                            )
+                        runtime_snapshot = runtime.latest.read()
+                        model_contract = load_authority_manifest()["models"][manager.model_id]
+                        expected = ShadowTruthIdentity(
+                            session_id=session_id,
+                            simulation_epoch=runtime_snapshot.stream_epoch,
+                            model_id=manager.model_id,
+                            model_version=manager.model_version,
+                            rig_id=model_contract["rig_id"],
+                            rig_version=model_contract["rig_version"],
+                            calibration_version=model_contract["calibration_version"],
+                        )
+                        sample = decode_shadow_truth(message.snapshot, expected)
+                        runtime.submit_shadow_truth(session_id, sample)
                     elif isinstance(message, PingMessage):
                         await send(
                             {

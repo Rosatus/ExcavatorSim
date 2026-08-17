@@ -212,3 +212,18 @@ contract before removing the previous visual. If validation or loading fails,
 hide both candidate and previous visuals, clear the active frame/pose state,
 and expose a contract error. Never leave the previous model visible as an
 implicit cross-model fallback.
+
+## 11. Jolt migration shadow producer
+
+`simulation_truth_shadow_v1` is an optional, Godot-to-Python latest-value
+producer. `SimulationTruthPublisher` runs after the local physics step only when
+`simulation/authority_profile == "jolt_shadow"`; the persisted project default is
+`python_kinematic`. `MotionClient` sends at most 30 Hz and replaces an unsent
+sample with the newest snapshot.
+
+The publisher may call only read APIs such as `get_status_snapshot`,
+`get_frame_node`, and `surface_snapshot`. It must not call transform setters,
+terrain mutation, bucket transfer, lifecycle, or view-state reducer APIs.
+Reset/reconnect/model switch rotates its authority epoch and clears pending
+transport state. Full schema, identity, order, matrix, TTL, and error behavior is
+defined by [the shadow truth contract](../backend/shadow-truth.md).

@@ -20,7 +20,8 @@ const CAPABILITIES := [
 	"input_snapshot",
 	"commands",
 ]
-const OPTIONAL_CAPABILITIES := ["bucket_load_feedback_v1"]
+const OPTIONAL_CAPABILITIES := ["bucket_load_feedback_v1", "simulation_truth_shadow_v1"]
+const JOINT_NAMES := ["swing_joint", "boom_joint", "arm_joint", "bucket_joint"]
 const FRAME_NAMES := [
 	"base_link",
 	"upper_structure_link",
@@ -88,6 +89,14 @@ static func bucket_load_feedback_message(
 	}
 
 
+static func simulation_truth_shadow_message(snapshot: Dictionary) -> Dictionary:
+	return {
+		"type": "simulation_truth_shadow",
+		"protocol_version": PROTOCOL_VERSION,
+		"snapshot": snapshot.duplicate(true),
+	}
+
+
 static func rows_to_transform(rows: Array) -> Transform3D:
 	# Python/Pinocchio publishes right-handed world matrices in a Z-up basis.
 	# The imported glTF scene is right-handed Y-up. Convert the complete frame
@@ -106,6 +115,24 @@ static func rows_to_transform(rows: Array) -> Transform3D:
 		Vector3.ZERO
 	)
 	return python_to_godot * python_transform * python_to_godot.affine_inverse()
+
+
+static func transform_to_canonical_rows(transform: Transform3D) -> Array:
+	var canonical_to_godot := Transform3D(
+		Basis(Vector3(1.0, 0.0, 0.0), Vector3(0.0, 0.0, -1.0), Vector3(0.0, 1.0, 0.0)),
+		Vector3.ZERO
+	)
+	var canonical := canonical_to_godot.affine_inverse() * transform * canonical_to_godot
+	return [
+		[canonical.basis.x.x, canonical.basis.y.x, canonical.basis.z.x, canonical.origin.x],
+		[canonical.basis.x.y, canonical.basis.y.y, canonical.basis.z.y, canonical.origin.y],
+		[canonical.basis.x.z, canonical.basis.y.z, canonical.basis.z.z, canonical.origin.z],
+		[0.0, 0.0, 0.0, 1.0],
+	]
+
+
+static func vector_to_canonical_array(value: Vector3) -> Array[float]:
+	return [value.x, -value.z, value.y]
 
 
 static func decode_text(raw: String) -> Dictionary:

@@ -90,3 +90,19 @@ if profile == "motion-only":
 The web boundary gates optional routes by negotiated capability and the runtime
 publishes a schema-compatible live view directly from the authoritative
 `RuntimeSnapshot`.
+
+## Authority Migration Profiles
+
+Authority selection is separate from backend service composition:
+
+| Authority profile | Product pose writer | Shadow publisher | Current status |
+|---|---|---|---|
+| `python_kinematic` | Python `Simulator`/Pinocchio | off | Default/current |
+| `jolt_shadow` | Python `Simulator`/Pinocchio | Godot observational | Implemented opt-in |
+| `jolt_authoritative` | Godot/Jolt | off | Declared only; fail closed until later phases |
+
+Both backend runtime profiles may advertise `simulation_truth_shadow_v1` as an
+optional capability. Negotiation only enables the isolated slot in
+[shadow-truth.md](./shadow-truth.md); it never changes the runtime's pose writer.
+The existing required capability intersection and `view_state` behavior remain
+unchanged.

@@ -3,6 +3,7 @@ from __future__ import annotations
 import queue
 import threading
 import time
+from collections.abc import Callable
 
 import numpy as np
 import pytest
@@ -27,6 +28,29 @@ def _wait_for(predicate: object, timeout: float = 1.0) -> None:
             return
         time.sleep(0.005)
     raise AssertionError("condition was not reached before timeout")
+
+
+def _wait_for_stable_terrain(
+    view: Callable[[], TerrainView], timeout: float = 2.0, quiet_seconds: float = 0.1
+) -> TerrainView:
+    current = view()
+    fingerprint = (current.terrain_revision, current.snapshot_sha256, current.bucket_soil_volume_m3)
+    stable_since = time.perf_counter()
+    deadline = stable_since + timeout
+    while time.perf_counter() < deadline:
+        time.sleep(0.01)
+        current = view()
+        next_fingerprint = (
+            current.terrain_revision,
+            current.snapshot_sha256,
+            current.bucket_soil_volume_m3,
+        )
+        if next_fingerprint != fingerprint:
+            fingerprint = next_fingerprint
+            stable_since = time.perf_counter()
+        elif time.perf_counter() - stable_since >= quiet_seconds:
+            return current
+    raise AssertionError("terrain view did not settle before timeout")
 
 
 def test_runtime_applies_commands_and_keeps_ticking_while_paused(
@@ -162,7 +186,7 @@ def test_simulation_reset_preserves_deformed_terrain_and_clears_bucket(
                 client_sequence=sequence,
                 connected=True,
                 focused=True,
-                    axes=(0.0, 1.0, -1.0, -1.0),
+                axes=(0.0, 1.0, -1.0, -1.0),
             )
             sequence += 1
             time.sleep(0.04)
@@ -175,7 +199,7 @@ def test_simulation_reset_preserves_deformed_terrain_and_clears_bucket(
             axes=(0.0, 0.0, 0.0, 0.0),
         )
         runtime.submit_command("terrain-reset", "pause-dig", "pause").result(timeout=1.0)
-        before = terrain_view()
+        before = _wait_for_stable_terrain(terrain_view)
         assert before.bucket_soil_volume_m3 > 0.0
         assert before.terrain_revision > undeformed.terrain_revision
         assert before.snapshot_sha256 != undeformed.snapshot_sha256
@@ -255,7 +279,12 @@ def test_motion_only_profile_has_no_optional_workers(
     assert runtime.replay is None
     assert runtime.exchange is None
     assert runtime.capabilities == frozenset(
-        {"input_snapshot", "commands", "bucket_load_feedback_v1"}
+        {
+            "input_snapshot",
+            "commands",
+            "bucket_load_feedback_v1",
+            "simulation_truth_shadow_v1",
+        }
     )
     runtime.start()
     try:

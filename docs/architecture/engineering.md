@@ -1,6 +1,6 @@
 # ExcavatorSim 工程详细架构
 
-> 面向工程、开发、测试与长期维护。事实截止：**2026-08-13**。
+> 面向工程、开发、测试与长期维护。事实截止：**2026-08-17**。
 >
 > 本文是架构导航层，不替代协议 schema、算法说明或测试契约。若图表与专项契约不一致，以代码、schema 和下方 source-of-truth 索引为准。
 
@@ -14,10 +14,18 @@
 → Godot MotionPresentation / Terrain / UI → Windows 桌面画面
 ```
 
+Jolt 权威迁移的 Phase 0 已加入但默认关闭：`jolt_shadow` 可在同一连接上
+发布 Godot fixed-tick truth 快照到 Python 的隔离 latest-value 诊断槽；它不改变
+上述产品姿态链。项目默认仍是 `python_kinematic`，`jolt_authoritative` 只有合同
+声明，尚未成为可用产品模式。
+
 权威边界只有两条：
 
 1. Python/Pinocchio 权威维护四关节运动、frame transforms、输入安全和生命周期。
 2. Godot-first 路径中，Godot `TerrainState`/`BucketSoilState` 权威维护本地地形与斗土便利状态；Terrain3D、Jolt、渲染网格、粒子和视觉 GLB 都是派生消费者。
+
+`SimulationTruthPublisher` 是观察者而非第三条写权威；Python 接收的 shadow
+数据不得进入 `Simulator`、`view_state`、地形或斗土状态。
 
 Legacy Python terrain/recording/replay 继续存在，但只用于兼容和回归；它不是当前 Godot-first 产品目标，回放也不是当前产品需求。
 
@@ -54,7 +62,7 @@ flowchart LR
     legacy[Python legacy terrain / recording / replay<br/>Legacy]
 
     operator --> keyboard --> godot
-    godot <-->|WS v3 input / view| python
+    godot <-->|WS v3 input / view<br/>optional shadow truth| python
     godot --> monitor
     monitor --> operator
     python -. legacy profile .-> legacy
@@ -96,7 +104,7 @@ flowchart TB
 | Python terrain worker / `terrain_view` / `terrain_patch` | 无；路由返回 `capability_unavailable` | 有 |
 | recording / playback / RRD exchange | 无 | 有 |
 | Godot 本地 terrain/bucket | 主路径唯一本地语义状态 | 不应镜像 legacy authority |
-| 对外能力集合 | `input_snapshot`, `commands` | 另含 `latency`, `playback`, `recording`, `terrain` |
+| 对外能力集合 | 必需：`input_snapshot`, `commands`；可选：bucket feedback / shadow truth | 另含 `latency`, `playback`, `recording`, `terrain`，并保留相同可选观测能力 |
 | 当前产品定位 | Godot-first | 等待独立迁移决策前保留 |
 
 Profile 合同位于 [`runtime-profiles.md`](../../.trellis/spec/backend/runtime-profiles.md#L1-L44)。motion-only 必须不创建隐形 `TerrainController`、`ReplayWorker` 或 exchange worker；禁用的 HTTP/WS 能力要在边界处失败而不是改变运动状态。
@@ -181,6 +189,7 @@ flowchart TB
 | World | `WorldEnvironment`, `SunLight`, `SkyDome`, `TimeOfDay` | Sky3D 天空、固定日照、雾、云和星空 | Current / Derived |
 | Camera/UI | `CameraRig`, `OperatorUI`, `VisualQualityController` | 中键绕行、缩放、连接/authority/lifecycle/bucket 状态、质量档位 | Current |
 | Motion | `MotionClient`, `MotionProtocol`, `MotionPresentation` | 接收 Python state、一次性坐标转换、GLB 父局部 pivot 与被动四连杆 | Current |
+| Authority migration | `SimulationTruthPublisher`, `PhysicsRigDescriptor` | 默认关闭；Y-up 状态转 canonical Z-up 并发布隔离 shadow truth | Current / observational |
 | Visual asset | `PresentationRoot/SY205Excavator` | 仅视觉模型；不含运动 authority、animation 或 collision authority | Current / Derived |
 | Logical terrain | `TerrainState`, `TerrainWorld`, `ExcavationWorld` | Godot-first 本地地形快照、铲斗接触/铲入/侧漏/卸土、revision/generation | Current authority（local world） |
 | Bucket | `BucketSoilState` | 固定容量 0.35 m³、切削/倾倒和网格体积守恒 | Current authority（local bucket） |
@@ -228,6 +237,11 @@ sequenceDiagram
 
 这条时序中，Godot 本地 terrain/bucket 不回写 Python；它只从当前运动呈现计算 bucket contact proxy，并在 authority generation 变化时清空派生状态。
 
+在显式 `jolt_shadow` profile 中，另有一条最多 30 Hz 的 Godot→Python 观察链：
+publisher 在 fixed tick 后读取五个 frame、履带、terrain identity 和 payload，转换为
+`simulation-truth-v1`，经协商后写入 Python 独立 slot。拒绝或超时不会影响上图的
+输入、模拟和 `view_state` 循环。
+
 ## 7. Authority、派生状态与失效键
 
 ```mermaid
@@ -262,6 +276,18 @@ flowchart LR
 
 关键原则：Python 的 `simulation_epoch` 不等于 Godot 的 `terrain_epoch`；`buffer_generation` 是 legacy recording diagnostic，不能被当作运动 generation。详见 [`motion-transport.md`](../../.trellis/spec/frontend/motion-transport.md#L26-L53) 与 [`terrain-api.md`](../terrain-api.md#L49-L74)。
 
+### 7.1 Authority migration profiles
+
+| Profile | 唯一产品姿态写入者 | Godot truth 发布 | 当前可用性 |
+|---|---|---|---|
+| `python_kinematic` | Python Simulator/Pinocchio | 无 | 默认产品模式 |
+| `jolt_shadow` | Python Simulator/Pinocchio | 只读 shadow | Phase 0 opt-in |
+| `jolt_authoritative` | 目标为 Godot/Jolt | 无 shadow 双写 | 仅声明，后续阶段实现 |
+
+SY205/SY135 已有独立 `physics-rig-v1` descriptor，但质量、惯量、collision proxy
+均明确标记为 provisional/unverified，不能据此跳过后续 chassis/articulation 稳定性
+验收。完整边界见 [`shadow-truth.md`](../../.trellis/spec/backend/shadow-truth.md)。
+
 ## 8. 坐标系与资产关系
 
 ```mermaid
@@ -289,6 +315,7 @@ flowchart LR
 | 视觉模型 | [`SY205_excavator_godot.glb`](../../godot/client/assets/visual/SY205_excavator_godot.glb)：五个可识别 frame/pivot 的 visual skin；不拥有 Python motion、animation 或 collision authority |
 | manifest | [`sy205_visual_manifest.json`](../../godot/client/resources/visual/sy205_visual_manifest.json)：frame 映射、Blender/Godot up-axis、校准和 parity fixture 入口 |
 | 转换 | `p_godot=(x_python,z_python,-y_python)`；完整矩阵共轭 `T_godot=C*T_python*inverse(C)`，只在 `MotionProtocol` 做一次 |
+| shadow 导出 | `p_zup=(x_godot,-z_godot,y_godot)`；`T_zup=inverse(C)*T_godot*C`，同样只在 `MotionProtocol` 做一次 |
 | pivot | 保留 GLB parent-local origins；相邻 frame relation 只产生单轴局部旋转；不能再加全局 ±90° 或 per-pivot 轴交换 |
 | passive linkage | Godot 根据当前相邻局部 pin geometry 在 arm-local Y-Z 平面求解；只写允许的被动 link local transform，不发送回 Python |
 | parity | [`sy205_glb_test.gd`](../../godot/client/tests/sy205_glb_test.gd#L208-L425) 与 [`sy205_frame_parity_cases.json`](../../godot/client/tests/fixtures/sy205_frame_parity_cases.json) 负责导入结构、hash、frame 和 pose fixture |
@@ -299,8 +326,8 @@ flowchart LR
 
 | 接口 | 方向 | 频率/限制 | profile | 主要责任 |
 |---|---|---|---|---|
-| `ws://127.0.0.1:8765/ws` | Godot ↔ Python | hello 首帧；input 80/s 限流；command 20/s；server heartbeat 10 s；状态目标 30 Hz | 两者 | `hello`, `input_snapshot`, `command`, `view_state`, `status`, ACK/error |
-| `/health` | 监控 → Python | HTTP | 两者 | 健康探针 |
+| `ws://127.0.0.1:8765/ws` | Godot ↔ Python | hello 首帧；input 80/s；command 20/s；shadow 60/s；状态目标 30 Hz | 两者 | 既有 v3 消息；可选 `simulation_truth_shadow` |
+| `/health` | 监控 → Python | HTTP | 两者 | 健康探针及最新 shadow age/identity；无样本或过期为 `null` |
 | `/api/model`、视觉模型/GLB | Godot → Python | 启动/模型准备 | 两者 | 返回已验证模型/视觉资产入口 |
 | `/api/terrain/*` | client → Python | HTTP；session + epoch/revision/token | Legacy | terrain preview/snapshot；motion-only 返回 `capability_unavailable` |
 | `/api/recording/*` | client → Python | HTTP；staging 256 MiB、token 5 min | Legacy | series/export/import validate/commit/cancel |

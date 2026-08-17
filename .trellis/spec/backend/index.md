@@ -12,6 +12,7 @@ The backend is the authoritative Python service migrated from BabylonSim. It own
 | [Quality Guidelines](./quality-guidelines.md) | Formatting, typing, deterministic tests, and forbidden shortcuts |
 | [Logging Guidelines](./logging-guidelines.md) | Operational diagnostics and sensitive-data boundaries |
 | [Runtime Profiles](./runtime-profiles.md) | Legacy and opt-in motion-only service composition |
+| [Simulation Truth Shadow](./shadow-truth.md) | Negotiated Godot observation schema, isolation, ordering, and diagnostics |
 
 Pre-development checklist:
 
