@@ -1,0 +1,40 @@
+{
+  "id": "jolt-authoritative-simulation",
+  "name": "jolt-authoritative-simulation",
+  "title": "Jolt authoritative simulation migration",
+  "description": "Move coupled excavator motion/contact authority to a profile-gated Godot/Jolt simulation core and make Python the external telemetry/device gateway.",
+  "status": "planning",
+  "dev_type": "architecture",
+  "scope": "cross-layer",
+  "package": "godot+backend+protocol",
+  "priority": "P1",
+  "creator": "rosatus",
+  "assignee": "rosatus",
+  "createdAt": "2026-08-17",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "08-17-authority-contract-shadow-state",
+    "08-17-jolt-chassis-track-authority",
+    "08-17-jolt-articulated-equipment",
+    "08-17-jolt-terrain-excavation-coupling",
+    "08-17-sensor-telemetry-python-gateway",
+    "08-17-jolt-authority-cutover"
+  ],
+  "parent": null,
+  "relatedFiles": [
+    "docs/architecture/engineering.md",
+    "docs/godot-integration.md",
+    "godot/client/scripts/motion_client.gd",
+    "godot/client/scripts/tracked_chassis_controller.gd",
+    "backend/src/babylon_sim/runtime.py",
+    "protocol/godot-pinocchio-v3.schema.json"
+  ],
+  "notes": "Parent planning task. Implementation occurs only in ordered child tasks after separate approval.",
+  "meta": {}
+}

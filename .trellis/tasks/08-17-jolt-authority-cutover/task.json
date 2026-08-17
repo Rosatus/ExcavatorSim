@@ -1,0 +1,32 @@
+{
+  "id": "jolt-authority-cutover",
+  "name": "jolt-authority-cutover",
+  "title": "Jolt authority cutover and legacy retirement",
+  "description": "Make Jolt authority the product default, remove duplicate Jolt-mode writers, retain explicit Python compatibility, and complete release/rollback evidence.",
+  "status": "planning",
+  "dev_type": "migration",
+  "scope": "cross-layer",
+  "package": "godot+backend+protocol",
+  "priority": "P1",
+  "creator": "rosatus",
+  "assignee": "rosatus",
+  "createdAt": "2026-08-17",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "08-17-jolt-authoritative-simulation",
+  "relatedFiles": [
+    "docs/architecture/engineering.md",
+    "docs/godot-integration.md",
+    "godot/client/project.godot",
+    "pixi.toml",
+    "backend/src/babylon_sim/runtime.py"
+  ],
+  "notes": "Phase 5. Depends on all earlier children; legacy deletion is explicitly deferred.",
+  "meta": {}
+}

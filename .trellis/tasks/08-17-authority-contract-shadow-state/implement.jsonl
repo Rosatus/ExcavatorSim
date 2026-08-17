@@ -1,0 +1,6 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Current Godot ownership and forbidden feedback rules to preserve during shadow mode."}
+{"file":".trellis/spec/backend/authority-and-concurrency.md","reason":"Current Python single-writer/lifecycle rules that shadow state must not change."}
+{"file":".trellis/spec/backend/runtime-profiles.md","reason":"Profile and capability negotiation precedent."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Coordinate conversion, versioning, and decoder ownership guidance."}
+{"file":".trellis/tasks/08-17-jolt-authoritative-simulation/research/current-authority-evidence.md","reason":"Observed migration seams and strict v3 constraints."}
+{"file":".trellis/tasks/08-17-jolt-authoritative-simulation/research/physics-rig-gaps.md","reason":"Required local Jolt probes and descriptor gaps."}

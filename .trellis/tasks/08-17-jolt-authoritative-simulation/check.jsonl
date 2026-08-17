@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend quality gate for final parent integration review."}
+{"file":".trellis/spec/backend/index.md","reason":"Backend quality gate for final parent integration review."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Cross-layer state, protocol, coordinate, and identity audit."}
+{"file":".trellis/tasks/08-17-jolt-authoritative-simulation/research/current-authority-evidence.md","reason":"Check shipped authority against the observed baseline and planned migration."}

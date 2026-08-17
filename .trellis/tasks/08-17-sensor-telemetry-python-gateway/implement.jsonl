@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Godot authority and local terrain/payload identity rules."}
+{"file":".trellis/spec/backend/authority-and-concurrency.md","reason":"Python concurrency, bounded latest state, lifecycle, and no hidden writers."}
+{"file":".trellis/spec/backend/runtime-profiles.md","reason":"Capability/profile composition and legacy isolation."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Single decoder, coordinate, sequence, and projection boundary guidance."}
+{"file":".trellis/tasks/08-17-jolt-authoritative-simulation/research/sensor-gateway-boundary.md","reason":"Observed sensor/recording/hardware gaps and recommended boundary."}

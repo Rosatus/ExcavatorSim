@@ -1,0 +1,7 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Current Godot authority, terrain, bucket, locomotion, and physics constraints."}
+{"file":".trellis/spec/backend/authority-and-concurrency.md","reason":"Current Python single-writer and lifecycle rules that the migration must version deliberately."}
+{"file":".trellis/spec/backend/runtime-profiles.md","reason":"Existing profile and capability composition used for staged migration."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Protocol, coordinate, identity, and validation guidance across Godot and Python."}
+{"file":".trellis/tasks/08-17-jolt-authoritative-simulation/research/current-authority-evidence.md","reason":"Observed current data flow and migration seams."}
+{"file":".trellis/tasks/08-17-jolt-authoritative-simulation/research/physics-rig-gaps.md","reason":"Observed physics asset gaps and required spikes."}
+{"file":".trellis/tasks/08-17-jolt-authoritative-simulation/research/sensor-gateway-boundary.md","reason":"Observed sensor gaps and recommended gateway boundary."}

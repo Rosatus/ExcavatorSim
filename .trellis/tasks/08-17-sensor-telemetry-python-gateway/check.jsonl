@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Godot producer quality gate."}
+{"file":".trellis/spec/backend/index.md","reason":"Python gateway quality gate."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Cross-language schema, frame, clock, decoder, and gap review."}
+{"file":".trellis/tasks/08-17-jolt-authoritative-simulation/research/sensor-gateway-boundary.md","reason":"Check that all observed missing contract fields are handled."}

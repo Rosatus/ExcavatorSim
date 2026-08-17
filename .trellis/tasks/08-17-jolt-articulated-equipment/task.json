@@ -1,0 +1,31 @@
+{
+  "id": "jolt-articulated-equipment",
+  "name": "jolt-articulated-equipment",
+  "title": "Jolt articulated work equipment",
+  "description": "Add Jolt upper/boom/arm/bucket bodies, physical joints, bounded actuator response, payload coupling, and actual-state visual following.",
+  "status": "planning",
+  "dev_type": "feature",
+  "scope": "frontend",
+  "package": "godot",
+  "priority": "P1",
+  "creator": "rosatus",
+  "assignee": "rosatus",
+  "createdAt": "2026-08-17",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "08-17-jolt-authoritative-simulation",
+  "relatedFiles": [
+    "godot/client/scripts/motion_presentation.gd",
+    "godot/client/scripts/bucket_soil_state.gd",
+    "godot/client/resources/models/model_catalog.json",
+    "assets/model/model-registry-v1.json"
+  ],
+  "notes": "Phase 2. Depends on chassis authority; keep the SY205 four-bar visual-only initially.",
+  "meta": {}
+}

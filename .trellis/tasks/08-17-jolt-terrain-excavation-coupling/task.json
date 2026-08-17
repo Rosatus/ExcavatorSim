@@ -1,0 +1,32 @@
+{
+  "id": "jolt-terrain-excavation-coupling",
+  "name": "jolt-terrain-excavation-coupling",
+  "title": "Jolt terrain excavation coupling",
+  "description": "Couple Jolt bucket/chassis contacts to physical reaction and one conserved TerrainState/BucketSoilState excavation transaction.",
+  "status": "planning",
+  "dev_type": "feature",
+  "scope": "frontend",
+  "package": "godot",
+  "priority": "P1",
+  "creator": "rosatus",
+  "assignee": "rosatus",
+  "createdAt": "2026-08-17",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "08-17-jolt-authoritative-simulation",
+  "relatedFiles": [
+    "godot/client/scripts/excavation_world.gd",
+    "godot/client/scripts/terrain_state.gd",
+    "godot/client/scripts/bucket_soil_state.gd",
+    "godot/client/scripts/terrain_commit_scheduler.gd",
+    "godot/client/scripts/terrain_collider.gd"
+  ],
+  "notes": "Phase 3. Depends on articulated authority; Jolt contact informs but does not own logical soil volume.",
+  "meta": {}
+}

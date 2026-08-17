@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Final Godot authority, legacy isolation, terrain, payload, and lifecycle review."}
+{"file":".trellis/spec/backend/authority-and-concurrency.md","reason":"Final Python gateway/legacy worker ownership and shutdown review."}
+{"file":".trellis/spec/backend/runtime-profiles.md","reason":"Default and explicit compatibility profile composition."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"End-to-end writer, schema, coordinate, and lifecycle audit."}
+{"file":".trellis/tasks/08-17-jolt-authoritative-simulation/roadmap.md","reason":"All phase exit gates and final integration requirements."}

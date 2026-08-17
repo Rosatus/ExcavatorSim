@@ -1,0 +1,32 @@
+{
+  "id": "authority-contract-shadow-state",
+  "name": "authority-contract-shadow-state",
+  "title": "Authority contract and shadow state",
+  "description": "Define authority/rig/truth contracts, validate local Jolt APIs, and publish observational shadow state without changing product motion.",
+  "status": "in_progress",
+  "dev_type": "architecture",
+  "scope": "cross-layer",
+  "package": "godot+backend+protocol",
+  "priority": "P1",
+  "creator": "rosatus",
+  "assignee": "rosatus",
+  "createdAt": "2026-08-17",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "08-17-jolt-authoritative-simulation",
+  "relatedFiles": [
+    "protocol/godot-pinocchio-v3.schema.json",
+    "godot/client/scripts/motion_client.gd",
+    "godot/client/scripts/motion_protocol.gd",
+    "backend/src/babylon_sim/protocol.py",
+    "backend/src/babylon_sim/runtime.py"
+  ],
+  "notes": "Phase 0. Must remain observational and preserve the current default profile.",
+  "meta": {}
+}

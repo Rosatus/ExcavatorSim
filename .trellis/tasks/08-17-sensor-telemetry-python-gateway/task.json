@@ -1,0 +1,32 @@
+{
+  "id": "sensor-telemetry-python-gateway",
+  "name": "sensor-telemetry-python-gateway",
+  "title": "Sensor telemetry and Python gateway",
+  "description": "Publish Jolt truth and initial simulated sensors from Godot and make Python the strict telemetry, recording, diagnostics, and external command gateway.",
+  "status": "planning",
+  "dev_type": "feature",
+  "scope": "cross-layer",
+  "package": "godot+backend+protocol",
+  "priority": "P1",
+  "creator": "rosatus",
+  "assignee": "rosatus",
+  "createdAt": "2026-08-17",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "08-17-jolt-authoritative-simulation",
+  "relatedFiles": [
+    "godot/client/scripts/motion_protocol.gd",
+    "backend/src/babylon_sim/protocol.py",
+    "backend/src/babylon_sim/runtime.py",
+    "backend/src/babylon_sim/web.py",
+    "protocol/godot-pinocchio-v3.schema.json"
+  ],
+  "notes": "Phase 4. Depends on stable Jolt body/joint/contact/terrain/payload truth; production hardware drivers remain out of scope.",
+  "meta": {}
+}

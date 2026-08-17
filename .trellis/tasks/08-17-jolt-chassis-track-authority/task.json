@@ -1,0 +1,31 @@
+{
+  "id": "jolt-chassis-track-authority",
+  "name": "jolt-chassis-track-authority",
+  "title": "Jolt chassis and track authority",
+  "description": "Make a model-specific Jolt chassis and distributed left/right track force model the sole chassis authority in the new profile.",
+  "status": "planning",
+  "dev_type": "feature",
+  "scope": "frontend",
+  "package": "godot",
+  "priority": "P1",
+  "creator": "rosatus",
+  "assignee": "rosatus",
+  "createdAt": "2026-08-17",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "08-17-jolt-authoritative-simulation",
+  "relatedFiles": [
+    "godot/client/scripts/tracked_chassis_controller.gd",
+    "godot/client/scripts/tracked_locomotion_state.gd",
+    "godot/client/scripts/terrain_collider.gd",
+    "godot/client/resources/models/model_catalog.json"
+  ],
+  "notes": "Phase 1. Depends on 08-17-authority-contract-shadow-state; equipment remains frozen.",
+  "meta": {}
+}
