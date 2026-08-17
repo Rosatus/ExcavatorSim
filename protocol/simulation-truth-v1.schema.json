@@ -7,7 +7,7 @@
   "required": ["schema_version", "authority_profile", "authority_epoch", "sequence", "physics_tick", "monotonic_time_ns", "coordinate_basis", "identity", "gravity_m_s2", "bodies", "joints", "tracks", "payload", "contacts", "quality_flags"],
   "properties": {
     "schema_version": {"const": "simulation-truth-v1"},
-    "authority_profile": {"const": "jolt_shadow"},
+    "authority_profile": {"enum": ["jolt_shadow", "jolt_authoritative"]},
     "authority_epoch": {"type": "string", "minLength": 1, "maxLength": 128},
     "sequence": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
     "physics_tick": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
@@ -15,8 +15,8 @@
     "coordinate_basis": {"const": "canonical-z-up-right-handed-meters"},
     "identity": {"$ref": "#/$defs/identity"},
     "gravity_m_s2": {"$ref": "#/$defs/vec3"},
-    "bodies": {"type": "array", "maxItems": 16, "items": {"$ref": "#/$defs/body"}},
-    "joints": {"type": "array", "maxItems": 16, "items": {"$ref": "#/$defs/joint"}},
+    "bodies": {"type": "array", "minItems": 5, "maxItems": 5, "items": {"$ref": "#/$defs/body"}},
+    "joints": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"$ref": "#/$defs/joint"}},
     "tracks": {"$ref": "#/$defs/tracks"},
     "payload": {"$ref": "#/$defs/payload"},
     "contacts": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/contact"}},
@@ -48,7 +48,7 @@
       "type": "object", "additionalProperties": false,
       "required": ["name", "transform", "linear_velocity_m_s", "angular_velocity_rad_s", "sleeping"],
       "properties": {
-        "name": {"type": "string", "minLength": 1},
+        "name": {"enum": ["chassis", "upper", "boom", "arm", "bucket"]},
         "transform": {"$ref": "#/$defs/matrix4"},
         "linear_velocity_m_s": {"$ref": "#/$defs/vec3"},
         "angular_velocity_rad_s": {"$ref": "#/$defs/vec3"},
@@ -59,7 +59,7 @@
       "type": "object", "additionalProperties": false,
       "required": ["name", "position_rad", "velocity_rad_s", "effort_n"],
       "properties": {
-        "name": {"type": "string", "minLength": 1},
+        "name": {"enum": ["swing_joint", "boom_joint", "arm_joint", "bucket_joint"]},
         "position_rad": {"type": "number"},
         "velocity_rad_s": {"type": "number"},
         "effort_n": {"type": "number"}
@@ -67,13 +67,20 @@
     },
     "tracks": {
       "type": "object", "additionalProperties": false,
-      "required": ["left_command", "right_command", "left_speed_m_s", "right_speed_m_s", "grounded"],
+      "required": ["left_command", "right_command", "left_speed_m_s", "right_speed_m_s", "grounded", "left_contact_count", "right_contact_count", "left_slip_ratio", "right_slip_ratio", "left_saturated", "right_saturated", "terrain_identity_valid"],
       "properties": {
         "left_command": {"type": "number", "minimum": -1, "maximum": 1},
         "right_command": {"type": "number", "minimum": -1, "maximum": 1},
         "left_speed_m_s": {"type": "number"},
         "right_speed_m_s": {"type": "number"},
-        "grounded": {"type": "boolean"}
+        "grounded": {"type": "boolean"},
+        "left_contact_count": {"type": "integer", "minimum": 0, "maximum": 16},
+        "right_contact_count": {"type": "integer", "minimum": 0, "maximum": 16},
+        "left_slip_ratio": {"type": "number", "minimum": -4, "maximum": 4},
+        "right_slip_ratio": {"type": "number", "minimum": -4, "maximum": 4},
+        "left_saturated": {"type": "boolean"},
+        "right_saturated": {"type": "boolean"},
+        "terrain_identity_valid": {"type": "boolean"}
       }
     },
     "payload": {

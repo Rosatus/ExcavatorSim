@@ -16,7 +16,7 @@
       "soil_contract_path": "res://resources/models/sy205_soil_contract.json",
       "soil_contract_sha256": "7a6f864fa8f2bcce45d4199830c3c753d24061b6f4913831c3d097b95e8c4bd9",
       "physics_rig_path": "res://resources/physics/sy205_physics_rig.json",
-      "physics_rig_sha256": "32b9d52b5b8fd5a5617a570ab34a39577a31783014067e514630f01857bcaa0b",
+      "physics_rig_sha256": "1952d807ae9f487bccf7bf06a73ed3509fa838b96e74f18f74b193a521dfc42f",
       "tracked_locomotion": {
         "track_gauge_m": 2.2,
         "contact_length_m": 3.4,
@@ -51,7 +51,7 @@
       "soil_contract_path": "res://resources/models/sy135_soil_contract.json",
       "soil_contract_sha256": "448d5574f52384bfc8166c03e7f12caaed31ba87f33607102bd9d7aeceae3ae3",
       "physics_rig_path": "res://resources/physics/sy135_physics_rig.json",
-      "physics_rig_sha256": "e8ecbc959fe949776f52d4504391152e14caa444f503036cf2cd44369be8b4a0",
+      "physics_rig_sha256": "217b8866383ce12ba6ac000547923dedc6b6a1bdc2e61536f65fc026f5fc4e40",
       "tracked_locomotion": {
         "track_gauge_m": 1.96,
         "contact_length_m": 2.9,

@@ -15,6 +15,8 @@ from .protocol import ProtocolError
 
 SHADOW_TRUTH_CAPABILITY = "simulation_truth_shadow_v1"
 SHADOW_TRUTH_TIMEOUT_SECONDS = 0.5
+TRUTH_BODY_NAMES = frozenset({"chassis", "upper", "boom", "arm", "bucket"})
+TRUTH_JOINT_NAMES = frozenset({"swing_joint", "boom_joint", "arm_joint", "bucket_joint"})
 
 
 @dataclass(frozen=True)
@@ -93,6 +95,21 @@ def decode_shadow_truth(
     )
     if errors:
         raise ProtocolError("shadow_schema_validation_failed", errors[0].message)
+    if snapshot["authority_profile"] != "jolt_shadow":
+        raise ProtocolError(
+            "shadow_schema_validation_failed",
+            "shadow transport requires jolt_shadow authority_profile",
+        )
+    body_names = [body["name"] for body in cast(list[dict[str, Any]], snapshot["bodies"])]
+    joint_names = [joint["name"] for joint in cast(list[dict[str, Any]], snapshot["joints"])]
+    if len(set(body_names)) != len(body_names) or set(body_names) != TRUTH_BODY_NAMES:
+        raise ProtocolError(
+            "shadow_schema_validation_failed", "shadow truth requires five unique named bodies"
+        )
+    if len(set(joint_names)) != len(joint_names) or set(joint_names) != TRUTH_JOINT_NAMES:
+        raise ProtocolError(
+            "shadow_schema_validation_failed", "shadow truth requires four unique named joints"
+        )
     identity = cast(dict[str, Any], snapshot["identity"])
     actual = ShadowTruthIdentity(
         session_id=identity["session_id"],

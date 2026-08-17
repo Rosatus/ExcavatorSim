@@ -47,7 +47,7 @@ def _snapshot(
         "gravity_m_s2": [0.0, 0.0, -9.80665],
         "bodies": [
             {
-                "name": "chassis",
+                "name": name,
                 "transform": [
                     [1.0, 0.0, 0.0, 1.0],
                     [0.0, 1.0, 0.0, 2.0],
@@ -58,14 +58,25 @@ def _snapshot(
                 "angular_velocity_rad_s": [0.0, 0.0, 0.0],
                 "sleeping": False,
             }
+            for name in ("chassis", "upper", "boom", "arm", "bucket")
         ],
-        "joints": [],
+        "joints": [
+            {"name": name, "position_rad": 0.0, "velocity_rad_s": 0.0, "effort_n": 0.0}
+            for name in ("swing_joint", "boom_joint", "arm_joint", "bucket_joint")
+        ],
         "tracks": {
             "left_command": 0.0,
             "right_command": 0.0,
             "left_speed_m_s": 0.0,
             "right_speed_m_s": 0.0,
             "grounded": True,
+            "left_contact_count": 0,
+            "right_contact_count": 0,
+            "left_slip_ratio": 0.0,
+            "right_slip_ratio": 0.0,
+            "left_saturated": False,
+            "right_saturated": False,
+            "terrain_identity_valid": True,
         },
         "payload": {
             "mass_kg": 0.0,
@@ -87,7 +98,7 @@ def _identity(
         model_id="sy205",
         model_version="sy205-glb-urdf-v4",
         rig_id="sy205-jolt-rig",
-        rig_version="sy205-jolt-rig-v1",
+        rig_version="sy205-jolt-rig-v2",
         calibration_version="machine-calibration-v2",
     )
 
@@ -105,6 +116,9 @@ def test_rig_descriptors_match_strict_schema() -> None:
         validator.validate(descriptor)
         assert len({body["name"] for body in descriptor["bodies"]}) == 5
         assert len({joint["name"] for joint in descriptor["joints"]}) == 4
+        invalid_descriptor = json.loads(json.dumps(descriptor))
+        invalid_descriptor["bodies"][0]["inertia_diagonal_kg_m2"][0] = 0.0
+        assert list(validator.iter_errors(invalid_descriptor))
 
     identity_fixture = json.loads(
         (
@@ -146,6 +160,14 @@ def test_shadow_decoder_is_typed_immutable_and_strictly_ordered() -> None:
     invalid["bodies"][0]["transform"][0][0] = 2.0
     with pytest.raises(ProtocolError, match="normalized"):
         decode_shadow_truth(invalid, identity)
+    authoritative = _snapshot(identity)
+    authoritative["authority_profile"] = "jolt_authoritative"
+    with pytest.raises(ProtocolError, match="shadow transport requires jolt_shadow"):
+        decode_shadow_truth(authoritative, identity)
+    duplicate_body = _snapshot(identity)
+    duplicate_body["bodies"][1]["name"] = "chassis"
+    with pytest.raises(ProtocolError, match="five unique named bodies"):
+        decode_shadow_truth(duplicate_body, identity)
 
 
 def test_shadow_terrain_identity_is_monotonic_within_world_generation() -> None:
@@ -215,6 +237,18 @@ async def test_shadow_transport_is_negotiated_observational_and_cleared(
         hello = await _receive_type(ws, "hello_ack")
         assert hello["negotiated_optional_capabilities"] == ["simulation_truth_shadow_v1"]
         identity = _identity(hello["session_id"], hello["simulation_epoch"])
+        authoritative = _snapshot(identity)
+        authoritative["authority_profile"] = "jolt_authoritative"
+        await ws.send_json(
+            {
+                "type": "simulation_truth_shadow",
+                "protocol_version": "godot-pinocchio-v3",
+                "snapshot": authoritative,
+            }
+        )
+        error = await _receive_type(ws, "error")
+        assert error["code"] == "shadow_schema_validation_failed"
+        assert (await (await client.get("/health")).json())["simulation_truth_shadow"] is None
         await ws.send_json(
             {
                 "type": "simulation_truth_shadow",

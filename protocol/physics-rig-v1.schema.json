@@ -4,7 +4,7 @@
   "title": "Excavator Physics Rig Descriptor v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "rig_id", "rig_version", "model_id", "model_version", "coordinate_basis", "provenance", "collision_layers", "bodies", "joints", "tracks", "quality_flags"],
+  "required": ["schema_version", "rig_id", "rig_version", "model_id", "model_version", "coordinate_basis", "provenance", "collision_layers", "bodies", "joints", "chassis_dynamics", "tracks", "quality_flags"],
   "properties": {
     "schema_version": {"const": "physics-rig-v1"},
     "rig_id": {"type": "string", "minLength": 1},
@@ -44,23 +44,69 @@
       "maxItems": 4,
       "items": {"$ref": "#/$defs/joint"}
     },
+    "chassis_dynamics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mass_kg", "center_of_mass_m", "inertia_diagonal_kg_m2", "linear_damp", "angular_damp", "max_linear_speed_m_s", "max_angular_speed_rad_s", "ground_clearance_m", "can_sleep", "continuous_collision_detection", "compound_shapes"],
+      "properties": {
+        "mass_kg": {"type": "number", "exclusiveMinimum": 0},
+        "center_of_mass_m": {"$ref": "#/$defs/vec3"},
+        "inertia_diagonal_kg_m2": {"$ref": "#/$defs/positive_vec3"},
+        "linear_damp": {"type": "number", "minimum": 0},
+        "angular_damp": {"type": "number", "minimum": 0},
+        "max_linear_speed_m_s": {"type": "number", "exclusiveMinimum": 0},
+        "max_angular_speed_rad_s": {"type": "number", "exclusiveMinimum": 0},
+        "ground_clearance_m": {"type": "number", "exclusiveMinimum": 0},
+        "can_sleep": {"type": "boolean"},
+        "continuous_collision_detection": {"type": "boolean"},
+        "compound_shapes": {"type": "array", "minItems": 2, "maxItems": 8, "items": {"$ref": "#/$defs/phase1_shape"}}
+      }
+    },
     "tracks": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["gauge_m", "contact_length_m", "contact_width_m", "traction_points_per_side", "friction", "max_drive_force_n"],
+      "required": ["gauge_m", "contact_length_m", "contact_width_m", "traction_points_per_side", "friction", "max_drive_force_n", "max_belt_speed_m_s", "brake_force_n", "traction_response_n_per_m_s", "lateral_resistance_n_per_m_s", "probe_height_m", "probe_depth_m", "yaw_torque_scale"],
       "properties": {
         "gauge_m": {"type": "number", "exclusiveMinimum": 0},
         "contact_length_m": {"type": "number", "exclusiveMinimum": 0},
         "contact_width_m": {"type": "number", "exclusiveMinimum": 0},
         "traction_points_per_side": {"type": "integer", "minimum": 2, "maximum": 16},
         "friction": {"type": "number", "minimum": 0, "maximum": 4},
-        "max_drive_force_n": {"type": "number", "exclusiveMinimum": 0}
+        "max_drive_force_n": {"type": "number", "exclusiveMinimum": 0},
+        "max_belt_speed_m_s": {"type": "number", "exclusiveMinimum": 0},
+        "brake_force_n": {"type": "number", "exclusiveMinimum": 0},
+        "traction_response_n_per_m_s": {"type": "number", "exclusiveMinimum": 0},
+        "lateral_resistance_n_per_m_s": {"type": "number", "exclusiveMinimum": 0},
+        "probe_height_m": {"type": "number", "exclusiveMinimum": 0},
+        "probe_depth_m": {"type": "number", "exclusiveMinimum": 0},
+        "yaw_torque_scale": {"type": "number", "exclusiveMinimum": 0, "maximum": 1}
       }
     },
     "quality_flags": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
   },
   "$defs": {
     "vec3": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}},
+    "positive_vec3": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number", "exclusiveMinimum": 0}},
+    "shape": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "center_m", "size_m"],
+      "properties": {
+        "kind": {"enum": ["box", "capsule", "convex_proxy"]},
+        "center_m": {"$ref": "#/$defs/vec3"},
+        "size_m": {"$ref": "#/$defs/positive_vec3"}
+      }
+    },
+    "phase1_shape": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "center_m", "size_m"],
+      "properties": {
+        "kind": {"const": "box"},
+        "center_m": {"$ref": "#/$defs/vec3"},
+        "size_m": {"$ref": "#/$defs/positive_vec3"}
+      }
+    },
     "body": {
       "type": "object",
       "additionalProperties": false,
@@ -70,7 +116,7 @@
         "frame": {"enum": ["base_link", "upper_structure_link", "boom_link", "arm_link", "bucket_link"]},
         "mass_kg": {"type": "number", "exclusiveMinimum": 0},
         "center_of_mass_m": {"$ref": "#/$defs/vec3"},
-        "inertia_diagonal_kg_m2": {"$ref": "#/$defs/vec3"},
+        "inertia_diagonal_kg_m2": {"$ref": "#/$defs/positive_vec3"},
         "shape": {
           "type": "object",
           "additionalProperties": false,
@@ -78,7 +124,7 @@
           "properties": {
             "kind": {"enum": ["box", "capsule", "convex_proxy"]},
             "center_m": {"$ref": "#/$defs/vec3"},
-            "size_m": {"$ref": "#/$defs/vec3"}
+            "size_m": {"$ref": "#/$defs/positive_vec3"}
           }
         }
       }

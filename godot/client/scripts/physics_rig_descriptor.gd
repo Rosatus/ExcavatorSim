@@ -7,12 +7,24 @@ const JOINT_NAMES := ["swing_joint", "boom_joint", "arm_joint", "bucket_joint"]
 const TOP_LEVEL_FIELDS := [
 	"schema_version", "rig_id", "rig_version", "model_id", "model_version",
 	"coordinate_basis", "provenance", "collision_layers", "bodies", "joints",
-	"tracks", "quality_flags",
+	"chassis_dynamics", "tracks", "quality_flags",
 ]
 const BODY_FIELDS := ["name", "frame", "mass_kg", "center_of_mass_m", "inertia_diagonal_kg_m2", "shape"]
 const SHAPE_FIELDS := ["kind", "center_m", "size_m"]
 const JOINT_FIELDS := ["name", "type", "parent_body", "child_body", "frame", "axis", "limit_rad", "actuator"]
 const ACTUATOR_FIELDS := ["mode", "max_force_n", "max_velocity_rad_s", "damping"]
+const CHASSIS_DYNAMICS_FIELDS := [
+	"mass_kg", "center_of_mass_m", "inertia_diagonal_kg_m2", "linear_damp",
+	"angular_damp", "max_linear_speed_m_s", "max_angular_speed_rad_s",
+	"ground_clearance_m", "can_sleep", "continuous_collision_detection",
+	"compound_shapes",
+]
+const TRACK_FIELDS := [
+	"gauge_m", "contact_length_m", "contact_width_m", "traction_points_per_side",
+	"friction", "max_drive_force_n", "max_belt_speed_m_s", "brake_force_n",
+	"traction_response_n_per_m_s", "lateral_resistance_n_per_m_s",
+	"probe_height_m", "probe_depth_m", "yaw_torque_scale",
+]
 const BODY_FRAMES := {
 	"chassis": "base_link",
 	"upper": "upper_structure_link",
@@ -71,6 +83,8 @@ func is_valid_for(model_id: String, model_version: String) -> bool:
 		return false
 	if not _validate_joints(_data.get("joints")):
 		return false
+	if not _validate_chassis_dynamics(_data.get("chassis_dynamics")):
+		return false
 	if not _validate_tracks(_data.get("tracks")):
 		return false
 	return _validate_quality_flags(_data.get("quality_flags"))
@@ -90,6 +104,18 @@ func rig_id() -> String:
 
 func rig_version() -> String:
 	return String(_data.get("rig_version", ""))
+
+
+func model_version() -> String:
+	return String(_data.get("model_version", ""))
+
+
+func chassis_dynamics() -> Dictionary:
+	return (_data.get("chassis_dynamics", {}) as Dictionary).duplicate(true)
+
+
+func tracks() -> Dictionary:
+	return (_data.get("tracks", {}) as Dictionary).duplicate(true)
 
 
 func _validate_provenance(value: Variant) -> bool:
@@ -222,10 +248,11 @@ func _validate_tracks(value: Variant) -> bool:
 	if not value is Dictionary:
 		return _reject("tracks", "must be an object")
 	var tracks := value as Dictionary
-	var fields := ["gauge_m", "contact_length_m", "contact_width_m", "traction_points_per_side", "friction", "max_drive_force_n"]
-	if not _exact_fields(tracks, fields, "tracks"):
+	if not _exact_fields(tracks, TRACK_FIELDS, "tracks"):
 		return false
-	for field in ["gauge_m", "contact_length_m", "contact_width_m", "max_drive_force_n"]:
+	for field in TRACK_FIELDS:
+		if field == "traction_points_per_side" or field == "friction":
+			continue
 		if not _positive_number(tracks.get(field)):
 			return _reject("tracks.%s" % field, "must be finite and positive")
 	var points: Variant = tracks.get("traction_points_per_side")
@@ -233,6 +260,43 @@ func _validate_tracks(value: Variant) -> bool:
 		return _reject("tracks.traction_points_per_side", "must be an integer from 2 to 16")
 	if not _finite_number(tracks.get("friction")) or float(tracks.get("friction")) < 0.0 or float(tracks.get("friction")) > 4.0:
 		return _reject("tracks.friction", "must be finite and between 0 and 4")
+	if float(tracks.get("yaw_torque_scale")) > 1.0:
+		return _reject("tracks.yaw_torque_scale", "must be at most 1")
+	return true
+
+
+func _validate_chassis_dynamics(value: Variant) -> bool:
+	if not value is Dictionary:
+		return _reject("chassis_dynamics", "must be an object")
+	var dynamics := value as Dictionary
+	if not _exact_fields(dynamics, CHASSIS_DYNAMICS_FIELDS, "chassis_dynamics"):
+		return false
+	for field in ["mass_kg", "max_linear_speed_m_s", "max_angular_speed_rad_s", "ground_clearance_m"]:
+		if not _positive_number(dynamics.get(field)):
+			return _reject("chassis_dynamics.%s" % field, "must be finite and positive")
+	for field in ["linear_damp", "angular_damp"]:
+		if not _finite_number(dynamics.get(field)) or float(dynamics.get(field)) < 0.0:
+			return _reject("chassis_dynamics.%s" % field, "must be finite and non-negative")
+	if not dynamics.get("can_sleep") is bool:
+		return _reject("chassis_dynamics.can_sleep", "must be boolean")
+	if not dynamics.get("continuous_collision_detection") is bool:
+		return _reject("chassis_dynamics.continuous_collision_detection", "must be boolean")
+	if not _vec3(dynamics.get("center_of_mass_m"), "chassis_dynamics.center_of_mass_m"):
+		return false
+	if not _vec3(dynamics.get("inertia_diagonal_kg_m2"), "chassis_dynamics.inertia_diagonal_kg_m2", true):
+		return false
+	var compound_shapes: Variant = dynamics.get("compound_shapes")
+	if not compound_shapes is Array or compound_shapes.size() < 2 or compound_shapes.size() > 8:
+		return _reject("chassis_dynamics.compound_shapes", "must contain 2 to 8 primitive shapes")
+	for index in compound_shapes.size():
+		if not _validate_shape(compound_shapes[index], "chassis_dynamics.compound_shapes[%d]" % index):
+			return false
+		if String(compound_shapes[index].get("kind", "")) != "box":
+			return _reject("chassis_dynamics.compound_shapes[%d].kind" % index, "must equal box in Phase 1")
+	var inertia_data := dynamics.get("inertia_diagonal_kg_m2") as Array
+	var inertia := Vector3(float(inertia_data[0]), float(inertia_data[1]), float(inertia_data[2]))
+	if inertia.x >= inertia.y + inertia.z or inertia.y >= inertia.x + inertia.z or inertia.z >= inertia.x + inertia.y:
+		return _reject("chassis_dynamics.inertia_diagonal_kg_m2", "must satisfy rigid-body triangle inequalities")
 	return true
 
 
