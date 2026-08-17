@@ -21,6 +21,10 @@ func _run() -> void:
 		return _fail("jolt_shadow must publish")
 	if AuthorityProfile.writes_product_pose("jolt_shadow"):
 		return _fail("jolt_shadow must not write product pose")
+	if not AuthorityProfile.writes_product_pose("jolt_authoritative"):
+		return _fail("jolt_authoritative must own product pose")
+	if not AuthorityProfile.produces_truth("jolt_authoritative"):
+		return _fail("jolt_authoritative must produce local truth")
 	for model_id in ["sy205", "sy135"]:
 		var descriptor := PhysicsRigDescriptor.load_for_model(model_id)
 		if descriptor == null:
@@ -41,6 +45,8 @@ func _run() -> void:
 		["bodies[0].shape.size_m[1]", _with_nested_value(valid_descriptor.to_dictionary(), ["bodies", 0, "shape", "size_m", 1], 0.0)],
 		["joints[0].actuator.max_force_n", _with_nested_value(valid_descriptor.to_dictionary(), ["joints", 0, "actuator", "max_force_n"], 0.0)],
 		["tracks.traction_points_per_side", _with_nested_value(valid_descriptor.to_dictionary(), ["tracks", "traction_points_per_side"], 1)],
+		["chassis_dynamics.inertia_diagonal_kg_m2", _with_nested_value(valid_descriptor.to_dictionary(), ["chassis_dynamics", "inertia_diagonal_kg_m2"], [1.0, 1.0, 3.0])],
+		["tracks.probe_depth_m", _with_nested_value(valid_descriptor.to_dictionary(), ["tracks", "probe_depth_m"], 0.0)],
 	]
 	for invalid_case in invalid_cases:
 		var invalid := PhysicsRigDescriptor.from_dictionary_for_test(invalid_case[1])

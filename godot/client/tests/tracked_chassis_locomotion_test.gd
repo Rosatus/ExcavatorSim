@@ -189,6 +189,20 @@ func _test_input_actions_and_parent_composition() -> int:
 	) != 0:
 		host.free()
 		return 1
+	if _check(
+		presentation.set_authority_profile_for_test(AuthorityProfile.JOLT_AUTHORITATIVE),
+		"presentation rejected the authoritative profile"
+	) != 0:
+		host.free()
+		return 1
+	var frozen_base := base.global_transform
+	if _check(
+		not presentation.apply_pose_for_test(fixture["poses"]["swing_positive_90"])
+		and base.global_transform.is_equal_approx(frozen_base),
+		"Python pose changed the physics-owned presentation"
+	) != 0:
+		host.free()
+		return 1
 	chassis.reset_for_test()
 	if _check(
 		chassis.transform.is_equal_approx(Transform3D.IDENTITY),

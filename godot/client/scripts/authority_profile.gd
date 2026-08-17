@@ -17,3 +17,7 @@ static func writes_product_pose(value: String) -> bool:
 
 static func publishes_shadow(value: String) -> bool:
 	return value == JOLT_SHADOW
+
+
+static func produces_truth(value: String) -> bool:
+	return value == JOLT_SHADOW or value == JOLT_AUTHORITATIVE

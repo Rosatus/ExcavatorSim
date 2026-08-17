@@ -1,7 +1,11 @@
 class_name SimulationTruthPublisher
 extends Node
 
+const LOCAL_SESSION_ID := "godot-local-authority"
+const CALIBRATION_VERSION := "machine-calibration-v2"
+
 @export_enum("python_kinematic", "jolt_shadow", "jolt_authoritative") var authority_profile := AuthorityProfile.PYTHON_KINEMATIC
+@export var use_project_authority_profile := true
 @export var motion_client_path := NodePath("../MotionClient")
 @export var motion_presentation_path := NodePath("../MotionPresentation")
 @export var terrain_world_path := NodePath("../TerrainRoot/TerrainWorld")
@@ -29,60 +33,70 @@ func _ready() -> void:
 	_terrain_world = get_node_or_null(terrain_world_path) as TerrainWorld
 	_excavation_world = get_node_or_null(excavation_world_path) as ExcavationWorld
 	_chassis = get_node_or_null(chassis_path) as TrackedChassisController
-	authority_profile = String(ProjectSettings.get_setting("simulation/authority_profile", authority_profile))
+	if use_project_authority_profile:
+		authority_profile = String(ProjectSettings.get_setting("simulation/authority_profile", authority_profile))
 	if not AuthorityProfile.is_valid(authority_profile):
 		_fail_closed("unknown authority profile: %s" % authority_profile)
 		return
-	if authority_profile == AuthorityProfile.JOLT_AUTHORITATIVE:
-		_fail_closed("jolt_authoritative is declared but not implemented")
-		return
 	_rotate_epoch()
-	if _motion_client != null:
+	if _motion_client != null and not _motion_client.authority_changed.is_connected(_on_authority_changed):
 		_motion_client.authority_changed.connect(_on_authority_changed)
 
 
 func _physics_process(_delta: float) -> void:
-	if not AuthorityProfile.publishes_shadow(authority_profile):
+	if not AuthorityProfile.produces_truth(authority_profile):
 		return
 	var snapshot := build_snapshot()
 	if snapshot == null:
 		return
 	_last_snapshot = snapshot
-	_motion_client.queue_simulation_truth_shadow(snapshot.to_dictionary())
+	if AuthorityProfile.publishes_shadow(authority_profile) and _motion_client != null:
+		_motion_client.queue_simulation_truth_shadow(snapshot.to_dictionary())
 
 
 func build_snapshot() -> SimulationTruthSnapshot:
-	if _motion_client == null or _presentation == null or _terrain_world == null or _terrain_world.terrain_state == null:
+	var authoritative := AuthorityProfile.writes_product_pose(authority_profile)
+	if _presentation == null or _terrain_world == null or _terrain_world.terrain_state == null:
 		return null
-	if _motion_client.connection_state != MotionClient.STATE_READY:
-		return null
-	var pose := _motion_client.get_latest_accepted_pose()
-	if not _pose_matches_authority(pose):
-		return null
-	var authority_identity := "%s|%s|%s" % [
-		_motion_client.session_id, _motion_client.simulation_epoch, _motion_client.active_model_id,
-	]
-	if authority_identity != _last_authority_identity:
-		_last_authority_identity = authority_identity
-		_rotate_epoch()
+	var pose: Dictionary = {}
+	if not authoritative:
+		if _motion_client == null or _motion_client.connection_state != MotionClient.STATE_READY:
+			return null
+		pose = _motion_client.get_latest_accepted_pose()
+		if not _pose_matches_authority(pose):
+			return null
+		var authority_identity := "%s|%s|%s" % [
+			_motion_client.session_id, _motion_client.simulation_epoch, _motion_client.active_model_id,
+		]
+		if authority_identity != _last_authority_identity:
+			_last_authority_identity = authority_identity
+			_rotate_epoch()
 	var model_id := _presentation.get_active_model_id()
-	var model_version := String(_motion_client.accepted_versions.get("model_version", ""))
-	if model_id.is_empty() or model_version.is_empty():
+	if model_id.is_empty():
 		return null
 	if model_id != _last_model_id:
 		_descriptor = PhysicsRigDescriptor.load_for_model(model_id)
 		_last_model_id = model_id
+		_rotate_epoch()
 	if _descriptor == null:
 		contract_error = "missing physics rig descriptor for %s" % model_id
 		return null
-	if not _descriptor.is_valid_for(model_id, model_version):
-		contract_error = _descriptor.validation_error()
+	var model_version := (
+		_descriptor.model_version()
+		if authoritative
+		else String(_motion_client.accepted_versions.get("model_version", ""))
+	)
+	if model_version.is_empty() or not _descriptor.is_valid_for(model_id, model_version):
+		contract_error = _descriptor.validation_error() if not model_version.is_empty() else "model version unavailable"
 		return null
-	contract_error = ""
 	var terrain := _terrain_world.terrain_state.surface_snapshot()
 	var excavation := _excavation_world.get_status_snapshot() if _excavation_world != null else {}
 	var chassis := _chassis.get_status_snapshot() if _chassis != null else {}
-	var raw: Dictionary = pose.get("raw", {})
+	if authoritative and not bool(chassis.get("configured", false)):
+		contract_error = "authoritative chassis is not configured"
+		return null
+	contract_error = ""
+	var raw: Dictionary = pose.get("raw", {}) if not authoritative else {}
 	var joint_positions: Array = raw.get("joint_position", [0.0, 0.0, 0.0, 0.0])
 	var joint_velocities: Array = raw.get("joint_velocity", [0.0, 0.0, 0.0, 0.0])
 	var body_frames := {
@@ -94,12 +108,21 @@ func build_snapshot() -> SimulationTruthSnapshot:
 		var frame := _presentation.get_frame_node(body_frames[body_name])
 		if frame == null:
 			return null
+		var body_transform := frame.global_transform
+		var linear_velocity := Vector3.ZERO
+		var angular_velocity := Vector3.ZERO
+		var sleeping := false
+		if authoritative and body_name == "chassis":
+			body_transform = chassis.get("body_transform", body_transform) as Transform3D
+			linear_velocity = chassis.get("linear_velocity", Vector3.ZERO) as Vector3
+			angular_velocity = chassis.get("angular_velocity", Vector3.ZERO) as Vector3
+			sleeping = bool(chassis.get("sleeping", false))
 		bodies.append({
 			"name": body_name,
-			"transform": MotionProtocol.transform_to_canonical_rows(frame.global_transform),
-			"linear_velocity_m_s": [0.0, 0.0, 0.0],
-			"angular_velocity_rad_s": [0.0, 0.0, 0.0],
-			"sleeping": false,
+			"transform": MotionProtocol.transform_to_canonical_rows(body_transform),
+			"linear_velocity_m_s": MotionProtocol.vector_to_canonical_array(linear_velocity),
+			"angular_velocity_rad_s": MotionProtocol.vector_to_canonical_array(angular_velocity),
+			"sleeping": sleeping,
 		})
 	var joints: Array[Dictionary] = []
 	for index in MotionProtocol.JOINT_NAMES.size():
@@ -109,23 +132,56 @@ func build_snapshot() -> SimulationTruthSnapshot:
 			"velocity_rad_s": float(joint_velocities[index]),
 			"effort_n": 0.0,
 		})
+	var session_id := LOCAL_SESSION_ID
+	var simulation_epoch := _authority_epoch
+	var calibration_version := CALIBRATION_VERSION
+	if _motion_client != null:
+		if not _motion_client.session_id.is_empty():
+			session_id = _motion_client.session_id
+		if not _motion_client.simulation_epoch.is_empty():
+			simulation_epoch = _motion_client.simulation_epoch
+		calibration_version = String(_motion_client.accepted_versions.get("calibration_version", CALIBRATION_VERSION))
+	var contacts: Array[Dictionary] = []
+	if authoritative:
+		for contact in chassis.get("contacts", []):
+			if contact is Dictionary:
+				contacts.append({
+					"body": String(contact.get("body", "chassis")),
+					"other": String(contact.get("other", "terrain")),
+					"point_m": MotionProtocol.vector_to_canonical_array(contact.get("point", Vector3.ZERO) as Vector3),
+					"normal": MotionProtocol.vector_to_canonical_array(contact.get("normal", Vector3.UP) as Vector3),
+					"impulse_n_s": maxf(0.0, float(contact.get("impulse_n_s", 0.0))),
+					"penetration_m": maxf(0.0, float(contact.get("penetration_m", 0.0))),
+				})
+	var quality_flags: Array[String] = []
+	for flag in _descriptor.to_dictionary().get("quality_flags", []):
+		quality_flags.append(String(flag))
+	if authoritative:
+		quality_flags.append("jolt_chassis_authority")
+		quality_flags.append("work_equipment_frozen_phase1")
+		quality_flags.append("jolt_contact_manifold_unavailable")
+		for flag in chassis.get("quality_flags", []):
+			if not quality_flags.has(String(flag)):
+				quality_flags.append(String(flag))
+	else:
+		quality_flags.append_array(["shadow_observation", "kinematic_body_velocity_unavailable", "jolt_contact_manifold_unavailable"])
 	var center := excavation.get("center_of_mass_local", Vector3.ZERO) as Vector3
 	var result := {
 		"schema_version": "simulation-truth-v1",
-		"authority_profile": AuthorityProfile.JOLT_SHADOW,
+		"authority_profile": authority_profile,
 		"authority_epoch": _authority_epoch,
 		"sequence": _sequence,
-		"physics_tick": Engine.get_physics_frames(),
+		"physics_tick": int(chassis.get("physics_tick", Engine.get_physics_frames())) if authoritative else Engine.get_physics_frames(),
 		"monotonic_time_ns": Time.get_ticks_usec() * 1000,
 		"coordinate_basis": "canonical-z-up-right-handed-meters",
 		"identity": {
-			"session_id": _motion_client.session_id,
-			"simulation_epoch": _motion_client.simulation_epoch,
+			"session_id": session_id,
+			"simulation_epoch": simulation_epoch,
 			"model_id": model_id,
 			"model_version": model_version,
 			"rig_id": _descriptor.rig_id(),
 			"rig_version": _descriptor.rig_version(),
-			"calibration_version": String(_motion_client.accepted_versions.get("calibration_version", "")),
+			"calibration_version": calibration_version,
 			"terrain_epoch": String(terrain.get("terrain_epoch", "unknown")),
 			"terrain_revision": int(terrain.get("terrain_revision", 0)),
 			"world_generation": int(terrain.get("world_generation", 0)),
@@ -138,7 +194,14 @@ func build_snapshot() -> SimulationTruthSnapshot:
 			"right_command": float(chassis.get("right_command", 0.0)),
 			"left_speed_m_s": float(chassis.get("left_speed_mps", 0.0)),
 			"right_speed_m_s": float(chassis.get("right_speed_mps", 0.0)),
-			"grounded": true,
+			"grounded": bool(chassis.get("grounded", not authoritative)),
+			"left_contact_count": int(chassis.get("left_contact_count", 0)),
+			"right_contact_count": int(chassis.get("right_contact_count", 0)),
+			"left_slip_ratio": float(chassis.get("left_slip_ratio", 0.0)),
+			"right_slip_ratio": float(chassis.get("right_slip_ratio", 0.0)),
+			"left_saturated": bool(chassis.get("left_saturated", false)),
+			"right_saturated": bool(chassis.get("right_saturated", false)),
+			"terrain_identity_valid": bool(chassis.get("terrain_identity_valid", not authoritative)),
 		},
 		"payload": {
 			"mass_kg": float(excavation.get("payload_mass_kg", 0.0)),
@@ -146,8 +209,8 @@ func build_snapshot() -> SimulationTruthSnapshot:
 			"fill_ratio": clampf(float(excavation.get("fill_ratio", 0.0)), 0.0, 1.5),
 			"center_of_mass_m": MotionProtocol.vector_to_canonical_array(center),
 		},
-		"contacts": [],
-		"quality_flags": ["shadow_observation", "kinematic_body_velocity_unavailable", "jolt_contact_manifold_unavailable"],
+		"contacts": contacts,
+		"quality_flags": quality_flags,
 	}
 	_sequence += 1
 	return SimulationTruthSnapshot.from_dictionary(result)
@@ -161,7 +224,8 @@ func get_status_snapshot() -> Dictionary:
 	return {
 		"authority_profile": authority_profile,
 		"contract_error": contract_error,
-		"publishing": AuthorityProfile.publishes_shadow(authority_profile) and contract_error.is_empty(),
+		"publishing": AuthorityProfile.produces_truth(authority_profile) and contract_error.is_empty(),
+		"transport_publishing": AuthorityProfile.publishes_shadow(authority_profile) and contract_error.is_empty(),
 		"sequence": _sequence,
 		"model_id": _last_model_id,
 	}
@@ -170,6 +234,7 @@ func get_status_snapshot() -> Dictionary:
 func _on_authority_changed(_session_id: String, _simulation_epoch: String, _generation: int) -> void:
 	if _motion_client != null:
 		_motion_client.clear_simulation_truth_shadow()
+	_rotate_epoch()
 
 
 func _pose_matches_authority(pose: Dictionary) -> bool:

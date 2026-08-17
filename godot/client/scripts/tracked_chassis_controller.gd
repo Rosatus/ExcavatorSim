@@ -10,6 +10,8 @@ const INPUT_ACTIONS := {
 }
 
 @export var controller_enabled := false
+@export_enum("python_kinematic", "jolt_shadow", "jolt_authoritative") var authority_profile := AuthorityProfile.PYTHON_KINEMATIC
+@export var use_project_authority_profile := true
 @export var ground_lift_enabled := true
 @export var use_jolt_support_hints := true
 @export var jolt_probe_height_m := 4.0
@@ -31,15 +33,30 @@ var _terrain_collider: TerrainCollider
 var _input_focused := true
 var _jolt_hint_status := "unavailable"
 var _base_local_transform := Transform3D.IDENTITY
+var _jolt_runtime: JoltChassisTrackRuntime
+var _use_test_commands := false
+var _test_commands := Vector2.ZERO
 
 
 func _ready() -> void:
 	process_physics_priority = -20
+	if use_project_authority_profile:
+		authority_profile = String(ProjectSettings.get_setting("simulation/authority_profile", authority_profile))
+	if not AuthorityProfile.is_valid(authority_profile):
+		contract_error = "unknown authority profile: %s" % authority_profile
+		set_physics_process(false)
+		push_error(contract_error)
+		return
+	if AuthorityProfile.writes_product_pose(authority_profile):
+		controller_enabled = true
 	_ensure_input_actions()
 	call_deferred("_connect_runtime")
 
 
 func _physics_process(delta: float) -> void:
+	if AuthorityProfile.writes_product_pose(authority_profile):
+		_step_authoritative_chassis()
+		return
 	if not controller_enabled or not locomotion_state.configured or _terrain_world == null:
 		return
 	var left := 0.0
@@ -60,14 +77,28 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
 		_input_focused = false
 		locomotion_state.stop_motion()
+		if _jolt_runtime != null:
+			_jolt_runtime.stop_motion()
 	elif what == NOTIFICATION_APPLICATION_FOCUS_IN:
 		_input_focused = true
+
+
+func _exit_tree() -> void:
+	var parent := get_parent()
+	if parent != null and parent.is_queued_for_deletion():
+		_jolt_runtime = null
+		return
+	_destroy_jolt_runtime()
 
 
 func set_controller_enabled(value: bool) -> void:
 	controller_enabled = value
 	if not value:
-		_reset_motion()
+		if AuthorityProfile.writes_product_pose(authority_profile):
+			if _jolt_runtime != null:
+				_jolt_runtime.set_enabled(false)
+		else:
+			_reset_motion()
 
 
 func configure_model_for_test(model_id: String) -> bool:
@@ -75,7 +106,22 @@ func configure_model_for_test(model_id: String) -> bool:
 
 
 func set_commands_for_test(left: float, right: float) -> void:
+	_use_test_commands = true
+	_test_commands = Vector2(
+		clampf(left, -1.0, 1.0) if is_finite(left) else 0.0,
+		clampf(right, -1.0, 1.0) if is_finite(right) else 0.0
+	)
 	locomotion_state.set_commands(left, right)
+	if _jolt_runtime != null:
+		_jolt_runtime.set_commands(_test_commands.x, _test_commands.y)
+
+
+func clear_commands_for_test() -> void:
+	_use_test_commands = false
+	_test_commands = Vector2.ZERO
+	locomotion_state.set_commands(0.0, 0.0)
+	if _jolt_runtime != null:
+		_jolt_runtime.set_commands(0.0, 0.0)
 
 
 func step_fixed_for_test(delta: float, height_sampler: Callable) -> bool:
@@ -112,14 +158,50 @@ func sample_terrain_height_for_test(world_xz: Vector2) -> float:
 
 
 func get_status_snapshot() -> Dictionary:
-	var status := locomotion_state.get_status_snapshot()
+	var status := (
+		(
+			_jolt_runtime.get_status_snapshot()
+			if _jolt_runtime != null
+			else _empty_authoritative_status()
+		)
+		if AuthorityProfile.writes_product_pose(authority_profile)
+		else locomotion_state.get_status_snapshot()
+	)
 	status["enabled"] = controller_enabled
 	status["focused"] = _input_focused
 	status["model_id"] = active_model_id
 	status["contract_error"] = contract_error
 	status["jolt_hint_status"] = _jolt_hint_status
 	status["ground_lift"] = ground_lift_reaction.get_status_snapshot()
+	status["authority_profile"] = authority_profile
 	return status
+
+
+func _empty_authoritative_status() -> Dictionary:
+	return {
+		"authority_mode": AuthorityProfile.JOLT_AUTHORITATIVE,
+		"configured": false,
+		"body_transform": global_transform,
+		"linear_velocity": Vector3.ZERO,
+		"angular_velocity": Vector3.ZERO,
+		"sleeping": false,
+		"left_command": 0.0,
+		"right_command": 0.0,
+		"left_speed_mps": 0.0,
+		"right_speed_mps": 0.0,
+		"left_slip_ratio": 0.0,
+		"right_slip_ratio": 0.0,
+		"left_contact_count": 0,
+		"right_contact_count": 0,
+		"left_saturated": false,
+		"right_saturated": false,
+		"grounded": false,
+		"terrain_generation": -1,
+		"terrain_revision": -1,
+		"terrain_identity_valid": false,
+		"contacts": [],
+		"quality_flags": ["authoritative_runtime_unavailable"],
+	}
 
 
 func _connect_runtime() -> void:
@@ -151,16 +233,25 @@ func _configure_model(model_id: String) -> bool:
 			if not parameters is Dictionary or not locomotion_state.configure(parameters as Dictionary):
 				contract_error = "model_contract_mismatch: invalid tracked locomotion for %s" % model_id
 				active_model_id = ""
+				if AuthorityProfile.writes_product_pose(authority_profile):
+					_destroy_jolt_runtime()
 				_reset_motion()
 				return false
 			active_model_id = model_id
 			contract_error = ""
 			_base_local_transform = locomotion_state.chassis_transform
 			ground_lift_reaction.configure(parameters as Dictionary)
-			transform = _base_local_transform * ground_lift_reaction.step_fixed(0.0)
+			if AuthorityProfile.writes_product_pose(authority_profile):
+				if not _configure_jolt_runtime(candidate as Dictionary):
+					active_model_id = ""
+					return false
+			else:
+				transform = _base_local_transform * ground_lift_reaction.step_fixed(0.0)
 			return true
 	contract_error = "unknown_model: %s" % model_id
 	active_model_id = ""
+	if AuthorityProfile.writes_product_pose(authority_profile):
+		_destroy_jolt_runtime()
 	_reset_motion()
 	return false
 
@@ -214,7 +305,15 @@ func _reset_motion() -> void:
 	locomotion_state.reset()
 	ground_lift_reaction.reset()
 	_base_local_transform = Transform3D.IDENTITY
-	transform = Transform3D.IDENTITY
+	_use_test_commands = false
+	_test_commands = Vector2.ZERO
+	if AuthorityProfile.writes_product_pose(authority_profile) and _jolt_runtime != null:
+		var descriptor := PhysicsRigDescriptor.load_for_model(active_model_id)
+		var spawn := _authoritative_spawn_transform(descriptor) if descriptor != null else Transform3D.IDENTITY
+		_jolt_runtime.reset(spawn)
+		_sync_visual_to_jolt_body()
+	else:
+		transform = Transform3D.IDENTITY
 
 
 func _base_global_transform() -> Transform3D:
@@ -231,7 +330,123 @@ func _on_pose_cleared(_generation: int, _reason: String) -> void:
 
 
 func _on_world_reset(_generation: int) -> void:
+	if AuthorityProfile.writes_product_pose(authority_profile):
+		_ensure_authoritative_terrain_collider()
 	_reset_motion()
+
+
+func _step_authoritative_chassis() -> void:
+	if _jolt_runtime == null or not _jolt_runtime.configured:
+		return
+	var left := 0.0
+	var right := 0.0
+	if controller_enabled and _input_focused:
+		if _use_test_commands:
+			left = _test_commands.x
+			right = _test_commands.y
+		else:
+			left = Input.get_action_strength("track_left_forward") - Input.get_action_strength("track_left_reverse")
+			right = Input.get_action_strength("track_right_forward") - Input.get_action_strength("track_right_reverse")
+	_jolt_runtime.set_enabled(controller_enabled)
+	_jolt_runtime.set_commands(left, right)
+	_sync_visual_to_jolt_body()
+
+
+func _configure_jolt_runtime(catalog_entry: Dictionary) -> bool:
+	_destroy_jolt_runtime()
+	if _terrain_world == null or _terrain_world.terrain_state == null or _terrain_collider == null:
+		contract_error = "jolt_authoritative requires TerrainWorld and TerrainCollider"
+		return false
+	var descriptor := PhysicsRigDescriptor.load_for_model(active_model_id)
+	var model_version := String(catalog_entry.get("model_version", ""))
+	if descriptor == null or not descriptor.is_valid_for(active_model_id, model_version):
+		contract_error = (
+			"missing physics rig descriptor for %s" % active_model_id
+			if descriptor == null
+			else descriptor.validation_error()
+		)
+		return false
+	if not _ensure_authoritative_terrain_collider():
+		contract_error = "jolt_authoritative terrain collider identity is unavailable"
+		return false
+	_jolt_runtime = JoltChassisTrackRuntime.new()
+	_jolt_runtime.name = "JoltChassisTrackRuntime"
+	var parent := get_parent()
+	if parent == null:
+		contract_error = "jolt_authoritative chassis has no scene parent"
+		_jolt_runtime.free()
+		_jolt_runtime = null
+		return false
+	parent.add_child(_jolt_runtime)
+	if not _jolt_runtime.configure(
+		descriptor,
+		_terrain_world,
+		_terrain_collider,
+		_authoritative_spawn_transform(descriptor)
+	):
+		contract_error = _jolt_runtime.contract_error
+		_destroy_jolt_runtime()
+		return false
+	_jolt_runtime.set_enabled(controller_enabled)
+	_sync_visual_to_jolt_body()
+	return true
+
+
+func _destroy_jolt_runtime() -> void:
+	if _jolt_runtime == null:
+		return
+	_jolt_runtime.teardown()
+	if _jolt_runtime.is_inside_tree():
+		_jolt_runtime.queue_free()
+	else:
+		_jolt_runtime.free()
+	_jolt_runtime = null
+
+
+func _ensure_authoritative_terrain_collider() -> bool:
+	if _terrain_world == null or _terrain_world.terrain_state == null or _terrain_collider == null:
+		return false
+	_terrain_collider.enabled = true
+	var identity := Vector2i(
+		_terrain_world.terrain_state.world_generation,
+		_terrain_world.terrain_state.terrain_revision
+	)
+	if _terrain_collider.get_applied_identity() != identity:
+		_terrain_collider.queue_snapshot(_terrain_world.terrain_state.surface_snapshot())
+		_terrain_collider.apply_pending()
+	return _terrain_collider.available and _terrain_collider.get_applied_identity() == identity
+
+
+func _authoritative_spawn_transform(descriptor: PhysicsRigDescriptor) -> Transform3D:
+	var parent := get_parent_node_3d()
+	var spawn := parent.global_transform if parent != null else Transform3D.IDENTITY
+	spawn.basis = spawn.basis.orthonormalized()
+	var surface_y := 0.0
+	if _terrain_world != null and _terrain_world.terrain_state != null:
+		var sampled := _terrain_world.terrain_state.sample_surface_bilinear_at(Vector2(spawn.origin.x, spawn.origin.z))
+		if is_finite(sampled):
+			surface_y = sampled
+	var data := descriptor.to_dictionary()
+	var dynamics := data.get("chassis_dynamics", {}) as Dictionary
+	var minimum_bottom := 0.0
+	for shape in dynamics.get("compound_shapes", []):
+		var center := _vector3(shape.get("center_m", [0.0, 0.0, 0.0]))
+		var size := _vector3(shape.get("size_m", [1.0, 1.0, 1.0]))
+		minimum_bottom = minf(minimum_bottom, center.y - 0.5 * size.y)
+	spawn.origin.y = surface_y - minimum_bottom + float(dynamics.get("ground_clearance_m", 0.05))
+	return spawn
+
+
+func _sync_visual_to_jolt_body() -> void:
+	if _jolt_runtime == null or not _jolt_runtime.has_body():
+		return
+	global_transform = _jolt_runtime.get_body_global_transform()
+	_base_local_transform = transform
+
+
+func _vector3(value: Variant) -> Vector3:
+	var data := value as Array
+	return Vector3(float(data[0]), float(data[1]), float(data[2]))
 
 
 func _ensure_input_actions() -> void:

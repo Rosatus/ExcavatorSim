@@ -4,7 +4,8 @@ extends Node3D
 ## Applies converted Python named-frame transforms to the selected imported visual
 ## skin. MotionProtocol owns the one Python Z-up -> Godot Y-up conversion. The
 ## imported GLB owns pivot origins; adjacent authority frames provide only the
-## clean local joint rotations while Python remains the motion authority.
+## clean local joint rotations. In jolt_authoritative, the imported skin stays
+## at its rest articulation and follows the physics-owned ChassisMotionRoot.
 
 const MODEL_CATALOG_PATH := "res://resources/models/model_catalog.json"
 const RIGID_BASIS_TOLERANCE := 0.001
@@ -13,6 +14,8 @@ const JOINT_AXIS_RESIDUAL_TOLERANCE := 0.001
 
 @export var motion_client_path := NodePath("../MotionClient")
 @export var presentation_root_path := NodePath("../PresentationRoot")
+@export_enum("python_kinematic", "jolt_shadow", "jolt_authoritative") var authority_profile := AuthorityProfile.PYTHON_KINEMATIC
+@export var use_project_authority_profile := true
 
 var _motion_client: MotionClient
 var _presentation_root: Node3D
@@ -69,6 +72,8 @@ signal model_activated(model_id: String, asset_root: Node3D)
 
 
 func _ready() -> void:
+	if use_project_authority_profile:
+		authority_profile = String(ProjectSettings.get_setting("simulation/authority_profile", authority_profile))
 	_motion_client = get_node_or_null(motion_client_path) as MotionClient
 	_presentation_root = get_node_or_null(presentation_root_path) as Node3D
 	if _motion_client == null or _presentation_root == null:
@@ -84,7 +89,7 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	if _motion_client == null or not _has_pose:
+	if AuthorityProfile.writes_product_pose(authority_profile) or _motion_client == null or not _has_pose:
 		return
 	var render_pose := _motion_client.get_render_pose()
 	if render_pose.is_empty():
@@ -201,6 +206,8 @@ func get_pivot_diagnostics_for_test() -> Dictionary:
 
 
 func apply_pose_for_test(pose: Dictionary) -> bool:
+	if AuthorityProfile.writes_product_pose(authority_profile):
+		return false
 	if not _has_required_frames():
 		return false
 	var transforms: Dictionary = pose.get("frame_transforms", {})
@@ -218,6 +225,22 @@ func apply_pose_for_test(pose: Dictionary) -> bool:
 
 func restore_rest_pose_for_test() -> void:
 	_restore_rest_pose()
+
+
+func set_authority_profile_for_test(profile: String) -> bool:
+	if not AuthorityProfile.is_valid(profile):
+		return false
+	authority_profile = profile
+	if AuthorityProfile.writes_product_pose(authority_profile):
+		_has_pose = false
+		_last_render_revision = -1
+		clear_bucket_pose_history()
+		_restore_rest_pose()
+	return true
+
+
+func activate_model_for_test(model_id: String) -> bool:
+	return _activate_model(model_id)
 
 
 func _activate_model(model_id: String) -> bool:
@@ -397,6 +420,10 @@ func _load_mapping_contract(model_id: String) -> bool:
 
 
 func _on_pose_accepted(_pose: Dictionary) -> void:
+	if AuthorityProfile.writes_product_pose(authority_profile):
+		_has_pose = false
+		_restore_rest_pose()
+		return
 	_has_pose = true
 	_last_render_revision = -1
 	_apply_render_pose(_motion_client.get_render_pose())
@@ -580,6 +607,8 @@ func _update_soil_debug_proxies(current: Dictionary) -> void:
 
 
 func _apply_render_pose(pose: Dictionary) -> void:
+	if AuthorityProfile.writes_product_pose(authority_profile):
+		return
 	var transforms: Dictionary = pose.get("transforms", {})
 	_apply_base_transform(transforms)
 	for frame_index in range(1, MotionProtocol.FRAME_NAMES.size()):
