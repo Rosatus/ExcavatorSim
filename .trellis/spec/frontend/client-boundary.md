@@ -46,6 +46,8 @@ Python four-axis articulation protocol.
 TrackedLocomotionState.configure(parameters: Dictionary) -> bool
 TrackedLocomotionState.step_fixed(delta: float, height_sampler: Callable) -> bool
 TrackedChassisController.set_controller_enabled(value: bool) -> void
+TrackedChassisController.submit_bucket_support_contact(contact: Dictionary) -> void
+TrackedChassisController.raw_world_transform(world_transform: Transform3D) -> Transform3D
 TrackedChassisController.get_status_snapshot() -> Dictionary
 ```
 
@@ -58,6 +60,17 @@ The local actions are `track_left_forward`, `track_left_reverse`,
 - `ChassisMotionRoot` is the only writer of the Godot-local chassis transform.
   `PresentationRoot`, the active GLB, and all named articulation frames remain
   below it.
+- Bucket ground support is a bounded presentation offset owned by the same
+  controller. It composes after `TrackedLocomotionState.chassis_transform` and
+  before visual children; no second node may write the chassis root.
+- `ExcavationWorld` classifies rear/shell support from the model proxy and
+  authoritative heightfield, then submits an identity-tagged contact sample.
+  It must convert proxy transforms through `raw_world_transform()` before
+  measuring penetration so the prior support offset cannot feed itself.
+- The support response is limited to local heave/pitch/roll. It cannot edit
+  `TerrainState`, `BucketSoilState`, Python joint pose, or replay state. Missing
+  or stale Jolt data degrades to the coarse heightfield; feature disablement and
+  lifecycle resets decay/clear the offset without changing locomotion state.
 - `MotionPresentation` composes the Python base delta as
   `ChassisMotionRoot * base_delta * rest_presentation_local`; it must not write
   a global base transform that cancels the moving parent.

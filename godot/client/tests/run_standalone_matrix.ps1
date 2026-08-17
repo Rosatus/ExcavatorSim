@@ -12,6 +12,7 @@ $tests = @(
     "motion_client_test.gd",
     "model_switch_test.gd",
     "tracked_chassis_locomotion_test.gd",
+    "bucket_ground_lift_test.gd",
     "construction_site_terrain_test.gd",
     "terrain3d_adapter_test.gd",
     "terrain_state_test.gd",
@@ -20,16 +21,31 @@ $tests = @(
     "release_candidate_test.gd"
 )
 
-& $GodotExe --headless --path $projectDir --editor --quit
-if ($LASTEXITCODE -ne 0) {
+function Invoke-Godot {
+    param(
+        [Parameter(Mandatory)]
+        [string[]]$Arguments
+    )
+
+    $process = Start-Process `
+        -FilePath $GodotExe `
+        -ArgumentList $Arguments `
+        -NoNewWindow `
+        -Wait `
+        -PassThru
+    return $process.ExitCode
+}
+
+$exitCode = Invoke-Godot -Arguments @("--headless", "--path", $projectDir, "--editor", "--quit")
+if ($exitCode -ne 0) {
     throw "Godot import check failed"
 }
 
 foreach ($test in $tests) {
     $path = "res://tests/$test"
     Write-Host "[godot] $test"
-    & $GodotExe --headless --path $projectDir --script $path
-    if ($LASTEXITCODE -ne 0) {
+    $exitCode = Invoke-Godot -Arguments @("--headless", "--path", $projectDir, "--script", $path)
+    if ($exitCode -ne 0) {
         throw "Godot test failed: $test"
     }
 }

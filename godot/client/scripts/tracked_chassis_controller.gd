@@ -10,6 +10,7 @@ const INPUT_ACTIONS := {
 }
 
 @export var controller_enabled := false
+@export var ground_lift_enabled := true
 @export var use_jolt_support_hints := true
 @export var jolt_probe_height_m := 4.0
 @export var jolt_hint_max_error_m := 0.2
@@ -20,6 +21,7 @@ const INPUT_ACTIONS := {
 @export var terrain_collider_path := NodePath("../TerrainRoot/TerrainCollider")
 
 var locomotion_state := TrackedLocomotionState.new()
+var ground_lift_reaction := BucketGroundLiftReaction.new()
 var active_model_id := ""
 var contract_error := ""
 var _motion_client: MotionClient
@@ -28,6 +30,7 @@ var _terrain_world: TerrainWorld
 var _terrain_collider: TerrainCollider
 var _input_focused := true
 var _jolt_hint_status := "unavailable"
+var _base_local_transform := Transform3D.IDENTITY
 
 
 func _ready() -> void:
@@ -45,8 +48,12 @@ func _physics_process(delta: float) -> void:
 		left = Input.get_action_strength("track_left_forward") - Input.get_action_strength("track_left_reverse")
 		right = Input.get_action_strength("track_right_forward") - Input.get_action_strength("track_right_reverse")
 	locomotion_state.set_commands(left, right)
-	if locomotion_state.step_fixed(delta, Callable(self, "_sample_terrain_height")):
-		transform = locomotion_state.chassis_transform
+	locomotion_state.step_fixed(delta, Callable(self, "_sample_terrain_height"))
+	_base_local_transform = locomotion_state.chassis_transform
+	ground_lift_reaction.enabled = ground_lift_enabled
+	if not ground_lift_enabled:
+		ground_lift_reaction.clear_target()
+	transform = _base_local_transform * ground_lift_reaction.step_fixed(delta)
 
 
 func _notification(what: int) -> void:
@@ -73,9 +80,27 @@ func set_commands_for_test(left: float, right: float) -> void:
 
 func step_fixed_for_test(delta: float, height_sampler: Callable) -> bool:
 	var changed := locomotion_state.step_fixed(delta, height_sampler)
-	if changed:
-		transform = locomotion_state.chassis_transform
+	_base_local_transform = locomotion_state.chassis_transform
+	ground_lift_reaction.enabled = ground_lift_enabled
+	if not ground_lift_enabled:
+		ground_lift_reaction.clear_target()
+	transform = _base_local_transform * ground_lift_reaction.step_fixed(delta)
 	return changed
+
+
+func submit_bucket_support_contact(contact: Dictionary) -> void:
+	ground_lift_reaction.enabled = ground_lift_enabled
+	ground_lift_reaction.submit_contact(contact, _base_global_transform())
+
+
+func clear_bucket_support_contact() -> void:
+	ground_lift_reaction.submit_contact({}, _base_global_transform())
+
+
+func raw_world_transform(world_transform: Transform3D) -> Transform3D:
+	var effective_global := global_transform
+	var base_global := _base_global_transform()
+	return base_global * effective_global.affine_inverse() * world_transform
 
 
 func reset_for_test() -> void:
@@ -93,6 +118,7 @@ func get_status_snapshot() -> Dictionary:
 	status["model_id"] = active_model_id
 	status["contract_error"] = contract_error
 	status["jolt_hint_status"] = _jolt_hint_status
+	status["ground_lift"] = ground_lift_reaction.get_status_snapshot()
 	return status
 
 
@@ -129,7 +155,9 @@ func _configure_model(model_id: String) -> bool:
 				return false
 			active_model_id = model_id
 			contract_error = ""
-			transform = locomotion_state.chassis_transform
+			_base_local_transform = locomotion_state.chassis_transform
+			ground_lift_reaction.configure(parameters as Dictionary)
+			transform = _base_local_transform * ground_lift_reaction.step_fixed(0.0)
 			return true
 	contract_error = "unknown_model: %s" % model_id
 	active_model_id = ""
@@ -184,7 +212,14 @@ func _sample_terrain_height(world_xz: Vector2) -> float:
 
 func _reset_motion() -> void:
 	locomotion_state.reset()
+	ground_lift_reaction.reset()
+	_base_local_transform = Transform3D.IDENTITY
 	transform = Transform3D.IDENTITY
+
+
+func _base_global_transform() -> Transform3D:
+	var parent := get_parent_node_3d()
+	return (parent.global_transform if parent != null else Transform3D.IDENTITY) * _base_local_transform
 
 
 func _on_model_activated(model_id: String, _asset_root: Node3D) -> void:

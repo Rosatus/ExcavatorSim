@@ -7,6 +7,7 @@ signal excavation_changed(status: Dictionary)
 @export var terrain_collider_path := NodePath("../TerrainCollider")
 @export var motion_presentation_path := NodePath("../../MotionPresentation")
 @export var motion_client_path := NodePath("../../MotionClient")
+@export var tracked_chassis_controller_path := NodePath("../../ChassisMotionRoot")
 @export var automatic_soil_enabled := true
 @export var debug_manual_controls := false
 @export var hero_clods_enabled := true
@@ -22,11 +23,14 @@ var authority_generation := 0
 
 var _presentation: MotionPresentation
 var _motion_client: MotionClient
+var _tracked_chassis_controller: TrackedChassisController
 var _next_command_sequence := 0
 var _last_pose_snapshot: Dictionary = {}
 var _last_interaction := "idle"
 var _last_support: Dictionary = {"active": false, "penetration_m": 0.0}
 var _last_flow_volume_m3 := 0.0
+var _last_raw_support_point := Vector3.ZERO
+var _has_raw_support_point := false
 var _material_generation := 0
 var _initialized := false
 
@@ -54,6 +58,7 @@ func _initialize() -> void:
 	soil_state = BucketSoilState.new(terrain_world.terrain_state, contract, terrain_scheduler)
 	terrain_scheduler.refresh_collider_derivative()
 	_motion_client = get_node_or_null(motion_client_path) as MotionClient
+	_tracked_chassis_controller = get_node_or_null(tracked_chassis_controller_path) as TrackedChassisController
 	if _motion_client != null:
 		if not _motion_client.pose_cleared.is_connected(_on_pose_cleared):
 			_motion_client.pose_cleared.connect(_on_pose_cleared)
@@ -253,6 +258,10 @@ func _process_bucket_snapshot(snapshot: Dictionary, delta: float) -> void:
 	if not bool(snapshot.get("valid", false)):
 		_last_interaction = "no_pose"
 		_last_support = {"active": false, "penetration_m": 0.0}
+		_last_raw_support_point = Vector3.ZERO
+		_has_raw_support_point = false
+		if _tracked_chassis_controller != null:
+			_tracked_chassis_controller.clear_bucket_support_contact()
 		return
 	var previous: Dictionary = snapshot["previous"]
 	var current: Dictionary = snapshot["current"]
@@ -261,7 +270,7 @@ func _process_bucket_snapshot(snapshot: Dictionary, delta: float) -> void:
 	var movement := current_cutting.origin - previous_cutting.origin
 	var contract: Dictionary = snapshot["contract"]
 	var interaction: Dictionary = contract.get("interaction", {})
-	_update_support_contact(current, contract)
+	_update_support_contact(snapshot, current, contract)
 	var deposit_center: Variant = _settled_deposit_center((current["opening"] as Transform3D).origin)
 	var opening_down_dot := (snapshot["opening_normal_world"] as Vector3).dot(Vector3.DOWN)
 	var dump_threshold := float(interaction.get("dump_opening_down_dot", 0.3))
@@ -304,19 +313,48 @@ func _process_bucket_snapshot(snapshot: Dictionary, delta: float) -> void:
 	_last_interaction = "push" if in_contact else ("carry" if soil_state.bucket_volume_m3 > BucketSoilState.EPSILON_M3 else "idle")
 
 
-func _update_support_contact(current: Dictionary, contract: Dictionary) -> void:
+func _update_support_contact(snapshot: Dictionary, current: Dictionary, contract: Dictionary) -> void:
 	var support_transform := current["rear_support"] as Transform3D
-	var center_xz := Vector2(support_transform.origin.x, support_transform.origin.z)
+	var raw_support_transform := support_transform
+	if _tracked_chassis_controller != null:
+		raw_support_transform = _tracked_chassis_controller.raw_world_transform(support_transform)
+	var center_xz := Vector2(raw_support_transform.origin.x, raw_support_transform.origin.z)
 	var surface := terrain_world.terrain_state.sample_surface_bilinear_at(center_xz)
 	var support_contract: Dictionary = (contract.get("proxies", {}) as Dictionary).get("rear_support", {})
 	var radius := float(support_contract.get("radius_m", 0.0))
-	var penetration := 0.0 if is_nan(surface) else maxf(0.0, surface + radius - support_transform.origin.y)
+	var penetration := 0.0 if is_nan(surface) else maxf(0.0, surface + radius - raw_support_transform.origin.y)
+	var movement := raw_support_transform.origin - _last_raw_support_point if _has_raw_support_point else Vector3.ZERO
+	var penetration_delta := penetration - float(_last_support.get("penetration_m", 0.0))
+	var cutting_direction := snapshot.get("cutting_direction_world", Vector3.DOWN) as Vector3
+	var opening_normal := snapshot.get("opening_normal_world", Vector3.UP) as Vector3
+	var classification := BucketGroundLiftReaction.classify_contact(
+		penetration,
+		penetration_delta,
+		movement,
+		Vector3.UP,
+		cutting_direction,
+		opening_normal,
+		bool(_last_support.get("eligible", false))
+	)
+	var eligible := bool(classification.get("eligible", false))
 	_last_support = {
 		"active": penetration > 0.0,
+		"eligible": eligible,
+		"classification": String(classification.get("classification", "invalid")),
 		"penetration_m": penetration,
-		"point_world": support_transform.origin,
+		"point_world": raw_support_transform.origin,
+		"movement_world": movement,
 		"surface_y": surface,
+		"terrain_normal_world": Vector3.UP,
+		"opening_down_dot": opening_normal.dot(Vector3.DOWN),
+		"model_id": _presentation.get_active_model_id() if _presentation != null else "",
+		"authority_generation": authority_generation,
+		"physics_hint_status": "heightfield_fallback",
 	}
+	_last_raw_support_point = raw_support_transform.origin
+	_has_raw_support_point = true
+	if _tracked_chassis_controller != null:
+		_tracked_chassis_controller.submit_bucket_support_contact(_last_support)
 
 
 func _sample_bucket_pose() -> Dictionary:
@@ -394,6 +432,10 @@ func _on_world_reset(generation: int) -> void:
 	_last_pose_snapshot.clear()
 	_last_interaction = "reset"
 	_last_support = {"active": false, "penetration_m": 0.0}
+	_last_raw_support_point = Vector3.ZERO
+	_has_raw_support_point = false
+	if _tracked_chassis_controller != null:
+		_tracked_chassis_controller.clear_bucket_support_contact()
 	_last_flow_volume_m3 = 0.0
 	if _motion_client != null:
 		_motion_client.clear_bucket_load_feedback()
@@ -412,6 +454,10 @@ func _clear_local_material(reason: String) -> void:
 	_last_pose_snapshot.clear()
 	_last_interaction = reason
 	_last_support = {"active": false, "penetration_m": 0.0}
+	_last_raw_support_point = Vector3.ZERO
+	_has_raw_support_point = false
+	if _tracked_chassis_controller != null:
+		_tracked_chassis_controller.clear_bucket_support_contact()
 	_last_flow_volume_m3 = 0.0
 	if _motion_client != null:
 		_motion_client.clear_bucket_load_feedback()

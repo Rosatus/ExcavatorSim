@@ -1,0 +1,30 @@
+{
+  "id": "bucket-ground-lift-reaction",
+  "name": "bucket-ground-lift-reaction",
+  "title": "Bucket ground lift reaction",
+  "description": "Add bounded chassis support/lift feedback when the bucket rear or shell pushes into the ground at adverse angles.",
+  "status": "in_progress",
+  "dev_type": "feature",
+  "scope": "frontend",
+  "package": "godot",
+  "priority": "P1",
+  "creator": "rosatus",
+  "assignee": "rosatus",
+  "createdAt": "2026-08-15",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "08-15-realistic-excavator-interaction",
+  "relatedFiles": [
+    "godot/client/scripts/motion_presentation.gd",
+    "godot/client/scripts/excavation_world.gd",
+    "godot/client/scripts/terrain_state.gd"
+  ],
+  "notes": "Third child. Depends on tracked locomotion and automatic soil contact classification.",
+  "meta": {}
+}
