@@ -1173,3 +1173,36 @@ Implemented and verified hybrid Jolt authoritative chassis with bounded kinemati
 ### Next Steps
 
 - None - task complete
+
+
+## Session 31: Sensor telemetry gateway
+
+**Date**: 2026-08-18
+**Task**: Sensor telemetry gateway
+**Branch**: `main`
+
+### Summary
+
+Implemented and verified Godot-to-Python sensor telemetry with strict layouts, lifecycle clearing, capability gating, bounded export, and live MCP validation; archived the completed Phase 4 task.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3ca489a` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
