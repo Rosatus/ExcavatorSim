@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 31
+- **Total Sessions**: 32
 - **Last Active**: 2026-08-18
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1208 | Active |
+| `journal-1.md` | ~1279 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 32 | 2026-08-18 | Archive Jolt authority cutover | `780e4cf` | `main` |
 | 31 | 2026-08-18 | Sensor telemetry gateway | `3ca489a` | `main` |
 | 30 | 2026-08-18 | Complete hybrid Jolt terrain excavation coupling | `815b6b3` | `main` |
 | 29 | 2026-08-17 | Jolt articulated equipment authority | `88369b8` | `main` |

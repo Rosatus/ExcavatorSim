@@ -1244,3 +1244,36 @@ architecture/spec documentation.
 [OK] **Implementation, automated gates and live MCP smoke complete. The task is
 archived by explicit user direction with the longer two-model performance soak
 still unchecked and deferred to the parent release acceptance.**
+
+
+## Session 32: Archive Jolt authority cutover
+
+**Date**: 2026-08-18
+**Task**: Archive Jolt authority cutover
+**Branch**: `main`
+
+### Summary
+
+Committed the Jolt-default gateway cutover, passed backend and smoke gates, archived the child task, and left the unavailable long two-model soak explicitly deferred to parent release acceptance.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `780e4cf` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
