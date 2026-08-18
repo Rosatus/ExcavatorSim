@@ -54,6 +54,7 @@ func _test_scene_adapter_seam() -> int:
 	var scene := packed.instantiate()
 	root.add_child(scene)
 	await process_frame
+	await process_frame
 	var adapter := scene.get_node_or_null("TerrainRoot/Terrain3DAdapter") as Terrain3DAdapter
 	var terrain_world := scene.get_node_or_null("TerrainRoot/TerrainWorld") as TerrainWorld
 	var fallback := scene.get_node_or_null("TerrainRoot/TerrainWorld/TerrainMesh") as TerrainRenderer
@@ -115,8 +116,12 @@ func _test_scene_adapter_seam() -> int:
 	if dressing.find_children("*", "CollisionObject3D", true, false).size() != 0:
 		scene.queue_free()
 		return _fail("site dressing does not add physics authority")
+	var scene_collider := scene.get_node_or_null("TerrainRoot/TerrainCollider") as TerrainCollider
+	if scene_collider != null:
+		scene_collider.disable_for_test()
 	scene.queue_free()
 	await process_frame
+	await physics_frame
 	return 0
 
 
@@ -131,9 +136,18 @@ func _test_jolt_collision_and_disable() -> int:
 	await process_frame
 	var adapter := scene.get_node_or_null("TerrainRoot/Terrain3DAdapter") as Terrain3DAdapter
 	var terrain_world := scene.get_node_or_null("TerrainRoot/TerrainWorld") as TerrainWorld
-	if adapter == null or terrain_world == null or not adapter.available:
+	var logical_collider := scene.get_node_or_null("TerrainRoot/TerrainCollider") as TerrainCollider
+	if adapter == null or terrain_world == null or logical_collider == null or not adapter.available:
 		scene.queue_free()
 		return _fail("native Terrain3D backend is available for collision smoke")
+	# The product-default Jolt chassis may enable the separate logical heightfield
+	# collider. Disable it here so this test isolates Terrain3D's native shape.
+	logical_collider.disable_for_test()
+	var chassis_body := scene.get_node_or_null("ChassisMotionRoot/AuthoritativeChassisBody") as CollisionObject3D
+	if chassis_body != null:
+		chassis_body.collision_layer = 0
+		chassis_body.collision_mask = 0
+	await physics_frame
 	var before := terrain_world.terrain_state.surface_snapshot()
 	if not adapter.set_collision_mode(1):
 		scene.queue_free()
@@ -155,9 +169,11 @@ func _test_jolt_collision_and_disable() -> int:
 		if not adapter.collision_available:
 			break
 		await physics_frame
-	if not scene.get_world_3d().direct_space_state.intersect_ray(query).is_empty():
+	var stale_hit: Dictionary = scene.get_world_3d().direct_space_state.intersect_ray(query)
+	if not stale_hit.is_empty():
 		scene.queue_free()
-		return _fail("disabled Terrain3D collision leaves no stale shape")
+		var stale_collider: Variant = stale_hit.get("collider")
+		return _fail("disabled Terrain3D collision leaves no stale shape (%s)" % (stale_collider.get_class() if stale_collider is Object else "unknown"))
 	var after := terrain_world.terrain_state.surface_snapshot()
 	if before["surface_bytes"] != after["surface_bytes"] or before["terrain_revision"] != after["terrain_revision"]:
 		scene.queue_free()

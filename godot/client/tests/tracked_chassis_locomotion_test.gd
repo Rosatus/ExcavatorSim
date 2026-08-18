@@ -140,6 +140,8 @@ func _test_input_actions_and_parent_composition() -> int:
 	terrain_root.add_child(terrain_world)
 	var chassis := TrackedChassisController.new()
 	chassis.name = "ChassisMotionRoot"
+	chassis.use_project_authority_profile = false
+	chassis.authority_profile = AuthorityProfile.PYTHON_KINEMATIC
 	host.add_child(chassis)
 	var presentation_root := Node3D.new()
 	presentation_root.name = "PresentationRoot"
@@ -152,6 +154,8 @@ func _test_input_actions_and_parent_composition() -> int:
 	var presentation := MotionPresentation.new()
 	presentation.name = "MotionPresentation"
 	presentation.presentation_root_path = NodePath("../ChassisMotionRoot/PresentationRoot")
+	presentation.use_project_authority_profile = false
+	presentation.authority_profile = AuthorityProfile.PYTHON_KINEMATIC
 	host.add_child(presentation)
 	await process_frame
 	await process_frame
@@ -229,6 +233,8 @@ func _test_jolt_hints_and_lifecycle() -> int:
 	terrain_root.add_child(terrain_collider)
 	var chassis := TrackedChassisController.new()
 	chassis.name = "ChassisMotionRoot"
+	chassis.use_project_authority_profile = false
+	chassis.authority_profile = AuthorityProfile.PYTHON_KINEMATIC
 	host.add_child(chassis)
 	var presentation_root := Node3D.new()
 	presentation_root.name = "PresentationRoot"
@@ -241,6 +247,8 @@ func _test_jolt_hints_and_lifecycle() -> int:
 	var presentation := MotionPresentation.new()
 	presentation.name = "MotionPresentation"
 	presentation.presentation_root_path = NodePath("../ChassisMotionRoot/PresentationRoot")
+	presentation.use_project_authority_profile = false
+	presentation.authority_profile = AuthorityProfile.PYTHON_KINEMATIC
 	host.add_child(presentation)
 	await process_frame
 	await process_frame

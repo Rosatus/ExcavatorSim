@@ -18,6 +18,7 @@ from aiohttp.client_exceptions import ClientConnectionResetError
 
 from .constants import ACTIVE_JOINT_NAMES
 from .exchange import ExchangeError
+from .gateway_runtime import GatewayRuntimeController
 from .input_router import InputRouterError
 from .paths import (
     FRONTEND_DIST_PATH,
@@ -66,6 +67,8 @@ from .shadow_state import (
 from .terrain import TerrainSpecError, terrain_snapshot_bytes
 from .terrain_controller import TerrainCommandError
 from .visual_assets import VisualModelManifest, load_visual_model_manifest
+
+RuntimeLike = RuntimeController | GatewayRuntimeController
 
 HELLO_TIMEOUT_SECONDS = 3.0
 INPUT_RATE_LIMIT = 80
@@ -162,7 +165,7 @@ def _state_message(
     }
 
 
-def _status_message(runtime: RuntimeController) -> dict[str, object]:
+def _status_message(runtime: RuntimeLike) -> dict[str, object]:
     status = runtime.status_snapshot()
     return {
         "type": "status",
@@ -176,7 +179,7 @@ def _status_message(runtime: RuntimeController) -> dict[str, object]:
     }
 
 
-def _recording_status_message(runtime: RuntimeController) -> dict[str, object]:
+def _recording_status_message(runtime: RuntimeLike) -> dict[str, object]:
     if runtime.recording is None or runtime.replay is None:
         raise RuntimeError("recording capability is unavailable")
     snapshot = runtime.recording.snapshot()
@@ -256,7 +259,7 @@ async def _send_playback_result(
 
 
 def create_app(
-    runtime: RuntimeController | RuntimeSessionManager,
+    runtime: RuntimeLike | RuntimeSessionManager,
     *,
     frontend_dir: Path = FRONTEND_DIST_PATH,
     model_path: Path = URDF_PATH,
@@ -312,7 +315,7 @@ def create_app(
 
 
 def _require_capability(
-    runtime: RuntimeController | RuntimeSessionManager, capability: str
+    runtime: RuntimeLike | RuntimeSessionManager, capability: str
 ) -> None:
     if capability not in runtime.capabilities:
         raise web.HTTPConflict(
@@ -324,7 +327,6 @@ def _require_capability(
 async def _health(request: web.Request) -> web.Response:
     manager = request.app[RUNTIME_KEY]
     runtime = manager.runtime
-    snapshot = runtime.latest.read()
     versions = load_version_manifest().for_model(
         model_version=manager.model_version,
         visual_model_version=manager.visual_model_version,
@@ -332,8 +334,8 @@ async def _health(request: web.Request) -> web.Response:
     return web.json_response(
         {
             "status": "ok" if runtime.is_running() else "starting",
-            "lifecycle": snapshot.lifecycle,
-            "stream_epoch": snapshot.stream_epoch,
+            "lifecycle": runtime.lifecycle,
+            "stream_epoch": runtime.stream_epoch,
             "model_id": manager.model_id,
             "versions": versions.as_dict(),
             "capabilities": sorted(runtime.capabilities),
@@ -717,7 +719,7 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
     if not _origin_allowed(request):
         raise web.HTTPForbidden(text="WebSocket origin is not allowed")
     manager = request.app[RUNTIME_KEY]
-    runtime: RuntimeController | None = None
+    runtime: RuntimeLike | None = None
     session_id = uuid.uuid4().hex
     ws = web.WebSocketResponse(max_msg_size=64 * 1024, heartbeat=10.0, autoping=True)
     await ws.prepare(request)
@@ -786,11 +788,11 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
                 "type": "hello_ack",
                 "session_id": session_id,
                 "model_id": manager.model_id,
-                "simulation_epoch": runtime.latest.read().stream_epoch,
+                "simulation_epoch": runtime.stream_epoch,
                 "recording_epoch": runtime.recording_epoch,
                 "versions": versions.as_dict(),
                 "model_url": "/api/model",
-                "lifecycle": runtime.latest.read().lifecycle,
+                "lifecycle": runtime.lifecycle,
                 "capabilities": sorted(set(hello.capabilities) & runtime.capabilities),
         }
         negotiated_optional_capabilities: set[str] = set()
@@ -802,9 +804,11 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
                 negotiated_optional_capabilities
             )
         await send(hello_ack)
-        sender_task = asyncio.create_task(
-            _state_sender(runtime, ws, send, authority_lock), name=f"state-{session_id}"
-        )
+        if runtime.publishes_view_state:
+            sender_task = asyncio.create_task(
+                _state_sender(cast(RuntimeController, runtime), ws, send, authority_lock),
+                name=f"state-{session_id}",
+            )
         status_task = asyncio.create_task(
             _status_sender(runtime, ws, send), name=f"status-{session_id}"
         )
@@ -820,7 +824,8 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
                 close_tasks.add(close_task)
                 close_task.add_done_callback(close_tasks.discard)
 
-        sender_task.add_done_callback(close_failed_session)
+        if sender_task is not None:
+            sender_task.add_done_callback(close_failed_session)
         status_task.add_done_callback(close_failed_session)
 
         async for ws_message in ws:
@@ -938,10 +943,9 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
                                 "capability_unavailable",
                                 "bucket load feedback was not negotiated",
                             )
-                        snapshot = runtime.latest.read()
                         if (
                             message.session_id != session_id
-                            or message.simulation_epoch != snapshot.stream_epoch
+                            or message.simulation_epoch != runtime.stream_epoch
                             or message.model_id != manager.model_id
                             or message.model_version != manager.model_version
                         ):
@@ -956,11 +960,10 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
                                 "capability_unavailable",
                                 "simulation truth shadow was not negotiated",
                             )
-                        runtime_snapshot = runtime.latest.read()
                         model_contract = load_authority_manifest()["models"][manager.model_id]
                         expected = ShadowTruthIdentity(
                             session_id=session_id,
-                            simulation_epoch=runtime_snapshot.stream_epoch,
+                            simulation_epoch=runtime.stream_epoch,
                             model_id=manager.model_id,
                             model_version=manager.model_version,
                             rig_id=model_contract["rig_id"],
@@ -975,11 +978,10 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
                                 "capability_unavailable",
                                 "sensor telemetry was not negotiated",
                             )
-                        runtime_snapshot = runtime.latest.read()
                         model_contract = load_authority_manifest()["models"][manager.model_id]
                         expected_sensor = SensorTelemetryIdentity(
                             session_id=session_id,
-                            simulation_epoch=runtime_snapshot.stream_epoch,
+                            simulation_epoch=runtime.stream_epoch,
                             model_id=manager.model_id,
                             model_version=manager.model_version,
                             rig_id=model_contract["rig_id"],
@@ -1050,7 +1052,7 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
 
 
 async def _handle_input(
-    runtime: RuntimeController,
+    runtime: RuntimeLike,
     session_id: str,
     message: InputMessage,
     send: Callable[[dict[str, object]], Awaitable[None]],
@@ -1122,7 +1124,7 @@ async def _state_sender(
 
 
 async def _status_sender(
-    runtime: RuntimeController,
+    runtime: RuntimeLike,
     ws: web.WebSocketResponse,
     send: Callable[[dict[str, object]], Awaitable[None]],
 ) -> None:

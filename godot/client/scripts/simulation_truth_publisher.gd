@@ -4,7 +4,7 @@ extends Node
 const LOCAL_SESSION_ID := "godot-local-authority"
 const CALIBRATION_VERSION := "machine-calibration-v2"
 
-@export_enum("python_kinematic", "jolt_shadow", "jolt_authoritative") var authority_profile := AuthorityProfile.PYTHON_KINEMATIC
+@export_enum("python_kinematic", "jolt_shadow", "jolt_authoritative") var authority_profile := AuthorityProfile.JOLT_AUTHORITATIVE
 @export var use_project_authority_profile := true
 @export var motion_client_path := NodePath("../MotionClient")
 @export var motion_presentation_path := NodePath("../MotionPresentation")

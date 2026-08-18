@@ -26,6 +26,8 @@ func _run() -> void:
 
 	if _check(presentation.get_contract_error().is_empty(), presentation.get_contract_error()) != 0:
 		return _finish(host, 1)
+	if _check(presentation.set_authority_profile_for_test(AuthorityProfile.PYTHON_KINEMATIC), "model switching parity test selects Python compatibility profile") != 0:
+		return _finish(host, 1)
 	if _check(presentation.get_active_model_id() == "sy135", "SY135 did not activate") != 0:
 		return _finish(host, 1)
 	if _check(_visible_model_count(presentation_root) == 1, "SY135 activation is not singular") != 0:

@@ -9,10 +9,13 @@ def test_loopback_urls_support_ipv4_ipv6_and_localhost() -> None:
     assert _application_url(_loopback_host("localhost"), 8765) == "http://localhost:8765/"
 
 
-def test_runtime_profile_is_opt_in_and_defaults_to_legacy() -> None:
+def test_gateway_runtime_is_the_product_default_and_python_profiles_are_explicit() -> None:
     assert build_parser().parse_args([]).model == "sy205"
-    assert build_parser().parse_args([]).runtime_profile == "legacy"
+    assert build_parser().parse_args([]).runtime_profile == "gateway-only"
     assert (
         build_parser().parse_args(["--runtime-profile", "motion-only"]).runtime_profile
         == "motion-only"
+    )
+    assert (
+        build_parser().parse_args(["--runtime-profile", "legacy"]).runtime_profile == "legacy"
     )

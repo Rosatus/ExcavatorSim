@@ -1,6 +1,6 @@
 # ExcavatorSim 工程详细架构
 
-> 面向工程、开发、测试与长期维护。事实截止：**2026-08-17**。
+> 面向工程、开发、测试与长期维护。事实截止：**2026-08-18**。
 >
 > 本文是架构导航层，不替代协议 schema、算法说明或测试契约。若图表与专项契约不一致，以代码、schema 和下方 source-of-truth 索引为准。
 
@@ -9,15 +9,15 @@
 当前产品主路径是：
 
 ```text
-输入设备 → Godot MotionClient → WebSocket v3 → Python InputRouter
-→ 100 Hz Simulator → Pinocchio FK → view_state
-→ Godot MotionPresentation / Terrain / UI → Windows 桌面画面
+输入设备 → Godot SimulationCore/Jolt → 本地 truth / TerrainState / BucketSoilState
+→ MotionPresentation / Terrain / UI → Windows 桌面画面
+                         ↘ Python gateway（lifecycle / input lease / telemetry）
 ```
 
-Jolt 权威迁移仍默认关闭：`jolt_shadow` 可在同一连接上发布 Godot fixed-tick
-truth 快照到 Python 的隔离 latest-value 诊断槽；它不改变上述产品姿态链。
-项目默认仍是 `python_kinematic`。显式选择 `jolt_authoritative` 时，Phase 2 已由
-Godot hybrid runtime 取代：Jolt 独占一个动态底盘刚体和履带力，受限运动学状态
+`jolt_shadow` 仍可显式发布 Godot fixed-tick truth 快照到 Python 的隔离
+latest-value 诊断槽；它不改变产品姿态链。项目默认是
+`jolt_authoritative`，Python 默认运行 `gateway-only`。此时 Jolt 独占一个动态
+底盘刚体和履带力，受限运动学状态
 独占回转、动臂、斗杆、铲斗姿态，query-only 铲斗代理提供地形接触证据。该模式
 生成本地 authoritative truth，但不会把它作为 shadow 发回 Python。
 
@@ -58,7 +58,7 @@ flowchart LR
 
     subgraph desktop[Windows 桌面主机]
         godot[Godot 4.7 Forward+<br/>Current client]
-        python[Python aiohttp service<br/>Default kinematic authority / gateway]
+        python[Python aiohttp service<br/>Default gateway / explicit kinematic compatibility]
         mcp[Godot MCP / godot_ai<br/>Dev-only]
     end
 
@@ -69,7 +69,7 @@ flowchart LR
     legacy[Python legacy terrain / recording / replay<br/>Legacy]
 
     operator --> keyboard --> godot
-    godot <-->|WS v3 input / view<br/>optional shadow truth| python
+    godot <-->|WS v3 input / lifecycle / telemetry<br/>compatibility view_state| python
     godot --> monitor
     monitor --> operator
     python -. legacy profile .-> legacy
@@ -83,7 +83,7 @@ flowchart LR
 | 边界 | 当前事实 | 入口/来源 |
 |---|---|---|
 | Godot 客户端 | Windows desktop、Godot 4.7、Forward+、1920×1080 stretch；主场景 `res://scenes/main.tscn` | [`godot/client/project.godot`](../../godot/client/project.godot#L11-L48)、[`README.md`](../../README.md#L3-L4) |
-| Python 服务 | `pixi run start` 启动 `python -m babylon_sim.cli --frontend-dir godot/dist`；`start-motion-only` 显式选择 motion-only | [`pixi.toml`](../../pixi.toml#L26-L36)、[`backend/src/babylon_sim/cli.py`](../../backend/src/babylon_sim/cli.py#L69-L89) |
+| Python 服务 | `pixi run start` 启动 `gateway-only`；`start-python-kinematic` 显式选择 motion-only，`start-legacy` 选择完整兼容服务 | [`pixi.toml`](../../pixi.toml#L26-L38)、[`backend/src/babylon_sim/cli.py`](../../backend/src/babylon_sim/cli.py#L69-L93) |
 | 默认网络 | loopback `127.0.0.1:8765`；Godot 默认 `ws://127.0.0.1:8765/ws` | [`backend/src/babylon_sim/cli.py`](../../backend/src/babylon_sim/cli.py#L23-L47)、[`godot/client/scripts/motion_client.gd`](../../godot/client/scripts/motion_client.gd#L19-L23) |
 | MCP | EditorPlugin，默认开发端口 HTTP 8000 / WS 9500；导出时 helper 被剥离 | [`godot/client/addons/godot_ai/plugin.gd`](../../godot/client/addons/godot_ai/plugin.gd#L1-L4)、[`mcp_export_plugin.gd`](../../godot/client/addons/godot_ai/export/mcp_export_plugin.gd#L1-L69) |
 | 未来硬件 | 仅目标拓扑；当前没有驱动、总线或中控产品实现 | 代码/依赖检索无 `pyserial`、`python-can`、USB/HID、ROS client 证据 |
@@ -95,28 +95,36 @@ MCP 是开发工具，不是 Python 运动服务的替代品，也不是导出�
 ```mermaid
 flowchart TB
     cli[CLI --runtime-profile]
-    cli --> motion[motion-only<br/>Godot-first 主路径]
+    cli --> gateway[gateway-only<br/>产品默认，不构造 Simulator]
+    cli --> motion[motion-only<br/>Python 兼容]
     cli --> legacy_profile[legacy<br/>兼容与回归]
+    gateway --> gateway_components[lifecycle + InputRouter<br/>telemetry latest-value store]
     motion --> motion_components[Simulator + InputRouter<br/>固定频率线程 + local view projection]
     legacy_profile --> legacy_components[Simulator + InputRouter<br/>recording + terrain + replay + exchange]
     motion_components --> godot_client[Godot local TerrainState / BucketSoilState]
     legacy_components --> legacy_client[legacy terrain / recording / playback clients]
 ```
 
-| 能力/组件 | `motion-only`（Current 主路径） | `legacy`（Legacy 兼容） |
+| 能力/组件 | `gateway-only`（Product default） | `motion-only` / `legacy`（Explicit compatibility） |
 |---|---|---|
-| 运动、输入安全、生命周期 | 有 | 有 |
-| `hello_ack` / `view_state` | 有，保持 v3 标识和必需字段 | 有 |
+| Python 运动/FK | 无 | 有 |
+| 输入安全、生命周期 | 有 | 有 |
+| `hello_ack` / `view_state` | 有 handshake；不发 `view_state` | 有，保持 v3 标识 |
 | `input_snapshot` / `commands` | 有 | 有 |
-| Python terrain worker / `terrain_view` / `terrain_patch` | 无；路由返回 `capability_unavailable` | 有 |
+| Python terrain worker / `terrain_view` / `terrain_patch` | 无；路由返回 `capability_unavailable` | motion-only 无；legacy 有 |
 | recording / playback / RRD exchange | 无 | 有 |
-| Godot 本地 terrain/bucket | 主路径唯一本地语义状态 | 不应镜像 legacy authority |
-| 对外能力集合 | 必需：`input_snapshot`, `commands`；可选：bucket feedback / shadow truth | 另含 `latency`, `playback`, `recording`, `terrain`，并保留相同可选观测能力 |
-| 当前产品定位 | Godot-first | 等待独立迁移决策前保留 |
+| Godot 本地 terrain/bucket | 产品唯一语义状态 | motion-only 仍是本地状态；legacy 兼容旧服务 |
+| 对外能力集合 | `input_snapshot`, `commands`, bucket feedback / sensor telemetry | 按各自旧 profile 合同 |
+| 当前产品定位 | 默认产品路径 | 兼容、回滚和回归 |
 
-Profile 合同位于 [`runtime-profiles.md`](../../.trellis/spec/backend/runtime-profiles.md#L1-L44)。motion-only 必须不创建隐形 `TerrainController`、`ReplayWorker` 或 exchange worker；禁用的 HTTP/WS 能力要在边界处失败而不是改变运动状态。
+Profile 合同位于 [`runtime-profiles.md`](../../.trellis/spec/backend/runtime-profiles.md#L1-L55)。gateway-only 必须不创建 `Simulator`、Pinocchio、`TerrainController`、`ReplayWorker` 或 exchange worker；禁用的 HTTP/WS 能力要在边界处失败而不是改变运动状态。
 
-## 4. Python 后端：输入到权威状态
+## 4. Python 后端：gateway 与兼容运动 authority
+
+默认 `gateway-only` 只接受生命周期、输入租约和观测 telemetry。它不创建
+`Simulator`、不运行 Pinocchio FK、也不生成 `view_state`。下图是显式
+`motion-only`/`legacy` 兼容 profile 的 Python authority 链；这条链不能与
+默认 Jolt 世界共用一个活动 session。
 
 ```mermaid
 flowchart LR
@@ -195,8 +203,8 @@ flowchart TB
 |---|---|---|---|
 | World | `WorldEnvironment`, `SunLight`, `SkyDome`, `TimeOfDay` | Sky3D 天空、固定日照、雾、云和星空 | Current / Derived |
 | Camera/UI | `CameraRig`, `OperatorUI`, `VisualQualityController` | 中键绕行、缩放、连接/authority/lifecycle/bucket 状态、质量档位 | Current |
-| Motion | `MotionClient`, `MotionProtocol`, `MotionPresentation` | 默认接收 Python state；authoritative profile 拒绝 Python pose，并从 Jolt post-step 快照驱动 GLB pivots | Current / profile-selected |
-| Authority migration | `JoltChassisTrackRuntime`, `SimulationTruthPublisher`, `PhysicsRigDescriptor` | 默认关闭；可选 shadow 观察或 Phase 2 Jolt 五刚体/四关节权威与本地 truth | Current / opt-in |
+| Motion | `MotionClient`, `MotionProtocol`, `MotionPresentation` | 默认由 Jolt post-step 快照驱动 GLB pivots；显式 Python 兼容 profile 才接收 Python state | Current / profile-selected |
+| Authority migration | `JoltChassisTrackRuntime`, `SimulationTruthPublisher`, `PhysicsRigDescriptor` | Jolt 五刚体/四关节权威与本地 truth 为产品默认；shadow 仅为显式诊断 profile | Current / profile-selected |
 | Visual asset | `PresentationRoot/SY205Excavator` | 仅视觉模型；不含运动 authority、animation 或 collision authority | Current / Derived |
 | Logical terrain | `TerrainState`, `TerrainWorld`, `ExcavationWorld` | Godot-first 本地地形快照、铲斗接触/铲入/侧漏/卸土、revision/generation | Current authority（local world） |
 | Bucket | `BucketSoilState` | 固定容量 0.35 m³、切削/倾倒和网格体积守恒 | Current authority（local bucket） |
@@ -270,7 +278,7 @@ RRD columns.
 
 ```mermaid
 flowchart LR
-    py[Python Simulator / Pinocchio<br/>default pose authority]
+    py[Python gateway<br/>lifecycle + input safety + telemetry]
     jolt_auth[Hybrid authority<br/>Jolt chassis + kinematic equipment]
     view[view_state<br/>session + simulation_epoch + view_revision]
     pose[Godot pose buffer / GLB pivots]
@@ -279,8 +287,8 @@ flowchart LR
     derived[TerrainRenderer / Terrain3D / Jolt / SoilEffects<br/>Derived]
     reset[reset / reconnect / stale / epoch change]
 
-    py -->|default / shadow| view --> pose
-    jolt_auth -->|authoritative only| pose
+    py -.compatibility profiles.-> view --> pose
+    jolt_auth -->|product default| pose
     pose --> derived
     terrain --> derived
     terrain --> bucket
@@ -306,9 +314,9 @@ flowchart LR
 
 | Profile | 唯一产品姿态写入者 | Godot truth 发布 | 当前可用性 |
 |---|---|---|---|
-| `python_kinematic` | Python Simulator/Pinocchio | 无 | 默认产品模式 |
+| `python_kinematic` | Python Simulator/Pinocchio | 无 | 显式兼容模式 |
 | `jolt_shadow` | Python Simulator/Pinocchio | 只读 shadow | Phase 0 opt-in |
-| `jolt_authoritative` | Godot 混合：Jolt 单底盘 + 四轴运动学 | 本地 truth；可选 sensor telemetry | Phase 4 opt-in |
+| `jolt_authoritative` | Godot 混合：Jolt 单底盘 + 四轴运动学 | 本地 truth；可选 sensor telemetry | 产品默认 |
 
 SY205/SY135 已有独立、hash-bound 的 `physics-rig-v1` descriptor；当前产品路径消费
 底盘 compound/履带接触、四组 parent/child anchor、关节轴/限位/运动整形，并绑定
@@ -424,7 +432,7 @@ MCP 测试发现只覆盖 `res://tests/test_*.gd` 的 `McpTestSuite`；产品 co
 
 | 状态 | 范围 | 事实/边界 |
 |---|---|---|
-| Current | SY205/SY135 GLB、Python/Pinocchio 默认运动、Godot hybrid opt-in、单底盘 Jolt/四轴运动学、bucket query/soil batch、Godot terrain/bucket、Terrain3D/Sky3D 视觉、桌面 UI、测试矩阵 | 已有代码、schema 或测试证据 |
+| Current | SY205/SY135 GLB、Godot/Jolt 默认运动、Python gateway、显式 Python/Pinocchio 兼容 profile、单底盘 Jolt/四轴运动学、bucket query/soil batch、Godot terrain/bucket、Terrain3D/Sky3D 视觉、桌面 UI、测试矩阵 | 已有代码、schema 或测试证据 |
 | Legacy | Python terrain、recording、replay、RRD、terrain HTTP/WS、BabylonSim 命名 | 继续兼容；移除前需要独立迁移和回滚决策 [`release-candidate.md`](../release-candidate.md#L3-L14) |
 | Planned | 真实座舱手柄、踏板、按钮面板、中控/触屏、CAN-to-USB/设备适配 | 用户确认目标拓扑；没有驱动、消息协议或硬件验收实现 |
 | Deferred | 生产级液压、底盘接触/质量标定、连续介质或 per-grain soil、全机刚体自碰撞、C++/GDExtension 优化 | 当前 hybrid 有碰撞证据驱动的挖土/撑地，但刻意不实现开放链动力学或逐颗粒土体 [`README.md`](../../README.md#L46-L48) |

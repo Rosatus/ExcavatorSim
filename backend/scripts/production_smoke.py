@@ -22,7 +22,9 @@ def _available_port() -> int:
         return int(listener.getsockname()[1])
 
 
-async def _probe(port: int, process: subprocess.Popen[str]) -> None:
+async def _probe(
+    port: int, process: subprocess.Popen[str], *, runtime_profile: str
+) -> None:
     base_url = f"http://127.0.0.1:{port}"
     deadline = time.monotonic() + 20.0
     timeout = ClientTimeout(total=3.0)
@@ -68,20 +70,23 @@ async def _probe(port: int, process: subprocess.Popen[str]) -> None:
             ):
                 raise RuntimeError("production GLB asset probe failed")
         async with session.ws_connect(f"{base_url}/ws", origin=base_url) as websocket:
-            await websocket.send_json(
-                {
-                    "type": "hello",
-                    "protocol_version": "godot-pinocchio-v3",
-                    "capabilities": [
-                        "input_snapshot",
-                        "commands",
-                        "latency",
-                        "playback",
-                        "recording",
-                        "terrain",
-                    ],
-                }
-            )
+            hello: dict[str, object] = {
+                "type": "hello",
+                "protocol_version": "godot-pinocchio-v3",
+                "capabilities": ["input_snapshot", "commands"],
+            }
+            if runtime_profile == "gateway-only":
+                hello["optional_capabilities"] = ["sensor_telemetry_v1"]
+            else:
+                hello["capabilities"] = [
+                    "input_snapshot",
+                    "commands",
+                    "latency",
+                    "playback",
+                    "recording",
+                    "terrain",
+                ]
+            await websocket.send_json(hello)
             first = await websocket.receive_str(timeout=3.0)
             message = json.loads(first)
             protocol_version = message.get("versions", {}).get("protocol_version")
@@ -90,6 +95,27 @@ async def _probe(port: int, process: subprocess.Popen[str]) -> None:
             session_id = message.get("session_id")
             if not isinstance(session_id, str):
                 raise RuntimeError("WebSocket handshake did not provide a session id")
+            if runtime_profile == "gateway-only":
+                negotiated = message.get("negotiated_optional_capabilities", [])
+                if negotiated != ["sensor_telemetry_v1"]:
+                    raise RuntimeError("gateway smoke did not negotiate sensor telemetry")
+                async with session.get(f"{base_url}/api/recording/series") as response:
+                    if response.status != 409:
+                        raise RuntimeError("gateway exposed a Python recording capability")
+                deadline = time.monotonic() + 0.5
+                while time.monotonic() < deadline:
+                    try:
+                        candidate = json.loads(
+                            await websocket.receive_str(
+                                timeout=max(0.01, deadline - time.monotonic())
+                            )
+                        )
+                    except TimeoutError:
+                        break
+                    if candidate.get("type") == "view_state":
+                        raise RuntimeError("gateway unexpectedly emitted view_state")
+                return
+
             view_state: dict[str, object] | None = None
             terrain_view: dict[str, object] | None = None
             deadline = time.monotonic() + 3.0
@@ -145,13 +171,15 @@ async def _probe(port: int, process: subprocess.Popen[str]) -> None:
                     raise RuntimeError("production terrain snapshot probe failed")
 
 
-def main() -> int:
+def _run_profile(runtime_profile: str) -> None:
     port = _available_port()
     process = subprocess.Popen(
         [
             sys.executable,
             "-m",
             "babylon_sim.cli",
+            "--runtime-profile",
+            runtime_profile,
             "--no-browser",
             "--port",
             str(port),
@@ -162,12 +190,7 @@ def main() -> int:
         text=True,
     )
     try:
-        asyncio.run(_probe(port, process))
-        print(
-            "Backend smoke passed: health, placeholder frontend, URDF, visual GLB, "
-            "WebSocket handshake, and authoritative terrain snapshot."
-        )
-        return 0
+        asyncio.run(_probe(port, process, runtime_profile=runtime_profile))
     finally:
         process.terminate()
         try:
@@ -179,6 +202,16 @@ def main() -> int:
             output = process.stdout.read().strip()
             if output:
                 print(output, file=sys.stderr)
+
+
+def main() -> int:
+    _run_profile("gateway-only")
+    _run_profile("legacy")
+    print(
+        "Backend smoke passed: gateway lifecycle/telemetry isolation plus legacy "
+        "health, frontend, URDF, visual GLB, WebSocket, and terrain snapshot."
+    )
+    return 0
 
 
 if __name__ == "__main__":

@@ -35,6 +35,8 @@ func _run_contracts() -> int:
 	var chassis := TrackedChassisController.new()
 	chassis.name = "ChassisMotionRoot"
 	chassis.controller_enabled = true
+	chassis.use_project_authority_profile = false
+	chassis.authority_profile = AuthorityProfile.PYTHON_KINEMATIC
 	host.add_child(chassis)
 	for model_id in ["sy205", "sy135"]:
 		if not chassis.configure_model_for_test(model_id):

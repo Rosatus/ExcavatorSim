@@ -1206,3 +1206,41 @@ Implemented and verified Godot-to-Python sensor telemetry with strict layouts, l
 ### Next Steps
 
 - None - task complete
+
+
+## Session 32: Jolt authority product cutover
+
+**Date**: 2026-08-18
+**Task**: Jolt authority cutover and legacy retirement
+**Branch**: `main`
+
+### Summary
+
+Made Godot/Jolt the product-default motion authority and added a Python
+`gateway-only` runtime that owns lifecycle, input safety and bounded observations
+without constructing `Simulator`/Pinocchio or publishing `view_state`. Retained
+explicit `motion-only` and `legacy` compatibility launchers and synchronized the
+architecture/spec documentation.
+
+### Main Changes
+
+- Extracted the shared observation store and introduced the gateway runtime.
+- Made `pixi run start` and the Godot project select the Jolt/gateway product path.
+- Guarded MotionPresentation pose clearing in Jolt mode and isolated legacy tests.
+- Updated production smoke to cover both gateway isolation and legacy terrain.
+- Fixed Terrain3D collision-disable visibility during native shape rebuilds.
+
+### Testing
+
+- `pixi run verify`: passed, 170 backend tests.
+- `pixi run backend-smoke`: passed for gateway-only and legacy profiles.
+- Godot 4.7.1 standalone matrix: 18/18 scripts passed.
+- Godot AI MCP: default SY205 Jolt body moved under dual-track input; gateway
+  telemetry stayed current, bounded at 256 batches and reported zero drops.
+- `git diff --check`: passed; existing headless resource/deprecation warnings remain.
+
+### Status
+
+[OK] **Implementation, automated gates and live MCP smoke complete. The task is
+archived by explicit user direction with the longer two-model performance soak
+still unchecked and deferred to the parent release acceptance.**

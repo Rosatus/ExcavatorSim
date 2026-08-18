@@ -10,7 +10,7 @@ const INPUT_ACTIONS := {
 }
 
 @export var controller_enabled := false
-@export_enum("python_kinematic", "jolt_shadow", "jolt_authoritative") var authority_profile := AuthorityProfile.PYTHON_KINEMATIC
+@export_enum("python_kinematic", "jolt_shadow", "jolt_authoritative") var authority_profile := AuthorityProfile.JOLT_AUTHORITATIVE
 @export var use_project_authority_profile := true
 @export var ground_lift_enabled := true
 @export var use_jolt_support_hints := true

@@ -390,6 +390,11 @@ func _configure_collision() -> void:
 		if native_collision_mode > 0:
 			_set_error("Terrain3D collision mode API is unavailable")
 		return
+	# Terrain3D rebuilds its native shape asynchronously. Mask the collision
+	# object immediately on disable so stale shapes cannot remain query-visible
+	# during that rebuild window; restore the declared layer when re-enabled.
+	if _has_property(collision_object, "layer"):
+		collision_object.set("layer", 1 if native_collision_mode > 0 else 0)
 	collision_available = native_collision_mode > 0
 
 

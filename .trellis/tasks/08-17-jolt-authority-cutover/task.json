@@ -3,7 +3,7 @@
   "name": "jolt-authority-cutover",
   "title": "Jolt authority cutover and legacy retirement",
   "description": "Make Jolt authority the product default, remove duplicate Jolt-mode writers, retain explicit Python compatibility, and complete release/rollback evidence.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": "migration",
   "scope": "cross-layer",
   "package": "godot+backend+protocol",

@@ -1,8 +1,8 @@
 # ExcavatorSim 概念架构
 
-> 面向项目负责人、产品、现场与非技术协作者。事实截止：**2026-08-17**。
+> 面向项目负责人、产品、现场与非技术协作者。事实截止：**2026-08-18**。
 >
-> 一句话理解：**人给出操作意图；默认由 Python 计算运动，或显式选择 Godot 混合模式，由 Jolt 计算底盘/履带、受限运动学计算工作装置；Godot 负责本地世界与拟真画面，Python 始终保留输入安全和生命周期边界。**
+> 一句话理解：**人给出操作意图；默认由 Godot/Jolt 计算底盘、履带和工作装置，Python 作为输入安全、生命周期与遥测网关；Python/Pinocchio 运动计算仍保留为显式兼容路径。**
 
 ## 图例
 
@@ -21,8 +21,8 @@ flowchart LR
 
     subgraph host[Windows 仿真主机]
         direction LR
-        godot[Godot 交互、拟真与可选 hybrid authority<br/>Jolt 底盘 + 运动学工作装置 + 地形斗土]
-        python[Python / Pinocchio<br/>默认运动计算、输入安全、生命周期]
+        godot[Godot 交互、拟真与 Jolt authority<br/>Jolt 底盘 + 运动学工作装置 + 地形斗土]
+        python[Python gateway<br/>输入安全、生命周期、遥测与兼容服务]
         scene[数字施工现场<br/>SY205 / SY135 挖掘机 + 土方工地]
     end
 
@@ -40,8 +40,8 @@ flowchart LR
 
     operator -->|操作| current_input
     current_input -->|操作意图| godot
-    godot -->|输入意图、启动 / 暂停 / 复位| python
-    python -->|默认 profile 的权威运动状态| godot
+    godot -->|输入意图、启动 / 暂停 / 复位、遥测| python
+    python -.兼容 profile 的 view_state.-> godot
     godot -->|生成拟真世界| scene
     scene -->|实时画面| display
     display -->|视觉反馈| operator
@@ -89,12 +89,12 @@ flowchart LR
   <rect x="445" y="100" width="250" height="120" rx="12" fill="#eaf2ff" stroke="#315b8a" stroke-width="3"/>
   <text x="570" y="140" text-anchor="middle" font-size="21" font-weight="700" fill="#172b4d">Godot</text>
   <text x="570" y="170" text-anchor="middle" font-size="15" fill="#315b8a">输入、场景、地形、斗土、UI</text>
-  <text x="570" y="195" text-anchor="middle" font-size="15" fill="#315b8a">可选 Jolt 底盘 + 运动学工作装置</text>
+  <text x="570" y="195" text-anchor="middle" font-size="15" fill="#315b8a">默认 Jolt 底盘 + 运动学工作装置</text>
 
   <rect x="775" y="100" width="250" height="120" rx="12" fill="#eaf2ff" stroke="#315b8a" stroke-width="3"/>
-  <text x="900" y="140" text-anchor="middle" font-size="21" font-weight="700" fill="#172b4d">Python / Pinocchio</text>
-  <text x="900" y="170" text-anchor="middle" font-size="15" fill="#315b8a">默认运动计算、输入安全</text>
-  <text x="900" y="195" text-anchor="middle" font-size="15" fill="#315b8a">生命周期</text>
+  <text x="900" y="140" text-anchor="middle" font-size="21" font-weight="700" fill="#172b4d">Python Gateway</text>
+  <text x="900" y="170" text-anchor="middle" font-size="15" fill="#315b8a">输入安全、生命周期</text>
+  <text x="900" y="195" text-anchor="middle" font-size="15" fill="#315b8a">遥测与兼容服务</text>
 
   <rect x="550" y="290" width="370" height="95" rx="12" fill="#eaf2ff" stroke="#315b8a" stroke-width="3"/>
   <text x="735" y="330" text-anchor="middle" font-size="21" font-weight="700" fill="#172b4d">数字施工现场</text>
@@ -111,7 +111,7 @@ flowchart LR
   <line x1="695" y1="135" x2="775" y2="135" stroke="#315b8a" stroke-width="3" marker-end="url(#arrow-current)"/>
   <text x="735" y="120" text-anchor="middle" font-size="12" fill="#315b8a">输入 / 命令</text>
   <line x1="775" y1="190" x2="695" y2="190" stroke="#315b8a" stroke-width="3" marker-end="url(#arrow-current)"/>
-  <text x="735" y="210" text-anchor="middle" font-size="12" fill="#315b8a">默认权威运动状态</text>
+  <text x="735" y="210" text-anchor="middle" font-size="12" fill="#315b8a">兼容 profile 的 view_state</text>
   <line x1="570" y1="220" x2="650" y2="290" stroke="#315b8a" stroke-width="3" marker-end="url(#arrow-current)"/>
   <text x="585" y="260" font-size="13" fill="#315b8a">生成世界</text>
   <line x1="920" y1="338" x2="1110" y2="190" stroke="#315b8a" stroke-width="3" marker-end="url(#arrow-current)"/>
@@ -146,25 +146,24 @@ flowchart LR
 </svg>
 </div>
 
-HTML/SVG 版中的两条 Godot/Python 箭头是默认 profile 的两个方向：Godot
-发送操作意图和生命周期命令，Python 返回权威运动状态。显式
-`jolt_authoritative` 时，Godot 在同一进程内用 Jolt 独占底盘/履带姿态，用受限
-运动学独占工作装置姿态，并通过铲斗 query 驱动挖土与有界撑地反馈；Python 不再把
-pose 写入画面。
+HTML/SVG 版中 Godot 向 Python 发送操作意图、生命周期命令和遥测。反向的
+`view_state` 箭头只属于显式 Python 兼容 profile。产品默认
+`jolt_authoritative` 在 Godot 进程内用 Jolt 独占底盘/履带姿态，用受限运动学独占
+工作装置姿态，并通过铲斗 query 驱动挖土与有界撑地反馈；Python 不把 pose 写入画面。
 
 ## 不依赖图片也能读懂
 
 | 问题 | 当前答案 |
 |---|---|
 | 谁操作？ | 操作人员通过键盘或通用游戏手柄输入；未来才考虑真实座舱手柄、踏板和按钮面板。 |
-| 谁计算？ | 默认由 Python/Pinocchio 计算运动；显式 Jolt profile 由 Godot/Jolt 计算底盘/履带、由受限运动学计算工作装置。Python 始终执行输入安全与启动、暂停、复位控制。 |
+| 谁计算？ | 产品默认由 Godot/Jolt 计算底盘、履带与受限运动学工作装置；Python 负责输入安全、启动/暂停/复位和遥测网关。Python/Pinocchio 仅在显式兼容 profile 中计算运动。 |
 | 谁生成画面？ | Godot 按当前 profile 应用唯一权威姿态，同时维护本地施工地形、斗土表现、天空、相机和 UI。 |
 | 在哪里看到结果？ | 当前输出到 Windows 桌面显示器；未来中控/触屏仍处于未接入状态。 |
 
 ## 必须知道的边界
 
-- **Python → Godot：**默认/Shadow profile 发送权威关节和机身状态；Jolt
-  authoritative profile 拒绝这条 pose 写入。
+- **Python → Godot：**默认 Jolt authoritative 不发送产品 pose；只有显式
+  Python 兼容 profile 才发送 `view_state`。
 - **Godot → Python：**发送输入意图以及启动、暂停、复位命令；Shadow profile
   可另发隔离诊断。Jolt authoritative truth 保留在本地，不伪装成 Python shadow 权威。
 - **Godot 本地世界：**施工地形与斗土体积由本地权威状态维护；铲斗 query 提供接触证据，粒子/土块只做表现，不改变 Python 的运动计算。

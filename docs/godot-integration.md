@@ -43,9 +43,11 @@ converted frame relations provide only the local single-axis joint rotations.
 
 ## Authority boundary
 
-Python remains authoritative for input safety and lifecycle in every profile,
-and for chassis/joint pose in `python_kinematic` and `jolt_shadow`. The `legacy`
-Python runtime profile remains authoritative for
+Python remains authoritative for lifecycle and input safety in every profile.
+The product default uses Python's `gateway-only` runtime for that boundary; it
+does not reconstruct pose. Python is authoritative for chassis/joint pose only
+in the explicit `python_kinematic` and `jolt_shadow` compatibility profiles.
+The `legacy` Python runtime profile remains authoritative for
 terrain layers, bucket inventory, events, recording and replay. The
 `motion-only` backend profile supplies the motion/input contract to the
 Godot-first local-world client, which keeps deterministic-enough terrain/world
@@ -55,9 +57,9 @@ Python. The two profiles coexist until the integration release-candidate
 review selects one runtime contract.
 
 Crawler travel keeps four Godot-local track actions and never extends the Python
-four-axis articulation vector. In default/shadow profiles,
+four-axis articulation vector. In Python compatibility/shadow profiles,
 `TrackedChassisController` retains the legacy local locomotion layer while
-Python provides the base/joint pose below `PresentationRoot`. In explicit
+Python provides the base/joint pose below `PresentationRoot`. In the default
 `jolt_authoritative`, a model-specific `JoltChassisTrackRuntime` owns one dynamic
 chassis body and distributed track forces. `KinematicArticulationState` owns the
 four bounded work-equipment axes and accepted FK; it creates no boom, arm,
@@ -99,10 +101,10 @@ only and never becomes terrain, replay, or articulation authority.
 ### Authority migration shadow profile
 
 The project setting `simulation/authority_profile` defaults to
-`python_kinematic`. Phase 0 also implements opt-in `jolt_shadow`: Python remains
+`jolt_authoritative`. Phase 0 also implements opt-in `jolt_shadow`: Python remains
 the only product pose writer, while the root-level `SimulationTruthPublisher`
 reads post-physics state and queues a negotiated `simulation_truth_shadow_v1`
-observation at no more than 30 Hz. The opt-in `jolt_authoritative` profile uses
+observation at no more than 30 Hz. The default `jolt_authoritative` profile uses
 a dynamic chassis plus kinematic work equipment. It creates local
 `simulation-truth-v1` diagnostics from one chassis body, four kinematic frames,
 four logical joints, bucket query/support wrench and track/payload state, but

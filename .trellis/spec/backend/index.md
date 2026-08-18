@@ -1,10 +1,10 @@
 # Backend Development Guidelines
 
 The backend is the Python service migrated from BabylonSim. It owns input safety,
-the HTTP/WebSocket contract, default-profile kinematics, and legacy-profile
-terrain/bucket/replay services. In `jolt_authoritative` Phase 1, Godot owns
-chassis pose locally; the backend shadow boundary remains observational and
-rejects authoritative-profile truth.
+the HTTP/WebSocket contract, gateway lifecycle/input/telemetry services, and
+explicit Python compatibility profiles. In the product-default
+`jolt_authoritative` profile, Godot owns chassis pose locally; the backend does
+not publish product pose and the shadow boundary remains observational.
 
 ## Guidelines
 
@@ -15,7 +15,7 @@ rejects authoritative-profile truth.
 | [Error Handling](./error-handling.md) | Typed validation and recoverable API failures |
 | [Quality Guidelines](./quality-guidelines.md) | Formatting, typing, deterministic tests, and forbidden shortcuts |
 | [Logging Guidelines](./logging-guidelines.md) | Operational diagnostics and sensitive-data boundaries |
-| [Runtime Profiles](./runtime-profiles.md) | Legacy and opt-in motion-only service composition |
+| [Runtime Profiles](./runtime-profiles.md) | Gateway default and explicit Python compatibility service composition |
 | [Simulation Truth Shadow](./shadow-truth.md) | Negotiated Godot observation schema, isolation, ordering, and diagnostics |
 | [Sensor Telemetry](./sensor-telemetry.md) | Fixed-tick sensor batches, identity/order guards, freshness, and gateway isolation |
 

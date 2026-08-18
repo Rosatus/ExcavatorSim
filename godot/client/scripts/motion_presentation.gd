@@ -12,7 +12,7 @@ const JOINT_AXIS_RESIDUAL_TOLERANCE := 0.001
 
 @export var motion_client_path := NodePath("../MotionClient")
 @export var presentation_root_path := NodePath("../PresentationRoot")
-@export_enum("python_kinematic", "jolt_shadow", "jolt_authoritative") var authority_profile := AuthorityProfile.PYTHON_KINEMATIC
+@export_enum("python_kinematic", "jolt_shadow", "jolt_authoritative") var authority_profile := AuthorityProfile.JOLT_AUTHORITATIVE
 @export var use_project_authority_profile := true
 
 var _motion_client: MotionClient
@@ -442,6 +442,8 @@ func _on_pose_cleared(_generation: int, _reason: String) -> void:
 	_has_pose = false
 	_last_render_revision = -1
 	clear_bucket_pose_history()
+	if AuthorityProfile.writes_product_pose(authority_profile):
+		return
 	_restore_rest_pose()
 
 

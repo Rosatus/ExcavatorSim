@@ -210,6 +210,9 @@ func _test_automatic_motion_for_both_models() -> int:
 	await process_frame
 	await process_frame
 	var excavation := scene.get_node("TerrainRoot/ExcavationWorld") as ExcavationWorld
+	# This scenario injects bucket snapshots directly to exercise the soil
+	# reducer; leave Jolt chassis query identity to the dedicated hybrid test.
+	excavation._tracked_chassis_controller = null
 	for contract_path in [SY205_SOIL_CONTRACT, SY135_SOIL_CONTRACT]:
 		var contract := _read_json(contract_path)
 		excavation.terrain_scheduler.reset_world()

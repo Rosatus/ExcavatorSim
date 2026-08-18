@@ -11,20 +11,25 @@ deterministic-enough terrain and excavation loop, visual presentation systems,
 and standalone release-candidate checks. Trellis remains the source of project
 plans, implementation decisions, and session history.
 
-By default, Python remains authoritative for:
+In the product default, Godot/Jolt remains authoritative for:
 
-- Pinocchio excavator kinematics and input safety;
-- lifecycle state and the Godot-Pinocchio HTTP/WebSocket motion contract;
-- the legacy terrain, bucket-volume, recording, and replay services exposed by
-  the legacy runtime profile.
+- chassis/track dynamics, bounded work-equipment kinematics, contacts, local
+  terrain and bucket inventory;
+- the visual and sensor truth produced by the accepted fixed tick.
+
+Python runs the `gateway-only` lifecycle/input/telemetry service. It validates
+identity, ordering and freshness but does not construct or step Pinocchio and
+does not emit product `view_state` in this profile. `start-python-kinematic`
+and `start-legacy` remain explicit compatibility launchers for the old Python
+authority and terrain/replay stack.
 
 In the Godot-first profile, Godot owns desktop rendering, GLB scene assembly,
 UI, local terrain and excavation state, and bucket-soil convenience state. The
 explicit `jolt_authoritative` Phase 1 profile also makes one Jolt body the sole
 chassis/track pose and velocity writer while the work equipment stays frozen;
-the default remains `python_kinematic`. Terrain3D, bounded particles, and visual
-GLBs remain derived. Godot authoritative truth stays local and is not written
-into Python's shadow diagnostic slot.
+Terrain3D, bounded particles, and visual GLBs remain derived. Godot
+authoritative truth stays local; only bounded observational telemetry crosses
+the gateway boundary.
 
 ## Repository map
 
@@ -53,8 +58,9 @@ Architecture reading order:
    standalone-path gates.
 2. Run `pixi run backend-smoke` and the Godot standalone matrix when changing
    transport, terrain, or client behavior.
-3. Keep the legacy and Godot-first runtime profiles compatible until an
-   approved integration release-candidate decision selects a migration path.
+3. Use `pixi run start` for the Jolt-authoritative product and an explicit
+   compatibility task (`start-python-kinematic` or `start-legacy`) when Python
+   pose/replay behavior is under test.
 4. Treat articulated Jolt equipment, production-grade hydraulics, contact/mass
    calibration, excavation coupling, and per-grain soil as deferred model work;
    evaluate C++ only after profiling identifies a measured bottleneck.

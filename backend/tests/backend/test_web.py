@@ -13,6 +13,7 @@ from babylon_sim.calibration import MachineCalibration
 from babylon_sim.model import ExcavatorModel
 from babylon_sim.replay_contract import SourceMode
 from babylon_sim.runtime import RuntimeController
+from babylon_sim.session_manager import RuntimeSessionManager
 from babylon_sim.web import create_app
 
 
@@ -86,6 +87,46 @@ async def test_motion_only_negotiates_capabilities_and_rejects_optional_routes(
         error = await _receive_type(ws, "error")
         assert error["code"] == "capability_unavailable"
         assert error["request_id"] == "unsupported-terrain"
+        await ws.close()
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_gateway_only_handshake_has_no_python_view_state(
+    tmp_path: Path,
+) -> None:
+    frontend = tmp_path / "dist"
+    frontend.mkdir()
+    (frontend / "index.html").write_text("<html></html>", encoding="utf-8")
+    manager = RuntimeSessionManager(model_id="sy205", profile="gateway-only")
+    client = TestClient(TestServer(create_app(manager, frontend_dir=frontend)))
+    await client.start_server()
+    try:
+        health = await client.get("/health")
+        payload = await health.json()
+        assert payload["capabilities"] == [
+            "bucket_load_feedback_v1",
+            "commands",
+            "input_snapshot",
+            "sensor_telemetry_v1",
+        ]
+        assert payload["sensor_telemetry"] is None
+        assert (await client.get("/api/recording/export")).status == 409
+        origin = str(client.make_url("/")).rstrip("/")
+        ws = await client.ws_connect("/ws", headers={"Origin": origin})
+        await ws.send_json(
+            {
+                "type": "hello",
+                "protocol_version": "godot-pinocchio-v3",
+                "capabilities": ["input_snapshot", "commands"],
+                "optional_capabilities": ["sensor_telemetry_v1"],
+            }
+        )
+        hello = await _receive_type(ws, "hello_ack")
+        assert hello["negotiated_optional_capabilities"] == ["sensor_telemetry_v1"]
+        with pytest.raises(asyncio.TimeoutError):
+            await ws.receive_json(timeout=0.1)
         await ws.close()
     finally:
         await client.close()

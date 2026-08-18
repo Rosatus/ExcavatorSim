@@ -43,9 +43,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--runtime-profile",
-        choices=("legacy", "motion-only"),
-        default="legacy",
-        help="runtime services to enable (default: legacy)",
+        choices=("gateway-only", "legacy", "motion-only"),
+        default="gateway-only",
+        help=(
+            "runtime services to enable (default: gateway-only; "
+            "legacy and motion-only are explicit Python compatibility profiles)"
+        ),
     )
     return parser
 

@@ -306,6 +306,9 @@ func _test_scene_presentation() -> int:
 	if _check(presentation != null and presentation.get_contract_error().is_empty(), "presentation mapping contract loads") != 0:
 		instance.queue_free()
 		return 1
+	if _check(presentation.set_authority_profile_for_test(AuthorityProfile.PYTHON_KINEMATIC), "presentation parity test selects Python compatibility profile") != 0:
+		instance.queue_free()
+		return 1
 	var excavation := instance.get_node_or_null("TerrainRoot/ExcavationWorld") as ExcavationWorld
 	if _check(excavation != null, "excavation world exposes the bucket tooth proxy") != 0:
 		instance.queue_free()

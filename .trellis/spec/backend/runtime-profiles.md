@@ -3,22 +3,31 @@
 ## 1. Scope / Trigger
 
 This contract applies when the standalone service is started for the Godot
-motion vertical slice and needs kinematics without legacy terrain, recording or
-replay workers. It defines the opt-in profile added by M3; the default remains
-the legacy BabylonSim composition.
+motion vertical slice. The product default is a gateway-only process because
+Godot/Jolt owns product pose, contact, terrain and payload; Python kinematic
+profiles remain explicit compatibility launchers.
 
 ## 2. Signatures
 
 ```python
 RuntimeController(model, calibration, *, profile: Literal["legacy", "motion-only"] = "legacy")
+GatewayRuntimeController(descriptor, *, profile: Literal["gateway-only"] = "gateway-only")
 create_runtime(model, calibration, *, profile: RuntimeProfile = "legacy")
 ```
 
-The CLI accepts `--runtime-profile {legacy,motion-only}`. `pixi run start` is
-legacy; `pixi run start-motion-only` is the explicit motion-only launcher.
+The CLI accepts `--runtime-profile {gateway-only,legacy,motion-only}`.
+`pixi run start` selects `gateway-only`; `pixi run start-legacy` selects the
+full Python compatibility service and `pixi run start-python-kinematic` selects
+the explicit motion-only Pinocchio service. `start-motion-only` remains an
+alias.
 
 ## 3. Contracts
 
+- Gateway-only constructs no `Simulator`, Pinocchio model, recording, terrain,
+  replay or exchange service. It owns only lifecycle, input lease validation,
+  model identity and bounded observational telemetry stores. It advertises
+  `input_snapshot`, `commands`, `bucket_load_feedback_v1`, and
+  `sensor_telemetry_v1`; it never emits `view_state`.
 - Legacy constructs recording, terrain, replay and exchange services and
   advertises `input_snapshot`, `commands`, `latency`, `playback`, `recording`,
   and `terrain` after hello capability intersection.
@@ -97,9 +106,9 @@ Authority selection is separate from backend service composition:
 
 | Authority profile | Product pose writer | Shadow publisher | Current status |
 |---|---|---|---|
-| `python_kinematic` | Python `Simulator`/Pinocchio | off | Default/current |
+| `python_kinematic` | Python `Simulator`/Pinocchio | off | Explicit compatibility |
 | `jolt_shadow` | Python `Simulator`/Pinocchio | Godot observational | Implemented opt-in |
-| `jolt_authoritative` | Godot hybrid: one Jolt chassis plus kinematic work equipment | off; local truth only | Phase 3 opt-in |
+| `jolt_authoritative` | Godot hybrid: one Jolt chassis plus kinematic work equipment | off; local truth only | Product default |
 
 Both backend runtime profiles may advertise `simulation_truth_shadow_v1` and
 `sensor_telemetry_v1` as optional capabilities. Negotiation only enables the isolated slots in

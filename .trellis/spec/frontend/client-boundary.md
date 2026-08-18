@@ -11,7 +11,7 @@ derived work, reconnect, reset, historical seek, and Return Live as explicit
 state transitions.
 
 In `python_kinematic` and `jolt_shadow`, Godot physics is derived presentation
-and cannot write product pose. In opt-in `jolt_authoritative`, one Jolt chassis
+and cannot write product pose. In the default `jolt_authoritative`, one Jolt chassis
 body and one bounded kinematic articulation state jointly form the sole hybrid
 pose writer. Terrain deformation, bucket inventory, and replay authority remain
 outside Jolt.
@@ -26,12 +26,13 @@ shadow transport.
 
 ## Godot-first local-world profile
 
-For the first realistic Godot product slice, Python owns motion kinematics,
-input safety and lifecycle while Godot owns deterministic-enough terrain/world
-state, bucket convenience state and presentation. `TerrainState` keeps stable and
-loose Float32 layers; `TerrainRenderer` only consumes copied snapshots and is
-generation-gated. This profile is opt-in and coexists with the legacy Python
-terrain/replay service until the integration release candidate is reviewed.
+The product default uses Godot/Jolt for motion kinematics, contacts and local
+world truth. Python's `gateway-only` service owns lifecycle, input safety and
+bounded telemetry validation without publishing pose. The explicit
+`motion-only` compatibility profile retains Python kinematics while Godot owns
+deterministic-enough terrain/world state, bucket convenience state and
+presentation. `TerrainState` keeps stable and loose Float32 layers;
+`TerrainRenderer` only consumes copied snapshots and is generation-gated.
 
 `BucketSoilState` is the single local bucket-inventory owner in this profile. In
 production, `ExcavationWorld` derives cut, carry, spill, and dump from swept
@@ -143,8 +144,9 @@ Correct: ChassisMotionRoot owns travel; MotionPresentation composes below it
 
 ### 1. Scope / Trigger
 
-Use this contract only when `simulation/authority_profile` is explicitly
-`jolt_authoritative`. The default remains `python_kinematic`. This profile uses
+Use this contract when `simulation/authority_profile` is
+`jolt_authoritative`, the product default. The compatibility profiles remain
+explicit. This profile uses
 Jolt for the dynamic chassis/tracks, bounded kinematics for slew/boom/arm/bucket,
 and Jolt space queries for bucket/terrain evidence.
 
@@ -255,7 +257,7 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
 
 | Condition | Required behavior |
 |---|---|
-| Default/unknown profile | Keep Python path, or fail closed for unknown value; never auto-select Jolt |
+| Product default / unknown profile | Select Jolt only from the declared default; fail closed for unknown values and never fall back to Python pose |
 | Missing/hash-mismatched/invalid rig | Reject model and destroy any old dynamic runtime; no cross-model fallback |
 | Collider unavailable or identity stale | Stop track force activation and report quality/identity failure |
 | Python pose arrives in authoritative mode | Reject the pose write; retain the latest Jolt snapshot |
@@ -272,9 +274,9 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
 
 ### 5. Good / Base / Bad Cases
 
-- Good: explicit profile -> one dynamic chassis + accepted kinematic FK ->
+- Good: product-default Jolt profile -> one dynamic chassis + accepted kinematic FK ->
   identity-bound bucket query -> one interaction batch -> local hybrid truth.
-- Base: default profile -> unchanged Python pose writer and no dynamic chassis rig.
+- Base: explicit Python compatibility profile -> Python pose writer and no dynamic chassis rig.
 - Bad: apply Python base transform after the Jolt step, accept a stale terrain
   collider, create dynamic work-equipment bodies, or relabel authoritative truth
   as a shadow message.

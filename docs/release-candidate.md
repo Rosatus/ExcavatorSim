@@ -1,7 +1,11 @@
 # Godot-first release-candidate boundary
 
-The release candidate keeps two explicit runtime profiles:
+The release candidate keeps a Jolt-authoritative default plus two explicit
+Python compatibility profiles:
 
+- `gateway-only`: Python owns lifecycle, input lease validation, model identity
+  and bounded telemetry storage. It does not construct/step Simulator or emit
+  `view_state`; Godot/Jolt owns product motion and contacts.
 - `motion-only`: Python owns kinematics, input safety and lifecycle; Godot owns
   its local deterministic terrain, bucket convenience state and presentation.
 - `legacy`: the existing Python terrain, recording and replay services remain
@@ -50,8 +54,8 @@ With the Godot editor connected to MCP, use this exact smoke sequence:
    authority-generation changes, pose clearing and bucket-soil reset. Stop the
    game with `project_manage({"op":"stop"})`.
 
-For the opt-in authoritative smoke, preserve the current
-`simulation/authority_profile`, set it to `jolt_authoritative` through
+For the authoritative smoke, use the default
+`simulation/authority_profile=jolt_authoritative` through
 `project_manage(settings_set)`, run the main scene, and inspect the controller's
 current runtime snapshot. For both SY205 and SY135 it must contain exactly one
 `chassis` body, four named `kinematic_frames`, four logical joints, and a bucket

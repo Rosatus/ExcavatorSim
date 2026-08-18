@@ -5,16 +5,16 @@
 This contract applies to Godot product code that consumes the Python `GET /ws`
 motion service. It was established by the M2 connected motion vertical slice.
 
-> **Profile scope (2026-08-13):** The authority sentence below describes the
-> original M2/legacy contract. In the current approved `motion-only`
-> Godot-first profile, Python remains authoritative for joint state, input
-> safety and lifecycle, while Godot owns its local `TerrainState` and
-> `BucketSoilState`; Python terrain, recording and replay remain only in the
-> `legacy` compatibility profile. See [`runtime-profiles.md`](../backend/runtime-profiles.md)
-> and [`client-boundary.md`](client-boundary.md).
+> **Profile scope (2026-08-18):** The product default uses
+> `jolt_authoritative` in Godot and `gateway-only` in Python. Python remains a
+> lifecycle/input/telemetry gateway and does not publish product pose. The
+> `motion-only` and `legacy` profiles preserve the older Python-authority
+> compatibility behavior.
 
-The client is a presentation consumer: Python remains authoritative for joint
-state, lifecycle, terrain, recording, and replay.
+The client is a product physics consumer in the default profile: Godot/Jolt is
+authoritative for pose, contact, local terrain and payload. Python remains the
+lifecycle/input/telemetry gateway. In compatibility profiles the client may
+consume Python `view_state` according to the selected runtime contract.
 
 ## 2. Signatures
 
@@ -219,7 +219,9 @@ implicit cross-model fallback.
 producer. `SimulationTruthPublisher` runs after the local physics step only when
 `simulation/authority_profile == "jolt_shadow"`; the persisted project default is
 `python_kinematic`. `MotionClient` sends at most 30 Hz and replaces an unsent
-sample with the newest snapshot.
+sample with the newest snapshot. The default gateway does not negotiate this
+diagnostic capability; authoritative sensor telemetry is the supported
+observation path.
 
 The publisher may call only read APIs such as `get_status_snapshot`,
 `get_frame_node`, and `surface_snapshot`. It must not call transform setters,

@@ -44,7 +44,7 @@ rendering_device/driver.windows="d3d12"
 
 [simulation]
 
-authority_profile="python_kinematic"
+authority_profile="jolt_authoritative"
 
 [terrain3d]
 

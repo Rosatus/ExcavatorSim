@@ -7,9 +7,12 @@ from collections.abc import Callable
 from typing import Any
 
 from .calibration import MachineCalibration
+from .gateway_runtime import GatewayRuntimeController
 from .model import ExcavatorModel
 from .model_registry import ModelDescriptor, ModelRegistry, load_model_registry
 from .runtime import RuntimeController, RuntimeProfile
+
+ManagedRuntime = RuntimeController | GatewayRuntimeController
 
 
 class ModelSelectionError(RuntimeError):
@@ -26,7 +29,7 @@ class RuntimeSessionManager:
 
     def __init__(
         self,
-        runtime: RuntimeController | None = None,
+        runtime: ManagedRuntime | None = None,
         *,
         model_id: str | None = None,
         profile: RuntimeProfile = "legacy",
@@ -68,14 +71,18 @@ class RuntimeSessionManager:
     @staticmethod
     def _build_runtime(
         descriptor: ModelDescriptor, *, profile: RuntimeProfile
-    ) -> RuntimeController:
+    ) -> ManagedRuntime:
+        if profile == "gateway-only":
+            return GatewayRuntimeController(descriptor)
         model = ExcavatorModel.from_urdf(
             descriptor.urdf_path, model_version=descriptor.model_version
         )
         calibration = MachineCalibration.from_json(descriptor.calibration_path)
         return RuntimeController(model, calibration, profile=profile)
 
-    def _descriptor_for_runtime(self, runtime: RuntimeController) -> ModelDescriptor:
+    def _descriptor_for_runtime(self, runtime: ManagedRuntime) -> ModelDescriptor:
+        if isinstance(runtime, GatewayRuntimeController):
+            return runtime.descriptor
         try:
             return self.registry.resolve(runtime.model.model_version)
         except Exception as exc:
@@ -89,7 +96,7 @@ class RuntimeSessionManager:
             ) from exc
 
     @property
-    def runtime(self) -> RuntimeController:
+    def runtime(self) -> ManagedRuntime:
         with self._lock:
             return self._runtime
 
@@ -127,7 +134,7 @@ class RuntimeSessionManager:
         requested_model_id: str | None,
         *,
         session_is_closed: Callable[[], bool] | None = None,
-    ) -> RuntimeController:
+    ) -> ManagedRuntime:
         """Validate/select the model for a new hello and register the session."""
         with self._lock:
             self._prune_closed_sessions()
