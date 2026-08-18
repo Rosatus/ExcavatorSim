@@ -3,7 +3,7 @@
   "name": "sensor-telemetry-python-gateway",
   "title": "Sensor telemetry and Python gateway",
   "description": "Publish Jolt truth and initial simulated sensors from Godot and make Python the strict telemetry, recording, diagnostics, and external command gateway.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": "feature",
   "scope": "cross-layer",
   "package": "godot+backend+protocol",

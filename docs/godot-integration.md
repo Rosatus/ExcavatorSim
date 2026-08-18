@@ -129,6 +129,30 @@ support wrench, distributed track contact, slip, saturation, and terrain
 identity. No shadow
 path calls product transform, terrain, bucket, or lifecycle setters.
 
+When `jolt_authoritative` is selected, the same accepted truth snapshot also
+feeds the optional `sensor_telemetry_v1` gateway. Godot publishes four joint
+encoders, four declared IMU frames, GNSS, combined track/contact state, and
+bucket payload/load at a bounded 30 Hz transport cadence. Each batch retains
+the fixed-tick authority epoch/physics tick, model/rig/calibration identity,
+per-stream sample sequence, canonical Z-up units, raw value, validity, quality,
+and explicit noise metadata. Python only validates and stores the latest batch
+with freshness diagnostics; it does not reconstruct pose or write sensor values
+into `view_state` or the legacy RRD columns. Local keyboard and Jolt physics
+continue when the gateway is absent.
+
+The sample layouts are explicit rather than concatenated ad-hoc values: encoder
+is `[position_rad, velocity_rad_s, effort_n]`; each IMU is a 15-value
+`[rotation_matrix_3x3, angular_velocity_rad_s, specific_force_m_s2]` vector;
+GNSS is `[position_xyz_m, velocity_xyz_m_s]`; track/contact and payload retain
+their six- and four-value layouts from the protocol schema. The four IMU stream
+IDs are the model-declared `swing_imu_link`, `boom_imu_link`, `arm_imu_link`, and
+`bucket_imu_link`; their current Jolt frame sources are the corresponding
+upper, boom, arm, and bucket kinematic frames.
+
+For diagnostics, Python exposes a bounded `/api/telemetry?limit=N` export of
+accepted batches. This is a telemetry stream, not a replacement for recording
+or replay, and it is cleared with the owning session/runtime.
+
 The realistic visual pass uses Sky3D 2.1 behind the project-owned
 `VisualEnvironment` seam, plus a generation-gated soil particle emitter and a
 bounded camera/quality controller. The root node keeps the stable

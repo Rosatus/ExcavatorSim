@@ -25,6 +25,7 @@ CLIENT_MESSAGE_TYPES = frozenset(
         "terrain_command",
         "bucket_load_feedback",
         "simulation_truth_shadow",
+        "sensor_telemetry_batch",
         "ping",
     }
 )
@@ -166,6 +167,11 @@ class SimulationTruthShadowMessage:
     snapshot: dict[str, Any]
 
 
+@dataclass(frozen=True)
+class SensorTelemetryBatchMessage:
+    batch: dict[str, Any]
+
+
 ClientMessage: TypeAlias = (
     HelloMessage
     | InputMessage
@@ -174,6 +180,7 @@ ClientMessage: TypeAlias = (
     | TerrainMessage
     | BucketLoadFeedbackMessage
     | SimulationTruthShadowMessage
+    | SensorTelemetryBatchMessage
     | PingMessage
 )
 
@@ -351,6 +358,8 @@ def decode_client_message(raw: str | bytes, *, max_bytes: int = MAX_MESSAGE_BYTE
         )
     if message_type == "simulation_truth_shadow":
         return SimulationTruthShadowMessage(cast(dict[str, Any], payload["snapshot"]))
+    if message_type == "sensor_telemetry_batch":
+        return SensorTelemetryBatchMessage(payload)
     return PingMessage(payload["id"], float(payload["client_sent_ms"]))
 
 

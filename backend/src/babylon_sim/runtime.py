@@ -7,11 +7,11 @@ import queue
 import threading
 import time
 import uuid
-from collections import OrderedDict
+from collections import OrderedDict, deque
 from collections.abc import Callable
 from concurrent.futures import Future
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal, cast
 
 from .calibration import MachineCalibration
 from .constants import DISPLAY_HZ, SIMULATION_DT_SECONDS
@@ -22,6 +22,13 @@ from .protocol import BucketLoadFeedbackMessage, ProtocolError
 from .recording import ChunkedRecordingBuffer
 from .replay import AuthoritativeViewState, LatestViewSlot, ReplayWorker
 from .replay_contract import PlaybackState, SourceMode
+from .sensor_gateway import (
+    SENSOR_TELEMETRY_CAPABILITY,
+    SENSOR_TELEMETRY_TIMEOUT_SECONDS,
+    LatestSensorTelemetry,
+    SensorTelemetryBatch,
+    validate_sensor_order,
+)
 from .shadow_state import (
     SHADOW_TRUTH_CAPABILITY,
     SHADOW_TRUTH_TIMEOUT_SECONDS,
@@ -44,6 +51,7 @@ RuntimeProfile = Literal["legacy", "motion-only"]
 COMMAND_QUEUE_CAPACITY = 32
 COMMANDS_PER_TICK = 8
 COMMAND_CACHE_CAPACITY = 128
+SENSOR_HISTORY_CAPACITY = 256
 BUCKET_FEEDBACK_TIMEOUT_SECONDS = 0.5
 BUCKET_FEEDBACK_CAPABILITY = "bucket_load_feedback_v1"
 
@@ -179,6 +187,9 @@ class RuntimeController:
         self._bucket_feedback_lock = threading.Lock()
         self._shadow_truth: dict[str, LatestShadowTruth] = {}
         self._shadow_truth_lock = threading.Lock()
+        self._sensor_telemetry: dict[str, LatestSensorTelemetry] = {}
+        self._sensor_telemetry_lock = threading.Lock()
+        self._sensor_history: dict[str, deque[SensorTelemetryBatch]] = {}
         self._submit_lock = threading.Lock()
         self._metrics_lock = threading.Lock()
         self._stop_event = threading.Event()
@@ -242,6 +253,7 @@ class RuntimeController:
                     "commands",
                     BUCKET_FEEDBACK_CAPABILITY,
                     SHADOW_TRUTH_CAPABILITY,
+                    SENSOR_TELEMETRY_CAPABILITY,
                 }
             )
         return frozenset(
@@ -254,6 +266,7 @@ class RuntimeController:
                 "terrain",
                 BUCKET_FEEDBACK_CAPABILITY,
                 SHADOW_TRUTH_CAPABILITY,
+                SENSOR_TELEMETRY_CAPABILITY,
             }
         )
 
@@ -300,6 +313,9 @@ class RuntimeController:
             self._bucket_feedback.clear()
         with self._shadow_truth_lock:
             self._shadow_truth.clear()
+        with self._sensor_telemetry_lock:
+            self._sensor_telemetry.clear()
+            self._sensor_history.clear()
         if self.profile == "motion-only":
             with self._input_clients_lock:
                 input_clients = tuple(self._input_clients)
@@ -347,6 +363,9 @@ class RuntimeController:
             self._bucket_feedback.pop(client_id, None)
         with self._shadow_truth_lock:
             self._shadow_truth.pop(client_id, None)
+        with self._sensor_telemetry_lock:
+            self._sensor_telemetry.pop(client_id, None)
+            self._sensor_history.pop(client_id, None)
 
     def submit_bucket_load_feedback(
         self, session_id: str, sample: BucketLoadFeedbackMessage
@@ -408,6 +427,70 @@ class RuntimeController:
                 self._shadow_truth.pop(current.sample.identity.session_id, None)
                 return None
             return current.as_dict(now)
+
+    def submit_sensor_telemetry(self, session_id: str, batch: SensorTelemetryBatch) -> None:
+        now = self._clock()
+        with self._sensor_telemetry_lock:
+            previous = self._sensor_telemetry.get(session_id)
+            if previous is not None:
+                try:
+                    validate_sensor_order(previous.batch, batch)
+                except ProtocolError as exc:
+                    raise RuntimeCommandError(exc.code, str(exc)) from exc
+                accepted = previous.accepted_batches + 1
+                dropped = previous.dropped_batches
+            else:
+                accepted = 1
+                dropped = 0
+            self._sensor_telemetry[session_id] = LatestSensorTelemetry(
+                batch=batch,
+                received_monotonic_s=now,
+                accepted_batches=accepted,
+                dropped_batches=dropped,
+            )
+            history = self._sensor_history.setdefault(
+                session_id, deque(maxlen=SENSOR_HISTORY_CAPACITY)
+            )
+            history.append(batch)
+
+    def latest_sensor_telemetry(self) -> dict[str, object] | None:
+        now = self._clock()
+        with self._sensor_telemetry_lock:
+            current = max(
+                self._sensor_telemetry.values(),
+                key=lambda value: value.received_monotonic_s,
+                default=None,
+            )
+            if current is None:
+                return None
+            if now - current.received_monotonic_s > SENSOR_TELEMETRY_TIMEOUT_SECONDS:
+                self._sensor_telemetry.pop(current.batch.identity.session_id, None)
+                return None
+            result = current.as_dict(now)
+            result["history_count"] = len(
+                self._sensor_history.get(current.batch.identity.session_id, ())
+            )
+            return result
+
+    def sensor_telemetry_export(self, limit: int = 64) -> dict[str, object]:
+        bounded_limit = max(1, min(int(limit), SENSOR_HISTORY_CAPACITY))
+        with self._sensor_telemetry_lock:
+            batches: list[dict[str, object]] = []
+            for history in self._sensor_history.values():
+                batches.extend(batch.as_dict() for batch in history)
+        batches.sort(
+            key=lambda batch: (
+                int(cast(Any, batch["monotonic_time_ns"])),
+                int(cast(Any, batch["batch_sequence"])),
+            )
+        )
+        truncated = len(batches) > bounded_limit
+        return {
+            "batches": batches[-bounded_limit:],
+            "count": min(len(batches), bounded_limit),
+            "truncated": truncated,
+            "capacity": SENSOR_HISTORY_CAPACITY,
+        }
 
     def submit_command(
         self, session_id: str, command_id: str, command: LifecycleCommand
@@ -541,6 +624,12 @@ class RuntimeController:
         else:
             self.simulator.reset()
             self._stream_epoch = uuid.uuid4().hex
+            # Sensor batches belong to the old authority epoch.  Clear both
+            # latest-value and bounded history before publishing the reset
+            # snapshot so diagnostics cannot expose cross-epoch samples.
+            with self._sensor_telemetry_lock:
+                self._sensor_telemetry.clear()
+                self._sensor_history.clear()
             return True
         return False
 

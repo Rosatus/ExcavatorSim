@@ -34,6 +34,7 @@ from .protocol import (
     PingMessage,
     PlaybackMessage,
     ProtocolError,
+    SensorTelemetryBatchMessage,
     SimulationTruthShadowMessage,
     TerrainMessage,
     decode_client_message,
@@ -48,6 +49,11 @@ from .runtime import (
     CommandResult,
     RuntimeCommandError,
     RuntimeController,
+)
+from .sensor_gateway import (
+    SENSOR_TELEMETRY_CAPABILITY,
+    SensorTelemetryIdentity,
+    decode_sensor_batch,
 )
 from .series import SeriesQueryError, project_series
 from .session_manager import ModelSelectionError, RuntimeSessionManager
@@ -67,6 +73,7 @@ COMMAND_RATE_LIMIT = 20
 PING_RATE_LIMIT = 20
 BUCKET_FEEDBACK_RATE_LIMIT = 20
 SHADOW_TRUTH_RATE_LIMIT = 60
+SENSOR_TELEMETRY_RATE_LIMIT = 30
 RATE_WINDOW_SECONDS = 1.0
 MAX_PROTOCOL_VIOLATIONS = 3
 # Leave headroom for strict JSON encoding/validation after each poll.
@@ -89,6 +96,7 @@ class SlidingWindowRateLimiter:
             "terrain_command": deque(),
             "bucket_load_feedback": deque(),
             "simulation_truth_shadow": deque(),
+            "sensor_telemetry_batch": deque(),
             "ping": deque(),
         }
 
@@ -99,6 +107,7 @@ class SlidingWindowRateLimiter:
             "terrain_command": COMMAND_RATE_LIMIT,
             "bucket_load_feedback": BUCKET_FEEDBACK_RATE_LIMIT,
             "simulation_truth_shadow": SHADOW_TRUTH_RATE_LIMIT,
+            "sensor_telemetry_batch": SENSOR_TELEMETRY_RATE_LIMIT,
             "ping": PING_RATE_LIMIT,
         }
         events = self._events[message_type]
@@ -282,6 +291,7 @@ def create_app(
     app.on_cleanup.append(on_cleanup)
     app.router.add_get("/health", _health)
     app.router.add_get("/api/capabilities", _capabilities)
+    app.router.add_get("/api/telemetry", _telemetry_export)
     app.router.add_get("/api/model", _model)
     app.router.add_get("/api/visual-model", _visual_model)
     app.router.add_get("/api/visual-assets/{asset_id:[a-z][a-z0-9-]*}", _visual_asset)
@@ -329,6 +339,7 @@ async def _health(request: web.Request) -> web.Response:
             "capabilities": sorted(runtime.capabilities),
             "bucket_load_feedback": runtime.latest_bucket_load_feedback(),
             "simulation_truth_shadow": runtime.latest_shadow_truth(),
+            "sensor_telemetry": runtime.latest_sensor_telemetry(),
         }
     )
 
@@ -337,7 +348,11 @@ async def _capabilities(request: web.Request) -> web.Response:
     runtime = request.app[RUNTIME_KEY].runtime
     optional = [
         capability
-        for capability in (BUCKET_FEEDBACK_CAPABILITY, SHADOW_TRUTH_CAPABILITY)
+        for capability in (
+            BUCKET_FEEDBACK_CAPABILITY,
+            SHADOW_TRUTH_CAPABILITY,
+            SENSOR_TELEMETRY_CAPABILITY,
+        )
         if capability in runtime.capabilities
     ]
     return web.json_response(
@@ -346,6 +361,18 @@ async def _capabilities(request: web.Request) -> web.Response:
             "optional_capabilities": optional,
         }
     )
+
+
+async def _telemetry_export(request: web.Request) -> web.Response:
+    runtime = request.app[RUNTIME_KEY].runtime
+    _require_capability(runtime, SENSOR_TELEMETRY_CAPABILITY)
+    try:
+        limit = int(request.query.get("limit", "64"))
+    except ValueError as exc:
+        raise web.HTTPBadRequest(text="invalid telemetry limit") from exc
+    if limit < 1 or limit > 256:
+        raise web.HTTPBadRequest(text="telemetry limit must be between 1 and 256")
+    return web.json_response(runtime.sensor_telemetry_export(limit))
 
 
 async def _model(request: web.Request) -> web.StreamResponse:
@@ -815,6 +842,8 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
                         if isinstance(message, BucketLoadFeedbackMessage)
                         else "simulation_truth_shadow"
                         if isinstance(message, SimulationTruthShadowMessage)
+                        else "sensor_telemetry_batch"
+                        if isinstance(message, SensorTelemetryBatchMessage)
                         else "ping"
                     )
                     if not limiter.allow(kind, time.monotonic()):
@@ -940,6 +969,25 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
                         )
                         sample = decode_shadow_truth(message.snapshot, expected)
                         runtime.submit_shadow_truth(session_id, sample)
+                    elif isinstance(message, SensorTelemetryBatchMessage):
+                        if SENSOR_TELEMETRY_CAPABILITY not in negotiated_optional_capabilities:
+                            raise ProtocolError(
+                                "capability_unavailable",
+                                "sensor telemetry was not negotiated",
+                            )
+                        runtime_snapshot = runtime.latest.read()
+                        model_contract = load_authority_manifest()["models"][manager.model_id]
+                        expected_sensor = SensorTelemetryIdentity(
+                            session_id=session_id,
+                            simulation_epoch=runtime_snapshot.stream_epoch,
+                            model_id=manager.model_id,
+                            model_version=manager.model_version,
+                            rig_id=model_contract["rig_id"],
+                            rig_version=model_contract["rig_version"],
+                            calibration_version=model_contract["calibration_version"],
+                        )
+                        batch = decode_sensor_batch(message.batch, expected_sensor)
+                        runtime.submit_sensor_telemetry(session_id, batch)
                     elif isinstance(message, PingMessage):
                         await send(
                             {

@@ -24,6 +24,9 @@ var _last_model_id := ""
 var _last_authority_identity := ""
 var _last_runtime_authority_epoch := ""
 var _last_snapshot: SimulationTruthSnapshot
+var _previous_sensor_linear := Vector3.ZERO
+var _previous_sensor_time_ns := -1
+var _previous_sensor_authority_epoch := ""
 var contract_error := ""
 
 
@@ -47,12 +50,15 @@ func _ready() -> void:
 func _physics_process(_delta: float) -> void:
 	if not AuthorityProfile.produces_truth(authority_profile):
 		return
+	var authoritative := AuthorityProfile.writes_product_pose(authority_profile)
 	var snapshot := build_snapshot()
 	if snapshot == null:
 		return
 	_last_snapshot = snapshot
 	if AuthorityProfile.publishes_shadow(authority_profile) and _motion_client != null:
 		_motion_client.queue_simulation_truth_shadow(snapshot.to_dictionary())
+	if authoritative and _motion_client != null:
+		_motion_client.queue_sensor_telemetry(build_sensor_batch(snapshot.to_dictionary()))
 
 
 func build_snapshot() -> SimulationTruthSnapshot:
@@ -270,6 +276,184 @@ func build_snapshot() -> SimulationTruthSnapshot:
 	return SimulationTruthSnapshot.from_dictionary(result)
 
 
+func build_sensor_batch(snapshot: Dictionary) -> Dictionary:
+	var identity := snapshot.get("identity", {}) as Dictionary
+	var samples: Array[Dictionary] = []
+	var sample_sequence := int(snapshot.get("sequence", 0))
+	for joint_value in snapshot.get("joints", []):
+		if not joint_value is Dictionary:
+			continue
+		var joint := joint_value as Dictionary
+		samples.append({
+			"sensor_id": "encoder/%s" % String(joint.get("name", "joint")),
+			"kind": "encoder",
+			"frame_id": String(joint.get("name", "joint")),
+			"sample_sequence": sample_sequence,
+			"sample_time_ns": int(snapshot.get("monotonic_time_ns", 0)),
+			"units": "rad,rad_s,N",
+			"coordinate_basis": "canonical-z-up-right-handed-meters",
+			"valid": true,
+			"quality": "high",
+			"value": [float(joint.get("position_rad", 0.0)), float(joint.get("velocity_rad_s", 0.0)), float(joint.get("effort_n", 0.0))],
+			"noise": _sensor_noise(3),
+		})
+	var chassis := {}
+	for body_value in snapshot.get("bodies", []):
+		if body_value is Dictionary and String((body_value as Dictionary).get("name", "")) == "chassis":
+			chassis = body_value as Dictionary
+			break
+	var chassis_transform := chassis.get("transform", []) as Array
+	var chassis_origin := _matrix_origin(chassis_transform)
+	var linear := _vector3_array(chassis.get("linear_velocity_m_s", [0.0, 0.0, 0.0]))
+	var angular := _vector3_array(chassis.get("angular_velocity_rad_s", [0.0, 0.0, 0.0]))
+	var sensor_time_ns := int(snapshot.get("monotonic_time_ns", 0))
+	var authority_epoch := String(snapshot.get("authority_epoch", ""))
+	var acceleration := Vector3.ZERO
+	if (
+		_previous_sensor_time_ns >= 0
+		and _previous_sensor_authority_epoch == authority_epoch
+		and sensor_time_ns > _previous_sensor_time_ns
+	):
+		var dt_s := float(sensor_time_ns - _previous_sensor_time_ns) / 1_000_000_000.0
+		if dt_s > 0.0:
+			acceleration = (_vector3_from_array(linear) - _previous_sensor_linear) / dt_s
+	_previous_sensor_linear = _vector3_from_array(linear)
+	_previous_sensor_time_ns = sensor_time_ns
+	_previous_sensor_authority_epoch = authority_epoch
+	var specific_force := acceleration - Vector3(0.0, 0.0, -9.80665)
+	var kinematic_frames := snapshot.get("kinematic_frames", []) as Array
+	var imu_frame_sources := {
+		"swing_imu_link": "upper_structure_link",
+		"boom_imu_link": "boom_link",
+		"arm_imu_link": "arm_link",
+		"bucket_imu_link": "bucket_link",
+	}
+	for frame_id in ["swing_imu_link", "boom_imu_link", "arm_imu_link", "bucket_imu_link"]:
+		var source_frame_id := String(imu_frame_sources[frame_id])
+		var frame_rows := chassis_transform
+		var frame_valid := not chassis.is_empty()
+		if source_frame_id != "base_link":
+			frame_valid = false
+			for frame_value in kinematic_frames:
+				if frame_value is Dictionary and String((frame_value as Dictionary).get("name", "")) == source_frame_id:
+					frame_rows = (frame_value as Dictionary).get("transform", []) as Array
+					frame_valid = true
+					break
+		var imu_value := _matrix_rotation_values(frame_rows)
+		imu_value.append_array(angular)
+		imu_value.append_array(_vector3_array(specific_force))
+		samples.append({
+			"sensor_id": "imu/%s" % frame_id,
+			"kind": "imu",
+			"frame_id": frame_id,
+			"sample_sequence": sample_sequence,
+			"sample_time_ns": sensor_time_ns,
+			"units": "rotation_matrix_3x3,rad_s,m_s2",
+			"coordinate_basis": "canonical-z-up-right-handed-meters",
+			"valid": frame_valid,
+			"quality": "nominal" if frame_valid else "invalid",
+			"value": imu_value,
+			"noise": _sensor_noise(15),
+		})
+	samples.append({
+		"sensor_id": "gnss/main",
+		"kind": "gnss",
+		"frame_id": "gnss_link",
+		"sample_sequence": sample_sequence,
+		"sample_time_ns": sensor_time_ns,
+		"units": "position_m,velocity_m_s",
+		"coordinate_basis": "canonical-z-up-right-handed-meters",
+		"valid": not chassis.is_empty(),
+		"quality": "nominal" if not chassis.is_empty() else "invalid",
+		"value": chassis_origin + linear,
+		"noise": _sensor_noise(6),
+	})
+	var tracks := snapshot.get("tracks", {}) as Dictionary
+	samples.append({
+		"sensor_id": "track/contact",
+		"kind": "track_contact",
+		"frame_id": "chassis",
+		"sample_sequence": sample_sequence,
+		"sample_time_ns": int(snapshot.get("monotonic_time_ns", 0)),
+		"units": "m_s,m_s,ratio,ratio,count,count",
+		"coordinate_basis": "canonical-z-up-right-handed-meters",
+		"valid": true,
+		"quality": "nominal",
+		"value": [float(tracks.get("left_speed_m_s", 0.0)), float(tracks.get("right_speed_m_s", 0.0)), float(tracks.get("left_slip_ratio", 0.0)), float(tracks.get("right_slip_ratio", 0.0)), float(tracks.get("left_contact_count", 0)), float(tracks.get("right_contact_count", 0))],
+		"noise": _sensor_noise(6),
+	})
+	var payload := snapshot.get("payload", {}) as Dictionary
+	samples.append({
+		"sensor_id": "payload/bucket",
+		"kind": "payload",
+		"frame_id": "bucket_link",
+		"sample_sequence": sample_sequence,
+		"sample_time_ns": int(snapshot.get("monotonic_time_ns", 0)),
+		"units": "kg,m3,ratio,ratio",
+		"coordinate_basis": "canonical-z-up-right-handed-meters",
+		"valid": true,
+		"quality": "high",
+		"value": [float(payload.get("mass_kg", 0.0)), float(payload.get("volume_m3", 0.0)), float(payload.get("fill_ratio", 0.0)), float(payload.get("motion_load_factor", 1.0))],
+		"noise": _sensor_noise(4),
+	})
+	for sample in samples:
+		sample["raw_value"] = (sample["value"] as Array).duplicate()
+	return {
+		"type": "sensor_telemetry_batch",
+		"session_id": String(identity.get("session_id", "")),
+		"simulation_epoch": String(identity.get("simulation_epoch", "")),
+		"model_id": String(identity.get("model_id", "")),
+		"model_version": String(identity.get("model_version", "")),
+		"rig_id": String(identity.get("rig_id", "")),
+		"rig_version": String(identity.get("rig_version", "")),
+		"calibration_version": String(identity.get("calibration_version", "")),
+		"authority_profile": String(snapshot.get("authority_profile", "")),
+		"authority_epoch": String(snapshot.get("authority_epoch", "")),
+		"physics_tick": int(snapshot.get("physics_tick", 0)),
+		"monotonic_time_ns": int(snapshot.get("monotonic_time_ns", 0)),
+		"batch_sequence": int(snapshot.get("sequence", 0)),
+		"samples": samples,
+		"gaps": [],
+	}
+
+
+func _sensor_noise(size: int) -> Dictionary:
+	var zeros: Array[float] = []
+	zeros.resize(size)
+	zeros.fill(0.0)
+	return {"config_version": "simulated-noise-v1", "sigma": zeros.duplicate(), "bias": zeros.duplicate()}
+
+
+func _matrix_origin(rows: Array) -> Array[float]:
+	if rows.size() < 3:
+		return [0.0, 0.0, 0.0]
+	return [float((rows[0] as Array)[3]), float((rows[1] as Array)[3]), float((rows[2] as Array)[3])]
+
+
+func _vector3_array(value: Variant) -> Array[float]:
+	if value is Vector3:
+		var vector := value as Vector3
+		return [vector.x, vector.y, vector.z]
+	if not value is Array or (value as Array).size() < 3:
+		return [0.0, 0.0, 0.0]
+	return [float((value as Array)[0]), float((value as Array)[1]), float((value as Array)[2])]
+
+
+func _vector3_from_array(value: Array) -> Vector3:
+	if value.size() < 3:
+		return Vector3.ZERO
+	return Vector3(float(value[0]), float(value[1]), float(value[2]))
+
+
+func _matrix_rotation_values(rows: Array) -> Array[float]:
+	var values: Array[float] = []
+	for row_index in 3:
+		var row := rows[row_index] as Array if row_index < rows.size() and rows[row_index] is Array else []
+		for column_index in 3:
+			values.append(float(row[column_index]) if column_index < row.size() else (1.0 if row_index == column_index else 0.0))
+	return values
+
+
 func _canonical_bucket_query(query: Dictionary) -> Dictionary:
 	var contacts: Array[Dictionary] = []
 	for contact_value in query.get("contacts", []):
@@ -356,6 +540,7 @@ func get_status_snapshot() -> Dictionary:
 		"contract_error": contract_error,
 		"publishing": AuthorityProfile.produces_truth(authority_profile) and contract_error.is_empty(),
 		"transport_publishing": AuthorityProfile.publishes_shadow(authority_profile) and contract_error.is_empty(),
+		"sensor_telemetry_publishing": AuthorityProfile.writes_product_pose(authority_profile) and contract_error.is_empty(),
 		"sequence": _sequence,
 		"model_id": _last_model_id,
 	}

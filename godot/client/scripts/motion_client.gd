@@ -22,6 +22,7 @@ const DEFAULT_ENDPOINT := "ws://127.0.0.1:8765/ws"
 const INPUT_HZ := 30.0
 const BUCKET_FEEDBACK_HZ := 10.0
 const SHADOW_TRUTH_HZ := 30.0
+const SENSOR_TELEMETRY_HZ := 30.0
 const PREFLIGHT_TIMEOUT_SECONDS := 1.5
 const HELLO_TIMEOUT_SECONDS := 3.0
 const RECONNECT_INITIAL_SECONDS := 0.25
@@ -89,6 +90,8 @@ var _next_feedback_sequence := 0
 var _pending_bucket_feedback: Dictionary = {}
 var _shadow_elapsed := 0.0
 var _pending_shadow_truth: Dictionary = {}
+var _sensor_elapsed := 0.0
+var _pending_sensor_telemetry: Dictionary = {}
 
 
 func _ready() -> void:
@@ -212,6 +215,23 @@ func queue_simulation_truth_shadow(snapshot: Dictionary) -> bool:
 func clear_simulation_truth_shadow() -> void:
 	_pending_shadow_truth.clear()
 	_shadow_elapsed = 0.0
+
+
+func queue_sensor_telemetry(batch: Dictionary) -> bool:
+	if connection_state != STATE_READY:
+		return false
+	if not negotiated_optional_capabilities.has("sensor_telemetry_v1"):
+		return false
+	if String(batch.get("type", "sensor_telemetry_batch")) != "sensor_telemetry_batch":
+		_set_error("invalid_sensor_telemetry", "sensor telemetry batch is malformed", true)
+		return false
+	_pending_sensor_telemetry = batch.duplicate(true)
+	return true
+
+
+func clear_sensor_telemetry() -> void:
+	_pending_sensor_telemetry.clear()
+	_sensor_elapsed = 0.0
 
 
 func set_focused(focused: bool) -> void:
@@ -349,6 +369,7 @@ func get_status_snapshot() -> Dictionary:
 		"accepted_view_revision": _accepted_view_revision,
 		"bucket_feedback_pending": not _pending_bucket_feedback.is_empty(),
 		"shadow_truth_pending": not _pending_shadow_truth.is_empty(),
+		"sensor_telemetry_pending": not _pending_sensor_telemetry.is_empty(),
 	}
 
 
@@ -497,6 +518,11 @@ func _tick(delta: float) -> void:
 		if _shadow_elapsed >= 1.0 / SHADOW_TRUTH_HZ:
 			_shadow_elapsed = 0.0
 			_send_pending_shadow_truth()
+	if connection_state == STATE_READY and not _pending_sensor_telemetry.is_empty():
+		_sensor_elapsed += delta
+		if _sensor_elapsed >= 1.0 / SENSOR_TELEMETRY_HZ:
+			_sensor_elapsed = 0.0
+			_send_pending_sensor_telemetry()
 
 
 func _on_transport_open() -> void:
@@ -592,6 +618,7 @@ func _accept_hello_ack(payload: Dictionary) -> void:
 	_pending_commands.clear()
 	clear_bucket_load_feedback()
 	clear_simulation_truth_shadow()
+	clear_sensor_telemetry()
 	_pose_buffer.clear()
 	_zero_armed = false
 	_retry_delay = RECONNECT_INITIAL_SECONDS
@@ -764,6 +791,13 @@ func _send_pending_shadow_truth() -> void:
 		_pending_shadow_truth.clear()
 
 
+func _send_pending_sensor_telemetry() -> void:
+	if _pending_sensor_telemetry.is_empty() or connection_state != STATE_READY:
+		return
+	if _send_payload(MotionProtocol.sensor_telemetry_batch_message(_pending_sensor_telemetry)):
+		_pending_sensor_telemetry.clear()
+
+
 func _valid_bucket_feedback_sample(sample: Dictionary) -> bool:
 	var center: Variant = sample.get("center_of_mass_local")
 	if not center is Vector3 or not _finite_vector3(center as Vector3):
@@ -839,6 +873,7 @@ func _handle_disconnected(schedule_retry: bool) -> void:
 	accepted_versions.clear()
 	clear_bucket_load_feedback()
 	clear_simulation_truth_shadow()
+	clear_sensor_telemetry()
 	_clear_generation("disconnect")
 	_set_connection_state(STATE_DISCONNECTED)
 	if schedule_retry and auto_reconnect:

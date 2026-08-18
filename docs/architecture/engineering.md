@@ -258,6 +258,14 @@ motion fraction。runtime 在 fixed tick 后只捕获一次“一底盘刚体 + 
 四连杆仍只在视觉侧求解。本地 truth
 `transport_publishing=false`，Python shadow decoder 也拒绝该 profile。
 
+Phase 4 adds a separate optional `sensor_telemetry_v1` observation chain for
+`jolt_authoritative`: the accepted fixed-tick snapshot produces encoder, IMU,
+GNSS, track/contact, and payload samples with the same epoch/tick and explicit
+frame/unit/quality/noise identity. Python validates and stores only a bounded
+latest batch, reports age and drop/sequence diagnostics through `/health`, and
+never feeds those samples into `Simulator`, `view_state`, terrain, or legacy
+RRD columns.
+
 ## 7. Authority、派生状态与失效键
 
 ```mermaid
@@ -300,7 +308,7 @@ flowchart LR
 |---|---|---|---|
 | `python_kinematic` | Python Simulator/Pinocchio | 无 | 默认产品模式 |
 | `jolt_shadow` | Python Simulator/Pinocchio | 只读 shadow | Phase 0 opt-in |
-| `jolt_authoritative` | Godot 混合：Jolt 单底盘 + 四轴运动学 | 本地 truth；无 shadow transport | Phase 3 opt-in |
+| `jolt_authoritative` | Godot 混合：Jolt 单底盘 + 四轴运动学 | 本地 truth；可选 sensor telemetry | Phase 4 opt-in |
 
 SY205/SY135 已有独立、hash-bound 的 `physics-rig-v1` descriptor；当前产品路径消费
 底盘 compound/履带接触、四组 parent/child anchor、关节轴/限位/运动整形，并绑定
@@ -348,8 +356,9 @@ flowchart LR
 
 | 接口 | 方向 | 频率/限制 | profile | 主要责任 |
 |---|---|---|---|---|
-| `ws://127.0.0.1:8765/ws` | Godot ↔ Python | hello 首帧；input 80/s；command 20/s；shadow 60/s；状态目标 30 Hz | 两者 | 既有 v3 消息；可选 `simulation_truth_shadow` |
-| `/health` | 监控 → Python | HTTP | 两者 | 健康探针及最新 shadow age/identity；无样本或过期为 `null` |
+| `ws://127.0.0.1:8765/ws` | Godot ↔ Python | hello 首帧；input 80/s；command 20/s；shadow 60/s；sensor batch 30/s；状态目标 30 Hz | 两者 | 既有 v3 消息；可选 shadow / `sensor_telemetry_v1` |
+| `/health` | 监控 → Python | HTTP | 两者 | 健康探针及最新 shadow/sensor age/identity；无样本或过期为 `null` |
+| `/api/telemetry` | 监控/导出 → Python | HTTP；limit 1..256 | 两者 | 有界传感器批次导出；不投影到 RRD |
 | `/api/model`、视觉模型/GLB | Godot → Python | 启动/模型准备 | 两者 | 返回已验证模型/视觉资产入口 |
 | `/api/terrain/*` | client → Python | HTTP；session + epoch/revision/token | Legacy | terrain preview/snapshot；motion-only 返回 `capability_unavailable` |
 | `/api/recording/*` | client → Python | HTTP；staging 256 MiB、token 5 min | Legacy | series/export/import validate/commit/cancel |
@@ -388,7 +397,7 @@ flowchart TB
     change[代码 / schema / asset change]
     verify[pixi run verify<br/>ruff + mypy + pytest + provenance + standalone path]
     smoke[pixi run backend-smoke<br/>临时 loopback service + health/model/WS/terrain]
-    matrix[Godot standalone matrix<br/>15 headless SceneTree suites]
+    matrix[Godot standalone matrix<br/>18 headless SceneTree suites]
     mcp_smoke[Godot MCP live smoke<br/>editor state / scene / run / UI / tree]
     release[RC evidence<br/>verify + backend-smoke + matrix + MCP]
 

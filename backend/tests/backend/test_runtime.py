@@ -284,6 +284,7 @@ def test_motion_only_profile_has_no_optional_workers(
             "commands",
             "bucket_load_feedback_v1",
             "simulation_truth_shadow_v1",
+            "sensor_telemetry_v1",
         }
     )
     runtime.start()

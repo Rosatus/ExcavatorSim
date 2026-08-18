@@ -17,6 +17,7 @@ rejects authoritative-profile truth.
 | [Logging Guidelines](./logging-guidelines.md) | Operational diagnostics and sensitive-data boundaries |
 | [Runtime Profiles](./runtime-profiles.md) | Legacy and opt-in motion-only service composition |
 | [Simulation Truth Shadow](./shadow-truth.md) | Negotiated Godot observation schema, isolation, ordering, and diagnostics |
+| [Sensor Telemetry](./sensor-telemetry.md) | Fixed-tick sensor batches, identity/order guards, freshness, and gateway isolation |
 
 Pre-development checklist:
 

@@ -20,7 +20,7 @@ const CAPABILITIES := [
 	"input_snapshot",
 	"commands",
 ]
-const OPTIONAL_CAPABILITIES := ["bucket_load_feedback_v1", "simulation_truth_shadow_v1"]
+const OPTIONAL_CAPABILITIES := ["bucket_load_feedback_v1", "simulation_truth_shadow_v1", "sensor_telemetry_v1"]
 const JOINT_NAMES := ["swing_joint", "boom_joint", "arm_joint", "bucket_joint"]
 const FRAME_NAMES := [
 	"base_link",
@@ -94,6 +94,28 @@ static func simulation_truth_shadow_message(snapshot: Dictionary) -> Dictionary:
 		"type": "simulation_truth_shadow",
 		"protocol_version": PROTOCOL_VERSION,
 		"snapshot": snapshot.duplicate(true),
+	}
+
+
+static func sensor_telemetry_batch_message(batch: Dictionary) -> Dictionary:
+	return {
+		"type": "sensor_telemetry_batch",
+		"protocol_version": PROTOCOL_VERSION,
+		"session_id": String(batch.get("session_id", "")),
+		"simulation_epoch": String(batch.get("simulation_epoch", "")),
+		"model_id": String(batch.get("model_id", "")),
+		"model_version": String(batch.get("model_version", "")),
+		"rig_id": String(batch.get("rig_id", "")),
+		"rig_version": String(batch.get("rig_version", "")),
+		"calibration_version": String(batch.get("calibration_version", "")),
+		"authority_profile": String(batch.get("authority_profile", "")),
+		"authority_epoch": String(batch.get("authority_epoch", "")),
+		"physics_tick": int(batch.get("physics_tick", 0)),
+		"monotonic_time_ns": int(batch.get("monotonic_time_ns", 0)),
+		"batch_sequence": int(batch.get("batch_sequence", 0)),
+		"source": "godot_fixed_tick",
+		"samples": (batch.get("samples", []) as Array).duplicate(true),
+		"gaps": (batch.get("gaps", []) as Array).duplicate(true),
 	}
 
 
