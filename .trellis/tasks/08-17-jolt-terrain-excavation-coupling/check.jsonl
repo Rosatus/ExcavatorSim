@@ -1,3 +1,5 @@
 {"file":".trellis/spec/frontend/index.md","reason":"Godot quality gate."}
 {"file":".trellis/spec/frontend/client-boundary.md","reason":"Terrain, bucket, collider, support, and derived-effect authority review."}
+{"file":".trellis/tasks/08-17-jolt-authoritative-simulation/prd.md","reason":"Check the approved hybrid authority and fidelity target."}
+{"file":".trellis/tasks/08-17-jolt-authoritative-simulation/design.md","reason":"Check dynamic/kinematic ownership, fixed-tick order, truth semantics, and rollback."}
 {"file":".trellis/tasks/08-17-jolt-authoritative-simulation/research/physics-rig-gaps.md","reason":"Check collider transaction and physical proxy risks."}

@@ -3,11 +3,11 @@
 The Godot client has an implemented M1–M7 Forward+ vertical slice under
 `godot/client/`. It includes the documented motion transport, SY205 visual
 presentation, Godot-first deterministic-enough world state, excavation loop,
-local tracked-chassis locomotion, and release-candidate checks. Further
-articulated physics and model work remains separate from the current Phase 1
-Jolt chassis/track slice. The client consumes Python motion authority in the
-default/shadow profiles and selects the documented single Jolt chassis writer
-only in explicit `jolt_authoritative`.
+local tracked-chassis locomotion, hybrid Jolt/kinematic excavation coupling, and
+release-candidate checks. The client consumes Python motion authority in the
+default/shadow profiles. Explicit `jolt_authoritative` selects one dynamic Jolt
+chassis writer, bounded kinematic work equipment, query-only bucket proxies,
+idempotent local soil transactions, and local hybrid truth.
 
 ## Guideline
 

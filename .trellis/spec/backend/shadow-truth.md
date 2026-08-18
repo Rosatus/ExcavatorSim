@@ -30,8 +30,11 @@ truth shape locally, but it is not a valid shadow transport profile.
 The independent `simulation-truth-v1` schema requires profile/authority epoch,
 strictly increasing sequence and physics tick, monotonic nanoseconds, canonical
 right-handed Z-up coordinates, current session/simulation/model/rig/calibration
-identity, terrain generation/revision, exactly the five named body transforms
-and four named joints, track, payload, contact, and quality data.
+identity, terrain generation/revision, body, kinematic-frame, joint, track,
+payload, contact, and quality data. The conditional profile shape is exact:
+`jolt_shadow` has the five named observational bodies and no kinematic frames;
+local `jolt_authoritative` has one `chassis` body and the four named
+`upper_structure_link`/`boom_link`/`arm_link`/`bucket_link` frames.
 
 Godot stays right-handed Y-up internally. `MotionProtocol` owns the only export
 conversion: `T_zup = inverse(C) * T_yup * C`; vectors map `(x,y,z)` to
@@ -52,7 +55,7 @@ excavation coupling, final mass properties, or production cutover.
 | Outer envelope unknown/oversized/non-finite | Existing v3 protocol error; 64 KiB maximum |
 | Unknown truth version or field/shape violation | `shadow_schema_validation_failed` |
 | Snapshot profile is not exactly `jolt_shadow` | `shadow_schema_validation_failed`; do not store it |
-| Missing/duplicate/unknown five-body or four-joint identity | `shadow_schema_validation_failed` |
+| Missing/duplicate/unknown shadow five-body, non-empty shadow kinematic frames, or four-joint identity | `shadow_schema_validation_failed` |
 | Session, simulation, model, rig, or calibration mismatch | `shadow_identity_mismatch` |
 | Authority epoch changes inside one simulation epoch | `stale_shadow_epoch` |
 | Sequence or physics tick does not strictly increase | `stale_shadow_tick` |
@@ -88,7 +91,8 @@ shadow stream so the diagnostic cannot silently splice two terrain histories.
   TTL, disconnect, stop, reset, and model-switch cleanup.
 - Explicit assertion that accepted shadow does not change Python joint/frame state.
 - Explicit assertion that an otherwise valid `jolt_authoritative` snapshot is
-  rejected before entering the latest-value slot.
+  rejected by the profile gate before its one-body/four-frame schema shape can
+  enter the latest-value slot.
 - Godot 4.7.1 Jolt API/contact/direct-state/cleanup probe and live Godot MCP smoke
   for both model identities.
 
@@ -112,6 +116,6 @@ runtime.submit_shadow_truth(session_id, sample)  # isolated diagnostic slot only
 The truth schema/version family is independent from `view_state`, while its
 transport uses one negotiated optional v3 envelope. This preserves the existing
 Python pose schema and lifecycle while allowing strict shadow validation and a
-one-capability rollback. Jolt authority may be enabled only in bounded phases
-after their single-writer and contact exit gates pass. Phase 1 has passed that
-gate for chassis/tracks only; it does not widen this transport.
+one-capability rollback. The local authoritative hybrid may evolve independently
+from the frozen shadow observer shape because the decoder gates the profile
+before schema admission. It does not widen this transport.

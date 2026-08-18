@@ -1,9 +1,9 @@
 {
   "id": "jolt-terrain-excavation-coupling",
   "name": "jolt-terrain-excavation-coupling",
-  "title": "Jolt terrain excavation coupling",
-  "description": "Couple Jolt bucket/chassis contacts to physical reaction and one conserved TerrainState/BucketSoilState excavation transaction.",
-  "status": "planning",
+  "title": "Hybrid work equipment and excavation coupling",
+  "description": "Replace the articulated Jolt product path with bounded kinematic work-equipment motion, bucket-only collision queries, capped chassis reaction, and one conserved soil transaction.",
+  "status": "in_progress",
   "dev_type": "feature",
   "scope": "frontend",
   "package": "godot",
@@ -21,12 +21,16 @@
   "children": [],
   "parent": "08-17-jolt-authoritative-simulation",
   "relatedFiles": [
+    "godot/client/scripts/jolt_chassis_track_runtime.gd",
+    "godot/client/scripts/tracked_chassis_controller.gd",
+    "godot/client/scripts/motion_presentation.gd",
+    "godot/client/scripts/simulation_truth_publisher.gd",
     "godot/client/scripts/excavation_world.gd",
     "godot/client/scripts/terrain_state.gd",
     "godot/client/scripts/bucket_soil_state.gd",
     "godot/client/scripts/terrain_commit_scheduler.gd",
     "godot/client/scripts/terrain_collider.gd"
   ],
-  "notes": "Phase 3. Depends on articulated authority; Jolt contact informs but does not own logical soil volume.",
+  "notes": "Phase 3. Retains Phase 1 dynamic chassis, supersedes Phase 2 articulated dynamics for the product path, and keeps TerrainState/BucketSoilState as logical soil authority.",
   "meta": {}
 }

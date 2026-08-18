@@ -9,6 +9,7 @@ $projectDir = (Resolve-Path (Join-Path $PSScriptRoot ".." )).Path
 $tests = @(
     "foundation_scene_test.gd",
     "jolt_capability_probe.gd",
+    "jolt_bucket_query_spike.gd",
     "jolt_chassis_track_test.gd",
     "jolt_articulated_equipment_test.gd",
     "authority_shadow_test.gd",

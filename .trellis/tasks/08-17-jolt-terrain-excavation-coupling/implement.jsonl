@@ -1,3 +1,5 @@
 {"file":".trellis/spec/frontend/client-boundary.md","reason":"TerrainState/BucketSoilState authority, collider, automatic excavation, and support rules."}
+{"file":".trellis/tasks/08-17-jolt-authoritative-simulation/design.md","reason":"Approved hybrid chassis, kinematic articulation, bucket query, snapshot, and fixed-tick ownership design."}
+{"file":".trellis/tasks/archive/2026-08/08-17-jolt-articulated-equipment/design.md","reason":"Phase 2 prototype seams to retain and five-body assumptions to replace."}
 {"file":".trellis/tasks/08-17-jolt-authoritative-simulation/research/physics-rig-gaps.md","reason":"Terrain collider replacement and bucket proxy risks."}
 {"file":".trellis/tasks/archive/2026-08/08-15-bucket-ground-lift-reaction/research/support-reaction-boundary.md","reason":"Existing raw support/contact isolation and model proxy evidence."}

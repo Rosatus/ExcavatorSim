@@ -20,6 +20,7 @@ The release-candidate matrix is:
 ```text
 foundation_scene_test.gd
 jolt_capability_probe.gd
+jolt_bucket_query_spike.gd
 jolt_chassis_track_test.gd
 jolt_articulated_equipment_test.gd
 authority_shadow_test.gd
@@ -42,6 +43,13 @@ Python service. The MCP add-on discovers only `res://tests/test_*.gd` classes
 that extend `McpTestSuite`, so these files are intentionally run by the
 PowerShell matrix instead of `test_run`; MCP remains a development-time scene
 and runtime smoke tool.
+
+`jolt_bucket_query_spike.gd` is the permanent real-Jolt query contract: it
+asserts translational cast/endpoint overlap/rest-info behavior, exact terrain
+collider ownership, initial overlap, bounded query cost, and teardown. The
+articulated/runtime tests then assert the product hybrid shape: one chassis body,
+four accepted kinematic frames, no work-equipment physics bodies, payload
+slowdown, query identity, and bounded next-tick support wrench.
 
 The standalone matrix does not replace the live service probes:
 

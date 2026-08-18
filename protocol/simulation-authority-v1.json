@@ -13,7 +13,7 @@
       "shadow_publisher": true
     },
     "jolt_authoritative": {
-      "pose_writer": "godot_jolt",
+      "pose_writer": "godot_hybrid_jolt_kinematic",
       "shadow_publisher": false
     }
   },

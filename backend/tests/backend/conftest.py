@@ -22,4 +22,3 @@ def calibration() -> MachineCalibration:
 @pytest.fixture(scope="session")
 def fixture_root() -> Path:
     return Path(__file__).resolve().parents[1] / "fixtures"
-

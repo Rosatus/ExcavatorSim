@@ -1,8 +1,8 @@
 {
   "id": "jolt-authoritative-simulation",
   "name": "jolt-authoritative-simulation",
-  "title": "Jolt authoritative simulation migration",
-  "description": "Move coupled excavator motion/contact authority to a profile-gated Godot/Jolt simulation core and make Python the external telemetry/device gateway.",
+  "title": "Hybrid Jolt authoritative simulation migration",
+  "description": "Move chassis/contact authority to profile-gated Godot/Jolt while a bounded Godot kinematic state machine owns work-equipment motion and Python remains the telemetry/device gateway.",
   "status": "planning",
   "dev_type": "architecture",
   "scope": "cross-layer",
@@ -35,6 +35,6 @@
     "backend/src/babylon_sim/runtime.py",
     "protocol/godot-pinocchio-v3.schema.json"
   ],
-  "notes": "Parent planning task. Implementation occurs only in ordered child tasks after separate approval.",
+  "notes": "Parent planning task. Product direction is dynamic Jolt chassis plus kinematic work equipment and bucket-only contact; implementation occurs only in ordered child tasks after separate approval.",
   "meta": {}
 }

@@ -7,6 +7,13 @@
 > only derived rendering/collision state. Do not read this API as a global
 > authority rule for both profiles.
 
+> **Local hybrid clarification (2026-08-17):** In opt-in
+> `jolt_authoritative`, Jolt supplies a dynamic chassis and query-only bucket /
+> terrain contact evidence. It does not become soil inventory authority.
+> `TerrainState`, `BucketSoilState`, and `TerrainCommitScheduler` still own the
+> stable/loose layers, bucket volume, and the sole accepted terrain transaction;
+> Terrain3D and the Jolt collider remain generation/revision-bound derivatives.
+
 `protocol/terrain-spec-v1.schema.json` owns deterministic Flat, Slope, Trench, and Profile inputs.
 `protocol/terrain-http-v1.schema.json` owns preview requests and metadata. The backend is the only
 generator and terrain-history authority; the browser must not regenerate a heightfield from a spec.

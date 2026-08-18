@@ -12,7 +12,7 @@ from jsonschema import Draft202012Validator
 
 from babylon_sim.calibration import MachineCalibration
 from babylon_sim.model import ExcavatorModel
-from babylon_sim.paths import PHYSICS_RIG_SCHEMA_PATH, PROJECT_ROOT
+from babylon_sim.paths import PHYSICS_RIG_SCHEMA_PATH, PROJECT_ROOT, SIMULATION_TRUTH_SCHEMA_PATH
 from babylon_sim.protocol import ProtocolError, SimulationTruthShadowMessage, decode_client_message
 from babylon_sim.runtime import RuntimeController
 from babylon_sim.shadow_state import (
@@ -60,6 +60,7 @@ def _snapshot(
             }
             for name in ("chassis", "upper", "boom", "arm", "bucket")
         ],
+        "kinematic_frames": [],
         "joints": [
             {"name": name, "position_rad": 0.0, "velocity_rad_s": 0.0, "effort_n": 0.0}
             for name in ("swing_joint", "boom_joint", "arm_joint", "bucket_joint")
@@ -103,6 +104,44 @@ def _identity(
     )
 
 
+def _authoritative_snapshot(identity: ShadowTruthIdentity) -> dict[str, Any]:
+    snapshot = _snapshot(identity)
+    snapshot["authority_profile"] = "jolt_authoritative"
+    snapshot["bodies"] = snapshot["bodies"][:1]
+    transform = snapshot["bodies"][0]["transform"]
+    snapshot["kinematic_frames"] = [
+        {"name": name, "transform": transform}
+        for name in ("upper_structure_link", "boom_link", "arm_link", "bucket_link")
+    ]
+    snapshot["payload"]["motion_load_factor"] = 1.0
+    snapshot["bucket_query"] = {
+        "valid": True,
+        "accepted_fraction": 1.0,
+        "authority_epoch": "authority-a",
+        "physics_tick": 10,
+        "motion_sequence": 1,
+        "terrain_generation": 3,
+        "terrain_revision": 2,
+        "previous_bucket_transform": transform,
+        "candidate_bucket_transform": transform,
+        "accepted_bucket_transform": transform,
+        "contacts": [],
+        "quality_flags": [],
+    }
+    snapshot["soil_interaction_batch"] = {
+        "key": "authority-a|10|3|2|1",
+        "eligible": True,
+        "duplicate": False,
+        "operation": "none",
+        "transaction_queued": False,
+        "consumed_contact_ids": [],
+        "classifications": [],
+    }
+    snapshot["queued_chassis_wrench"] = None
+    snapshot["applied_chassis_wrench"] = None
+    return snapshot
+
+
 def test_rig_descriptors_match_strict_schema() -> None:
     schema = json.loads(PHYSICS_RIG_SCHEMA_PATH.read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(schema)
@@ -142,6 +181,30 @@ def test_rig_descriptors_match_strict_schema() -> None:
         assert any(identity[field] != expected[field] for field in expected)
 
 
+def test_authoritative_truth_schema_requires_exact_hybrid_identity_sets() -> None:
+    schema = json.loads(SIMULATION_TRUTH_SCHEMA_PATH.read_text(encoding="utf-8"))
+    Draft202012Validator.check_schema(schema)
+    validator = Draft202012Validator(schema)
+    valid = _authoritative_snapshot(_identity())
+    validator.validate(valid)
+
+    wrong_body = json.loads(json.dumps(valid))
+    wrong_body["bodies"][0]["name"] = "upper"
+    assert list(validator.iter_errors(wrong_body))
+
+    duplicate_frame = json.loads(json.dumps(valid))
+    duplicate_frame["kinematic_frames"][1]["name"] = "upper_structure_link"
+    assert list(validator.iter_errors(duplicate_frame))
+
+    duplicate_joint = json.loads(json.dumps(valid))
+    duplicate_joint["joints"][1]["name"] = "swing_joint"
+    assert list(validator.iter_errors(duplicate_joint))
+
+    missing_query = json.loads(json.dumps(valid))
+    del missing_query["bucket_query"]
+    assert list(validator.iter_errors(missing_query))
+
+
 def test_shadow_decoder_is_typed_immutable_and_strictly_ordered() -> None:
     identity = _identity()
     raw = _snapshot(identity)
@@ -172,7 +235,7 @@ def test_shadow_decoder_is_typed_immutable_and_strictly_ordered() -> None:
         decode_shadow_truth(authoritative, identity)
     duplicate_body = _snapshot(identity)
     duplicate_body["bodies"][1]["name"] = "chassis"
-    with pytest.raises(ProtocolError, match="five unique named bodies"):
+    with pytest.raises(ProtocolError):
         decode_shadow_truth(duplicate_body, identity)
 
 

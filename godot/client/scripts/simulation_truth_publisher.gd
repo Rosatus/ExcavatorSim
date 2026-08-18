@@ -22,6 +22,7 @@ var _authority_epoch := ""
 var _sequence := 0
 var _last_model_id := ""
 var _last_authority_identity := ""
+var _last_runtime_authority_epoch := ""
 var _last_snapshot: SimulationTruthSnapshot
 var contract_error := ""
 
@@ -95,6 +96,22 @@ func build_snapshot() -> SimulationTruthSnapshot:
 	if authoritative and not bool(chassis.get("configured", false)):
 		contract_error = "authoritative chassis is not configured"
 		return null
+	var snapshot_authority_epoch := _authority_epoch
+	var snapshot_physics_tick := Engine.get_physics_frames()
+	if authoritative:
+		snapshot_authority_epoch = String(chassis.get("authority_epoch", ""))
+		snapshot_physics_tick = int(chassis.get("physics_tick", -1))
+		var query := chassis.get("bucket_query", {}) as Dictionary
+		if (
+			snapshot_authority_epoch.is_empty() or snapshot_physics_tick < 0
+			or String(query.get("authority_epoch", "")) != snapshot_authority_epoch
+			or int(query.get("physics_tick", -1)) != snapshot_physics_tick
+		):
+			contract_error = "authoritative bucket query identity is not aligned with the post-step snapshot"
+			return null
+		if snapshot_authority_epoch != _last_runtime_authority_epoch:
+			_last_runtime_authority_epoch = snapshot_authority_epoch
+			_sequence = 0
 	contract_error = ""
 	var raw: Dictionary = pose.get("raw", {}) if not authoritative else {}
 	var joint_positions: Array = raw.get("joint_position", [0.0, 0.0, 0.0, 0.0])
@@ -104,6 +121,7 @@ func build_snapshot() -> SimulationTruthSnapshot:
 		"arm": "arm_link", "bucket": "bucket_link",
 	}
 	var bodies: Array[Dictionary] = []
+	var kinematic_frames: Array[Dictionary] = []
 	if authoritative:
 		for body_value in chassis.get("bodies", []):
 			if not body_value is Dictionary:
@@ -115,6 +133,14 @@ func build_snapshot() -> SimulationTruthSnapshot:
 				"linear_velocity_m_s": MotionProtocol.vector_to_canonical_array(body.get("linear_velocity", Vector3.ZERO) as Vector3),
 				"angular_velocity_rad_s": MotionProtocol.vector_to_canonical_array(body.get("angular_velocity", Vector3.ZERO) as Vector3),
 				"sleeping": bool(body.get("sleeping", false)),
+			})
+		for frame_value in chassis.get("kinematic_frames", []):
+			if not frame_value is Dictionary:
+				return null
+			var frame := frame_value as Dictionary
+			kinematic_frames.append({
+				"name": String(frame.get("name", "")),
+				"transform": MotionProtocol.transform_to_canonical_rows(frame.get("transform", Transform3D.IDENTITY) as Transform3D),
 			})
 	else:
 		for body_name in body_frames:
@@ -175,8 +201,8 @@ func build_snapshot() -> SimulationTruthSnapshot:
 	for flag in _descriptor.to_dictionary().get("quality_flags", []):
 		quality_flags.append(String(flag))
 	if authoritative:
-		quality_flags.append("jolt_articulated_authority")
-		quality_flags.append("jolt_contact_manifold_unavailable")
+		quality_flags.append("jolt_chassis_kinematic_articulation_authority")
+		quality_flags.append("bucket_query_contact_evidence")
 		for flag in chassis.get("quality_flags", []):
 			if not quality_flags.has(String(flag)):
 				quality_flags.append(String(flag))
@@ -190,9 +216,9 @@ func build_snapshot() -> SimulationTruthSnapshot:
 	var result := {
 		"schema_version": "simulation-truth-v1",
 		"authority_profile": authority_profile,
-		"authority_epoch": _authority_epoch,
+		"authority_epoch": snapshot_authority_epoch,
 		"sequence": _sequence,
-		"physics_tick": int(chassis.get("physics_tick", Engine.get_physics_frames())) if authoritative else Engine.get_physics_frames(),
+		"physics_tick": snapshot_physics_tick,
 		"monotonic_time_ns": Time.get_ticks_usec() * 1000,
 		"coordinate_basis": "canonical-z-up-right-handed-meters",
 		"identity": {
@@ -209,6 +235,7 @@ func build_snapshot() -> SimulationTruthSnapshot:
 		},
 		"gravity_m_s2": [0.0, 0.0, -9.80665],
 		"bodies": bodies,
+		"kinematic_frames": kinematic_frames,
 		"joints": joints,
 		"tracks": {
 			"left_command": float(chassis.get("left_command", 0.0)),
@@ -229,12 +256,94 @@ func build_snapshot() -> SimulationTruthSnapshot:
 			"volume_m3": float(excavation.get("bucket_volume_m3", 0.0)),
 			"fill_ratio": clampf(float(excavation.get("fill_ratio", 0.0)), 0.0, 1.5),
 			"center_of_mass_m": MotionProtocol.vector_to_canonical_array(center),
+			"motion_load_factor": float(applied_payload.get("motion_load_factor", 1.0)),
 		},
 		"contacts": contacts,
 		"quality_flags": quality_flags,
 	}
+	if authoritative:
+		result["bucket_query"] = _canonical_bucket_query(chassis.get("bucket_query", {}) as Dictionary)
+		result["soil_interaction_batch"] = _canonical_soil_batch(excavation.get("soil_interaction_batch", {}) as Dictionary)
+		result["queued_chassis_wrench"] = _canonical_support_wrench(chassis.get("queued_chassis_wrench", {}) as Dictionary)
+		result["applied_chassis_wrench"] = _canonical_support_wrench(chassis.get("applied_chassis_wrench", {}) as Dictionary)
 	_sequence += 1
 	return SimulationTruthSnapshot.from_dictionary(result)
+
+
+func _canonical_bucket_query(query: Dictionary) -> Dictionary:
+	var contacts: Array[Dictionary] = []
+	for contact_value in query.get("contacts", []):
+		if contact_value is Dictionary:
+			var contact := contact_value as Dictionary
+			contacts.append({
+				"contact_id": String(contact.get("contact_id", "")),
+				"proxy_role": String(contact.get("proxy_role", "")),
+				"travel_fraction": float(contact.get("travel_fraction", 1.0)),
+				"point_m": MotionProtocol.vector_to_canonical_array(contact.get("point_world", Vector3.ZERO) as Vector3),
+				"normal": MotionProtocol.vector_to_canonical_array(contact.get("normal_world", Vector3.UP) as Vector3),
+				"initial_overlap": bool(contact.get("initial_overlap", false)),
+				"quality": String(contact.get("quality", "unknown")),
+			})
+	var previous := query.get("previous_bucket_transform", Transform3D.IDENTITY) as Transform3D
+	var candidate := query.get("candidate_bucket_transform", previous) as Transform3D
+	var accepted := query.get("accepted_bucket_transform", previous) as Transform3D
+	return {
+		"valid": bool(query.get("valid", false)),
+		"accepted_fraction": clampf(float(query.get("accepted_fraction", 1.0)), 0.0, 1.0),
+		"authority_epoch": String(query.get("authority_epoch", "")),
+		"physics_tick": int(query.get("physics_tick", -1)),
+		"motion_sequence": int(query.get("motion_sequence", 0)),
+		"terrain_generation": int(query.get("terrain_generation", 0)),
+		"terrain_revision": int(query.get("terrain_revision", 0)),
+		"previous_bucket_transform": MotionProtocol.transform_to_canonical_rows(previous),
+		"candidate_bucket_transform": MotionProtocol.transform_to_canonical_rows(candidate),
+		"accepted_bucket_transform": MotionProtocol.transform_to_canonical_rows(accepted),
+		"contacts": contacts,
+		"quality_flags": Array(query.get("quality_flags", []), TYPE_STRING, "", null),
+	}
+
+
+func _canonical_soil_batch(batch: Dictionary) -> Dictionary:
+	var classifications: Array[Dictionary] = []
+	for record_value in batch.get("classifications", []):
+		if record_value is Dictionary:
+			var record := record_value as Dictionary
+			classifications.append({
+				"contact_id": String(record.get("contact_id", "")),
+				"proxy_role": String(record.get("proxy_role", "")),
+				"classification": String(record.get("classification", "blocked")),
+				"travel_fraction": float(record.get("travel_fraction", 1.0)),
+			})
+	return {
+		"key": String(batch.get("key", "unavailable")),
+		"eligible": bool(batch.get("eligible", false)),
+		"duplicate": bool(batch.get("duplicate", false)),
+		"operation": String(batch.get("operation", "none")),
+		"transaction_queued": bool(batch.get("transaction_queued", false)),
+		"consumed_contact_ids": Array(batch.get("consumed_contact_ids", []), TYPE_STRING, "", null),
+		"classifications": classifications,
+	}
+
+
+func _canonical_support_wrench(wrench: Dictionary) -> Variant:
+	if wrench.is_empty():
+		return null
+	return {
+		"request_id": String(wrench.get("request_id", "")),
+		"source_physics_tick": int(wrench.get("source_physics_tick", 0)),
+		"eligible_apply_tick": int(wrench.get("eligible_apply_tick", 0)),
+		"expiry_tick": int(wrench.get("expiry_tick", 0)),
+		"terrain_generation": int(wrench.get("terrain_generation", 0)),
+		"terrain_revision": int(wrench.get("terrain_revision", 0)),
+		"point_m": MotionProtocol.vector_to_canonical_array(wrench.get("point_world", Vector3.ZERO) as Vector3),
+		"normal": MotionProtocol.vector_to_canonical_array(wrench.get("normal_world", Vector3.UP) as Vector3),
+		"force_n": MotionProtocol.vector_to_canonical_array(wrench.get("applied_force", wrench.get("requested_force", Vector3.ZERO)) as Vector3),
+		"torque_nm": MotionProtocol.vector_to_canonical_array(wrench.get("applied_torque", wrench.get("requested_torque", Vector3.ZERO)) as Vector3),
+		"blocked_distance_m": maxf(0.0, float(wrench.get("blocked_distance_m", 0.0))),
+		"classification": String(wrench.get("classification", "support")),
+		"support_contact_ticks": int(wrench.get("support_contact_ticks", 0)),
+		"applied_physics_tick": int(wrench.get("applied_physics_tick", -1)),
+	}
 
 
 func get_last_snapshot() -> Dictionary:
@@ -255,7 +364,8 @@ func get_status_snapshot() -> Dictionary:
 func _on_authority_changed(_session_id: String, _simulation_epoch: String, _generation: int) -> void:
 	if _motion_client != null:
 		_motion_client.clear_simulation_truth_shadow()
-	_rotate_epoch()
+	if not AuthorityProfile.writes_product_pose(authority_profile):
+		_rotate_epoch()
 
 
 func _pose_matches_authority(pose: Dictionary) -> bool:

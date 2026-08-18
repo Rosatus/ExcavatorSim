@@ -1095,3 +1095,48 @@ Implemented and verified the Phase 2 five-body, four-joint Jolt articulated equi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 30: Hybrid work equipment and excavation coupling
+
+**Date**: 2026-08-17
+**Task**: `08-17-jolt-terrain-excavation-coupling`
+**Branch**: `main`
+
+### Summary
+
+Implemented the Phase 3 hybrid authority path: one dynamic Jolt chassis,
+bounded kinematic slew/boom/arm/bucket motion, query-only bucket proxies,
+idempotent soil interaction batches, and capped later-tick chassis support
+wrenches. `TerrainState`, `BucketSoilState`, and `TerrainCommitScheduler` remain
+the logical soil and terrain authorities; `python_kinematic` remains default.
+
+### Main Changes
+
+- Added `KinematicArticulationState` and `BucketProxySweeper` with shared
+  accepted-FK/query identity for SY205 and SY135.
+- Added cutting/carry/spill/dump/support/blocked classification, one transaction
+  per interaction key, consumed contact IDs, and stale/duplicate fail-closed
+  behavior.
+- Added force, torque, rate, heave, tilt and continuous-contact caps for
+  shell/rear support; fixed doubled torque, duration re-arm, teardown safety,
+  and stable runtime naming.
+- Extended local authoritative truth/schema with one body, four kinematic
+  frames, query epoch/tick/terrain/motion identity, soil batch, payload load
+  factor, and queued/applied wrench.
+- Made model-specific bucket cell-grid replacement coherent and fill-profile
+  reads fail closed during a transient mismatch found through Godot AI MCP.
+
+### Testing
+
+- `pixi run verify`: passed, 159 backend tests.
+- `pixi run backend-smoke`: passed.
+- Godot 4.7.1 standalone matrix: 17/17 scripts passed.
+- Trellis context validation and `git diff --check`: passed.
+- Godot AI MCP: live SY205 and SY135 hybrid runtime/truth/grid identity verified;
+  default authority profile restored to `python_kinematic`.
+
+### Status
+
+[OK] **Implementation complete and quality gates passed; task remains active
+until the user requests commit/push/archive.**

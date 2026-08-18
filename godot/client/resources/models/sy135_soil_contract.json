@@ -39,6 +39,13 @@
       "up_godot": [0.0, 0.707107, 0.707107],
       "size_m": [0.94, 0.64, 0.78]
     },
+    "shell": {
+      "frame": "bucket_link",
+      "center_godot": [0.0, 0.64, -0.18],
+      "up_godot": [0.0, 0.707107, 0.707107],
+      "size_m": [0.94, 0.16, 0.64],
+      "evidence": "tuned_from_validated_bucket_local_aabb"
+    },
     "rear_support": {
       "frame": "bucket_link",
       "center_godot": [0.0, 0.66, -0.12],

@@ -2,7 +2,7 @@
 
 > 面向项目负责人、产品、现场与非技术协作者。事实截止：**2026-08-17**。
 >
-> 一句话理解：**人给出操作意图；默认由 Python 计算运动，或显式选择 Jolt 计算底盘/履带；Godot 负责本地世界与拟真画面，Python 始终保留输入安全和生命周期边界。**
+> 一句话理解：**人给出操作意图；默认由 Python 计算运动，或显式选择 Godot 混合模式，由 Jolt 计算底盘/履带、受限运动学计算工作装置；Godot 负责本地世界与拟真画面，Python 始终保留输入安全和生命周期边界。**
 
 ## 图例
 
@@ -21,9 +21,9 @@ flowchart LR
 
     subgraph host[Windows 仿真主机]
         direction LR
-        godot[Godot 交互、拟真与可选 Jolt 底盘<br/>输入、场景、地形、斗土、UI]
+        godot[Godot 交互、拟真与可选 hybrid authority<br/>Jolt 底盘 + 运动学工作装置 + 地形斗土]
         python[Python / Pinocchio<br/>默认运动计算、输入安全、生命周期]
-        scene[数字施工现场<br/>SY205 挖掘机 + 土方工地]
+        scene[数字施工现场<br/>SY205 / SY135 挖掘机 + 土方工地]
     end
 
     display[桌面显示器<br/>画面与状态反馈]
@@ -89,7 +89,7 @@ flowchart LR
   <rect x="445" y="100" width="250" height="120" rx="12" fill="#eaf2ff" stroke="#315b8a" stroke-width="3"/>
   <text x="570" y="140" text-anchor="middle" font-size="21" font-weight="700" fill="#172b4d">Godot</text>
   <text x="570" y="170" text-anchor="middle" font-size="15" fill="#315b8a">输入、场景、地形、斗土、UI</text>
-  <text x="570" y="195" text-anchor="middle" font-size="15" fill="#315b8a">交互、拟真与可选 Jolt 底盘</text>
+  <text x="570" y="195" text-anchor="middle" font-size="15" fill="#315b8a">可选 Jolt 底盘 + 运动学工作装置</text>
 
   <rect x="775" y="100" width="250" height="120" rx="12" fill="#eaf2ff" stroke="#315b8a" stroke-width="3"/>
   <text x="900" y="140" text-anchor="middle" font-size="21" font-weight="700" fill="#172b4d">Python / Pinocchio</text>
@@ -98,7 +98,7 @@ flowchart LR
 
   <rect x="550" y="290" width="370" height="95" rx="12" fill="#eaf2ff" stroke="#315b8a" stroke-width="3"/>
   <text x="735" y="330" text-anchor="middle" font-size="21" font-weight="700" fill="#172b4d">数字施工现场</text>
-  <text x="735" y="360" text-anchor="middle" font-size="16" fill="#315b8a">SY205 挖掘机 + 土方工地</text>
+  <text x="735" y="360" text-anchor="middle" font-size="16" fill="#315b8a">SY205 / SY135 挖掘机 + 土方工地</text>
 
   <rect x="1110" y="125" width="260" height="100" rx="12" fill="#eaf2ff" stroke="#315b8a" stroke-width="3"/>
   <text x="1240" y="165" text-anchor="middle" font-size="21" font-weight="700" fill="#172b4d">桌面显示器</text>
@@ -148,15 +148,16 @@ flowchart LR
 
 HTML/SVG 版中的两条 Godot/Python 箭头是默认 profile 的两个方向：Godot
 发送操作意图和生命周期命令，Python 返回权威运动状态。显式
-`jolt_authoritative` 时，Godot/Jolt 在同一进程内独占底盘/履带姿态，工作装置
-冻结；Python 不再把 pose 写入画面。
+`jolt_authoritative` 时，Godot 在同一进程内用 Jolt 独占底盘/履带姿态，用受限
+运动学独占工作装置姿态，并通过铲斗 query 驱动挖土与有界撑地反馈；Python 不再把
+pose 写入画面。
 
 ## 不依赖图片也能读懂
 
 | 问题 | 当前答案 |
 |---|---|
 | 谁操作？ | 操作人员通过键盘或通用游戏手柄输入；未来才考虑真实座舱手柄、踏板和按钮面板。 |
-| 谁计算？ | 默认由 Python/Pinocchio 计算运动；显式 Jolt profile 由 Godot 计算底盘/履带，工作装置暂时冻结。Python 始终执行输入安全与启动、暂停、复位控制。 |
+| 谁计算？ | 默认由 Python/Pinocchio 计算运动；显式 Jolt profile 由 Godot/Jolt 计算底盘/履带、由受限运动学计算工作装置。Python 始终执行输入安全与启动、暂停、复位控制。 |
 | 谁生成画面？ | Godot 按当前 profile 应用唯一权威姿态，同时维护本地施工地形、斗土表现、天空、相机和 UI。 |
 | 在哪里看到结果？ | 当前输出到 Windows 桌面显示器；未来中控/触屏仍处于未接入状态。 |
 
@@ -166,7 +167,7 @@ HTML/SVG 版中的两条 Godot/Python 箭头是默认 profile 的两个方向：
   authoritative profile 拒绝这条 pose 写入。
 - **Godot → Python：**发送输入意图以及启动、暂停、复位命令；Shadow profile
   可另发隔离诊断。Jolt authoritative truth 保留在本地，不伪装成 Python shadow 权威。
-- **Godot 本地世界：**施工地形、斗土体积和粒子效果服务于交互与拟真呈现，不改变 Python 的运动计算。
+- **Godot 本地世界：**施工地形与斗土体积由本地权威状态维护；铲斗 query 提供接触证据，粒子/土块只做表现，不改变 Python 的运动计算。
 - **Legacy：**Python 中保留的地形、记录和回放能力用于兼容与回归；回放不属于当前产品需求。
 - **未来硬件：**CAN、中控、触屏和真实座舱设备只是目标拓扑，目前没有驱动、协议或产品接入实现。
 

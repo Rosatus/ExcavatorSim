@@ -444,6 +444,7 @@ func _destroy_jolt_runtime() -> void:
 		return
 	_jolt_runtime.teardown()
 	if _jolt_runtime.is_inside_tree():
+		_jolt_runtime.name = "RetiredJoltChassisTrackRuntime"
 		_jolt_runtime.queue_free()
 	else:
 		_jolt_runtime.free()

@@ -11,17 +11,18 @@ derived work, reconnect, reset, historical seek, and Return Live as explicit
 state transitions.
 
 In `python_kinematic` and `jolt_shadow`, Godot physics is derived presentation
-and cannot write product pose. In opt-in `jolt_authoritative`, the Phase 2 Jolt
-rig is the sole five-body pose/velocity and four-joint writer. Terrain
-deformation, bucket inventory, and replay authority remain outside Jolt.
+and cannot write product pose. In opt-in `jolt_authoritative`, one Jolt chassis
+body and one bounded kinematic articulation state jointly form the sole hybrid
+pose writer. Terrain deformation, bucket inventory, and replay authority remain
+outside Jolt.
 Physics resources require an explicit adapter/lifecycle boundary and must be
 disposed on authority generation changes.
 
 Phase 0 adds an explicit `jolt_shadow` observer without changing the current
 writer. `SimulationTruthPublisher` is a root sibling observer and its shadow
-output may only enter Python's negotiated diagnostic slot. Phase 2 makes
-`jolt_authoritative` a complete articulated, opt-in mode; it produces local
-truth but must not send that truth through the shadow transport.
+output may only enter Python's negotiated diagnostic slot. The authoritative
+profile produces local hybrid truth but must not send that truth through the
+shadow transport.
 
 ## Godot-first local-world profile
 
@@ -138,13 +139,14 @@ Wrong: MotionPresentation writes base_link.global_transform and cancels chassis 
 Correct: ChassisMotionRoot owns travel; MotionPresentation composes below it
 ```
 
-## Scenario: Jolt-authoritative articulated equipment and tracks
+## Scenario: Jolt-authoritative hybrid chassis and work equipment
 
 ### 1. Scope / Trigger
 
 Use this contract only when `simulation/authority_profile` is explicitly
-`jolt_authoritative`. The default remains `python_kinematic`; this profile moves
-the chassis, slew, boom, arm, and bucket together under one Jolt runtime.
+`jolt_authoritative`. The default remains `python_kinematic`. This profile uses
+Jolt for the dynamic chassis/tracks, bounded kinematics for slew/boom/arm/bucket,
+and Jolt space queries for bucket/terrain evidence.
 
 ### 2. Signatures
 
@@ -158,6 +160,9 @@ JoltChassisTrackRuntime.reset(spawn_global_transform: Transform3D) -> void
 JoltChassisTrackRuntime.teardown() -> void
 JoltChassisTrackRuntime.get_post_step_snapshot() -> Dictionary
 JoltChassisTrackRuntime.get_status_snapshot() -> Dictionary
+KinematicArticulationState.propose_step(delta: float, chassis_transform: Transform3D) -> Dictionary
+KinematicArticulationState.accept_step(proposal: Dictionary, accepted_fraction: float) -> void
+BucketProxySweeper.sweep(space_owner: Node3D, previous_bucket: Transform3D, candidate_bucket: Transform3D, terrain_identity: Vector2i, physics_tick: int, authority_epoch: String, motion_sequence: int) -> Dictionary
 MotionPresentation.apply_physics_snapshot(snapshot: Dictionary) -> bool
 PhysicsRigDescriptor.is_valid_for(model_id: String, model_version: String) -> bool
 ```
@@ -167,33 +172,54 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
 
 ### 3. Contracts
 
-- `JoltChassisTrackRuntime` owns exactly five `RigidBody3D` nodes and four
-  `HingeJoint3D` nodes as one open chain. The controller applies the captured
-  chassis transform to `ChassisMotionRoot`; no presentation or Python frame may
-  write a physics body or the same root in this profile.
+- `JoltChassisTrackRuntime` owns exactly one dynamic chassis `RigidBody3D` and no
+  work-equipment body or `HingeJoint3D`. The controller applies its captured
+  transform to `ChassisMotionRoot`; no presentation or Python frame may write
+  that root in this profile.
 - Each model must pass its own hash-bound `physics-rig-v1` descriptor. It
-  requires explicit rigid rest transforms, parent/child anchors, unit axes,
-  finite limits, actuator torque/velocity/acceleration/jerk/damping, payload COM,
-  collision layers and an explicit self-collision mode. Current provisional box
-  proxies require `disabled_provisional`; do not silently enable overlapping
-  non-adjacent machine collisions.
+  requires explicit rest transforms, parent/child anchors, unit axes, finite
+  limits, bounded velocity/acceleration/jerk/braking, chassis compound shapes,
+  track contacts, and evidence provenance. Dynamic upper/boom/arm/bucket mass,
+  inertia, motors, hydraulics, and self-collision are not product authority.
 - The accepted four-axis command is sampled once per fixed tick. Stale command
   identity is ignored, invalid input disarms, and every rebuild requires a
-  neutral sample before effort. Godot's positive hinge-motor parameter is
-  inverted exactly once at the Jolt adapter because the descriptor, GLB and
-  truth contracts use right-handed declared-axis signs.
-- Joint target velocity is jerk/acceleration shaped, target position is
-  limit-anticipated, and damping-derived effort is clamped to `max_torque_nm`.
-  The snapshot reports target, actual position/velocity and applied effort.
+  neutral sample before movement. `KinematicArticulationState` shapes joint
+  target velocity, acceleration and jerk, anticipates limits, computes candidate
+  FK, and accepts one common motion fraction before recomputing accepted FK.
 - `BucketSoilState` remains payload authority. The controller submits mass,
-  local COM and monotonic material identity; the runtime applies them only at a
-  tick boundary and truth reports the applied, not merely requested, payload.
+  local COM and monotonic material identity; the runtime converts them at a tick
+  boundary into bounded joint motion-load multipliers. Payload never mutates a
+  bucket physics body because no such body exists.
 - Each track uses four distributed ray contact points. Longitudinal drive,
   braking, coast, lateral resistance, slip, and differential yaw torque are
   bounded before forces are applied to the body.
 - Track raycasts may hit only the project `TerrainCollider`, and forces activate
   only when its applied `(world_generation, terrain_revision)` matches the
   current `TerrainState`. The heightfield remains the logical terrain authority.
+- `BucketProxySweeper` owns no scene body. It segments previous-to-candidate
+  bucket motion, uses `cast_motion` plus endpoint overlap/rest queries, and
+  accepts hits only from the exact applied `TerrainCollider`. Cutting edge,
+  opening, cavity, shell, and rear-support proxies come from the selected model
+  soil contract; only cutting/shell/rear can block motion.
+- One query result is immutable and carries authority epoch, physics tick,
+  terrain generation/revision, bucket motion sequence, proxy version, accepted
+  fraction, contact IDs/roles and quality. Initial overlap, stale terrain,
+  non-finite data, or query failure disarms soil/support classification. Invalid
+  results still retain current identity; canonical truth is published only when
+  the query epoch/tick exactly equals the enclosing post-step snapshot.
+- `ExcavationWorld` reduces one query result to one idempotent interaction key
+  `(authority_epoch, physics_tick, terrain_generation, terrain_revision,
+  bucket_motion_sequence)`. Precedence remains `dump -> spill -> cutting ->
+  carry`; the accepted batch queues at most one existing
+  `BucketSoilState`/`TerrainCommitScheduler` transaction.
+- Valid shell/rear evidence may queue one chassis support request for
+  `source_tick + 1`. The runtime validates model/authority/terrain identity and
+  expiry, clamps force to 180 kN and torque to 320 kNm, limits per-tick changes
+  to 30 kN/60 kNm, and applies one Jolt wrench. Support also requires an
+  upward-facing normal and bucket motion into the surface, stops after 45
+  continuous ticks, and stays duration-locked until contact loss. Heave and
+  tilt-rate guards prevent sustained support from accelerating without bound.
+  Work-equipment free motion and bucket payload do not react on the chassis.
 - `TrackedChassisController` may materialize the collider only during initial
   rig activation and world reset. `TerrainCommitScheduler` remains the sole
   normal terrain-revision writer for render/collider derivatives; the Jolt
@@ -202,20 +228,28 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
 - Focus loss, reconnect/pose clear, reset, model switch, invalid rig, invalid
   terrain identity, profile exit, and tree teardown stop commands/forces and
   clear or rebuild the complete rig without a same-frame writer handoff.
-- The runtime captures one post-step snapshot. `MotionPresentation` derives GLB
-  local pivot twists from its five body transforms, and
-  `SimulationTruthPublisher` serializes those same five body/four joint values
-  directly. Neither consumer may re-read live physics nodes. SY205's passive
-  four-bar runs after physical arm/bucket pivots and remains visual-only.
-- Ray probes and `get_colliding_bodies()` do not expose a Jolt contact
-  manifold, so zero impulse/penetration fields require
-  `jolt_contact_manifold_unavailable`. `transport_publishing` must remain false.
+- In authoritative mode the Jolt runtime epoch owns local truth ordering.
+  Python `authority_changed` is observational and cannot reset that epoch or
+  sequence; a Jolt reset/model rebuild rotates the runtime epoch and restarts
+  the truth sequence at zero.
+- The runtime captures one post-step snapshot with one dynamic body, four
+  kinematic frames, four logical joints, track state, payload/load factor,
+  bucket query, and queued/applied wrench. Presentation and local truth consume
+  that snapshot and never sample live physics/query nodes independently.
+  Canonical `bucket_query` preserves authority epoch, physics tick, terrain
+  generation/revision and motion sequence in addition to previous/candidate/
+  accepted transforms. SY205's passive four-bar remains visual-only.
+- Model activation replaces bucket cell-grid dimensions and storage as one
+  coherent state change. Fill-profile consumers read a stable local snapshot
+  and return an empty profile rather than indexing mismatched transient state.
+- `transport_publishing` must remain false. The Python shadow decoder accepts
+  only the five-body `jolt_shadow` observation shape and rejects authoritative
+  hybrid truth before schema admission.
 - The legacy `BucketGroundLiftReaction` must be disabled in authoritative mode;
-  physical body/terrain reaction is the only lift path. Terrain mutation still
-  remains Phase 3 work.
+  query-derived later-tick chassis wrench is the only lift path.
 - SY205/SY135 mass, inertia and collision proxy values remain provisional tuning
-  evidence. Phase 2 validates finite articulated behavior, not production
-  hydraulic fidelity, contact calibration or cutover readiness.
+  evidence. The hybrid profile validates bounded gameplay behavior, not
+  production hydraulic fidelity, force transmission or per-grain soil.
 
 ### 4. Validation & Error Matrix
 
@@ -227,7 +261,10 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
 | Python pose arrives in authoritative mode | Reject the pose write; retain the latest Jolt snapshot |
 | Non-neutral first command after rebuild | Hold zero effort until a neutral sample arrives |
 | Stale equipment command identity | Ignore without changing current command state |
-| Invalid payload mass/COM/identity | Reject without changing the applied bucket mass properties |
+| Invalid payload mass/COM/identity | Reject without changing the applied motion-load factor |
+| Bucket query initial overlap/failure | Accept bounded recovery motion; disarm soil and support effects |
+| Duplicate interaction key | Report duplicate and queue no second soil transaction or wrench |
+| Early/late/stale support request | Drop it without applying force or changing chassis transform |
 | Track command outside `[-1,1]` | Clamp before force calculation |
 | Speed/angular limit reached | Clamp body velocity and report a quality flag |
 | Disconnect/reset/model switch/profile exit | Zero commands and teardown or rebuild the body and contact state |
@@ -235,24 +272,29 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
 
 ### 5. Good / Base / Bad Cases
 
-- Good: explicit profile -> validated model rig -> matching terrain collider ->
-  five-body/four-joint post-step snapshot -> visual pivots and local truth.
+- Good: explicit profile -> one dynamic chassis + accepted kinematic FK ->
+  identity-bound bucket query -> one interaction batch -> local hybrid truth.
 - Base: default profile -> unchanged Python pose writer and no dynamic chassis rig.
 - Bad: apply Python base transform after the Jolt step, accept a stale terrain
-  collider, or relabel authoritative truth as a shadow message.
+  collider, create dynamic work-equipment bodies, or relabel authoritative truth
+  as a shadow message.
 
 ### 6. Tests Required
 
 - Real Godot 4.7.1/Jolt tests cover both models settling, straight travel,
   braking, reversing, pivoting, bounded slope/mound traversal, speed/energy
   bounds, stale terrain rejection, model switch, and teardown.
-- Articulation tests assert five bodies/four joints, both command directions,
-  limits, target/actual/effort telemetry, neutral re-arm, stale identity,
-  payload mass/COM and zero residual bodies/joints for SY205 and SY135.
+- Articulation tests assert one body/four kinematic frames/four joints, both
+  command directions, limits, target/actual telemetry, neutral re-arm, stale
+  identity, payload slowdown and zero residual runtime nodes for both models.
+- Query/gameplay tests assert actual Jolt terrain hits, segmented motion,
+  accepted fraction, stale/initial-overlap failure, duplicate batch rejection,
+  one soil transaction, and next-tick bounded chassis wrench.
 - Controller/presentation tests assert exactly one writer, Python pose rejection,
   empty pivot diagnostics and visual-only SY205 passive linkage.
-- Truth tests assert five body/four joint/contact/track/terrain/payload fields,
-  epoch rotation, local publishing, and `transport_publishing=false`.
+- Truth tests assert one body/four kinematic frames/four joints plus
+  query/wrench/track/terrain/payload fields, epoch rotation, local publishing,
+  and `transport_publishing=false`.
 - Schema/backend tests assert descriptor strictness and reject
   `jolt_authoritative` on the negotiated shadow transport.
 - The standalone force step must remain below the 10 ms acceptance budget in
@@ -264,8 +306,11 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
 Wrong: Python view_state + Jolt body both write ChassisMotionRoot
 Correct: profile gate selects one writer; Jolt-authoritative ignores Python pose writes
 
-Wrong: presentation and truth independently sample live RigidBody3D nodes
+Wrong: presentation and truth independently sample live physics/query nodes
 Correct: both consume the runtime's single post-step snapshot
+
+Wrong: kinematic bucket RigidBody3D pushes the chassis with uncapped impulse
+Correct: query evidence queues one identity-checked, capped next-tick chassis wrench
 ```
 
 ### Terrain3D derived-backend contract

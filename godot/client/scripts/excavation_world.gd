@@ -3,6 +3,8 @@ extends Node3D
 
 signal excavation_changed(status: Dictionary)
 
+const SOIL_PROXY_ORDER := ["cutting_edge", "opening", "cavity", "shell", "rear_support"]
+
 @export var terrain_world_path := NodePath("../TerrainWorld")
 @export var terrain_collider_path := NodePath("../TerrainCollider")
 @export var motion_presentation_path := NodePath("../../MotionPresentation")
@@ -33,6 +35,9 @@ var _last_raw_support_point := Vector3.ZERO
 var _has_raw_support_point := false
 var _material_generation := 0
 var _initialized := false
+var _last_interaction_batch: Dictionary = {}
+var _consumed_batch_keys: Dictionary = {}
+var _consumed_batch_order: Array[String] = []
 
 
 func _ready() -> void:
@@ -187,6 +192,7 @@ func get_status_snapshot() -> Dictionary:
 	status["flow_volume_m3"] = _last_flow_volume_m3
 	status["bucket_pose"] = _last_pose_snapshot.duplicate(true)
 	status["support_contact"] = _last_support.duplicate(true)
+	status["soil_interaction_batch"] = _last_interaction_batch.duplicate(true)
 	status["terrain_commit"] = terrain_scheduler.get_status_snapshot() if terrain_scheduler != null else {}
 	status["collider_available"] = terrain_collider != null and terrain_collider.available
 	status["collider_enabled"] = terrain_collider != null and terrain_collider.enabled
@@ -267,50 +273,222 @@ func _process_bucket_snapshot(snapshot: Dictionary, delta: float) -> void:
 	var current: Dictionary = snapshot["current"]
 	var previous_cutting := previous["cutting_edge"] as Transform3D
 	var current_cutting := current["cutting_edge"] as Transform3D
-	var movement := current_cutting.origin - previous_cutting.origin
 	var contract: Dictionary = snapshot["contract"]
 	var interaction: Dictionary = contract.get("interaction", {})
 	_update_support_contact(snapshot, current, contract)
+	var batch := _build_interaction_batch(snapshot)
+	if not bool(batch.get("eligible", false)):
+		_last_interaction = "blocked"
+		return
 	var deposit_center: Variant = _settled_deposit_center((current["opening"] as Transform3D).origin)
 	var opening_down_dot := (snapshot["opening_normal_world"] as Vector3).dot(Vector3.DOWN)
 	var dump_threshold := float(interaction.get("dump_opening_down_dot", 0.3))
-	if deposit_center is Vector3 and soil_state.bucket_volume_m3 > BucketSoilState.EPSILON_M3 and opening_down_dot > dump_threshold:
+	var operation := String(batch.get("operation", "none"))
+	if operation == "dump" and deposit_center is Vector3:
 		var dump_rate := soil_state.bucket_capacity_m3 * lerpf(0.35, 1.4, clampf((opening_down_dot - dump_threshold) / maxf(0.01, 1.0 - dump_threshold), 0.0, 1.0))
 		var requested := minf(soil_state.bucket_volume_m3, dump_rate * delta)
-		if soil_state.queue_deposit_volume(_next_command_sequence, deposit_center as Vector3, requested):
+		if _queue_batch_deposit(batch, deposit_center as Vector3, requested, "dump"):
 			_next_command_sequence += 1
 			_last_interaction = "dump"
 			return
 	var spill_threshold := float(interaction.get("spill_opening_down_dot", dump_threshold - 0.25))
-	var fill_ratio := soil_state.bucket_volume_m3 / maxf(soil_state.nominal_capacity_m3, BucketSoilState.EPSILON_M3)
-	if deposit_center is Vector3 and soil_state.bucket_volume_m3 > BucketSoilState.EPSILON_M3 and opening_down_dot > spill_threshold and fill_ratio > 0.45:
+	if operation == "spill" and deposit_center is Vector3:
 		var exposure := clampf((opening_down_dot - spill_threshold) / maxf(0.01, dump_threshold - spill_threshold), 0.0, 1.0)
 		var spill_rate := soil_state.bucket_capacity_m3 * lerpf(0.04, 0.22, exposure)
 		var spill_volume := minf(soil_state.bucket_volume_m3, spill_rate * delta)
-		if soil_state.queue_deposit_volume(_next_command_sequence, deposit_center as Vector3, spill_volume):
+		if _queue_batch_deposit(batch, deposit_center as Vector3, spill_volume, "spill"):
 			_next_command_sequence += 1
 			_last_interaction = "spill"
 			return
-	var minimum_sweep := float(interaction.get("minimum_sweep_m", 0.004))
-	if movement.length() < minimum_sweep:
-		_last_interaction = "carry" if soil_state.bucket_volume_m3 > BucketSoilState.EPSILON_M3 else "idle"
-		return
-	var center_xz := Vector2(current_cutting.origin.x, current_cutting.origin.z)
-	if not terrain_world.terrain_state.is_inside_grid(center_xz):
-		_last_interaction = "outside_grid"
-		return
-	var surface := terrain_world.terrain_state.sample_surface_bilinear_at(center_xz)
-	var tolerance := float(interaction.get("contact_tolerance_m", BucketSoilState.CONTACT_TOLERANCE_M))
-	var in_contact := not is_nan(surface) and current_cutting.origin.y <= surface + tolerance
-	var cutting_direction := snapshot["cutting_direction_world"] as Vector3
-	var forward_cut := movement.normalized().dot(cutting_direction) > 0.12
-	var downward_cut := movement.y < -minimum_sweep * 0.35
-	if in_contact and (forward_cut or downward_cut):
-		if soil_state.queue_cut(_next_command_sequence, previous_cutting.origin, current_cutting.origin):
+	if operation == "cutting":
+		if _queue_batch_cut(batch, previous_cutting.origin, current_cutting.origin):
 			_next_command_sequence += 1
 			_last_interaction = "cut"
 			return
-	_last_interaction = "push" if in_contact else ("carry" if soil_state.bucket_volume_m3 > BucketSoilState.EPSILON_M3 else "idle")
+	_last_interaction = "carry" if operation == "carry" else ("push" if not (batch.get("classifications", []) as Array).is_empty() else "idle")
+	_last_interaction_batch["operation"] = _last_interaction
+
+
+func _build_interaction_batch(snapshot: Dictionary) -> Dictionary:
+	var chassis := _tracked_chassis_controller.get_status_snapshot() if _tracked_chassis_controller != null else {}
+	var hybrid := String(chassis.get("authority_profile", "")) == AuthorityProfile.JOLT_AUTHORITATIVE
+	var query := chassis.get("bucket_query", {}) as Dictionary
+	var physics_tick := int(query.get("physics_tick", chassis.get("physics_tick", Engine.get_physics_frames()))) if hybrid else Engine.get_physics_frames()
+	var motion_sequence := int(query.get("motion_sequence", chassis.get("bucket_motion_sequence", _next_command_sequence))) if hybrid else _next_command_sequence
+	var epoch := String(query.get("authority_epoch", chassis.get("authority_epoch", ""))) if hybrid else String(snapshot.get("identity", "local"))
+	var terrain_generation := int(query.get("terrain_generation", -1)) if hybrid else terrain_world.terrain_state.world_generation
+	var terrain_revision := int(query.get("terrain_revision", -1)) if hybrid else terrain_world.terrain_state.terrain_revision
+	var key := "%s|%d|%d|%d|%d" % [epoch, physics_tick, terrain_generation, terrain_revision, motion_sequence]
+	var identity_valid := not hybrid or (
+		bool(query.get("valid", false))
+		and epoch == String(chassis.get("authority_epoch", ""))
+		and physics_tick == int(chassis.get("physics_tick", -1))
+		and motion_sequence == int(chassis.get("bucket_motion_sequence", -1))
+		and terrain_generation == terrain_world.terrain_state.world_generation
+		and terrain_revision == terrain_world.terrain_state.terrain_revision
+	)
+	var contacts: Array[Dictionary] = []
+	for contact_value in query.get("contacts", []):
+		if contact_value is Dictionary:
+			contacts.append((contact_value as Dictionary).duplicate(true))
+	contacts.sort_custom(_contact_evidence_less)
+	var contact_roles: Array[String] = []
+	for contact in contacts:
+		contact_roles.append(String(contact.get("proxy_role", "")))
+	var classifications := _classify_interaction_records(snapshot, contacts, hybrid, identity_valid, physics_tick, motion_sequence)
+	var operation := _reduce_soil_operation(classifications)
+	var consumed_contact_ids: Array[String] = []
+	for record in classifications:
+		if String(record.get("classification", "blocked")) != "blocked":
+			consumed_contact_ids.append(String(record.get("contact_id", "")))
+	var batch := {
+		"key": key,
+		"authority_epoch": epoch,
+		"physics_tick": physics_tick,
+		"terrain_generation": terrain_generation,
+		"terrain_revision": terrain_revision,
+		"bucket_motion_sequence": motion_sequence,
+		"eligible": identity_valid,
+		"query_required": hybrid,
+		"duplicate": _consumed_batch_keys.has(key),
+		"consumed_contact_ids": consumed_contact_ids,
+		"contact_roles": contact_roles,
+		"classifications": classifications,
+		"operation": operation,
+		"query_identity_valid": identity_valid,
+		"transaction_queued": false,
+	}
+	if bool(batch["duplicate"]):
+		batch["eligible"] = false
+	_last_interaction_batch = batch.duplicate(true)
+	return batch
+
+
+func _classify_interaction_records(
+	snapshot: Dictionary,
+	contacts: Array[Dictionary],
+	query_required: bool,
+	query_identity_valid: bool,
+	physics_tick: int,
+	motion_sequence: int
+) -> Array[Dictionary]:
+	var previous := snapshot.get("previous", {}) as Dictionary
+	var current := snapshot.get("current", {}) as Dictionary
+	var contract := snapshot.get("contract", {}) as Dictionary
+	var interaction := contract.get("interaction", {}) as Dictionary
+	var classifications: Array[Dictionary] = []
+	var minimum_sweep := float(interaction.get("minimum_sweep_m", 0.004))
+	var previous_cutting := previous.get("cutting_edge", Transform3D.IDENTITY) as Transform3D
+	var current_cutting := current.get("cutting_edge", Transform3D.IDENTITY) as Transform3D
+	var cutting_movement := current_cutting.origin - previous_cutting.origin
+	var center_xz := Vector2(current_cutting.origin.x, current_cutting.origin.z)
+	var surface := terrain_world.terrain_state.sample_surface_bilinear_at(center_xz)
+	var tolerance := float(interaction.get("contact_tolerance_m", BucketSoilState.CONTACT_TOLERANCE_M))
+	var in_contact := not is_nan(surface) and current_cutting.origin.y <= surface + tolerance
+	var cutting_direction := snapshot.get("cutting_direction_world", Vector3.DOWN) as Vector3
+	var forward_cut := cutting_movement.length() >= minimum_sweep and cutting_movement.normalized().dot(cutting_direction) > 0.12
+	var downward_cut := cutting_movement.y < -minimum_sweep * 0.35
+	for contact in contacts:
+		var record := contact.duplicate(true)
+		var role := String(record.get("proxy_role", ""))
+		var classification := "blocked"
+		if not bool(record.get("initial_overlap", false)):
+			if role == "cutting_edge" and in_contact and (forward_cut or downward_cut):
+				classification = "cutting"
+			elif ["shell", "rear_support"].has(role):
+				classification = "support" if _is_support_record(snapshot, record) else "blocked"
+		record["classification"] = classification
+		classifications.append(record)
+	if not query_required and in_contact and (forward_cut or downward_cut):
+		classifications.append({
+			"contact_id": "legacy:%d:%d:cutting" % [physics_tick, motion_sequence],
+			"proxy_role": "cutting_edge",
+			"travel_fraction": 1.0,
+			"classification": "cutting",
+		})
+	var bucket_loaded := soil_state.bucket_volume_m3 > BucketSoilState.EPSILON_M3
+	if bucket_loaded and (not query_required or query_identity_valid):
+		var opening_down_dot := (snapshot.get("opening_normal_world", Vector3.UP) as Vector3).dot(Vector3.DOWN)
+		var dump_threshold := float(interaction.get("dump_opening_down_dot", 0.3))
+		var spill_threshold := float(interaction.get("spill_opening_down_dot", dump_threshold - 0.25))
+		var fill_ratio := soil_state.bucket_volume_m3 / maxf(soil_state.nominal_capacity_m3, BucketSoilState.EPSILON_M3)
+		var retained_classification := "carry"
+		if opening_down_dot > dump_threshold:
+			retained_classification = "dump"
+		elif opening_down_dot > spill_threshold and fill_ratio > 0.45:
+			retained_classification = "spill"
+		classifications.append({
+			"contact_id": "%d:%d:opening_state" % [physics_tick, motion_sequence],
+			"proxy_role": "opening",
+			"travel_fraction": 1.0,
+			"classification": retained_classification,
+			"evidence": "accepted_orientation",
+		})
+	return classifications
+
+
+func _is_support_record(snapshot: Dictionary, record: Dictionary) -> bool:
+	var role := String(record.get("proxy_role", ""))
+	var previous := snapshot.get("previous", {}) as Dictionary
+	var current := snapshot.get("current", {}) as Dictionary
+	if not previous.has(role) or not current.has(role):
+		return false
+	var normal := record.get("normal_world", Vector3.UP) as Vector3
+	if not normal.is_finite() or normal.length_squared() < 0.5 or normal.normalized().dot(Vector3.UP) < 0.2:
+		return false
+	var movement := (current[role] as Transform3D).origin - (previous[role] as Transform3D).origin
+	return -movement.dot(normal.normalized()) >= 0.001
+
+
+func _reduce_soil_operation(classifications: Array[Dictionary]) -> String:
+	for operation in ["dump", "spill", "cutting", "carry"]:
+		for record in classifications:
+			if String(record.get("classification", "")) == operation:
+				return operation
+	return "none"
+
+
+func _contact_evidence_less(first: Dictionary, second: Dictionary) -> bool:
+	var first_fraction := float(first.get("travel_fraction", 1.0))
+	var second_fraction := float(second.get("travel_fraction", 1.0))
+	if not is_equal_approx(first_fraction, second_fraction):
+		return first_fraction < second_fraction
+	var first_role := SOIL_PROXY_ORDER.find(String(first.get("proxy_role", "")))
+	var second_role := SOIL_PROXY_ORDER.find(String(second.get("proxy_role", "")))
+	if first_role != second_role:
+		return first_role < second_role
+	return String(first.get("contact_id", "")) < String(second.get("contact_id", ""))
+
+
+func _queue_batch_cut(batch: Dictionary, previous_tooth: Vector3, current_tooth: Vector3) -> bool:
+	if not bool(batch.get("eligible", false)) or _consumed_batch_keys.has(String(batch.get("key", ""))):
+		return false
+	if not soil_state.queue_cut(_next_command_sequence, previous_tooth, current_tooth):
+		return false
+	_consume_interaction_batch(batch, "cutting")
+	return true
+
+
+func _queue_batch_deposit(batch: Dictionary, center: Vector3, volume_m3: float, operation: String) -> bool:
+	if not bool(batch.get("eligible", false)) or _consumed_batch_keys.has(String(batch.get("key", ""))):
+		return false
+	if not soil_state.queue_deposit_volume(_next_command_sequence, center, volume_m3):
+		return false
+	_consume_interaction_batch(batch, operation)
+	return true
+
+
+func _consume_interaction_batch(batch: Dictionary, operation: String) -> void:
+	var key := String(batch.get("key", ""))
+	if key.is_empty() or _consumed_batch_keys.has(key):
+		return
+	_consumed_batch_keys[key] = operation
+	_consumed_batch_order.append(key)
+	while _consumed_batch_order.size() > 512:
+		_consumed_batch_keys.erase(_consumed_batch_order.pop_front())
+	_last_interaction_batch = batch.duplicate(true)
+	_last_interaction_batch["operation"] = operation
+	_last_interaction_batch["transaction_queued"] = true
 
 
 func _update_support_contact(snapshot: Dictionary, current: Dictionary, contract: Dictionary) -> void:
@@ -434,6 +612,9 @@ func _on_world_reset(generation: int) -> void:
 	_last_support = {"active": false, "penetration_m": 0.0}
 	_last_raw_support_point = Vector3.ZERO
 	_has_raw_support_point = false
+	_last_interaction_batch.clear()
+	_consumed_batch_keys.clear()
+	_consumed_batch_order.clear()
 	if _tracked_chassis_controller != null:
 		_tracked_chassis_controller.clear_bucket_support_contact()
 	_last_flow_volume_m3 = 0.0
@@ -456,6 +637,9 @@ func _clear_local_material(reason: String) -> void:
 	_last_support = {"active": false, "penetration_m": 0.0}
 	_last_raw_support_point = Vector3.ZERO
 	_has_raw_support_point = false
+	_last_interaction_batch.clear()
+	_consumed_batch_keys.clear()
+	_consumed_batch_order.clear()
 	if _tracked_chassis_controller != null:
 		_tracked_chassis_controller.clear_bucket_support_contact()
 	_last_flow_volume_m3 = 0.0

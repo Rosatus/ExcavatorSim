@@ -58,22 +58,38 @@ Crawler travel keeps four Godot-local track actions and never extends the Python
 four-axis articulation vector. In default/shadow profiles,
 `TrackedChassisController` retains the legacy local locomotion layer while
 Python provides the base/joint pose below `PresentationRoot`. In explicit
-`jolt_authoritative`, a model-specific `JoltChassisTrackRuntime` owns a five-body
-open chain and four Jolt hinges. The controller applies the captured chassis
-transform to `ChassisMotionRoot`; `MotionPresentation` rejects Python pose writes
-and consumes the same post-step body snapshot used by local truth. Reset,
+`jolt_authoritative`, a model-specific `JoltChassisTrackRuntime` owns one dynamic
+chassis body and distributed track forces. `KinematicArticulationState` owns the
+four bounded work-equipment axes and accepted FK; it creates no boom, arm,
+bucket, hinge, hydraulic, or cylinder physics bodies. The controller applies the
+captured chassis transform to `ChassisMotionRoot`; `MotionPresentation` rejects
+Python pose writes and consumes the same hybrid post-step snapshot used by local
+truth. Reset,
 reconnect, model activation, world reset, focus loss, invalid rig/terrain, or
 profile teardown stops forces and clears or rebuilds the complete dynamic rig.
 SY205 and SY135 use separate hash-bound rig and track descriptors with no
 cross-model fallback.
 
-The M5 excavation path keeps `BucketSoilState` as the one local inventory owner.
-In production, fixed-step swept bucket proxies classify contact, intake, carry,
-spill, and dump from articulated bucket motion; the visible fill and payload
-aggregates come from the same bounded cellular occupancy. The direct cut/deposit
-queue methods remain test/debug seams only. `TerrainCollider` is a copied,
-generation-gated static derivative and is disabled/fail-open when local physics
-is unavailable; its failure cannot stop motion or terrain presentation.
+The excavation path keeps `BucketSoilState` as the one local inventory owner.
+In authoritative hybrid mode, query-only cutting/opening/cavity/shell/rear
+proxies sweep previous-to-candidate bucket FK against the exact applied terrain
+collider revision. They own no scene body and cannot inject an uncapped impulse.
+The accepted result carries authority/tick/terrain/motion identity and reduces
+to one idempotent soil batch: `dump -> spill -> cutting -> carry`, at most one
+existing bucket/terrain transaction, and at most one capped next-tick chassis
+wrench from shell/rear support. Visible fill and payload aggregates come from
+the same bounded cellular occupancy. Direct cut/deposit queues remain test/debug
+seams only.
+
+The canonical authoritative truth keeps that bucket-query identity structured
+as `authority_epoch`, `physics_tick`, terrain generation/revision, and motion
+sequence alongside previous/candidate/accepted transforms. Support is limited
+to upward shell/rear contact while the bucket moves into the surface, with
+180 kN/320 kNm absolute caps, 30 kN/60 kNm per-tick rate caps, a 45-tick
+continuous-contact limit, and heave/tilt-rate guards. The duration lock is
+released only after contact loss. SY205/SY135 activation atomically replaces
+the bucket cell grid; a transient read mismatch fails closed instead of exposing
+partial fill data.
 
 The optional `bucket_load_feedback_v1` path is default-disabled. When enabled,
 Godot preflights and negotiates it with Python, then sends bounded latest-value
@@ -86,16 +102,18 @@ The project setting `simulation/authority_profile` defaults to
 `python_kinematic`. Phase 0 also implements opt-in `jolt_shadow`: Python remains
 the only product pose writer, while the root-level `SimulationTruthPublisher`
 reads post-physics state and queues a negotiated `simulation_truth_shadow_v1`
-observation at no more than 30 Hz. Phase 2 implements opt-in
-`jolt_authoritative` for chassis, tracks and work equipment. It creates local
-`simulation-truth-v1` diagnostics from one five-body/four-joint post-step
-snapshot and track/equipment contacts, but
+observation at no more than 30 Hz. The opt-in `jolt_authoritative` profile uses
+a dynamic chassis plus kinematic work equipment. It creates local
+`simulation-truth-v1` diagnostics from one chassis body, four kinematic frames,
+four logical joints, bucket query/support wrench and track/payload state, but
 does not queue shadow traffic; Python explicitly rejects authoritative-profile
 snapshots at the shadow boundary.
 
 The independent `simulation-truth-v1` payload carries authority epoch, physics
-tick, monotonic time, session/model/rig/calibration and terrain identity, five
-body transforms, joint/track/payload/contact fields, and quality flags. Godot
+tick, monotonic time, session/model/rig/calibration and terrain identity, body,
+kinematic-frame, joint/track/payload/contact fields, and quality flags. Its
+schema requires five bodies/zero kinematic frames for `jolt_shadow`, and one
+chassis/four named kinematic frames for local `jolt_authoritative`. Godot
 converts complete transforms and vectors from internal right-handed Y-up to
 canonical right-handed Z-up once in `MotionProtocol`. Python validates schema,
 identity, ordering, right-handed rigidity, size, and rate before storing only the
@@ -105,9 +123,10 @@ or model switch; `/health` is its only Phase 0 consumer.
 Both model rig descriptors are validated, versioned, and hash-bound, but their
 physical properties remain provisional. Shadow mode marks unavailable body
 velocity/contact fields through quality flags rather than inventing values;
-authoritative mode reports actual articulated transforms, joint targets,
-positions, velocities and bounded efforts, applied payload identity/COM,
-distributed track contact, slip, saturation, and terrain identity. No shadow
+authoritative mode reports the chassis body, accepted kinematic FK, joint
+targets/positions/velocities, payload load factor, bucket query, queued/applied
+support wrench, distributed track contact, slip, saturation, and terrain
+identity. No shadow
 path calls product transform, terrain, bucket, or lifecycle setters.
 
 The realistic visual pass uses Sky3D 2.1 behind the project-owned
@@ -191,11 +210,14 @@ When enabled, Terrain3D may generate static collision shapes. In default and
 shadow profiles, Jolt only queries/solves against derived shapes and does not
 own excavator motion. In `jolt_authoritative`, the project `TerrainCollider`
 with matching generation/revision supports the dynamic chassis, while
-`TerrainState` remains the deformation authority. Jolt never owns bucket
-inventory, replay, or Python state. The terrain data flow remains one-way:
+`TerrainState` remains the deformation authority. Bucket query contacts provide
+evidence but do not directly edit terrain; `TerrainCommitScheduler` remains the
+sole revision writer. Jolt never owns bucket inventory, replay, or Python state.
+The terrain data flow remains one-way:
 
 ```text
-fixed-step command -> TerrainState/BucketSoilState -> snapshot -> Terrain3D -> Jolt query
+fixed-step command -> bucket query -> BucketSoilState/TerrainState transaction
+                   -> copied snapshot -> Terrain3D/TerrainCollider -> later query
 ```
 
 Tracked support follows the same one-way rule. The bilinear `TerrainState`
@@ -209,9 +231,9 @@ The first soil presentation is not a per-grain rigid-body simulation. It combine
 
 ## Deferred model decisions
 
-The GLBs remain visual assets. Phase 2 adds explicit rest/anchor contracts,
-five provisional body proxies, four bounded hinges, jerk/acceleration-shaped
-motors, and tick-boundary bucket payload mass/COM coupling. Validated production
-collision geometry and mass properties, hydraulic force curves, material
-contact calibration, bucket cavity dynamics, and terrain-mutation coupling
-remain deferred to later Jolt authority phases.
+The GLBs remain visual assets. The authoritative hybrid uses explicit
+rest/anchor contracts, one provisional chassis compound, four bounded
+kinematic axes, query-only bucket proxies, and tick-boundary payload slowdown.
+Validated production chassis collision/mass properties, hydraulic force curves,
+material contact calibration, volumetric continuum soil, and per-grain dynamics
+remain deferred.

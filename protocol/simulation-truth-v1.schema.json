@@ -4,7 +4,7 @@
   "title": "Godot Simulation Truth Snapshot v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "authority_profile", "authority_epoch", "sequence", "physics_tick", "monotonic_time_ns", "coordinate_basis", "identity", "gravity_m_s2", "bodies", "joints", "tracks", "payload", "contacts", "quality_flags"],
+  "required": ["schema_version", "authority_profile", "authority_epoch", "sequence", "physics_tick", "monotonic_time_ns", "coordinate_basis", "identity", "gravity_m_s2", "bodies", "kinematic_frames", "joints", "tracks", "payload", "contacts", "quality_flags"],
   "properties": {
     "schema_version": {"const": "simulation-truth-v1"},
     "authority_profile": {"enum": ["jolt_shadow", "jolt_authoritative"]},
@@ -15,13 +15,71 @@
     "coordinate_basis": {"const": "canonical-z-up-right-handed-meters"},
     "identity": {"$ref": "#/$defs/identity"},
     "gravity_m_s2": {"$ref": "#/$defs/vec3"},
-    "bodies": {"type": "array", "minItems": 5, "maxItems": 5, "items": {"$ref": "#/$defs/body"}},
+    "bodies": {"type": "array", "minItems": 1, "maxItems": 5, "items": {"$ref": "#/$defs/body"}},
+    "kinematic_frames": {"type": "array", "maxItems": 4, "items": {"$ref": "#/$defs/kinematic_frame"}},
     "joints": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"$ref": "#/$defs/joint"}},
     "tracks": {"$ref": "#/$defs/tracks"},
     "payload": {"$ref": "#/$defs/payload"},
     "contacts": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/contact"}},
-    "quality_flags": {"type": "array", "maxItems": 32, "items": {"type": "string", "minLength": 1, "maxLength": 96}, "uniqueItems": true}
+    "quality_flags": {"type": "array", "maxItems": 32, "items": {"type": "string", "minLength": 1, "maxLength": 96}, "uniqueItems": true},
+    "bucket_query": {"$ref": "#/$defs/bucket_query"},
+    "soil_interaction_batch": {"$ref": "#/$defs/soil_interaction_batch"},
+    "queued_chassis_wrench": {"$ref": "#/$defs/nullable_support_wrench"},
+    "applied_chassis_wrench": {"$ref": "#/$defs/nullable_support_wrench"}
   },
+  "allOf": [
+    {
+      "if": {"properties": {"authority_profile": {"const": "jolt_shadow"}}},
+      "then": {
+        "properties": {
+          "bodies": {
+            "minItems": 5,
+            "maxItems": 5,
+            "allOf": [
+              {"$ref": "#/$defs/contains_chassis_body"},
+              {"$ref": "#/$defs/contains_upper_body"},
+              {"$ref": "#/$defs/contains_boom_body"},
+              {"$ref": "#/$defs/contains_arm_body"},
+              {"$ref": "#/$defs/contains_bucket_body"}
+            ]
+          },
+          "kinematic_frames": {"maxItems": 0}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"authority_profile": {"const": "jolt_authoritative"}}},
+      "then": {
+        "required": ["bucket_query", "soil_interaction_batch", "queued_chassis_wrench", "applied_chassis_wrench"],
+        "properties": {
+          "bodies": {
+            "minItems": 1,
+            "maxItems": 1,
+            "items": {"$ref": "#/$defs/chassis_body"}
+          },
+          "kinematic_frames": {
+            "minItems": 4,
+            "maxItems": 4,
+            "allOf": [
+              {"$ref": "#/$defs/contains_upper_structure_frame"},
+              {"$ref": "#/$defs/contains_boom_frame"},
+              {"$ref": "#/$defs/contains_arm_frame"},
+              {"$ref": "#/$defs/contains_bucket_frame"}
+            ]
+          },
+          "joints": {
+            "allOf": [
+              {"$ref": "#/$defs/contains_swing_joint"},
+              {"$ref": "#/$defs/contains_boom_joint"},
+              {"$ref": "#/$defs/contains_arm_joint"},
+              {"$ref": "#/$defs/contains_bucket_joint"}
+            ]
+          },
+          "payload": {"required": ["mass_kg", "volume_m3", "fill_ratio", "center_of_mass_m", "motion_load_factor"]}
+        }
+      }
+    }
+  ],
   "$defs": {
     "vec3": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}},
     "matrix4": {
@@ -55,6 +113,29 @@
         "sleeping": {"type": "boolean"}
       }
     },
+    "chassis_body": {
+      "allOf": [
+        {"$ref": "#/$defs/body"},
+        {"type": "object", "properties": {"name": {"const": "chassis"}}}
+      ]
+    },
+    "contains_chassis_body": {"contains": {"type": "object", "properties": {"name": {"const": "chassis"}}, "required": ["name"]}, "minContains": 1, "maxContains": 1},
+    "contains_upper_body": {"contains": {"type": "object", "properties": {"name": {"const": "upper"}}, "required": ["name"]}, "minContains": 1, "maxContains": 1},
+    "contains_boom_body": {"contains": {"type": "object", "properties": {"name": {"const": "boom"}}, "required": ["name"]}, "minContains": 1, "maxContains": 1},
+    "contains_arm_body": {"contains": {"type": "object", "properties": {"name": {"const": "arm"}}, "required": ["name"]}, "minContains": 1, "maxContains": 1},
+    "contains_bucket_body": {"contains": {"type": "object", "properties": {"name": {"const": "bucket"}}, "required": ["name"]}, "minContains": 1, "maxContains": 1},
+    "kinematic_frame": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "transform"],
+      "properties": {
+        "name": {"enum": ["upper_structure_link", "boom_link", "arm_link", "bucket_link"]},
+        "transform": {"$ref": "#/$defs/matrix4"}
+      }
+    },
+    "contains_upper_structure_frame": {"contains": {"type": "object", "properties": {"name": {"const": "upper_structure_link"}}, "required": ["name"]}, "minContains": 1, "maxContains": 1},
+    "contains_boom_frame": {"contains": {"type": "object", "properties": {"name": {"const": "boom_link"}}, "required": ["name"]}, "minContains": 1, "maxContains": 1},
+    "contains_arm_frame": {"contains": {"type": "object", "properties": {"name": {"const": "arm_link"}}, "required": ["name"]}, "minContains": 1, "maxContains": 1},
+    "contains_bucket_frame": {"contains": {"type": "object", "properties": {"name": {"const": "bucket_link"}}, "required": ["name"]}, "minContains": 1, "maxContains": 1},
     "joint": {
       "type": "object", "additionalProperties": false,
       "required": ["name", "position_rad", "velocity_rad_s", "effort_n"],
@@ -67,6 +148,10 @@
         "effort_n": {"type": "number"}
       }
     },
+    "contains_swing_joint": {"contains": {"type": "object", "properties": {"name": {"const": "swing_joint"}}, "required": ["name"]}, "minContains": 1, "maxContains": 1},
+    "contains_boom_joint": {"contains": {"type": "object", "properties": {"name": {"const": "boom_joint"}}, "required": ["name"]}, "minContains": 1, "maxContains": 1},
+    "contains_arm_joint": {"contains": {"type": "object", "properties": {"name": {"const": "arm_joint"}}, "required": ["name"]}, "minContains": 1, "maxContains": 1},
+    "contains_bucket_joint": {"contains": {"type": "object", "properties": {"name": {"const": "bucket_joint"}}, "required": ["name"]}, "minContains": 1, "maxContains": 1},
     "tracks": {
       "type": "object", "additionalProperties": false,
       "required": ["left_command", "right_command", "left_speed_m_s", "right_speed_m_s", "grounded", "left_contact_count", "right_contact_count", "left_slip_ratio", "right_slip_ratio", "left_saturated", "right_saturated", "terrain_identity_valid"],
@@ -92,9 +177,85 @@
         "mass_kg": {"type": "number", "minimum": 0},
         "volume_m3": {"type": "number", "minimum": 0},
         "fill_ratio": {"type": "number", "minimum": 0, "maximum": 1.5},
-        "center_of_mass_m": {"$ref": "#/$defs/vec3"}
+        "center_of_mass_m": {"$ref": "#/$defs/vec3"},
+        "motion_load_factor": {"type": "number", "minimum": 0.55, "maximum": 1}
       }
     },
+    "bucket_query_contact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contact_id", "proxy_role", "travel_fraction", "point_m", "normal", "initial_overlap", "quality"],
+      "properties": {
+        "contact_id": {"type": "string", "minLength": 1},
+        "proxy_role": {"enum": ["cutting_edge", "opening", "cavity", "shell", "rear_support"]},
+        "travel_fraction": {"type": "number", "minimum": 0, "maximum": 1},
+        "point_m": {"$ref": "#/$defs/vec3"},
+        "normal": {"$ref": "#/$defs/vec3"},
+        "initial_overlap": {"type": "boolean"},
+        "quality": {"type": "string", "minLength": 1}
+      }
+    },
+    "bucket_query": {
+      "type": "object", "additionalProperties": false,
+      "required": ["valid", "accepted_fraction", "authority_epoch", "physics_tick", "motion_sequence", "terrain_generation", "terrain_revision", "previous_bucket_transform", "candidate_bucket_transform", "accepted_bucket_transform", "contacts", "quality_flags"],
+      "properties": {
+        "valid": {"type": "boolean"},
+        "accepted_fraction": {"type": "number", "minimum": 0, "maximum": 1},
+        "authority_epoch": {"type": "string", "minLength": 1, "maxLength": 128},
+        "physics_tick": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        "motion_sequence": {"type": "integer", "minimum": 0},
+        "terrain_generation": {"type": "integer", "minimum": 0},
+        "terrain_revision": {"type": "integer", "minimum": 0},
+        "previous_bucket_transform": {"$ref": "#/$defs/matrix4"},
+        "candidate_bucket_transform": {"$ref": "#/$defs/matrix4"},
+        "accepted_bucket_transform": {"$ref": "#/$defs/matrix4"},
+        "contacts": {"type": "array", "maxItems": 16, "items": {"$ref": "#/$defs/bucket_query_contact"}},
+        "quality_flags": {"type": "array", "maxItems": 16, "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+      }
+    },
+    "interaction_classification": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contact_id", "proxy_role", "classification", "travel_fraction"],
+      "properties": {
+        "contact_id": {"type": "string", "minLength": 1},
+        "proxy_role": {"enum": ["cutting_edge", "opening", "cavity", "shell", "rear_support"]},
+        "classification": {"enum": ["cutting", "carry", "spill", "dump", "support", "blocked"]},
+        "travel_fraction": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "soil_interaction_batch": {
+      "type": "object", "additionalProperties": false,
+      "required": ["key", "eligible", "duplicate", "operation", "transaction_queued", "consumed_contact_ids", "classifications"],
+      "properties": {
+        "key": {"type": "string", "minLength": 1},
+        "eligible": {"type": "boolean"},
+        "duplicate": {"type": "boolean"},
+        "operation": {"enum": ["none", "cutting", "carry", "spill", "dump", "push", "idle"]},
+        "transaction_queued": {"type": "boolean"},
+        "consumed_contact_ids": {"type": "array", "maxItems": 16, "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "classifications": {"type": "array", "maxItems": 16, "items": {"$ref": "#/$defs/interaction_classification"}}
+      }
+    },
+    "support_wrench": {
+      "type": "object", "additionalProperties": false,
+      "required": ["request_id", "source_physics_tick", "eligible_apply_tick", "expiry_tick", "terrain_generation", "terrain_revision", "point_m", "normal", "force_n", "torque_nm", "blocked_distance_m", "classification", "support_contact_ticks", "applied_physics_tick"],
+      "properties": {
+        "request_id": {"type": "string", "minLength": 1},
+        "source_physics_tick": {"type": "integer", "minimum": 0},
+        "eligible_apply_tick": {"type": "integer", "minimum": 0},
+        "expiry_tick": {"type": "integer", "minimum": 0},
+        "terrain_generation": {"type": "integer", "minimum": 0},
+        "terrain_revision": {"type": "integer", "minimum": 0},
+        "point_m": {"$ref": "#/$defs/vec3"},
+        "normal": {"$ref": "#/$defs/vec3"},
+        "force_n": {"$ref": "#/$defs/vec3"},
+        "torque_nm": {"$ref": "#/$defs/vec3"},
+        "blocked_distance_m": {"type": "number", "minimum": 0},
+        "classification": {"const": "support"},
+        "support_contact_ticks": {"type": "integer", "minimum": 1, "maximum": 45},
+        "applied_physics_tick": {"type": "integer", "minimum": -1}
+      }
+    },
+    "nullable_support_wrench": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/support_wrench"}]},
     "contact": {
       "type": "object", "additionalProperties": false,
       "required": ["body", "other", "point_m", "normal", "impulse_n_s", "penetration_m"],

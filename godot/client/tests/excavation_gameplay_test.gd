@@ -5,6 +5,24 @@ const SY205_SOIL_CONTRACT := "res://resources/models/sy205_soil_contract.json"
 const SY135_SOIL_CONTRACT := "res://resources/models/sy135_soil_contract.json"
 
 
+class HybridStatusController:
+	extends TrackedChassisController
+
+	var test_status: Dictionary = {}
+
+	func get_status_snapshot() -> Dictionary:
+		return test_status.duplicate(true)
+
+	func raw_world_transform(world_transform: Transform3D) -> Transform3D:
+		return world_transform
+
+	func submit_bucket_support_contact(_contact: Dictionary) -> void:
+		pass
+
+	func clear_bucket_support_contact() -> void:
+		pass
+
+
 func _init() -> void:
 	call_deferred("_run")
 
@@ -14,11 +32,15 @@ func _run() -> void:
 	if result == 0:
 		result = _test_rejections_and_capacity()
 	if result == 0:
+		result = _test_model_contract_grid_switching()
+	if result == 0:
 		result = _test_scheduler_cadence_and_generation()
 	if result == 0:
 		result = await _test_scene_nodes_and_production_controls()
 	if result == 0:
 		result = await _test_automatic_motion_for_both_models()
+	if result == 0:
+		result = await _test_hybrid_query_batch_identity()
 	if result == 0:
 		print("Automatic excavation gameplay contracts passed.")
 	quit(result)
@@ -103,6 +125,29 @@ func _test_rejections_and_capacity() -> int:
 	return 0
 
 
+func _test_model_contract_grid_switching() -> int:
+	var state := BucketSoilState.new(TerrainState.new(91), _read_json(SY205_SOIL_CONTRACT))
+	for contract_path in [SY135_SOIL_CONTRACT, SY205_SOIL_CONTRACT, SY135_SOIL_CONTRACT]:
+		var contract := _read_json(contract_path)
+		if not state.configure_contract(contract):
+			return _fail("model switch accepts bucket soil contract: %s" % contract_path)
+		var status := state.get_status_snapshot()
+		var grid := status.get("cell_grid", []) as Array
+		if (
+			grid.size() != 3
+			or int(status.get("cell_count", -1)) != int(grid[0]) * int(grid[1]) * int(grid[2])
+			or (status.get("fill_profile", PackedFloat32Array()) as PackedFloat32Array).size() != int(grid[0]) * int(grid[2])
+		):
+			return _fail("model switch replaces bucket cell grid atomically: %s" % contract_path)
+	state._grid_dimensions = Vector3i(8, 5, 6)
+	state._cell_fill.resize(175)
+	if not (state.get_status_snapshot().get("fill_profile", PackedFloat32Array()) as PackedFloat32Array).is_empty():
+		return _fail("transient bucket cell-grid mismatch fails closed")
+	if not state.configure_contract(_read_json(SY135_SOIL_CONTRACT)):
+		return _fail("bucket cell grid recovers after a transient mismatch")
+	return 0
+
+
 func _test_scheduler_cadence_and_generation() -> int:
 	var terrain := TerrainState.new(123)
 	var scheduler := TerrainCommitScheduler.new(terrain)
@@ -182,6 +227,17 @@ func _test_automatic_motion_for_both_models() -> int:
 		):
 			scene.queue_free()
 			return _fail("bucket motion alone cuts and retains soil for %s" % contract.get("model_id", ""))
+		var batch := cut.get("soil_interaction_batch", {}) as Dictionary
+		if (
+			String(batch.get("key", "")).is_empty()
+			or String(batch.get("operation", "")) != "cutting"
+			or not bool(batch.get("transaction_queued", false))
+		):
+			scene.queue_free()
+			return _fail("cut did not publish one accepted soil interaction batch")
+		if excavation._queue_batch_cut(batch, previous_cut, current_cut):
+			scene.queue_free()
+			return _fail("duplicate soil interaction batch queued a second transaction")
 		var carry := excavation.step_automatic_snapshot_for_test(_soil_snapshot(contract, current_cut, current_cut, Vector3.UP))
 		if (
 			carry.get("interaction_state", "") != "carry"
@@ -244,6 +300,113 @@ func _test_automatic_motion_for_both_models() -> int:
 				scene.queue_free()
 				return _fail("sustained automatic interaction remains bounded for %s" % contract.get("model_id", ""))
 	scene.queue_free()
+	await process_frame
+	return 0
+
+
+func _test_hybrid_query_batch_identity() -> int:
+	var packed := load(MAIN_SCENE) as PackedScene
+	var scene := packed.instantiate()
+	root.add_child(scene)
+	await process_frame
+	await process_frame
+	var excavation := scene.get_node("TerrainRoot/ExcavationWorld") as ExcavationWorld
+	var contract := _read_json(SY205_SOIL_CONTRACT)
+	excavation.terrain_scheduler.reset_world()
+	excavation.soil_state.configure_contract(contract)
+	var fake := HybridStatusController.new()
+	excavation._tracked_chassis_controller = fake
+	var direction := _vector3((contract["proxies"] as Dictionary)["cutting_edge"].get("direction_godot", []))
+	var current_cut := Vector3(0.0, -0.02, 0.0)
+	var previous_cut := current_cut - direction * 0.12
+	var generation := excavation.terrain_world.terrain_state.world_generation
+	var revision := excavation.terrain_world.terrain_state.terrain_revision
+	var query := {
+		"valid": true,
+		"authority_epoch": "hybrid-test",
+		"physics_tick": 40,
+		"motion_sequence": 7,
+		"terrain_generation": generation,
+		"terrain_revision": revision,
+		"contacts": [{
+			"contact_id": "40:7:cutting_edge:0",
+			"proxy_role": "cutting_edge",
+			"travel_fraction": 0.5,
+			"point_world": current_cut,
+			"normal_world": Vector3.UP,
+			"initial_overlap": false,
+		}],
+	}
+	fake.test_status = {
+		"authority_profile": AuthorityProfile.JOLT_AUTHORITATIVE,
+		"authority_epoch": "hybrid-test",
+		"physics_tick": 40,
+		"bucket_motion_sequence": 7,
+		"bucket_query": query,
+	}
+	var cut := excavation.step_automatic_snapshot_for_test(_soil_snapshot(contract, previous_cut, current_cut, Vector3.UP))
+	var batch := cut.get("soil_interaction_batch", {}) as Dictionary
+	if (
+		cut.get("interaction_state", "") != "cut"
+		or not bool(batch.get("query_identity_valid", false))
+		or batch.get("operation", "") != "cutting"
+		or not bool(batch.get("transaction_queued", false))
+		or not String(batch.get("key", "")).begins_with("hybrid-test|40|")
+	):
+		scene.queue_free()
+		return _fail("hybrid query identity did not reduce to one cutting transaction")
+	var volume_after_cut := excavation.soil_state.bucket_volume_m3
+	var duplicate := excavation.step_automatic_snapshot_for_test(_soil_snapshot(contract, previous_cut, current_cut, Vector3.UP))
+	var duplicate_batch := duplicate.get("soil_interaction_batch", {}) as Dictionary
+	if not bool(duplicate_batch.get("duplicate", false)) or not is_equal_approx(excavation.soil_state.bucket_volume_m3, volume_after_cut):
+		scene.queue_free()
+		return _fail("hybrid duplicate query key changed soil a second time")
+
+	excavation.terrain_scheduler.reset_world()
+	excavation.soil_state.configure_contract(contract)
+	generation = excavation.terrain_world.terrain_state.world_generation
+	revision = excavation.terrain_world.terrain_state.terrain_revision
+	query = {
+		"valid": true,
+		"authority_epoch": "hybrid-test-2",
+		"physics_tick": 41,
+		"motion_sequence": 8,
+		"terrain_generation": generation,
+		"terrain_revision": revision,
+		"contacts": [{
+			"contact_id": "41:8:shell:0",
+			"proxy_role": "shell",
+			"travel_fraction": 0.4,
+			"point_world": current_cut,
+			"normal_world": Vector3.RIGHT,
+			"initial_overlap": false,
+		}],
+	}
+	fake.test_status = {
+		"authority_profile": AuthorityProfile.JOLT_AUTHORITATIVE,
+		"authority_epoch": "hybrid-test-2",
+		"physics_tick": 41,
+		"bucket_motion_sequence": 8,
+		"bucket_query": query,
+	}
+	var shell_only := excavation.step_automatic_snapshot_for_test(_soil_snapshot(contract, previous_cut, current_cut, Vector3.UP))
+	var shell_batch := shell_only.get("soil_interaction_batch", {}) as Dictionary
+	if bool(shell_batch.get("transaction_queued", false)) or float(shell_only.get("bucket_volume_m3", 0.0)) > BucketSoilState.EPSILON_M3:
+		scene.queue_free()
+		return _fail("shell-only query evidence was misclassified as a soil transaction")
+
+	query["physics_tick"] = 42
+	query["motion_sequence"] = 9
+	query["terrain_revision"] = revision + 1
+	fake.test_status["physics_tick"] = 42
+	fake.test_status["bucket_motion_sequence"] = 9
+	fake.test_status["bucket_query"] = query
+	var stale := excavation.step_automatic_snapshot_for_test(_soil_snapshot(contract, previous_cut, current_cut, Vector3.UP))
+	if bool((stale.get("soil_interaction_batch", {}) as Dictionary).get("eligible", true)):
+		scene.queue_free()
+		return _fail("stale hybrid query terrain identity remained eligible")
+	scene.queue_free()
+	fake.free()
 	await process_frame
 	return 0
 

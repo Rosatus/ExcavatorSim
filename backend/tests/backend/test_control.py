@@ -27,4 +27,3 @@ def test_disconnected_command_is_zero_and_correlated() -> None:
     assert command.connected is False
     assert command.input_client_sequence == 9
     assert "input_disconnected" in command.diagnostics
-

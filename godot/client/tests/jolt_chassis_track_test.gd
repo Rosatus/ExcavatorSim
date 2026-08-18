@@ -95,6 +95,7 @@ func _test_model(model_id: String) -> void:
 		failures.append("%s exceeded the configured speed bound" % model_id)
 	if int(driven["peak_step_usec"]) > 10000:
 		failures.append("%s track force step exceeded 10 ms: %s" % [model_id, driven["peak_step_usec"]])
+	print("jolt_chassis_track_test: %s peak fixed step=%d usec" % [model_id, int(driven["peak_step_usec"])])
 	var speed_before_brake := (driven["linear_velocity"] as Vector3).length()
 	runtime.set_commands(0.0, 0.0)
 	for _frame in 120:
@@ -303,17 +304,38 @@ func _test_controller_authority_lifecycle() -> void:
 			failures.append("authoritative truth omitted track telemetry")
 		if truth.get("identity", {}).get("rig_version") != "sy135-jolt-rig-v3":
 			failures.append("authoritative truth retained stale rig identity")
-		if not (truth.get("quality_flags", []) as Array).has("jolt_articulated_authority"):
-			failures.append("authoritative truth did not declare articulated authority")
+		if not (truth.get("quality_flags", []) as Array).has("jolt_chassis_kinematic_articulation_authority"):
+			failures.append("authoritative truth did not declare hybrid authority")
 		if (truth.get("quality_flags", []) as Array).has("work_equipment_frozen_phase1"):
 			failures.append("authoritative truth retained the Phase 1 frozen-equipment flag")
-		if (truth.get("bodies", []) as Array).size() != 5 or (truth.get("joints", []) as Array).size() != 4:
-			failures.append("authoritative truth omitted articulated body or joint state")
+		if (
+			(truth.get("bodies", []) as Array).size() != 1
+			or (truth.get("kinematic_frames", []) as Array).size() != 4
+			or (truth.get("joints", []) as Array).size() != 4
+		):
+			failures.append("authoritative truth omitted hybrid body, frame, or joint state")
 		for joint_value in truth.get("joints", []):
 			if not (joint_value as Dictionary).has_all(["target_position_rad", "target_velocity_rad_s", "position_rad", "velocity_rad_s", "effort_n"]):
 				failures.append("authoritative truth omitted target/actual/effort joint telemetry")
-		if not (truth.get("quality_flags", []) as Array).has("jolt_contact_manifold_unavailable"):
-			failures.append("authoritative ray contacts did not declare unavailable manifold values")
+		if not (truth.get("quality_flags", []) as Array).has("bucket_query_contact_evidence"):
+			failures.append("authoritative truth did not identify query-only bucket contacts")
+		var truth_query := truth.get("bucket_query", {}) as Dictionary
+		if not truth_query.has_all([
+			"accepted_fraction", "previous_bucket_transform", "candidate_bucket_transform",
+			"accepted_bucket_transform", "authority_epoch", "physics_tick", "motion_sequence",
+			"terrain_generation", "terrain_revision",
+		]):
+			failures.append("authoritative truth omitted bucket motion/query identity")
+		elif (
+			String(truth_query.get("authority_epoch", "")) != String(truth.get("authority_epoch", ""))
+			or int(truth_query.get("physics_tick", -1)) != int(truth.get("physics_tick", -2))
+		):
+			failures.append("authoritative truth bucket query does not share the post-step epoch/tick")
+		var truth_payload := truth.get("payload", {}) as Dictionary
+		if not truth_payload.has("motion_load_factor"):
+			failures.append("authoritative truth omitted payload motion load factor")
+		if not truth.has_all(["soil_interaction_batch", "queued_chassis_wrench", "applied_chassis_wrench"]):
+			failures.append("authoritative truth omitted soil batch or support wrench state")
 	var publisher_status := publisher.get_status_snapshot()
 	if not bool(publisher_status.get("publishing", false)) or bool(publisher_status.get("transport_publishing", true)):
 		failures.append("authoritative truth publisher exposed the wrong local/transport status")
@@ -322,15 +344,27 @@ func _test_controller_authority_lifecycle() -> void:
 	publisher._physics_process(0.0)
 	if bool(client.get_status_snapshot().get("shadow_truth_pending", false)):
 		failures.append("authoritative truth was queued onto the shadow transport")
-	var first_epoch := String(publisher.get_last_snapshot().get("authority_epoch", ""))
+	var first_truth := publisher.get_last_snapshot()
+	var first_epoch := String(first_truth.get("authority_epoch", ""))
+	var first_sequence := int(first_truth.get("sequence", -1))
 	client.authority_changed.emit("new-session", "new-simulation", 7)
-	var rotated := publisher.build_snapshot()
-	if rotated == null:
-		failures.append("authoritative truth did not rebuild after authority rotation")
+	var unchanged := publisher.build_snapshot()
+	if unchanged == null:
+		failures.append("authoritative truth did not survive an observational Python authority change")
 	else:
-		var rotated_data := rotated.to_dictionary()
-		if String(rotated_data.get("authority_epoch", "")) == first_epoch or int(rotated_data.get("sequence", -1)) != 0:
-			failures.append("authority rotation did not start a fresh truth epoch/sequence")
+		var unchanged_data := unchanged.to_dictionary()
+		if (
+			String(unchanged_data.get("authority_epoch", "")) != first_epoch
+			or int(unchanged_data.get("sequence", -1)) <= first_sequence
+		):
+			failures.append("Python authority change reset the local Jolt epoch/sequence")
+	client.pose_cleared.emit(8, "authoritative_runtime_reset")
+	await physics_frame
+	var rotated_data := publisher.get_last_snapshot()
+	if rotated_data.is_empty():
+		failures.append("authoritative truth did not rebuild after a Jolt runtime reset")
+	elif String(rotated_data.get("authority_epoch", "")) == first_epoch or int(rotated_data.get("sequence", -1)) != 0:
+		failures.append("Jolt runtime reset did not start a fresh truth epoch/sequence")
 
 	chassis.set_controller_enabled(false)
 	await physics_frame

@@ -89,17 +89,17 @@ def shadow_truth_validator() -> Draft202012Validator:
 def decode_shadow_truth(
     snapshot: dict[str, Any], expected: ShadowTruthIdentity
 ) -> ShadowTruthSample:
+    if snapshot.get("authority_profile") != "jolt_shadow":
+        raise ProtocolError(
+            "shadow_schema_validation_failed",
+            "shadow transport requires jolt_shadow authority_profile",
+        )
     errors = sorted(
         shadow_truth_validator().iter_errors(snapshot),
         key=lambda error: list(error.absolute_path),
     )
     if errors:
         raise ProtocolError("shadow_schema_validation_failed", errors[0].message)
-    if snapshot["authority_profile"] != "jolt_shadow":
-        raise ProtocolError(
-            "shadow_schema_validation_failed",
-            "shadow transport requires jolt_shadow authority_profile",
-        )
     body_names = [body["name"] for body in cast(list[dict[str, Any]], snapshot["bodies"])]
     joint_names = [joint["name"] for joint in cast(list[dict[str, Any]], snapshot["joints"])]
     if len(set(body_names)) != len(body_names) or set(body_names) != TRUTH_BODY_NAMES:

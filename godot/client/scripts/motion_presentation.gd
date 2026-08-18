@@ -125,7 +125,7 @@ func sample_bucket_pose_fixed(world_generation: int, authority_generation: int) 
 		if not accepted_pose.is_empty():
 			_apply_render_pose(accepted_pose)
 	var current := {}
-	for proxy_name in ["cutting_edge", "top_edge", "opening", "cavity", "rear_support"]:
+	for proxy_name in ["cutting_edge", "top_edge", "opening", "cavity", "shell", "rear_support"]:
 		var proxy_transform: Variant = _soil_proxy_transform(proxy_name)
 		if not proxy_transform is Transform3D:
 			clear_bucket_pose_history()
@@ -467,7 +467,7 @@ func _load_soil_contract(model_id: String) -> bool:
 		push_error(_contract_error)
 		return false
 	var proxies: Dictionary = contract.get("proxies", {})
-	for proxy_name in ["cutting_edge", "top_edge", "opening", "cavity", "rear_support"]:
+	for proxy_name in ["cutting_edge", "top_edge", "opening", "cavity", "shell", "rear_support"]:
 		var proxy: Dictionary = proxies.get(proxy_name, {})
 		var frame_name := String(proxy.get("frame", ""))
 		if not _frame_nodes.has(frame_name) or not _valid_vector3_array(proxy.get("center_godot", [])):
@@ -480,7 +480,7 @@ func _load_soil_contract(model_id: String) -> bool:
 	if not _valid_vector3_array((proxies["opening"] as Dictionary).get("normal_godot", [])):
 		_contract_error = "%s opening normal is invalid" % model_id
 		return false
-	for oriented_proxy_name in ["opening", "cavity"]:
+	for oriented_proxy_name in ["opening", "cavity", "shell"]:
 		var oriented_proxy := proxies[oriented_proxy_name] as Dictionary
 		if not _valid_direction_array(oriented_proxy.get("up_godot", [])):
 			_contract_error = "%s %s orientation is invalid" % [model_id, oriented_proxy_name]
@@ -495,6 +495,9 @@ func _load_soil_contract(model_id: String) -> bool:
 		return false
 	if not _valid_positive_array((proxies["cavity"] as Dictionary).get("size_m", []), 3):
 		_contract_error = "%s cavity size is invalid" % model_id
+		return false
+	if not _valid_positive_array((proxies["shell"] as Dictionary).get("size_m", []), 3):
+		_contract_error = "%s shell size is invalid" % model_id
 		return false
 	if float((proxies["rear_support"] as Dictionary).get("radius_m", 0.0)) <= 0.0:
 		_contract_error = "%s rear support radius is invalid" % model_id
@@ -567,9 +570,10 @@ func _ensure_soil_debug_root() -> void:
 		"top_edge": Color(1.0, 0.75, 0.1, 0.55),
 		"opening": Color(0.1, 0.8, 1.0, 0.45),
 		"cavity": Color(0.15, 1.0, 0.35, 0.28),
+		"shell": Color(0.95, 0.45, 0.1, 0.4),
 		"rear_support": Color(0.85, 0.2, 1.0, 0.5),
 	}
-	for proxy_name in ["cutting_edge", "top_edge", "opening", "cavity", "rear_support"]:
+	for proxy_name in ["cutting_edge", "top_edge", "opening", "cavity", "shell", "rear_support"]:
 		var mesh_instance := MeshInstance3D.new()
 		mesh_instance.name = proxy_name
 		var proxy_mesh: PrimitiveMesh
@@ -590,7 +594,7 @@ func _update_soil_debug_proxies(current: Dictionary) -> void:
 	if _soil_debug_root == null or not _soil_debug_root.visible:
 		return
 	var proxies: Dictionary = _soil_contract.get("proxies", {})
-	for proxy_name in ["cutting_edge", "top_edge", "opening", "cavity", "rear_support"]:
+	for proxy_name in ["cutting_edge", "top_edge", "opening", "cavity", "shell", "rear_support"]:
 		var mesh_instance := _soil_debug_root.get_node_or_null(NodePath(proxy_name)) as MeshInstance3D
 		if mesh_instance == null or not current.has(proxy_name):
 			continue
@@ -601,7 +605,7 @@ func _update_soil_debug_proxies(current: Dictionary) -> void:
 			(mesh_instance.mesh as SphereMesh).radius = 0.5
 			(mesh_instance.mesh as SphereMesh).height = 1.0
 			mesh_instance.scale = Vector3.ONE * diameter
-		elif proxy_name == "cavity":
+		elif proxy_name == "cavity" or proxy_name == "shell":
 			var cavity_size := _vector3_from_array(proxy.get("size_m", []))
 			(mesh_instance.mesh as BoxMesh).size = cavity_size
 			mesh_instance.scale = Vector3.ONE
@@ -629,22 +633,35 @@ func apply_physics_snapshot(snapshot: Dictionary) -> bool:
 	if not AuthorityProfile.writes_product_pose(authority_profile) or _asset_root == null:
 		return false
 	var body_values: Variant = snapshot.get("bodies", [])
-	if not body_values is Array or (body_values as Array).size() != MotionProtocol.FRAME_NAMES.size():
+	var frame_values: Variant = snapshot.get("kinematic_frames", [])
+	if (
+		not body_values is Array or (body_values as Array).size() != 1
+		or not frame_values is Array or (frame_values as Array).size() != MotionProtocol.FRAME_NAMES.size() - 1
+	):
 		return false
-	var body_to_frame := {
-		"chassis": "base_link", "upper": "upper_structure_link", "boom": "boom_link",
-		"arm": "arm_link", "bucket": "bucket_link",
-	}
 	var transforms := {}
 	for body_value in body_values as Array:
 		if not body_value is Dictionary:
 			return false
 		var body := body_value as Dictionary
-		var frame_name := String(body_to_frame.get(String(body.get("name", "")), ""))
+		var frame_name := "base_link" if String(body.get("name", "")) == "chassis" else ""
 		var transform_value: Variant = body.get("transform")
 		if frame_name.is_empty() or transforms.has(frame_name) or not transform_value is Transform3D:
 			return false
 		if not _is_rigid_transform(transform_value as Transform3D):
+			return false
+		transforms[frame_name] = transform_value
+	for frame_value in frame_values as Array:
+		if not frame_value is Dictionary:
+			return false
+		var frame := frame_value as Dictionary
+		var frame_name := String(frame.get("name", ""))
+		var transform_value: Variant = frame.get("transform")
+		if (
+			not MotionProtocol.FRAME_NAMES.has(frame_name) or frame_name == "base_link"
+			or transforms.has(frame_name) or not transform_value is Transform3D
+			or not _is_rigid_transform(transform_value as Transform3D)
+		):
 			return false
 		transforms[frame_name] = transform_value
 	if transforms.size() != MotionProtocol.FRAME_NAMES.size():

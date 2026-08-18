@@ -17,15 +17,17 @@
 Jolt 权威迁移仍默认关闭：`jolt_shadow` 可在同一连接上发布 Godot fixed-tick
 truth 快照到 Python 的隔离 latest-value 诊断槽；它不改变上述产品姿态链。
 项目默认仍是 `python_kinematic`。显式选择 `jolt_authoritative` 时，Phase 2 已由
-Godot/Jolt 独占五个刚体（底盘、回转平台、动臂、斗杆、铲斗）和四个关节的
-姿态/速度；该模式生成本地 authoritative truth，但不会把它作为 shadow 发回 Python。
+Godot hybrid runtime 取代：Jolt 独占一个动态底盘刚体和履带力，受限运动学状态
+独占回转、动臂、斗杆、铲斗姿态，query-only 铲斗代理提供地形接触证据。该模式
+生成本地 authoritative truth，但不会把它作为 shadow 发回 Python。
 
 当前权威边界按 profile 切换：
 
 1. `python_kinematic` / `jolt_shadow`：Python/Pinocchio 权威维护四关节与底盘
    frame transforms、输入安全和生命周期；Jolt 仅派生/观察。
-2. `jolt_authoritative` Phase 2：Jolt 权威维护五刚体开放链、四关节、履带力和
-   已应用斗内载荷；Python pose 写入被拒绝，视觉与 truth 消费同一 post-step 快照。
+2. `jolt_authoritative` Phase 3：Jolt 权威维护单底盘/履带动力学；运动学状态维护
+   四关节与 FK，斗内载荷只产生有界速度降级；Python pose 写入被拒绝，视觉、
+   query、soil batch 与 truth 消费同一 post-step identity。
 3. 所有 Godot-first profile 中，Godot `TerrainState`/`BucketSoilState` 权威维护
    本地地形与斗土状态；Terrain3D、渲染网格、粒子和视觉 GLB 都是派生消费者。
 
@@ -249,8 +251,11 @@ publisher 在 fixed tick 后读取五个 frame、履带、terrain identity 和 p
 
 在显式 `jolt_authoritative` profile 中，上图的 Python pose→presentation 写入被
 profile gate 拒绝；四个履带键驱动 Jolt 底盘，四个原有工作装置轴驱动回转/动臂/
-斗杆/铲斗。runtime 在 fixed tick 后只捕获一次五刚体/四关节快照，GLB pivot 与本地
-publisher 都消费该快照；SY205 四连杆仍只在视觉侧求解。本地 truth
+斗杆/铲斗。工作装置不是动力学开放链，而是带速度、加速度、jerk、限位和负载降速
+的运动学状态。铲斗代理从 previous FK sweep/query 到 candidate FK，并统一接受一个
+motion fraction。runtime 在 fixed tick 后只捕获一次“一底盘刚体 + 四运动学 frame +
+四逻辑关节 + query/wrench”快照，GLB pivot 与本地 publisher 都消费该快照；SY205
+四连杆仍只在视觉侧求解。本地 truth
 `transport_publishing=false`，Python shadow decoder 也拒绝该 profile。
 
 ## 7. Authority、派生状态与失效键
@@ -258,7 +263,7 @@ publisher 都消费该快照；SY205 四连杆仍只在视觉侧求解。本地 
 ```mermaid
 flowchart LR
     py[Python Simulator / Pinocchio<br/>default pose authority]
-    jolt_auth[Jolt five-body open chain<br/>opt-in articulated authority]
+    jolt_auth[Hybrid authority<br/>Jolt chassis + kinematic equipment]
     view[view_state<br/>session + simulation_epoch + view_revision]
     pose[Godot pose buffer / GLB pivots]
     terrain[Godot TerrainState<br/>terrain_epoch + revision + world_generation]
@@ -295,13 +300,14 @@ flowchart LR
 |---|---|---|---|
 | `python_kinematic` | Python Simulator/Pinocchio | 无 | 默认产品模式 |
 | `jolt_shadow` | Python Simulator/Pinocchio | 只读 shadow | Phase 0 opt-in |
-| `jolt_authoritative` | Godot/Jolt 五刚体/四关节 | 本地 truth；无 shadow transport | Phase 2 opt-in |
+| `jolt_authoritative` | Godot 混合：Jolt 单底盘 + 四轴运动学 | 本地 truth；无 shadow transport | Phase 3 opt-in |
 
-SY205/SY135 已有独立、hash-bound 的 `physics-rig-v1` descriptor；其中包含五个
-rest transform、四组 parent/child anchor、关节轴/限位/电机整形和显式自碰撞策略。
-质量、惯量和碰撞参数仍标记为 provisional/unverified：它们已通过有界底盘、双向
-关节、载荷和重建验收，但不能据此跳过后续液压、接触标定、excavation coupling
-或生产 cutover 验收。完整边界见
+SY205/SY135 已有独立、hash-bound 的 `physics-rig-v1` descriptor；当前产品路径消费
+底盘 compound/履带接触、四组 parent/child anchor、关节轴/限位/运动整形，并绑定
+各自 soil proxy contract。工作装置质量、惯量、液压和自碰撞字段不再是产品姿态
+权威。底盘质量/碰撞、bucket proxy 和撑地 wrench 参数仍标记为 provisional/tuned：
+它们通过了有界底盘、双向关节、Jolt query、幂等土壤批次、载荷降速和重建验收，
+但不能据此声称生产液压或真实土体力学。完整边界见
 [`shadow-truth.md`](../../.trellis/spec/backend/shadow-truth.md)。
 
 ## 8. 坐标系与资产关系
@@ -409,10 +415,10 @@ MCP 测试发现只覆盖 `res://tests/test_*.gd` 的 `McpTestSuite`；产品 co
 
 | 状态 | 范围 | 事实/边界 |
 |---|---|---|
-| Current | SY205 GLB、四关节运动、Pinocchio FK、Godot motion transport、Godot terrain/bucket、Terrain3D/Sky3D 视觉、桌面 UI、测试矩阵 | 已有代码、schema 或测试证据 |
+| Current | SY205/SY135 GLB、Python/Pinocchio 默认运动、Godot hybrid opt-in、单底盘 Jolt/四轴运动学、bucket query/soil batch、Godot terrain/bucket、Terrain3D/Sky3D 视觉、桌面 UI、测试矩阵 | 已有代码、schema 或测试证据 |
 | Legacy | Python terrain、recording、replay、RRD、terrain HTTP/WS、BabylonSim 命名 | 继续兼容；移除前需要独立迁移和回滚决策 [`release-candidate.md`](../release-candidate.md#L3-L14) |
 | Planned | 真实座舱手柄、踏板、按钮面板、中控/触屏、CAN-to-USB/设备适配 | 用户确认目标拓扑；没有驱动、消息协议或硬件验收实现 |
-| Deferred | 生产级液压、接触/质量标定、Jolt-地形挖掘耦合、per-grain soil、C++/GDExtension 优化 | Phase 2 已实现 provisional 开放链动力学；物理真实性与挖掘耦合仍需后续模型合同或 profiling 依据 [`README.md`](../../README.md#L46-L48) |
+| Deferred | 生产级液压、底盘接触/质量标定、连续介质或 per-grain soil、全机刚体自碰撞、C++/GDExtension 优化 | 当前 hybrid 有碰撞证据驱动的挖土/撑地，但刻意不实现开放链动力学或逐颗粒土体 [`README.md`](../../README.md#L46-L48) |
 | No evidence | 真实 CAN/串口/USB HID、ROS client、外部中控闭环、硬件传感器模拟 I/O | 本仓库未声明依赖或实现；不能画成 Current |
 
 ### 11.1 历史文档阅读警告

@@ -36,4 +36,3 @@ def test_state_deduplicates_quality_flags_and_freezes_transforms() -> None:
     assert state.quality_flags == ("a", "b")
     with pytest.raises(TypeError):
         state.frame_transforms["other"] = state.frame_transforms["base_link"]  # type: ignore[index]
-

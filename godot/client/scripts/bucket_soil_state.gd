@@ -306,10 +306,12 @@ func _is_finite(value: float) -> bool:
 
 
 func _initialize_cells(grid: Array) -> void:
-	_grid_dimensions = Vector3i(int(grid[0]), int(grid[1]), int(grid[2]))
-	var cell_count := int(grid[0]) * int(grid[1]) * int(grid[2])
-	_cell_fill = PackedFloat32Array()
-	_cell_fill.resize(cell_count)
+	var dimensions := Vector3i(int(grid[0]), int(grid[1]), int(grid[2]))
+	var cell_count := dimensions.x * dimensions.y * dimensions.z
+	var cells := PackedFloat32Array()
+	cells.resize(cell_count)
+	_cell_fill = cells
+	_grid_dimensions = dimensions
 	_cell_capacity_m3 = bucket_capacity_m3 / float(cell_count)
 	bucket_volume_m3 = 0.0
 
@@ -444,14 +446,22 @@ func _pending_cut_volume() -> float:
 
 
 func _build_fill_profile() -> PackedFloat32Array:
+	var dimensions := _grid_dimensions
+	var cells := _cell_fill
 	var profile := PackedFloat32Array()
-	profile.resize(_grid_dimensions.x * _grid_dimensions.z)
-	for z in _grid_dimensions.z:
-		for x in _grid_dimensions.x:
+	if (
+		dimensions.x <= 0 or dimensions.y <= 0 or dimensions.z <= 0
+		or cells.size() != dimensions.x * dimensions.y * dimensions.z
+	):
+		return profile
+	profile.resize(dimensions.x * dimensions.z)
+	for z in dimensions.z:
+		for x in dimensions.x:
 			var column_fill := 0.0
-			for y in _grid_dimensions.y:
-				column_fill += _cell_fill[_cell_index(x, y, z)]
-			profile[z * _grid_dimensions.x + x] = column_fill / float(_grid_dimensions.y)
+			for y in dimensions.y:
+				var index := (z * dimensions.y + y) * dimensions.x + x
+				column_fill += cells[index]
+			profile[z * dimensions.x + x] = column_fill / float(dimensions.y)
 	return profile
 
 

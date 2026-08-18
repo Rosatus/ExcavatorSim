@@ -50,6 +50,17 @@ With the Godot editor connected to MCP, use this exact smoke sequence:
    authority-generation changes, pose clearing and bucket-soil reset. Stop the
    game with `project_manage({"op":"stop"})`.
 
+For the opt-in authoritative smoke, preserve the current
+`simulation/authority_profile`, set it to `jolt_authoritative` through
+`project_manage(settings_set)`, run the main scene, and inspect the controller's
+current runtime snapshot. For both SY205 and SY135 it must contain exactly one
+`chassis` body, four named `kinematic_frames`, four logical joints, and a bucket
+query carrying matching authority/tick/terrain/motion identity. The runtime tree
+must contain no work-equipment `RigidBody3D` or `HingeJoint3D`. Restore the saved
+profile after stopping, even when the smoke fails. Long cutting/support motion
+is covered by `jolt_bucket_query_spike.gd`, `jolt_articulated_equipment_test.gd`,
+and `excavation_gameplay_test.gd`; MCP remains the live composition check.
+
 MCP test discovery is not part of this matrix: the add-on only loads
 `res://tests/test_*.gd` `McpTestSuite` classes, while the product contracts are
 standalone `SceneTree` scripts. This keeps the optional editor bridge from

@@ -99,7 +99,7 @@ Authority selection is separate from backend service composition:
 |---|---|---|---|
 | `python_kinematic` | Python `Simulator`/Pinocchio | off | Default/current |
 | `jolt_shadow` | Python `Simulator`/Pinocchio | Godot observational | Implemented opt-in |
-| `jolt_authoritative` | Godot/Jolt five-body articulated rig | off; local truth only | Phase 2 opt-in |
+| `jolt_authoritative` | Godot hybrid: one Jolt chassis plus kinematic work equipment | off; local truth only | Phase 3 opt-in |
 
 Both backend runtime profiles may advertise `simulation_truth_shadow_v1` as an
 optional capability. Negotiation only enables the isolated slot in
@@ -108,3 +108,9 @@ The existing required capability intersection and `view_state` behavior remain
 unchanged. Python must reject a `simulation_truth_shadow` payload whose
 `authority_profile` is `jolt_authoritative`; authoritative truth is a local
 Godot product snapshot, not a second inbound pose stream.
+
+The independent local truth schema distinguishes these shapes by profile:
+`jolt_shadow` remains exactly five observational bodies and zero
+`kinematic_frames`; `jolt_authoritative` is exactly one `chassis` body and four
+named kinematic frames. This conditional shape is a local diagnostic contract
+only and does not widen backend runtime composition or WebSocket capabilities.
