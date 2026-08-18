@@ -79,8 +79,21 @@ func _run() -> void:
 	)
 	if bool(overlap.get("valid", true)) or not (overlap.get("quality_flags", []) as Array).has("bucket_query_initial_overlap"):
 		failures.append("initial overlap was not surfaced as ineligible evidence")
+	if not is_equal_approx(float(overlap.get("accepted_fraction", -1.0)), 1.0):
+		failures.append("initial-overlap recovery motion was blocked")
+	var deeper_overlap := sweeper.sweep(
+		host.get_world_3d(),
+		Transform3D(Basis.IDENTITY, Vector3(0.0, 0.0, 0.0)),
+		Transform3D(Basis.IDENTITY, Vector3(0.0, -0.1, 0.0)),
+		identity,
+		12,
+		"probe-epoch",
+		3,
+	)
+	if not is_equal_approx(float(deeper_overlap.get("accepted_fraction", -1.0)), 1.0):
+		failures.append("deeper initial-overlap recovery motion was blocked")
 
-	var stale := sweeper.sweep(host.get_world_3d(), previous, candidate, Vector2i(identity.x, identity.y + 1), 12, "probe-epoch", 3)
+	var stale := sweeper.sweep(host.get_world_3d(), previous, candidate, Vector2i(identity.x, identity.y + 1), 13, "probe-epoch", 4)
 	if bool(stale.get("valid", true)) or not (stale.get("quality_flags", []) as Array).has("bucket_query_terrain_identity_mismatch"):
 		failures.append("stale terrain identity did not fail closed")
 

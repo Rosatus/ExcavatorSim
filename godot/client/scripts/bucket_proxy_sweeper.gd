@@ -131,14 +131,25 @@ func _sweep_proxy(
 ) -> Dictionary:
 	var result := {"accepted_fraction": 1.0, "initial_overlap": false, "contacts": []}
 	var initial_query := _query(shape, start, Vector3.ZERO)
+	# The sweep margin is a conservative cast safety band, not penetration.
+	# Reusing it for the zero-motion overlap probe turns a valid resting contact
+	# into an endless recovery state and prevents support force application.
+	initial_query.margin = 0.0
 	var initial_hits := space_state.intersect_shape(initial_query, 8)
 	if not initial_hits.is_empty():
 		var initial_hit := _first_terrain_hit(initial_hits)
 		if not initial_hit.is_empty():
 			result["initial_overlap"] = true
+			var initial_rest := space_state.get_rest_info(initial_query)
 			(result["contacts"] as Array[Dictionary]).append(
-				_contact_record(proxy_name, 0.0, initial_hit, {}, true, physics_tick, motion_sequence)
+				_contact_record(proxy_name, 0.0, initial_hit, initial_rest, true, physics_tick, motion_sequence)
 			)
+			# Initial-overlap queries remain invalid evidence, but the kinematic
+			# work-equipment proxy must be allowed one bounded fixed-step to
+			# recover. Soil stays disarmed; support still requires separate,
+			# non-initial shell/rear evidence from the same segmented sweep.
+			result["accepted_fraction"] = 1.0
+			return result
 	for segment_index in segment_count:
 		var alpha_start := float(segment_index) / float(segment_count)
 		var alpha_end := float(segment_index + 1) / float(segment_count)
@@ -186,7 +197,8 @@ func _contact_record(
 	var collider := hit.get("collider") as Node
 	var point := rest.get("point", Vector3.ZERO) as Vector3
 	var normal := rest.get("normal", Vector3.UP) as Vector3
-	if not point.is_finite():
+	var point_valid := rest.has("point") and point.is_finite()
+	if not point_valid:
 		point = Vector3.ZERO
 	if not normal.is_finite() or normal.length_squared() < 0.5:
 		normal = Vector3.UP
@@ -195,6 +207,7 @@ func _contact_record(
 		"proxy_role": proxy_name,
 		"travel_fraction": clampf(travel_fraction, 0.0, 1.0),
 		"point_world": point,
+		"point_valid": point_valid,
 		"normal_world": normal.normalized(),
 		"collider_id": collider.get_instance_id() if collider != null else 0,
 		"collider_name": String(collider.name) if collider != null else "terrain",

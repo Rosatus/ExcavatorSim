@@ -320,8 +320,11 @@ func _test_hybrid_query_batch_identity() -> int:
 	var fake := HybridStatusController.new()
 	excavation._tracked_chassis_controller = fake
 	var direction := _vector3((contract["proxies"] as Dictionary)["cutting_edge"].get("direction_godot", []))
-	var current_cut := Vector3(0.0, -0.02, 0.0)
+	# A wide bucket can touch a cross-slope at one edge while its frame center is
+	# still above the center sample. Hybrid cutting follows the validated contact.
+	var current_cut := Vector3(0.0, 0.4, 0.0)
 	var previous_cut := current_cut - direction * 0.12
+	var contact_point := Vector3(0.0, excavation.terrain_world.terrain_state.sample_surface_at(Vector2.ZERO), 0.0)
 	var generation := excavation.terrain_world.terrain_state.world_generation
 	var revision := excavation.terrain_world.terrain_state.terrain_revision
 	var query := {
@@ -335,7 +338,8 @@ func _test_hybrid_query_batch_identity() -> int:
 			"contact_id": "40:7:cutting_edge:0",
 			"proxy_role": "cutting_edge",
 			"travel_fraction": 0.5,
-			"point_world": current_cut,
+			"point_world": contact_point,
+			"point_valid": true,
 			"normal_world": Vector3.UP,
 			"initial_overlap": false,
 		}],

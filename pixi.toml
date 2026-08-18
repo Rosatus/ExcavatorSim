@@ -31,6 +31,8 @@ typecheck-backend = "mypy backend/src backend/scripts"
 verify-provenance = "python backend/scripts/verify_provenance.py"
 verify-standalone-paths = "python backend/scripts/verify_standalone.py --paths-only"
 backend-smoke = "python backend/scripts/production_smoke.py"
+soak-jolt-quick = "python backend/scripts/jolt_product_soak.py --mode quick"
+soak-jolt-release = "python backend/scripts/jolt_product_soak.py --mode release"
 verify = { depends-on = ["lint-backend", "typecheck-backend", "test-backend", "verify-provenance", "verify-standalone-paths"] }
 start = "python -m babylon_sim.cli --runtime-profile gateway-only --frontend-dir godot/dist"
 start-legacy = "python -m babylon_sim.cli --runtime-profile legacy --frontend-dir godot/dist"

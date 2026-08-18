@@ -375,6 +375,26 @@ func _test_controller_authority_lifecycle() -> void:
 	await physics_frame
 	if bool(chassis.get_status_snapshot().get("configured", false)):
 		failures.append("failed model switch retained an active Jolt runtime")
+	if not chassis._configure_model("sy205"):
+		failures.append("controller teardown fixture could not restore a Jolt runtime")
+		host.queue_free()
+		return
+	for _frame in 3:
+		await physics_frame
+	var retiring_runtime: JoltChassisTrackRuntime = null
+	for child in host.get_children():
+		if child is JoltChassisTrackRuntime:
+			retiring_runtime = child
+			break
+	if retiring_runtime == null:
+		failures.append("controller teardown fixture did not create a Jolt runtime")
+		host.queue_free()
+		return
+	root.remove_child(host)
+	for _frame in 3:
+		await process_frame
+	if is_instance_valid(retiring_runtime):
+		failures.append("controller parent removal retained the deferred Jolt runtime")
 	host.queue_free()
 	for _frame in 4:
 		await physics_frame

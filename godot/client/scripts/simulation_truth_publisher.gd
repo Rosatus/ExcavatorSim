@@ -27,6 +27,9 @@ var _last_snapshot: SimulationTruthSnapshot
 var _previous_sensor_linear := Vector3.ZERO
 var _previous_sensor_time_ns := -1
 var _previous_sensor_authority_epoch := ""
+var _transport_session_id := ""
+var _transport_simulation_epoch := ""
+var _sensor_transport_identity_ready := false
 var contract_error := ""
 
 
@@ -57,7 +60,7 @@ func _physics_process(_delta: float) -> void:
 	_last_snapshot = snapshot
 	if AuthorityProfile.publishes_shadow(authority_profile) and _motion_client != null:
 		_motion_client.queue_simulation_truth_shadow(snapshot.to_dictionary())
-	if authoritative and _motion_client != null:
+	if authoritative and _motion_client != null and _sensor_transport_identity_ready:
 		_motion_client.queue_sensor_telemetry(build_sensor_batch(snapshot.to_dictionary()))
 
 
@@ -540,15 +543,29 @@ func get_status_snapshot() -> Dictionary:
 		"contract_error": contract_error,
 		"publishing": AuthorityProfile.produces_truth(authority_profile) and contract_error.is_empty(),
 		"transport_publishing": AuthorityProfile.publishes_shadow(authority_profile) and contract_error.is_empty(),
-		"sensor_telemetry_publishing": AuthorityProfile.writes_product_pose(authority_profile) and contract_error.is_empty(),
+		"sensor_telemetry_publishing": AuthorityProfile.writes_product_pose(authority_profile) and contract_error.is_empty() and _sensor_transport_identity_ready,
+		"sensor_transport_identity_ready": _sensor_transport_identity_ready,
 		"sequence": _sequence,
 		"model_id": _last_model_id,
 	}
 
 
-func _on_authority_changed(_session_id: String, _simulation_epoch: String, _generation: int) -> void:
+func _on_authority_changed(session_id: String, simulation_epoch: String, _generation: int) -> void:
 	if _motion_client != null:
 		_motion_client.clear_simulation_truth_shadow()
+		_motion_client.clear_sensor_telemetry()
+	var identity_changed := (
+		not session_id.is_empty()
+		and not simulation_epoch.is_empty()
+		and (session_id != _transport_session_id or simulation_epoch != _transport_simulation_epoch)
+	)
+	_sensor_transport_identity_ready = identity_changed
+	if identity_changed:
+		_transport_session_id = session_id
+		_transport_simulation_epoch = simulation_epoch
+	elif session_id.is_empty() or simulation_epoch.is_empty():
+		_transport_session_id = ""
+		_transport_simulation_epoch = ""
 	if not AuthorityProfile.writes_product_pose(authority_profile):
 		_rotate_epoch()
 

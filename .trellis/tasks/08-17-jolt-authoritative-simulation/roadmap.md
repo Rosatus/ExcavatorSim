@@ -43,7 +43,7 @@ permanently expands mass, inertia, anchor, motor, collision, and solver tuning. 
 prototype remains available as evidence; later phases must not preserve its body
 counts or physical-joint claims merely for compatibility.
 
-## Phase 3: Hybrid Work Equipment And Excavation Coupling
+## Phase 3: Hybrid Work Equipment And Excavation Coupling - Completed
 
 Child: `08-17-jolt-terrain-excavation-coupling`
 
@@ -60,7 +60,7 @@ pusher; rear/shell support can lift/tilt the dynamic chassis within caps; teeth-
 cutting changes terrain and payload exactly once; stale collider identities cannot
 affect motion, chassis, or soil.
 
-## Phase 4: Sensor Telemetry And Python Gateway
+## Phase 4: Sensor Telemetry And Python Gateway - Completed
 
 Child: `08-17-sensor-telemetry-python-gateway`
 
@@ -74,7 +74,7 @@ contact/track, payload, and applied-wrench samples have documented clocks,
 frame/calibration identity, source semantics, quality, sequence/gap behavior, and
 cross-language contract tests.
 
-## Phase 5: Authority Cutover And Legacy Retirement Boundary
+## Phase 5: Authority Cutover And Legacy Retirement Boundary - Completed
 
 Child: `08-17-jolt-authority-cutover`
 
@@ -86,6 +86,21 @@ Exit gate: release-candidate tests prove one dynamic chassis writer and one
 kinematic articulation writer under all lifecycle paths; the Python gateway has no
 pose-reconstruction dependency; the archived five-body prototype is not selected
 implicitly; rollback and shipped documentation match the final boundary.
+
+The cutover child was archived after its implementation, automated matrix, and live
+MCP smoke passed. The parent integration phase closed its deferred evidence with a
+configurable two-model render/network/memory soak and an approved quick/release
+budget contract.
+
+## Parent Integration Acceptance - Completed
+
+The Windows product soak launches one fresh `gateway-only` backend and one rendered
+Godot process per model, drives tracks plus loaded cut/carry/dump/support cycles,
+and injects reset/reconnect transitions. It records fixed/render percentiles,
+telemetry loss/history, combined process-memory growth, authority/model identity,
+and runtime cardinality. The 90-second quick gate passes for SY205 and SY135;
+the 15-minute release gate remains the explicit pre-release command rather than a
+per-change developer test.
 
 ## Cross-Phase Gates
 

@@ -205,10 +205,13 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
   soil contract; only cutting/shell/rear can block motion.
 - One query result is immutable and carries authority epoch, physics tick,
   terrain generation/revision, bucket motion sequence, proxy version, accepted
-  fraction, contact IDs/roles and quality. Initial overlap, stale terrain,
-  non-finite data, or query failure disarms soil/support classification. Invalid
-  results still retain current identity; canonical truth is published only when
-  the query epoch/tick exactly equals the enclosing post-step snapshot.
+  fraction, contact IDs/roles and quality. Any initial overlap, stale terrain,
+  non-finite data, or query failure disarms soil classification. Support may use
+  a non-initial shell/rear contact from the same segmented sweep when that
+  load-bearing proxy has an upward normal, bounded accepted fraction, and motion
+  into the surface; initial overlap on the load-bearing proxy still disarms that
+  contact. Invalid results retain current identity; canonical truth is published
+  only when the query epoch/tick exactly equals the enclosing post-step snapshot.
 - `ExcavationWorld` reduces one query result to one idempotent interaction key
   `(authority_epoch, physics_tick, terrain_generation, terrain_revision,
   bucket_motion_sequence)`. Precedence remains `dump -> spill -> cutting ->
@@ -264,7 +267,7 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
 | Non-neutral first command after rebuild | Hold zero effort until a neutral sample arrives |
 | Stale equipment command identity | Ignore without changing current command state |
 | Invalid payload mass/COM/identity | Reject without changing the applied motion-load factor |
-| Bucket query initial overlap/failure | Accept bounded recovery motion; disarm soil and support effects |
+| Bucket query initial overlap/failure | Accept bounded recovery motion; disarm soil; support requires independent non-initial shell/rear evidence |
 | Duplicate interaction key | Report duplicate and queue no second soil transaction or wrench |
 | Early/late/stale support request | Drop it without applying force or changing chassis transform |
 | Track command outside `[-1,1]` | Clamp before force calculation |
@@ -301,6 +304,12 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
   `jolt_authoritative` on the negotiated shadow transport.
 - The standalone force step must remain below the 10 ms acceptance budget in
   the bounded test scene; MCP smoke verifies live rig/contact/model identity.
+- The rendered product soak runs SY205 and SY135 against a fresh `gateway-only`
+  process. Quick mode is 90 seconds/model and release mode is 15 minutes/model;
+  it gates fixed-step/render percentiles, zero telemetry drops, 256-batch history,
+  bounded process-memory growth, cut/dump/support/tracks, reset/reconnect, model
+  identity, and one runtime. The benchmark process disables VSync so render
+  percentiles measure throughput rather than display wait time.
 
 ### 7. Wrong vs Correct
 

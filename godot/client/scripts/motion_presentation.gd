@@ -150,7 +150,11 @@ func sample_bucket_pose_fixed(world_generation: int, authority_generation: int) 
 	var cutting_contract := proxies.get("cutting_edge", {}) as Dictionary
 	var opening_contract := proxies.get("opening", {}) as Dictionary
 	var cutting_direction_world := (current["cutting_edge"] as Transform3D).basis * _vector3_from_array(cutting_contract.get("direction_godot", []))
-	var opening_normal_world := (current["opening"] as Transform3D).basis * _vector3_from_array(opening_contract.get("normal_godot", []))
+	var opening_frame := get_frame_node(String(opening_contract.get("frame", "")))
+	if opening_frame == null:
+		clear_bucket_pose_history()
+		return {"valid": false, "reason": "opening_frame_unavailable"}
+	var opening_normal_world := opening_frame.global_transform.basis * _vector3_from_array(opening_contract.get("normal_godot", []))
 	var snapshot := {
 		"valid": valid,
 		"reason": reason,

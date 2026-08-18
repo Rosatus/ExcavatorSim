@@ -55,6 +55,16 @@ func _init() -> void:
 	var wire := MotionProtocol.sensor_telemetry_batch_message(batch)
 	_assert(wire["protocol_version"] == MotionProtocol.PROTOCOL_VERSION, "protocol version")
 	_assert((wire["samples"] as Array)[0]["sample_sequence"] == 7, "sample sequence")
+	var client := MotionClient.new()
+	publisher._motion_client = client
+	publisher._on_authority_changed("session", "stream", 1)
+	_assert(bool(publisher.get_status_snapshot()["sensor_transport_identity_ready"]), "initial sensor identity")
+	publisher._on_authority_changed("session", "stream", 2)
+	_assert(not bool(publisher.get_status_snapshot()["sensor_transport_identity_ready"]), "same-epoch reset suspension")
+	publisher._on_authority_changed("session", "stream-2", 3)
+	_assert(bool(publisher.get_status_snapshot()["sensor_transport_identity_ready"]), "new-epoch sensor resume")
+	client.free()
+	publisher.free()
 	print("Sensor telemetry producer contracts passed.")
 	quit()
 

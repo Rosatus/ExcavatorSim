@@ -76,6 +76,8 @@ var _support_contact_observed := false
 var _last_support_force := Vector3.ZERO
 var _last_support_torque := Vector3.ZERO
 var _last_applied_support_request_id := ""
+var _support_wrench_apply_count := 0
+var _retirement_queued := false
 
 
 func _ready() -> void:
@@ -167,8 +169,21 @@ func teardown() -> void:
 	_bucket_query.clear()
 	_queued_support_wrench.clear()
 	_applied_support_wrench.clear()
+	_support_wrench_apply_count = 0
 	_reset_support_response(true)
 	_clear_tick_telemetry()
+
+
+func retire_deferred() -> void:
+	if _retirement_queued or is_queued_for_deletion():
+		return
+	_retirement_queued = true
+	call_deferred("_complete_deferred_retirement")
+
+
+func _complete_deferred_retirement() -> void:
+	teardown()
+	queue_free()
 
 
 func set_enabled(value: bool) -> void:
@@ -250,6 +265,7 @@ func reset(spawn_global_transform := Transform3D.IDENTITY) -> void:
 	_set_invalid_bucket_query("bucket_query_not_sampled")
 	_queued_support_wrench.clear()
 	_applied_support_wrench.clear()
+	_support_wrench_apply_count = 0
 	_reset_support_response(true)
 	_clear_tick_telemetry()
 	_capture_post_step_snapshot()
@@ -375,7 +391,8 @@ func _update_joint_actuators(delta: float) -> void:
 		_bucket_query["previous_bucket_transform"] = previous_frames["bucket_link"]
 		_bucket_query["candidate_bucket_transform"] = candidate_frames["bucket_link"]
 		var support_queued := false
-		if bool(_bucket_query.get("valid", false)):
+		var support_evidence := _has_noninitial_support_contact()
+		if bool(_bucket_query.get("valid", false)) or support_evidence:
 			accepted_fraction = float(_bucket_query.get("accepted_fraction", 1.0))
 			support_queued = _queue_support_wrench(previous_frames, candidate_frames, accepted_fraction)
 		if not support_queued and not _support_contact_observed:
@@ -392,6 +409,17 @@ func _update_joint_actuators(delta: float) -> void:
 	var accepted_frames := _articulation.accepted_frames()
 	if not _bucket_query.is_empty() and accepted_frames.has("bucket_link"):
 		_bucket_query["accepted_bucket_transform"] = accepted_frames["bucket_link"]
+
+
+func _has_noninitial_support_contact() -> bool:
+	for contact_value in _bucket_query.get("contacts", []):
+		var contact := contact_value as Dictionary
+		if (
+			["shell", "rear_support"].has(String(contact.get("proxy_role", "")))
+			and not bool(contact.get("initial_overlap", false))
+		):
+			return true
+	return false
 
 
 func _apply_pending_payload() -> void:
@@ -440,6 +468,7 @@ func _capture_post_step_snapshot() -> void:
 		"bucket_query": _bucket_query.duplicate(true),
 		"queued_chassis_wrench": _queued_support_wrench.duplicate(true),
 		"applied_chassis_wrench": _applied_support_wrench.duplicate(true),
+		"support_wrench_apply_count": _support_wrench_apply_count,
 		"left_command": _left_command, "right_command": _right_command,
 		"left_speed_mps": _left_speed_m_s, "right_speed_mps": _right_speed_m_s,
 		"left_slip_ratio": _left_slip_ratio, "right_slip_ratio": _right_slip_ratio,
@@ -521,26 +550,52 @@ func _queue_support_wrench(previous_frames: Dictionary, candidate_frames: Dictio
 	if accepted_fraction >= 0.999999 or not _queued_support_wrench.is_empty():
 		return false
 	var support_contact: Dictionary = {}
+	var support_diagnostics: Array[Dictionary] = []
 	for contact_value in _bucket_query.get("contacts", []):
 		var contact := contact_value as Dictionary
-		if ["shell", "rear_support"].has(String(contact.get("proxy_role", ""))) and not bool(contact.get("initial_overlap", false)):
+		if ["shell", "rear_support"].has(String(contact.get("proxy_role", ""))):
+			var diagnostic := {
+				"role": String(contact.get("proxy_role", "")),
+				"initial_overlap": bool(contact.get("initial_overlap", false)),
+				"eligible": false,
+			}
+			if bool(diagnostic["initial_overlap"]):
+				diagnostic["rejection"] = "initial_overlap"
+				support_diagnostics.append(diagnostic)
+				continue
 			var normal := contact.get("normal_world", Vector3.UP) as Vector3
 			if not normal.is_finite() or normal.length_squared() < 0.5:
+				diagnostic["rejection"] = "invalid_normal"
+				support_diagnostics.append(diagnostic)
 				continue
+			var normalized_normal := normal.normalized()
+			diagnostic["normal_up_dot"] = normalized_normal.dot(Vector3.UP)
 			var role := String(contact.get("proxy_role", ""))
 			var proxy := (_soil_contract.get("proxies", {}) as Dictionary).get(role, {}) as Dictionary
 			if proxy.is_empty():
+				diagnostic["rejection"] = "missing_proxy"
+				support_diagnostics.append(diagnostic)
 				continue
 			var local_center := _vector3(proxy.get("center_godot", [0.0, 0.0, 0.0]))
 			var previous_point := (previous_frames.get("bucket_link", Transform3D.IDENTITY) as Transform3D) * local_center
 			var candidate_point := (candidate_frames.get("bucket_link", Transform3D.IDENTITY) as Transform3D) * local_center
-			var motion_into_surface := -(candidate_point - previous_point).dot(normal.normalized())
-			if normal.normalized().dot(Vector3.UP) < MIN_SUPPORT_NORMAL_UP_DOT or motion_into_surface < MIN_SUPPORT_INTO_SURFACE_M:
+			var motion_into_surface := -(candidate_point - previous_point).dot(normalized_normal)
+			diagnostic["motion_into_surface_m"] = motion_into_surface
+			if float(diagnostic["normal_up_dot"]) < MIN_SUPPORT_NORMAL_UP_DOT:
+				diagnostic["rejection"] = "normal_direction"
+				support_diagnostics.append(diagnostic)
 				continue
+			if motion_into_surface < MIN_SUPPORT_INTO_SURFACE_M:
+				diagnostic["rejection"] = "motion_direction"
+				support_diagnostics.append(diagnostic)
+				continue
+			diagnostic["eligible"] = true
+			support_diagnostics.append(diagnostic)
 			support_contact = contact.duplicate(true)
 			support_contact["classification"] = "support"
 			support_contact["motion_into_surface_m"] = motion_into_surface
 			break
+	_bucket_query["support_diagnostics"] = support_diagnostics
 	if support_contact.is_empty():
 		return false
 	_support_contact_observed = true
@@ -628,6 +683,7 @@ func _apply_queued_support_wrench() -> void:
 	_applied_support_wrench["applied_force"] = force
 	_applied_support_wrench["applied_torque"] = torque
 	_last_applied_support_request_id = request_id
+	_support_wrench_apply_count += 1
 	_queued_support_wrench.clear()
 
 

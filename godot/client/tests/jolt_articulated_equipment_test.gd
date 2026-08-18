@@ -172,8 +172,11 @@ func _test_model(model_id: String) -> void:
 			failures.append("%s first support request exceeded its torque rate cap" % model_id)
 		runtime._physics_tick = int(queued_wrench["eligible_apply_tick"])
 		runtime._apply_queued_support_wrench()
+		runtime._capture_post_step_snapshot()
 		if runtime._applied_support_wrench.is_empty() or not runtime._queued_support_wrench.is_empty():
 			failures.append("%s eligible support wrench was not applied exactly once" % model_id)
+		elif int(runtime.get_status_snapshot().get("support_wrench_apply_count", -1)) != 1:
+			failures.append("%s support wrench application was not counted" % model_id)
 		elif (
 			(runtime._applied_support_wrench.get("applied_force", Vector3.ZERO) as Vector3).length() > JoltChassisTrackRuntime.MAX_SUPPORT_FORCE_N + 0.01
 			or (runtime._applied_support_wrench.get("applied_torque", Vector3.ZERO) as Vector3).length() > JoltChassisTrackRuntime.MAX_SUPPORT_TORQUE_NM + 0.01
@@ -215,6 +218,9 @@ func _test_model(model_id: String) -> void:
 	runtime._reset_support_response()
 	if runtime._support_contact_ticks != 0 or runtime._support_contact_observed:
 		failures.append("%s support state did not reset after contact loss" % model_id)
+	runtime.reset(spawn)
+	if int(runtime.get_status_snapshot().get("support_wrench_apply_count", -1)) != 0:
+		failures.append("%s reset retained the support wrench application count" % model_id)
 
 	runtime.teardown()
 	await physics_frame

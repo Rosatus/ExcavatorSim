@@ -33,6 +33,25 @@ pixi run backend-smoke
 pixi run verify
 ```
 
+Run the rendered Jolt product soak against a fresh `gateway-only` process for
+both models:
+
+```powershell
+pixi run soak-jolt-quick
+pixi run soak-jolt-release
+```
+
+Quick mode runs 90 seconds per model; release mode runs 15 minutes per model.
+The dedicated benchmark process disables VSync so frame percentiles measure
+renderer throughput instead of the display refresh wait; product display
+settings are not changed.
+The gate requires fixed-step p95 <= 4 ms and peak <= 10 ms, rendered-frame p95
+<= 16.7 ms and p99 <= 33.3 ms, zero telemetry drops, bounded 256-batch history,
+and post-warmup combined Godot/backend working-set growth <= 10% and <= 128 MiB.
+It also requires track and articulation movement, cut/load/dump/support evidence,
+reset, reconnect, the selected model identity, and exactly one Jolt runtime. The
+JSON report and per-process logs are written under `artifacts/benchmark/`.
+
 The backend smoke starts a temporary legacy service and verifies health, URDF,
 the five-part visual manifest/GLB, WebSocket handshake, aligned `view_state` /
 `terrain_view`, and the authoritative Float32 terrain snapshot. It is kept out

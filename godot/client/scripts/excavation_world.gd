@@ -301,7 +301,8 @@ func _process_bucket_snapshot(snapshot: Dictionary, delta: float) -> void:
 			_last_interaction = "spill"
 			return
 	if operation == "cutting":
-		if _queue_batch_cut(batch, previous_cutting.origin, current_cutting.origin):
+		var cut_motion := _cut_motion_from_batch(batch, previous_cutting.origin, current_cutting.origin)
+		if _queue_batch_cut(batch, cut_motion["previous"], cut_motion["current"]):
 			_next_command_sequence += 1
 			_last_interaction = "cut"
 			return
@@ -393,7 +394,15 @@ func _classify_interaction_records(
 		var role := String(record.get("proxy_role", ""))
 		var classification := "blocked"
 		if not bool(record.get("initial_overlap", false)):
-			if role == "cutting_edge" and in_contact and (forward_cut or downward_cut):
+			var record_in_contact := in_contact
+			if query_required and role == "cutting_edge":
+				var point := record.get("point_world", Vector3.ZERO) as Vector3
+				var point_surface := terrain_world.terrain_state.sample_surface_bilinear_at(Vector2(point.x, point.z))
+				record_in_contact = (
+					query_identity_valid and bool(record.get("point_valid", true)) and point.is_finite()
+					and not is_nan(point_surface) and absf(point.y - point_surface) <= tolerance
+				)
+			if role == "cutting_edge" and record_in_contact and (forward_cut or downward_cut):
 				classification = "cutting"
 			elif ["shell", "rear_support"].has(role):
 				classification = "support" if _is_support_record(snapshot, record) else "blocked"
@@ -467,6 +476,19 @@ func _queue_batch_cut(batch: Dictionary, previous_tooth: Vector3, current_tooth:
 		return false
 	_consume_interaction_batch(batch, "cutting")
 	return true
+
+
+func _cut_motion_from_batch(batch: Dictionary, previous_tooth: Vector3, current_tooth: Vector3) -> Dictionary:
+	if bool(batch.get("query_required", false)):
+		for record_value in batch.get("classifications", []):
+			var record := record_value as Dictionary
+			if String(record.get("classification", "")) != "cutting":
+				continue
+			var contact_point := record.get("point_world", Vector3.ZERO) as Vector3
+			if bool(record.get("point_valid", true)) and contact_point.is_finite():
+				var movement := current_tooth - previous_tooth
+				return {"previous": contact_point - movement, "current": contact_point}
+	return {"previous": previous_tooth, "current": current_tooth}
 
 
 func _queue_batch_deposit(batch: Dictionary, center: Vector3, volume_m3: float, operation: String) -> bool:

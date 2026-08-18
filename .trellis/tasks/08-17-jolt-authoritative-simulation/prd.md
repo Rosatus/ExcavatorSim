@@ -161,3 +161,13 @@ last accepted profile without mixed authority state.
   tooling, but is not the authoritative-profile runtime pose writer.
 - Migration remains incremental and profile-gated; there is never a dual-writer
   runtime mode.
+
+## Parent Integration Evidence
+
+All six implementation children are archived. The parent integration phase now
+provides one Windows soak harness for both models and representative loaded
+excavation. Approved quick/release durations are 90 seconds and 15 minutes per
+model. Fixed/render percentile, zero-drop, bounded-history, process-memory,
+lifecycle, model identity, single-runtime, track, articulation, cut, dump, and
+support gates are executable through `pixi run soak-jolt-quick` and
+`pixi run soak-jolt-release`.

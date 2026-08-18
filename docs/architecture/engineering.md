@@ -204,7 +204,7 @@ flowchart TB
 | World | `WorldEnvironment`, `SunLight`, `SkyDome`, `TimeOfDay` | Sky3D 天空、固定日照、雾、云和星空 | Current / Derived |
 | Camera/UI | `CameraRig`, `OperatorUI`, `VisualQualityController` | 中键绕行、缩放、连接/authority/lifecycle/bucket 状态、质量档位 | Current |
 | Motion | `MotionClient`, `MotionProtocol`, `MotionPresentation` | 默认由 Jolt post-step 快照驱动 GLB pivots；显式 Python 兼容 profile 才接收 Python state | Current / profile-selected |
-| Authority migration | `JoltChassisTrackRuntime`, `SimulationTruthPublisher`, `PhysicsRigDescriptor` | Jolt 五刚体/四关节权威与本地 truth 为产品默认；shadow 仅为显式诊断 profile | Current / profile-selected |
+| Authority migration | `JoltChassisTrackRuntime`, `SimulationTruthPublisher`, `PhysicsRigDescriptor` | Jolt 单底盘刚体 + 四轴运动学工作装置与本地 truth 为产品默认；五刚体 shadow 仅为显式诊断 profile | Current / profile-selected |
 | Visual asset | `PresentationRoot/SY205Excavator` | 仅视觉模型；不含运动 authority、animation 或 collision authority | Current / Derived |
 | Logical terrain | `TerrainState`, `TerrainWorld`, `ExcavationWorld` | Godot-first 本地地形快照、铲斗接触/铲入/侧漏/卸土、revision/generation | Current authority（local world） |
 | Bucket | `BucketSoilState` | 固定容量 0.35 m³、切削/倾倒和网格体积守恒 | Current authority（local bucket） |
@@ -364,7 +364,7 @@ flowchart LR
 
 | 接口 | 方向 | 频率/限制 | profile | 主要责任 |
 |---|---|---|---|---|
-| `ws://127.0.0.1:8765/ws` | Godot ↔ Python | hello 首帧；input 80/s；command 20/s；shadow 60/s；sensor batch 30/s；状态目标 30 Hz | 两者 | 既有 v3 消息；可选 shadow / `sensor_telemetry_v1` |
+| `ws://127.0.0.1:8765/ws` | Godot ↔ Python | hello 首帧；input 80/s；command 20/s；shadow 60/s；sensor batch 目标 30 Hz、guard 60/s；状态目标 30 Hz | 两者 | 既有 v3 消息；可选 shadow / `sensor_telemetry_v1` |
 | `/health` | 监控 → Python | HTTP | 两者 | 健康探针及最新 shadow/sensor age/identity；无样本或过期为 `null` |
 | `/api/telemetry` | 监控/导出 → Python | HTTP；limit 1..256 | 两者 | 有界传感器批次导出；不投影到 RRD |
 | `/api/model`、视觉模型/GLB | Godot → Python | 启动/模型准备 | 两者 | 返回已验证模型/视觉资产入口 |

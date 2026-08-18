@@ -76,7 +76,8 @@ COMMAND_RATE_LIMIT = 20
 PING_RATE_LIMIT = 20
 BUCKET_FEEDBACK_RATE_LIMIT = 20
 SHADOW_TRUTH_RATE_LIMIT = 60
-SENSOR_TELEMETRY_RATE_LIMIT = 30
+# Keep protocol-abuse headroom above the client's jittery 30 Hz target cadence.
+SENSOR_TELEMETRY_RATE_LIMIT = 60
 RATE_WINDOW_SECONDS = 1.0
 MAX_PROTOCOL_VIOLATIONS = 3
 # Leave headroom for strict JSON encoding/validation after each poll.

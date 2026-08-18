@@ -94,6 +94,10 @@ func _exit_tree() -> void:
 	if parent != null and parent.is_queued_for_deletion():
 		_jolt_runtime = null
 		return
+	if _jolt_runtime != null and is_instance_valid(_jolt_runtime) and not _jolt_runtime.is_inside_tree():
+		_jolt_runtime.retire_deferred()
+		_jolt_runtime = null
+		return
 	_destroy_jolt_runtime()
 
 
