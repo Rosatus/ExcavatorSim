@@ -1140,3 +1140,36 @@ the logical soil and terrain authorities; `python_kinematic` remains default.
 
 [OK] **Implementation complete and quality gates passed; task remains active
 until the user requests commit/push/archive.**
+
+
+## Session 30: Complete hybrid Jolt terrain excavation coupling
+
+**Date**: 2026-08-18
+**Task**: Complete hybrid Jolt terrain excavation coupling
+**Branch**: `main`
+
+### Summary
+
+Implemented and verified hybrid Jolt authoritative chassis with bounded kinematic work equipment, bucket-only terrain queries, automatic excavate/carry/spill/dump soil transactions, capped chassis support wrench, shared truth identity, and SY205/SY135 lifecycle coverage. Passed backend, Godot standalone, task validation, and MCP checks; archived the completed coupling task.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `815b6b3` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
