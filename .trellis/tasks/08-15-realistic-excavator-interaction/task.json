@@ -1,0 +1,37 @@
+{
+  "id": "realistic-excavator-interaction",
+  "name": "realistic-excavator-interaction",
+  "title": "Realistic excavator interaction",
+  "description": "Close the historical interaction roadmap with current hybrid-Jolt lineage, two-model release endurance, and quality-tier integration evidence.",
+  "status": "in_progress",
+  "dev_type": "feature",
+  "scope": "cross-layer",
+  "package": "godot+backend",
+  "priority": "P1",
+  "creator": "rosatus",
+  "assignee": "rosatus",
+  "createdAt": "2026-08-15",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "08-15-tracked-chassis-locomotion",
+    "08-15-automatic-soil-interaction",
+    "08-15-bucket-ground-lift-reaction"
+  ],
+  "parent": null,
+  "relatedFiles": [
+    "docs/architecture/engineering.md",
+    "docs/release-candidate.md",
+    "backend/scripts/jolt_product_soak.py",
+    "backend/scripts/godot/jolt_product_soak.gd",
+    "backend/src/babylon_sim/product_soak.py",
+    "godot/client/scripts/visual_quality_controller.gd"
+  ],
+  "notes": "The three 08-15 children are archived. The 08-17 hybrid Jolt roadmap supersedes the original authority design. This parent now owns final release/quality evidence only and must not reimplement archived children.",
+  "meta": {}
+}

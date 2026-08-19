@@ -102,6 +102,22 @@ The local actions are `track_left_forward`, `track_left_reverse`,
   controller disable, or invalid terrain stops both tracks. Model/world changes
   also restore the local chassis transform to identity.
 
+### Test-only focus bypass
+
+Automated headless runners may lose OS focus while their Godot window is still
+running. A test harness that drives `set_*_for_test` commands must therefore opt
+in explicitly through:
+
+```text
+TrackedChassisController.set_test_input_focus_bypass_for_test(enabled: bool) -> void
+```
+
+The bypass is test-only state and is never enabled by production startup or user
+input. With it disabled, the normal focus-loss contract still zeros track and
+equipment commands. With it enabled, only the existing explicit test setters may
+drive commands; ordinary input remains focus-gated. Tests must cover both modes so
+an unattended soak cannot accidentally weaken the product safety behavior.
+
 ### 4. Validation & Error Matrix
 
 | Condition | Required behavior |

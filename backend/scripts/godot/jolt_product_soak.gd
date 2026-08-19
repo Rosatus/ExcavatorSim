@@ -2,8 +2,11 @@ extends SceneTree
 
 const MAIN_SCENE_PATH := "res://scenes/main.tscn"
 const READY_TIMEOUT_SECONDS := 20.0
+const QUALITY_PROFILES := ["low", "balanced", "high"]
+const REPORT_SCHEMA_VERSION := "excavator-sim-jolt-product-soak-godot-v2"
 
 var _model_id := "sy205"
+var _quality_profile := "balanced"
 var _endpoint := "ws://127.0.0.1:8765/ws"
 var _report_path := "user://jolt-product-soak.json"
 var _duration_seconds := 90.0
@@ -26,10 +29,17 @@ func _run() -> void:
 		return
 	var scene := packed.instantiate() as Node3D
 	var client := scene.get_node("MotionClient") as MotionClient
+	var chassis := scene.get_node("ChassisMotionRoot") as TrackedChassisController
+	var quality := scene.get_node_or_null("VisualQualityController") as VisualQualityController
+	if quality == null:
+		_finish({}, "visual quality controller is unavailable")
+		return
 	client.endpoint = _endpoint
 	client.desired_model_id = _model_id
+	chassis.set_test_input_focus_bypass_for_test(true)
+	quality.profile = _quality_profile
 	root.add_child(scene)
-	DisplayServer.window_set_title("ExcavatorSim soak - %s" % _model_id)
+	DisplayServer.window_set_title("ExcavatorSim soak - %s/%s" % [_model_id, _quality_profile])
 	DisplayServer.window_set_size(Vector2i(1280, 720))
 	# Measure renderer throughput rather than the display's 60 Hz wait interval.
 	# Product VSync settings remain untouched because this script runs in its own process.
@@ -38,7 +48,14 @@ func _run() -> void:
 	if not await _wait_until_ready(scene, client):
 		_finish({}, "product scene did not become ready")
 		return
-	var chassis := scene.get_node("ChassisMotionRoot") as TrackedChassisController
+	var quality_snapshot := quality.get_quality_snapshot()
+	var quality_contract_clean := (
+		String(quality_snapshot.get("profile", "")) == _quality_profile
+		and bool(quality_snapshot.get("applied", false))
+		and String(quality_snapshot.get("last_error", "")).is_empty()
+	)
+	if not quality_contract_clean:
+		_failures.append("visual quality contract mismatch: %s" % quality_snapshot)
 	var excavation := scene.get_node("TerrainRoot/ExcavationWorld") as ExcavationWorld
 	var terrain_world := scene.get_node("TerrainRoot/TerrainWorld") as TerrainWorld
 	var presentation := scene.get_node("MotionPresentation") as MotionPresentation
@@ -258,6 +275,7 @@ func _run() -> void:
 		and String(final_status.get("model_id", "")) == _model_id
 		and String(final_status.get("contract_error", "")).is_empty()
 		and presentation.get_active_model_id() == _model_id
+		and quality_contract_clean
 	)
 	var contract_report := {
 		"clean": final_contract_clean and _failures.is_empty(),
@@ -267,8 +285,11 @@ func _run() -> void:
 		"failures": _failures.duplicate(),
 	}
 	var report := {
-		"schema_version": "excavator-sim-jolt-product-soak-godot-v1",
+		"schema_version": REPORT_SCHEMA_VERSION,
 		"model_id": _model_id,
+		"requested_quality_profile": _quality_profile,
+		"observed_quality_profile": String(quality_snapshot.get("profile", "")),
+		"quality": quality_snapshot,
 		"duration_seconds": _duration_seconds,
 		"warmup_seconds": _warmup_seconds,
 		"metrics": {
@@ -502,8 +523,11 @@ func _finish(report: Dictionary, error := "") -> void:
 	if not error.is_empty():
 		_failures.append(error)
 		report = {
-			"schema_version": "excavator-sim-jolt-product-soak-godot-v1",
+			"schema_version": REPORT_SCHEMA_VERSION,
 			"model_id": _model_id,
+			"requested_quality_profile": _quality_profile,
+			"observed_quality_profile": "",
+			"quality": {},
 			"metrics": {},
 			"scenario": {},
 			"contract": {"clean": false, "maximum_runtime_count": 0, "failures": _failures.duplicate()},
@@ -533,6 +557,7 @@ func _parse_arguments() -> bool:
 		var value := String(arguments[index + 1])
 		match argument:
 			"--model": _model_id = value
+			"--quality-profile": _quality_profile = value
 			"--endpoint": _endpoint = value
 			"--report": _report_path = value
 			"--duration-seconds": _duration_seconds = value.to_float()
@@ -543,6 +568,7 @@ func _parse_arguments() -> bool:
 		index += 2
 	return (
 		["sy205", "sy135"].has(_model_id)
+		and QUALITY_PROFILES.has(_quality_profile)
 		and _duration_seconds > 0.0
 		and _warmup_seconds >= 0.0
 		and _warmup_seconds < _duration_seconds

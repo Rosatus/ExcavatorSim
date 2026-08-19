@@ -6,6 +6,10 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+SOAK_REPORT_SCHEMA_VERSION = "excavator-sim-jolt-product-soak-v2"
+GODOT_REPORT_SCHEMA_VERSION = "excavator-sim-jolt-product-soak-godot-v2"
+QUALITY_PROFILES = ("low", "balanced", "high")
+
 
 @dataclass(frozen=True)
 class SoakBudgets:
@@ -31,11 +35,29 @@ class SoakBudgets:
         }
 
 
-def evaluate_godot_report(report: Mapping[str, Any], budgets: SoakBudgets) -> dict[str, bool]:
+def evaluate_godot_report(
+    report: Mapping[str, Any],
+    budgets: SoakBudgets,
+    expected_model_id: str,
+    expected_quality_profile: str,
+) -> dict[str, bool]:
     metrics = _mapping(report.get("metrics"))
     scenario = _mapping(report.get("scenario"))
     contract = _mapping(report.get("contract"))
+    quality = _mapping(report.get("quality"))
+    requested_quality_profile = str(report.get("requested_quality_profile", ""))
+    observed_quality_profile = str(report.get("observed_quality_profile", ""))
     return {
+        "godot_report_schema": report.get("schema_version") == GODOT_REPORT_SCHEMA_VERSION,
+        "godot_model_identity": str(report.get("model_id", "")) == expected_model_id,
+        "quality_profile_expected": expected_quality_profile in QUALITY_PROFILES,
+        "quality_profile_requested": requested_quality_profile == expected_quality_profile,
+        "quality_profile_observed": observed_quality_profile == expected_quality_profile,
+        "quality_profile_known": requested_quality_profile in QUALITY_PROFILES
+        and observed_quality_profile in QUALITY_PROFILES,
+        "quality_profile_applied": bool(quality.get("applied", False))
+        and str(quality.get("last_error", "")) == ""
+        and str(quality.get("profile", "")) == observed_quality_profile,
         "godot_contract_clean": bool(contract.get("clean", False)),
         "single_authoritative_runtime": int(contract.get("maximum_runtime_count", 0)) == 1,
         "fixed_step_p95": _number(metrics.get("fixed_step_p95_ms")) <= budgets.fixed_p95_ms,

@@ -40,6 +40,7 @@ var _use_test_commands := false
 var _test_commands := Vector2.ZERO
 var _use_test_equipment_commands := false
 var _test_equipment_commands := Vector4.ZERO
+var _test_input_focus_bypass := false
 var _payload_identity := -1
 var _last_payload_sample: Dictionary = {}
 
@@ -139,6 +140,12 @@ func set_equipment_commands_for_test(commands: Vector4) -> void:
 	_test_equipment_commands = commands if commands.is_finite() else Vector4.ZERO
 	if _jolt_runtime != null:
 		_jolt_runtime.set_equipment_commands(_test_equipment_commands)
+
+
+func set_test_input_focus_bypass_for_test(enabled: bool) -> void:
+	_test_input_focus_bypass = enabled
+	if not enabled and not _input_focused and _jolt_runtime != null:
+		_jolt_runtime.stop_motion()
 
 
 func clear_equipment_commands_for_test() -> void:
@@ -379,7 +386,9 @@ func _step_authoritative_chassis() -> void:
 		return
 	var left := 0.0
 	var right := 0.0
-	if controller_enabled and _input_focused:
+	if controller_enabled and (
+		_input_focused or (_test_input_focus_bypass and _use_test_commands)
+	):
 		if _use_test_commands:
 			left = _test_commands.x
 			right = _test_commands.y
@@ -389,7 +398,9 @@ func _step_authoritative_chassis() -> void:
 	_jolt_runtime.set_enabled(controller_enabled)
 	_jolt_runtime.set_commands(left, right)
 	var equipment_axes := Vector4.ZERO
-	if controller_enabled and _input_focused:
+	if controller_enabled and (
+		_input_focused or (_test_input_focus_bypass and _use_test_equipment_commands)
+	):
 		equipment_axes = (
 			_test_equipment_commands
 			if _use_test_equipment_commands

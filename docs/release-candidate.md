@@ -42,6 +42,11 @@ pixi run soak-jolt-release
 ```
 
 Quick mode runs 90 seconds per model; release mode runs 15 minutes per model.
+Both commands pass `--quality-profile balanced` explicitly. For the full visual
+quality integration gate, run `pixi run soak-jolt-quality-matrix`; it executes
+the same 90-second interaction/lifecycle scenario for SY205 and SY135 at low,
+balanced, and high quality. Reports use the v2 schema and reject missing or
+mismatched requested/observed quality identity.
 The dedicated benchmark process disables VSync so frame percentiles measure
 renderer throughput instead of the display refresh wait; product display
 settings are not changed.

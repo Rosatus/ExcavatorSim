@@ -255,6 +255,29 @@ func _test_controller_authority_lifecycle() -> void:
 	var unfocused := chassis.get_status_snapshot()
 	if not is_zero_approx(float(unfocused["left_command"])) or not is_zero_approx(float(unfocused["right_command"])):
 		failures.append("focus loss did not disarm authoritative tracks")
+	chassis.set_test_input_focus_bypass_for_test(true)
+	chassis.set_commands_for_test(0.7, 0.7)
+	chassis.set_equipment_commands_for_test(Vector4(0.0, 0.0, 0.0, 1.0))
+	for _frame in 20:
+		await physics_frame
+	var automated := chassis.get_status_snapshot()
+	if not is_equal_approx(float(automated["left_command"]), 0.7) or not is_equal_approx(float(automated["right_command"]), 0.7):
+		failures.append("focus-independent automation did not retain authoritative track commands")
+	var automated_joints := automated.get("joints", []) as Array
+	if automated_joints.size() != 4 or float((automated_joints[3] as Dictionary).get("target_position_rad", 0.0)) <= 0.0:
+		failures.append("focus-independent automation did not retain equipment commands")
+	chassis.set_test_input_focus_bypass_for_test(false)
+	await physics_frame
+	var bypass_disabled := chassis.get_status_snapshot()
+	if not is_zero_approx(float(bypass_disabled["left_command"])) or not is_zero_approx(float(bypass_disabled["right_command"])):
+		failures.append("disabling the automation focus bypass did not restore focus safety")
+	chassis.clear_commands_for_test()
+	chassis.clear_equipment_commands_for_test()
+	chassis.set_commands_for_test(0.7, 0.7)
+	await physics_frame
+	var setter_after_cleanup := chassis.get_status_snapshot()
+	if not is_zero_approx(float(setter_after_cleanup["left_command"])) or not is_zero_approx(float(setter_after_cleanup["right_command"])):
+		failures.append("test setters bypassed focus safety after automation cleanup")
 	chassis.notification(Node.NOTIFICATION_APPLICATION_FOCUS_IN)
 	chassis.set_equipment_commands_for_test(Vector4(0.0, 0.0, 0.0, 1.0))
 	for _frame in 60:

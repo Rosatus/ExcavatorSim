@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Audit that quality selection and evidence do not create a second motion, terrain, bucket, or presentation writer."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Check typed validation, failure behavior, regression coverage, and bounded external data handling."}
+{"file":"docs/release-candidate.md","reason":"Verify every published release budget and lifecycle gate remains unchanged and passes for both models."}
+{"file":".trellis/tasks/archive/2026-08/08-17-jolt-authoritative-simulation/research/product-soak-evidence.md","reason":"Compare final release/matrix evidence with the accepted quick-soak baseline and known warnings."}
+{"file":".trellis/tasks/08-15-realistic-excavator-interaction/research/final-acceptance-gap.md","reason":"Verify lineage closure and ensure no superseded child work is reintroduced."}

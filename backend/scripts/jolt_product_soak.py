@@ -18,7 +18,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from babylon_sim.product_soak import SoakBudgets, evaluate_gateway_report, evaluate_godot_report
+from babylon_sim.product_soak import (
+    QUALITY_PROFILES,
+    SOAK_REPORT_SCHEMA_VERSION,
+    SoakBudgets,
+    evaluate_gateway_report,
+    evaluate_godot_report,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 CLIENT_DIR = ROOT / "godot/client"
@@ -65,24 +71,28 @@ def main() -> int:
     budgets = SoakBudgets()
     model_reports: list[dict[str, Any]] = []
     for model_id in args.models:
-        model_reports.append(
-            _run_model_with_retry(
-                model_id=model_id,
-                godot_exe=godot_exe,
-                duration_seconds=duration_seconds,
-                warmup_seconds=warmup_seconds,
-                output_dir=output.parent,
-                budgets=budgets,
-                allow_incomplete_scenario=args.allow_incomplete_scenario,
-                headless=args.headless,
+        for quality_profile in args.quality_profiles:
+            model_reports.append(
+                _run_model_with_retry(
+                    model_id=model_id,
+                    quality_profile=quality_profile,
+                    godot_exe=godot_exe,
+                    duration_seconds=duration_seconds,
+                    warmup_seconds=warmup_seconds,
+                    output_dir=output.parent,
+                    budgets=budgets,
+                    allow_incomplete_scenario=args.allow_incomplete_scenario,
+                    headless=args.headless,
+                )
             )
-        )
     report = {
-        "schema_version": "excavator-sim-jolt-product-soak-v1",
+        "schema_version": SOAK_REPORT_SCHEMA_VERSION,
         "captured_at_utc": datetime.now(UTC).isoformat(),
         "mode": args.mode,
         "rendered": not args.headless,
-        "duration_seconds_per_model": duration_seconds,
+        "quality_profiles": args.quality_profiles,
+        "duration_seconds_per_cell": duration_seconds,
+        "duration_seconds_per_model": duration_seconds * len(args.quality_profiles),
         "warmup_seconds": warmup_seconds,
         "budgets": budgets.as_dict(),
         "models": model_reports,
@@ -92,7 +102,8 @@ def main() -> int:
     for model in model_reports:
         failed = [name for name, passed in model["gates"].items() if not passed]
         status = "PASS" if model["pass"] else "FAIL"
-        print(f"{model['model_id']}: {status}" + (f" ({', '.join(failed)})" if failed else ""))
+        identity = f"{model['model_id']}/{model['quality_profile']}"
+        print(f"{identity}: {status}" + (f" ({', '.join(failed)})" if failed else ""))
     print(f"Jolt product soak report: {output}")
     return 0 if report["pass"] else 1
 
@@ -102,6 +113,13 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--mode", choices=("quick", "release"), default="quick")
     parser.add_argument(
         "--models", nargs="+", choices=("sy205", "sy135"), default=["sy205", "sy135"]
+    )
+    parser.add_argument(
+        "--quality-profile",
+        dest="quality_profiles",
+        nargs="+",
+        choices=QUALITY_PROFILES,
+        default=["balanced"],
     )
     parser.add_argument("--duration-seconds", type=float)
     parser.add_argument("--warmup-seconds", type=float)
@@ -142,6 +160,7 @@ def _run_model_with_retry(**kwargs: Any) -> dict[str, Any]:
 def _run_model(
     *,
     model_id: str,
+    quality_profile: str,
     godot_exe: Path,
     duration_seconds: float,
     warmup_seconds: float,
@@ -153,9 +172,10 @@ def _run_model(
     port = _reserve_port()
     health_url = f"http://127.0.0.1:{port}/health"
     endpoint = f"ws://127.0.0.1:{port}/ws"
-    godot_report_path = output_dir / f"jolt-product-soak-{model_id}-godot.json"
-    backend_log_path = output_dir / f"jolt-product-soak-{model_id}-backend.log"
-    godot_log_path = output_dir / f"jolt-product-soak-{model_id}-godot.log"
+    cell_id = f"{model_id}-{quality_profile}"
+    godot_report_path = output_dir / f"jolt-product-soak-{cell_id}-godot.json"
+    backend_log_path = output_dir / f"jolt-product-soak-{cell_id}-backend.log"
+    godot_log_path = output_dir / f"jolt-product-soak-{cell_id}-godot.log"
     backend_command = [
         sys.executable,
         "-u",
@@ -185,6 +205,8 @@ def _run_model(
             "--",
             "--model",
             model_id,
+            "--quality-profile",
+            quality_profile,
             "--duration-seconds",
             str(duration_seconds),
             "--warmup-seconds",
@@ -261,7 +283,7 @@ def _run_model(
         "telemetry": telemetry,
         "memory": memory,
     }
-    gates = evaluate_godot_report(godot_report, budgets)
+    gates = evaluate_godot_report(godot_report, budgets, model_id, quality_profile)
     gates.update(evaluate_gateway_report(gateway_report, budgets, model_id))
     gates["godot_process_exit"] = godot_exit_code == 0
     gates["rendered_product_path"] = not headless
@@ -271,6 +293,7 @@ def _run_model(
                 gates[name] = True
     return {
         "model_id": model_id,
+        "quality_profile": quality_profile,
         "godot_exit_code": godot_exit_code,
         "godot": godot_report,
         "gateway": gateway_report,
