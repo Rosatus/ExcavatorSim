@@ -211,6 +211,19 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
 - Each track uses four distributed ray contact points. Longitudinal drive,
   braking, coast, lateral resistance, slip, and differential yaw torque are
   bounded before forces are applied to the body.
+- Spawn and reset posture are calibrated from the same descriptor compound
+  shapes and the authoritative `TerrainState` surface. The initial transform
+  must establish a level/upright chassis relative to the sampled terrain
+  normal; changing only the vertical clearance is insufficient when provisional
+  center-of-mass or hull/contact geometry creates a pitch moment. Model-specific
+  posture corrections must be explicit descriptor data or a bounded calibration
+  step, never an untracked per-frame pose writer.
+- Longitudinal response is evaluated as a measured speed curve, not only by the
+  final speed clamp. Drive, coast and braking forces remain bounded by actual
+  support load, and brake effort must be slew-limited or otherwise bounded per
+  fixed tick so command release cannot create a one-tick pitch impulse. The
+  runtime snapshot should expose enough telemetry to measure acceleration,
+  stop time/distance, peak pitch rate and realized slip for each model.
 - Track raycasts may hit only the project `TerrainCollider`, and forces activate
   only when its applied `(world_generation, terrain_revision)` matches the
   current `TerrainState`. The heightfield remains the logical terrain authority.
@@ -305,6 +318,15 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
 - Real Godot 4.7.1/Jolt tests cover both models settling, straight travel,
   braking, reversing, pivoting, bounded slope/mound traversal, speed/energy
   bounds, stale terrain rejection, model switch, and teardown.
+- Reset/model-switch tests assert the lowest chassis point remains within the
+  configured clearance of `TerrainState`, the chassis up axis is within the
+  posture tolerance of the sampled terrain normal, and the first movement
+  still requires the neutral re-arm contract.
+- Braking tests sample the fixed-tick response and assert monotonic speed
+  reduction, bounded peak pitch angle/rate, bounded stop time and distance,
+  and no sign reversal or yaw snap. Acceleration tests compare time-to-target
+  and realized speed against per-model descriptor targets without relying on
+  the global velocity clamp as the primary behavior.
 - Articulation tests assert one body/four kinematic frames/four joints, both
   command directions, limits, target/actual telemetry, neutral re-arm, stale
   identity, payload slowdown and zero residual runtime nodes for both models.
