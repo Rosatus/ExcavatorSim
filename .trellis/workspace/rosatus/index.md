@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 34
-- **Last Active**: 2026-08-19
+- **Total Sessions**: 35
+- **Last Active**: 2026-08-20
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1345 | Active |
+| `journal-1.md` | ~1378 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 35 | 2026-08-20 | Godot standalone product and optional gateway | `b011b1a` | `main` |
 | 34 | 2026-08-19 | Jolt interaction acceptance closeout | `726434e` | `main` |
 | 33 | 2026-08-18 | Complete Jolt authoritative parent integration | `217f7a8f27252d764c6277d8736e8ed40ce61ef4` | `main` |
 | 32 | 2026-08-18 | Archive Jolt authority cutover | `780e4cf` | `main` |

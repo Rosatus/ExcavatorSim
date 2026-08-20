@@ -1343,3 +1343,36 @@ Added validated low/balanced/high quality identities to the Jolt product soak, r
 ### Next Steps
 
 - None - task complete
+
+
+## Session 35: Godot standalone product and optional gateway
+
+**Date**: 2026-08-20
+**Task**: Godot standalone product and optional gateway
+**Branch**: `main`
+
+### Summary
+
+Made Godot/Jolt the offline default product, separated the optional Python gateway and archived Pinocchio compatibility from the default runtime path.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b011b1a` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
