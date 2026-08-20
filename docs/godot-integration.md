@@ -43,9 +43,9 @@ converted frame relations provide only the local single-axis joint rotations.
 
 ## Authority boundary
 
-Python remains authoritative for lifecycle and input safety in every profile.
-The product default uses Python's `gateway-only` runtime for that boundary; it
-does not reconstruct pose. Python is authoritative for chassis/joint pose only
+Godot remains authoritative for lifecycle and input safety in the standalone
+product. The optional Python `gateway-only` runtime validates observational
+input/telemetry and does not reconstruct pose. Python is authoritative for chassis/joint pose only
 in the explicit `python_kinematic` and `jolt_shadow` compatibility profiles.
 The `legacy` Python runtime profile remains authoritative for
 terrain layers, bucket inventory, events, recording and replay. The

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "generated_from": "pixi.lock",
-  "pixi_lock_sha256": "b9b2ac7f544150626b7d63f04cd6643a0276f2f563b055dad0e3d0821e8610b8",
+  "pixi_lock_sha256": "427084c589505f5f3463791e277c6dea1fadce27cf64b8c15a17a9a4ec3d97e7",
   "packages": [
     {
       "name": "_python_abi3_support",

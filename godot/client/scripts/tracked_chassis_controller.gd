@@ -18,6 +18,7 @@ const INPUT_ACTIONS := {
 @export var jolt_hint_max_error_m := 0.2
 @export_flags_3d_physics var terrain_collision_mask := 1
 @export var motion_client_path := NodePath("../MotionClient")
+@export var product_session_path := NodePath("../ProductSession")
 @export var motion_presentation_path := NodePath("../MotionPresentation")
 @export var terrain_world_path := NodePath("../TerrainRoot/TerrainWorld")
 @export var terrain_collider_path := NodePath("../TerrainRoot/TerrainCollider")
@@ -28,6 +29,7 @@ var ground_lift_reaction := BucketGroundLiftReaction.new()
 var active_model_id := ""
 var contract_error := ""
 var _motion_client: MotionClient
+var _product_session: ProductSession
 var _motion_presentation: MotionPresentation
 var _terrain_world: TerrainWorld
 var _terrain_collider: TerrainCollider
@@ -112,7 +114,31 @@ func set_controller_enabled(value: bool) -> void:
 			_reset_motion()
 
 
+func set_product_session_state(running: bool, focused: bool) -> void:
+	if AuthorityProfile.writes_product_pose(authority_profile):
+		controller_enabled = running
+	_input_focused = focused
+	if not running or not focused:
+		stop_product_motion()
+
+
+func stop_product_motion() -> void:
+	locomotion_state.stop_motion()
+	_test_commands = Vector2.ZERO
+	_test_equipment_commands = Vector4.ZERO
+	if _jolt_runtime != null:
+		_jolt_runtime.stop_motion()
+		_jolt_runtime.set_commands(0.0, 0.0)
+		_jolt_runtime.set_equipment_commands(Vector4.ZERO, Engine.get_physics_frames())
+
+
 func configure_model_for_test(model_id: String) -> bool:
+	if active_model_id == model_id and contract_error.is_empty():
+		if AuthorityProfile.writes_product_pose(authority_profile):
+			if _jolt_runtime != null and _jolt_runtime.configured:
+				return true
+		elif locomotion_state.configured:
+			return true
 	return _configure_model(model_id)
 
 
@@ -249,6 +275,7 @@ func _empty_authoritative_status() -> Dictionary:
 
 func _connect_runtime() -> void:
 	_motion_client = get_node_or_null(motion_client_path) as MotionClient
+	_product_session = get_node_or_null(product_session_path) as ProductSession
 	_motion_presentation = get_node_or_null(motion_presentation_path) as MotionPresentation
 	_terrain_world = get_node_or_null(terrain_world_path) as TerrainWorld
 	_terrain_collider = get_node_or_null(terrain_collider_path) as TerrainCollider
@@ -401,10 +428,14 @@ func _step_authoritative_chassis() -> void:
 	if controller_enabled and (
 		_input_focused or (_test_input_focus_bypass and _use_test_equipment_commands)
 	):
-		equipment_axes = (
+			equipment_axes = (
 			_test_equipment_commands
 			if _use_test_equipment_commands
-			else (_motion_client.get_authoritative_input_axes() if _motion_client != null else Vector4.ZERO)
+			else (
+				_product_session.get_equipment_input_axes()
+				if _product_session != null
+				else (_motion_client.get_authoritative_input_axes() if _motion_client != null else Vector4.ZERO)
+			)
 		)
 	_jolt_runtime.set_equipment_commands(equipment_axes, Engine.get_physics_frames())
 	_submit_authoritative_payload()

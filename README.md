@@ -1,7 +1,8 @@
 # ExcavatorSim
 
-ExcavatorSim is a Windows desktop excavator simulator built around a Godot
-Forward+ client and a Python motion/input service migrated from BabylonSim.
+ExcavatorSim is a Windows desktop excavator simulator built around a standalone
+Godot Forward+ product. Python is an optional gateway and compatibility stack,
+not a product runtime dependency.
 
 ## Current state
 
@@ -17,7 +18,7 @@ In the product default, Godot/Jolt remains authoritative for:
   terrain and bucket inventory;
 - the visual and sensor truth produced by the accepted fixed tick.
 
-Python runs the `gateway-only` lifecycle/input/telemetry service. It validates
+The optional Python `gateway-only` service validates
 identity, ordering and freshness but does not construct or step Pinocchio and
 does not emit product `view_state` in this profile. `start-python-kinematic`
 and `start-legacy` remain explicit compatibility launchers for the old Python
@@ -58,9 +59,10 @@ Architecture reading order:
    standalone-path gates.
 2. Run `pixi run backend-smoke` and the Godot standalone matrix when changing
    transport, terrain, or client behavior.
-3. Use `pixi run start` for the Jolt-authoritative product and an explicit
-   compatibility task (`start-python-kinematic` or `start-legacy`) when Python
-   pose/replay behavior is under test.
+3. Start the product directly from Godot or its exported executable. Use
+   `pixi run start-gateway` only when the optional Python telemetry gateway is
+   needed, and use `start-python-kinematic` or `start-legacy` only for explicit
+   compatibility tests.
 4. Treat articulated Jolt equipment, production-grade hydraulics, contact/mass
    calibration, excavation coupling, and per-grain soil as deferred model work;
    evaluate C++ only after profiling identifies a measured bottleneck.

@@ -8,11 +8,10 @@ from typing import Any
 
 from .calibration import MachineCalibration
 from .gateway_runtime import GatewayRuntimeController
-from .model import ExcavatorModel
 from .model_registry import ModelDescriptor, ModelRegistry, load_model_registry
-from .runtime import RuntimeController, RuntimeProfile
+from .runtime_types import RuntimeProfile
 
-ManagedRuntime = RuntimeController | GatewayRuntimeController
+ManagedRuntime = Any
 
 
 class ModelSelectionError(RuntimeError):
@@ -74,6 +73,9 @@ class RuntimeSessionManager:
     ) -> ManagedRuntime:
         if profile == "gateway-only":
             return GatewayRuntimeController(descriptor)
+        from .model import ExcavatorModel
+        from .runtime import RuntimeController
+
         model = ExcavatorModel.from_urdf(
             descriptor.urdf_path, model_version=descriptor.model_version
         )

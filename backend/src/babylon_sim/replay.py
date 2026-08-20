@@ -10,7 +10,6 @@ from concurrent.futures import Future
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
-from .model import ExcavatorModel
 from .recording import (
     BufferSnapshot,
     ChunkedRecordingBuffer,
@@ -21,6 +20,7 @@ from .replay_contract import REPLAY_VIEW_HZ, PlaybackState, SourceMode
 from .state import Matrix4
 
 if TYPE_CHECKING:
+    from .model import ExcavatorModel
     from .runtime import RuntimeSnapshot
 
 ReplayAction = Literal["play", "pause", "seek", "go_live", "return_live"]

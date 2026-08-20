@@ -75,15 +75,18 @@ func _ready() -> void:
 		authority_profile = String(ProjectSettings.get_setting("simulation/authority_profile", authority_profile))
 	_motion_client = get_node_or_null(motion_client_path) as MotionClient
 	_presentation_root = get_node_or_null(presentation_root_path) as Node3D
-	if _motion_client == null or _presentation_root == null:
-		_contract_error = "MotionPresentation requires MotionClient and PresentationRoot"
+	if _presentation_root == null:
+		_contract_error = "MotionPresentation requires PresentationRoot"
 		push_warning(_contract_error)
 		return
-	_motion_client.model_changed.connect(_on_model_changed)
-	if not _activate_model(_motion_client.get_desired_model_id()):
+	if _motion_client != null:
+		_motion_client.model_changed.connect(_on_model_changed)
+	var initial_model := _motion_client.get_desired_model_id() if _motion_client != null else "sy205"
+	if not _activate_model(initial_model):
 		return
-	_motion_client.pose_accepted.connect(_on_pose_accepted)
-	_motion_client.pose_cleared.connect(_on_pose_cleared)
+	if _motion_client != null:
+		_motion_client.pose_accepted.connect(_on_pose_accepted)
+		_motion_client.pose_cleared.connect(_on_pose_cleared)
 	_restore_rest_pose()
 
 

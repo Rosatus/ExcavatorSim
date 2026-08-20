@@ -25,6 +25,7 @@
 [ext_resource type="Script" uid="uid://deo0gxkmk2ahd" path="res://addons/sky_3d/src/Sky3D.gd" id="14_sky3d"]
 [ext_resource type="Script" uid="uid://y3tj71yjij51" path="res://scripts/tracked_chassis_controller.gd" id="15_track_controller"]
 [ext_resource type="Script" path="res://scripts/simulation_truth_publisher.gd" id="16_truth_publisher"]
+[ext_resource type="Script" path="res://scripts/product_session.gd" id="17_product_session"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_qkpxi"]
 shader = ExtResource("1_pm3ni")
@@ -251,6 +252,9 @@ controller_enabled = true
 [node name="MotionClient" type="Node" parent="." unique_id=358783374]
 script = ExtResource("2_motion_client")
 
+[node name="ProductSession" type="Node" parent="." unique_id=498572130]
+script = ExtResource("17_product_session")
+
 [node name="MotionPresentation" type="Node3D" parent="." unique_id=2082115328]
 script = ExtResource("3_motion_presentation")
 presentation_root_path = NodePath("../ChassisMotionRoot/PresentationRoot")
@@ -283,7 +287,7 @@ text = "Connection: disconnected"
 
 [node name="Authority" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=1315170415]
 layout_mode = 2
-text = "Authority: waiting for Python"
+text = "Authority: Godot/Jolt local"
 
 [node name="Lifecycle" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=1302050459]
 layout_mode = 2

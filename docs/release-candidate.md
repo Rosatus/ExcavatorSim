@@ -1,11 +1,12 @@
 # Godot-first release-candidate boundary
 
-The release candidate keeps a Jolt-authoritative default plus two explicit
-Python compatibility profiles:
+The release candidate keeps a standalone Jolt-authoritative Godot product plus
+an optional gateway and two explicit Python compatibility profiles:
 
-- `gateway-only`: Python owns lifecycle, input lease validation, model identity
-  and bounded telemetry storage. It does not construct/step Simulator or emit
-  `view_state`; Godot/Jolt owns product motion and contacts.
+- `gateway-only`: an optional Python service owns only gateway lifecycle/input
+  validation, model identity and bounded telemetry storage. It does not
+  construct/step Simulator or emit `view_state`; Godot/Jolt owns product motion
+  and contacts even when this service is running.
 - `motion-only`: Python owns kinematics, input safety and lifecycle; Godot owns
   its local deterministic terrain, bucket convenience state and presentation.
 - `legacy`: the existing Python terrain, recording and replay services remain
@@ -20,6 +21,9 @@ back to Python.
 Release-candidate checks include the Godot standalone matrix in
 `godot/client/tests/README.md`, Godot MCP scene/runtime smoke, and `pixi run
 verify` for the backend/provenance/standalone gates.
+
+The standalone matrix includes `offline_product_test.gd`; this is the required
+offline-default smoke and must pass with no service listening on port 8765.
 
 ## Reproducible release evidence
 

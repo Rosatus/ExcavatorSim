@@ -11,15 +11,16 @@
 ```text
 输入设备 → Godot SimulationCore/Jolt → 本地 truth / TerrainState / BucketSoilState
 → MotionPresentation / Terrain / UI → Windows 桌面画面
-                         ↘ Python gateway（lifecycle / input lease / telemetry）
+                         ↘ optional Python gateway（telemetry / diagnostics）
 ```
 
 `jolt_shadow` 仍可显式发布 Godot fixed-tick truth 快照到 Python 的隔离
 latest-value 诊断槽；它不改变产品姿态链。项目默认是
-`jolt_authoritative`，Python 默认运行 `gateway-only`。此时 Jolt 独占一个动态
+`jolt_authoritative`，Python 可选运行 `gateway-only`。此时 Jolt 独占一个动态
 底盘刚体和履带力，受限运动学状态
 独占回转、动臂、斗杆、铲斗姿态，query-only 铲斗代理提供地形接触证据。该模式
-生成本地 authoritative truth，但不会把它作为 shadow 发回 Python。
+生成本地 authoritative truth，但不会把它作为 shadow 发回 Python。Python
+gateway 不在线时不影响产品启动、生命周期或本地运动。
 
 当前权威边界按 profile 切换：
 
@@ -83,7 +84,7 @@ flowchart LR
 | 边界 | 当前事实 | 入口/来源 |
 |---|---|---|
 | Godot 客户端 | Windows desktop、Godot 4.7、Forward+、1920×1080 stretch；主场景 `res://scenes/main.tscn` | [`godot/client/project.godot`](../../godot/client/project.godot#L11-L48)、[`README.md`](../../README.md#L3-L4) |
-| Python 服务 | `pixi run start` 启动 `gateway-only`；`start-python-kinematic` 显式选择 motion-only，`start-legacy` 选择完整兼容服务 | [`pixi.toml`](../../pixi.toml#L26-L38)、[`backend/src/babylon_sim/cli.py`](../../backend/src/babylon_sim/cli.py#L69-L93) |
+| Python 服务 | `pixi run start-gateway` 启动可选 `gateway-only`；`start-python-kinematic` 显式选择 motion-only，`start-legacy` 选择完整兼容服务 | [`pixi.toml`](../../pixi.toml#L26-L38)、[`backend/src/babylon_sim/cli.py`](../../backend/src/babylon_sim/cli.py#L69-L93) |
 | 默认网络 | loopback `127.0.0.1:8765`；Godot 默认 `ws://127.0.0.1:8765/ws` | [`backend/src/babylon_sim/cli.py`](../../backend/src/babylon_sim/cli.py#L23-L47)、[`godot/client/scripts/motion_client.gd`](../../godot/client/scripts/motion_client.gd#L19-L23) |
 | MCP | EditorPlugin，默认开发端口 HTTP 8000 / WS 9500；导出时 helper 被剥离 | [`godot/client/addons/godot_ai/plugin.gd`](../../godot/client/addons/godot_ai/plugin.gd#L1-L4)、[`mcp_export_plugin.gd`](../../godot/client/addons/godot_ai/export/mcp_export_plugin.gd#L1-L69) |
 | 未来硬件 | 仅目标拓扑；当前没有驱动、总线或中控产品实现 | 代码/依赖检索无 `pyserial`、`python-can`、USB/HID、ROS client 证据 |
@@ -105,7 +106,7 @@ flowchart TB
     legacy_components --> legacy_client[legacy terrain / recording / playback clients]
 ```
 
-| 能力/组件 | `gateway-only`（Product default） | `motion-only` / `legacy`（Explicit compatibility） |
+| 能力/组件 | `gateway-only`（Optional service） | `motion-only` / `legacy`（Explicit compatibility） |
 |---|---|---|
 | Python 运动/FK | 无 | 有 |
 | 输入安全、生命周期 | 有 | 有 |
@@ -115,13 +116,13 @@ flowchart TB
 | recording / playback / RRD exchange | 无 | 有 |
 | Godot 本地 terrain/bucket | 产品唯一语义状态 | motion-only 仍是本地状态；legacy 兼容旧服务 |
 | 对外能力集合 | `input_snapshot`, `commands`, bucket feedback / sensor telemetry | 按各自旧 profile 合同 |
-| 当前产品定位 | 默认产品路径 | 兼容、回滚和回归 |
+| 当前产品定位 | 可选诊断/设备桥接 | 兼容、回滚和回归 |
 
 Profile 合同位于 [`runtime-profiles.md`](../../.trellis/spec/backend/runtime-profiles.md#L1-L55)。gateway-only 必须不创建 `Simulator`、Pinocchio、`TerrainController`、`ReplayWorker` 或 exchange worker；禁用的 HTTP/WS 能力要在边界处失败而不是改变运动状态。
 
 ## 4. Python 后端：gateway 与兼容运动 authority
 
-默认 `gateway-only` 只接受生命周期、输入租约和观测 telemetry。它不创建
+可选 `gateway-only` 只接受输入租约和观测 telemetry。它不创建
 `Simulator`、不运行 Pinocchio FK、也不生成 `view_state`。下图是显式
 `motion-only`/`legacy` 兼容 profile 的 Python authority 链；这条链不能与
 默认 Jolt 世界共用一个活动 session。
@@ -278,7 +279,7 @@ RRD columns.
 
 ```mermaid
 flowchart LR
-    py[Python gateway<br/>lifecycle + input safety + telemetry]
+    py[Optional Python gateway<br/>telemetry + diagnostics]
     jolt_auth[Hybrid authority<br/>Jolt chassis + kinematic equipment]
     view[view_state<br/>session + simulation_epoch + view_revision]
     pose[Godot pose buffer / GLB pivots]

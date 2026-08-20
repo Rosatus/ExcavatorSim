@@ -3,7 +3,8 @@
 ## 1. Scope / Trigger
 
 This contract applies when the standalone service is started for the Godot
-motion vertical slice. The product default is a gateway-only process because
+motion vertical slice. The product default is a standalone Godot process.
+Python `gateway-only` is an optional independently launched service because
 Godot/Jolt owns product pose, contact, terrain and payload; Python kinematic
 profiles remain explicit compatibility launchers.
 
@@ -16,7 +17,7 @@ create_runtime(model, calibration, *, profile: RuntimeProfile = "legacy")
 ```
 
 The CLI accepts `--runtime-profile {gateway-only,legacy,motion-only}`.
-`pixi run start` selects `gateway-only`; `pixi run start-legacy` selects the
+`pixi run start-gateway` selects `gateway-only`; `pixi run start-legacy` selects the
 full Python compatibility service and `pixi run start-python-kinematic` selects
 the explicit motion-only Pinocchio service. `start-motion-only` remains an
 alias.

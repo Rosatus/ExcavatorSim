@@ -32,7 +32,13 @@ project/assembly_name="ExcavatorSim"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg", "res://addons/terrain_3d/plugin.cfg")
+enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg", "res://addons/sky_3d/plugin.cfg", "res://addons/terrain_3d/plugin.cfg")
+
+[gateway]
+
+enabled=false
+endpoint="ws://127.0.0.1:8765/ws"
+auto_reconnect=false
 
 [physics]
 

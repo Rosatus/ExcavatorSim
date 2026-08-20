@@ -15,7 +15,7 @@ from .input_router import InputRouter, InputSnapshot
 from .model_registry import ModelDescriptor
 from .observation_store import ObservationStore
 from .protocol import BucketLoadFeedbackMessage, ProtocolError
-from .runtime import (
+from .runtime_types import (
     BUCKET_FEEDBACK_CAPABILITY,
     COMMAND_CACHE_CAPACITY,
     CommandResult,

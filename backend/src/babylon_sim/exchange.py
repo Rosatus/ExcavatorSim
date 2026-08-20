@@ -11,11 +11,14 @@ from collections.abc import Callable
 from concurrent.futures import Future
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .recording import ChunkedRecordingBuffer
 from .replay import PlaybackApplied, ReplayCommandError, ReplayWorker
 from .replay_contract import IMPORT_TOKEN_TTL_SECONDS, SourceMode
-from .rrd import ImportedRecording, RrdProfileError, export_rrd, import_rrd
+
+if TYPE_CHECKING:
+	from .rrd import ImportedRecording
 
 
 class ExchangeError(RuntimeError):
@@ -90,6 +93,8 @@ class RecordingExchange:
                 )
             digest = _sha256(path)
             try:
+                from .rrd import RrdProfileError, import_rrd
+
                 imported = import_rrd(path, expected_model_version=self.model_version)
             except RrdProfileError as exc:
                 raise ExchangeError("invalid_rrd", str(exc)) from exc
@@ -181,6 +186,8 @@ class RecordingExchange:
         self._begin_operation()
         path = self.root / f"export-{uuid.uuid4().hex}.rrd"
         try:
+            from .rrd import RrdProfileError, export_rrd
+
             export_rrd(
                 self.recording.snapshot(),
                 path,

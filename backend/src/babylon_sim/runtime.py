@@ -23,6 +23,14 @@ from .protocol import BucketLoadFeedbackMessage, ProtocolError
 from .recording import ChunkedRecordingBuffer
 from .replay import AuthoritativeViewState, LatestViewSlot, ReplayWorker
 from .replay_contract import PlaybackState, SourceMode
+from .runtime_types import (
+    BUCKET_FEEDBACK_CAPABILITY,
+    COMMAND_CACHE_CAPACITY,
+    CommandResult,
+    LifecycleCommand,
+    RuntimeCommandError,
+    RuntimeStatus,
+)
 from .sensor_gateway import SENSOR_TELEMETRY_CAPABILITY, SensorTelemetryBatch
 from .shadow_state import SHADOW_TRUTH_CAPABILITY, ShadowTruthSample
 from .simulation import SimulationStatus, Simulator
@@ -35,27 +43,9 @@ from .terrain_excavation import (
     point_from_matrix,
 )
 
-LifecycleCommand = Literal["start", "pause", "reset"]
-RuntimeProfile = Literal["legacy", "motion-only", "gateway-only"]
 SimulationRuntimeProfile = Literal["legacy", "motion-only"]
 COMMAND_QUEUE_CAPACITY = 32
 COMMANDS_PER_TICK = 8
-COMMAND_CACHE_CAPACITY = 128
-BUCKET_FEEDBACK_CAPABILITY = "bucket_load_feedback_v1"
-
-
-class RuntimeCommandError(RuntimeError):
-    def __init__(self, code: str, message: str) -> None:
-        super().__init__(message)
-        self.code = code
-
-
-@dataclass(frozen=True)
-class CommandResult:
-    id: str
-    command: LifecycleCommand
-    lifecycle: str
-    state_sequence: int
 
 
 @dataclass(frozen=True)
@@ -66,17 +56,6 @@ class RuntimeSnapshot:
     state: SimulationState
     last_input_client_sequence: int | None
     server_monotonic_ms: float
-
-
-@dataclass(frozen=True)
-class RuntimeStatus:
-    simulation_hz: float
-    state_hz: float
-    render_target_hz: float
-    overruns: int
-    dropped_snapshots: int
-    controller_source: str | None
-    stale: bool
 
 
 @dataclass(frozen=True)

@@ -36,6 +36,7 @@ terrain_state_test.gd
 excavation_gameplay_test.gd
 visual_pass_test.gd
 release_candidate_test.gd
+offline_product_test.gd
 ```
 
 These scripts are standalone `SceneTree` checks rather than an addon test
@@ -51,6 +52,10 @@ collider ownership, initial overlap, bounded query cost, and teardown. The
 articulated/runtime tests then assert the product hybrid shape: one chassis body,
 four accepted kinematic frames, no work-equipment physics bodies, payload
 slowdown, query identity, and bounded next-tick support wrench.
+
+`offline_product_test.gd` is the default-product contract: it starts the real
+main scene with Gateway disabled, exercises local lifecycle/reset and model
+switching, and asserts that no Python listener is required.
 
 The standalone matrix does not replace the live service probes:
 

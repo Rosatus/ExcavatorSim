@@ -24,7 +24,8 @@ $tests = @(
     "terrain_state_test.gd",
     "excavation_gameplay_test.gd",
     "visual_pass_test.gd",
-    "release_candidate_test.gd"
+    "release_candidate_test.gd",
+    "offline_product_test.gd"
 )
 
 function Invoke-Godot {

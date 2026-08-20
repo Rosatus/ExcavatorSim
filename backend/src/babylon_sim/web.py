@@ -11,14 +11,13 @@ from collections import deque
 from collections.abc import Awaitable, Callable, Iterable
 from concurrent.futures import Future
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 from aiohttp import WSMsgType, web
 from aiohttp.client_exceptions import ClientConnectionResetError
 
 from .constants import ACTIVE_JOINT_NAMES
 from .exchange import ExchangeError
-from .gateway_runtime import GatewayRuntimeController
 from .input_router import InputRouterError
 from .paths import (
     FRONTEND_DIST_PATH,
@@ -45,12 +44,7 @@ from .protocol import (
 )
 from .replay import AuthoritativeViewState, PlaybackApplied, ReplayCommandError
 from .replay_contract import RECORDING_UPLOAD_MAX_BYTES
-from .runtime import (
-    BUCKET_FEEDBACK_CAPABILITY,
-    CommandResult,
-    RuntimeCommandError,
-    RuntimeController,
-)
+from .runtime_types import BUCKET_FEEDBACK_CAPABILITY, CommandResult, RuntimeCommandError
 from .sensor_gateway import (
     SENSOR_TELEMETRY_CAPABILITY,
     SensorTelemetryIdentity,
@@ -68,7 +62,7 @@ from .terrain import TerrainSpecError, terrain_snapshot_bytes
 from .terrain_controller import TerrainCommandError
 from .visual_assets import VisualModelManifest, load_visual_model_manifest
 
-RuntimeLike = RuntimeController | GatewayRuntimeController
+RuntimeLike = Any
 
 HELLO_TIMEOUT_SECONDS = 3.0
 INPUT_RATE_LIMIT = 80
@@ -127,7 +121,7 @@ class SlidingWindowRateLimiter:
 def _state_message(
     view: AuthoritativeViewState,
     emitted_sequence: int,
-    runtime: RuntimeSessionManager | RuntimeController,
+    runtime: RuntimeSessionManager | Any,
 ) -> dict[str, object]:
     model_version = runtime.model_version
     visual_model_version = runtime.visual_model_version
@@ -807,7 +801,7 @@ async def _websocket(request: web.Request) -> web.StreamResponse:
         await send(hello_ack)
         if runtime.publishes_view_state:
             sender_task = asyncio.create_task(
-                _state_sender(cast(RuntimeController, runtime), ws, send, authority_lock),
+                _state_sender(cast(Any, runtime), ws, send, authority_lock),
                 name=f"state-{session_id}",
             )
         status_task = asyncio.create_task(
@@ -1086,7 +1080,7 @@ async def _handle_input(
 
 
 async def _state_sender(
-    runtime: RuntimeController,
+    runtime: Any,
     ws: web.WebSocketResponse,
     send: Callable[[dict[str, object]], Awaitable[None]],
     authority_lock: asyncio.Lock,

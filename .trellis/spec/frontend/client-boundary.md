@@ -27,8 +27,8 @@ shadow transport.
 ## Godot-first local-world profile
 
 The product default uses Godot/Jolt for motion kinematics, contacts and local
-world truth. Python's `gateway-only` service owns lifecycle, input safety and
-bounded telemetry validation without publishing pose. The explicit
+world truth. Python's optional `gateway-only` service validates observational
+input and bounded telemetry without publishing pose. The explicit
 `motion-only` compatibility profile retains Python kinematics while Godot owns
 deterministic-enough terrain/world state, bucket convenience state and
 presentation. `TerrainState` keeps stable and loose Float32 layers;

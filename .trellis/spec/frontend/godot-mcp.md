@@ -43,7 +43,13 @@ Bad: hand-copy extracted textures into the repository, infer pivots from mesh na
 
 ## Cross-Layer Contract
 
-The MCP edits only the Godot presentation client. Python remains authoritative for joint state, terrain layers, bucket inventory, events, recording, replay, and lifecycle. MCP-assisted Godot code may consume HTTP/WebSocket snapshots and patches, but must not write authoritative transforms, terrain heights, bucket volume, or replay cursors back to Python.
+The MCP edits only the Godot presentation client. In the standalone product,
+Godot/Jolt is authoritative for lifecycle, joint state, terrain layers, bucket
+inventory and local truth; Python remains an explicit compatibility authority
+or optional observational gateway. MCP-assisted Godot code may consume
+HTTP/WebSocket snapshots and patches in those explicit modes, but must not write
+authoritative transforms, terrain heights, bucket volume, or replay cursors back
+to Python.
 
 ## Validation & Error Matrix
 

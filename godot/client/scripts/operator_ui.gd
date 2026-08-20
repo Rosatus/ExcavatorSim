@@ -2,9 +2,11 @@ class_name MotionOperatorUI
 extends CanvasLayer
 
 @export var motion_client_path := NodePath("../MotionClient")
+@export var product_session_path := NodePath("../ProductSession")
 @export var excavation_world_path := NodePath("../TerrainRoot/ExcavationWorld")
 
 var _motion_client: MotionClient
+var _product_session: ProductSession
 var _excavation_world: ExcavationWorld
 var _model_selector: OptionButton
 @onready var _connection_label: Label = $StatusPanel/Margin/VBox/Connection
@@ -19,6 +21,7 @@ var _model_selector: OptionButton
 
 func _ready() -> void:
 	_motion_client = get_node_or_null(motion_client_path) as MotionClient
+	_product_session = get_node_or_null(product_session_path) as ProductSession
 	_excavation_world = get_node_or_null(excavation_world_path) as ExcavationWorld
 	_model_selector = get_node_or_null("StatusPanel/Margin/VBox/ModelSelector") as OptionButton
 	if _model_selector == null:
@@ -37,32 +40,39 @@ func _ready() -> void:
 	if _excavation_world != null:
 		_excavation_world.excavation_changed.connect(_on_excavation_changed)
 		_refresh_bucket_volume()
-	if _motion_client == null:
-		_diagnostics_label.text = "Motion service: offline (static visual mode)"
-		return
-	_motion_client.connection_changed.connect(_on_connection_changed)
-	_motion_client.authority_changed.connect(_on_authority_changed)
-	_motion_client.diagnostics_changed.connect(_on_diagnostics_changed)
-	_motion_client.input_acknowledged.connect(_on_input_acknowledged)
-	_motion_client.command_acknowledged.connect(_on_command_acknowledged)
+	if _motion_client != null:
+		_motion_client.connection_changed.connect(_on_connection_changed)
+		_motion_client.authority_changed.connect(_on_authority_changed)
+		_motion_client.diagnostics_changed.connect(_on_diagnostics_changed)
+		_motion_client.input_acknowledged.connect(_on_input_acknowledged)
+		_motion_client.command_acknowledged.connect(_on_command_acknowledged)
+	if _product_session != null:
+		_product_session.status_changed.connect(_on_product_status_changed)
+		_product_session.model_changed.connect(_on_product_model_changed)
 	_refresh()
 	_refresh_model_selector()
 
 
 func _on_start_pressed() -> void:
-	if _motion_client != null:
+	if _product_session != null and _is_local_authority():
+		_product_session.request_start()
+	elif _motion_client != null:
 		_motion_client.request_start()
 
 
 func _on_pause_pressed() -> void:
-	if _motion_client != null:
+	if _product_session != null and _is_local_authority():
+		_product_session.request_pause()
+	elif _motion_client != null:
 		_motion_client.request_pause()
 
 
 func _on_reset_pressed() -> void:
-	if _motion_client != null:
+	if _product_session != null and _is_local_authority():
+		_product_session.request_reset()
+	elif _motion_client != null:
 		_motion_client.request_reset()
-	if _excavation_world != null:
+	if _product_session == null and _excavation_world != null:
 		_excavation_world.reset_for_test()
 
 
@@ -86,17 +96,32 @@ func _on_command_acknowledged(_ack: Dictionary) -> void:
 	_refresh()
 
 
+func _on_product_status_changed(_status: Dictionary) -> void:
+	_refresh()
+
+
+func _on_product_model_changed(_model_id: String) -> void:
+	_refresh()
+
+
 func _on_model_selected(index: int) -> void:
-	if _motion_client == null or _model_selector == null:
+	if _model_selector == null:
 		return
 	var model_id := String(_model_selector.get_item_metadata(index))
-	_motion_client.request_model_switch(model_id)
+	if _product_session != null and _is_local_authority():
+		_product_session.request_model_switch(model_id)
+	elif _motion_client != null:
+		_motion_client.request_model_switch(model_id)
 
 
 func _refresh_model_selector() -> void:
-	if _model_selector == null or _motion_client == null:
+	if _model_selector == null:
 		return
-	var selected := _motion_client.active_model_id if not _motion_client.active_model_id.is_empty() else _motion_client.desired_model_id
+	var selected := "sy205"
+	if _product_session != null and _is_local_authority():
+		selected = _product_session.active_model_id
+	elif _motion_client != null:
+		selected = _motion_client.active_model_id if not _motion_client.active_model_id.is_empty() else _motion_client.desired_model_id
 	for index in range(_model_selector.item_count):
 		if String(_model_selector.get_item_metadata(index)) == selected:
 			_model_selector.select(index)
@@ -108,17 +133,15 @@ func _on_excavation_changed(_status: Dictionary) -> void:
 
 
 func _refresh() -> void:
-	if _motion_client == null:
+	if _motion_client == null and _product_session == null:
 		return
-	var status := _motion_client.get_status_snapshot()
-	var connection := String(status.get("connection_state", "disconnected"))
-	_connection_label.text = "Connection: %s" % connection
+	var local_mode := _is_local_authority()
+	var status := _product_session.get_status_snapshot() if local_mode else _motion_client.get_status_snapshot()
+	var connection := String(status.get("gateway_state", "disabled")) if local_mode else String(status.get("connection_state", "disconnected"))
+	_connection_label.text = "Gateway: %s" % connection if local_mode else "Connection: %s" % connection
 	var session := String(status.get("session_id", ""))
-	var epoch := String(status.get("simulation_epoch", ""))
-	if session.is_empty():
-		_authority_label.text = "Authority: waiting for Python"
-	else:
-		_authority_label.text = "Authority: %s / %s" % [session.left(8), epoch.left(8)]
+	var epoch := String(status.get("authority_epoch", status.get("simulation_epoch", "")))
+	_authority_label.text = "Authority: Godot/Jolt %s / %s" % [session.left(8), epoch.left(8)] if local_mode else ("Authority: waiting for Python" if session.is_empty() else "Authority: %s / %s" % [session.left(8), epoch.left(8)])
 	_lifecycle_label.text = "Lifecycle: %s   Gen: %d   Rev: %d" % [
 		String(status.get("lifecycle", "stopped")),
 		int(status.get("generation", 0)),
@@ -126,12 +149,16 @@ func _refresh() -> void:
 	]
 	var last_ack: Dictionary = status.get("last_input_ack", {})
 	var last_error: Dictionary = status.get("last_error", {})
-	var diagnostics := "Input ACK: %s" % (str(last_ack.get("client_sequence", "—")) if not last_ack.is_empty() else "—")
+	var diagnostics := "Local input" if local_mode else "Input ACK: %s" % (str(last_ack.get("client_sequence", "—")) if not last_ack.is_empty() else "—")
 	if not last_error.is_empty():
 		diagnostics += "   Error: %s" % String(last_error.get("code", "unknown"))
 	_diagnostics_label.text = diagnostics
 	_refresh_bucket_volume()
 	_refresh_model_selector()
+
+
+func _is_local_authority() -> bool:
+	return String(ProjectSettings.get_setting("simulation/authority_profile", AuthorityProfile.JOLT_AUTHORITATIVE)) == AuthorityProfile.JOLT_AUTHORITATIVE
 
 
 func _refresh_bucket_volume() -> void:

@@ -1,0 +1,8 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Check single local authority, lifecycle/reset, focus safety, and compatibility isolation."}
+{"file":".trellis/spec/frontend/motion-transport.md","reason":"Check explicit Python profiles retain transport and generation safety."}
+{"file":".trellis/spec/frontend/godot-mcp.md","reason":"Check live offline product evidence is collected with required MCP workflow."}
+{"file":".trellis/spec/backend/runtime-profiles.md","reason":"Check Gateway and archived Pinocchio environments/launchers remain unambiguous."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Backend/Pixi changes must pass repository lint, typing, and regression gates."}
+{"file":".trellis/spec/backend/sensor-telemetry.md","reason":"Check Gateway remains observational across reconnect/disconnect."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Audit end-to-end status, command, identity, reset, and packaging data flow."}
+{"file":".trellis/tasks/08-19-godot-standalone-gateway-separation/research/current-boundary.md","reason":"Check implementation against audited current coupling and explicit non-goals."}

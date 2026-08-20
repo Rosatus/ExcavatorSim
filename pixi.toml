@@ -6,7 +6,7 @@ authors = ["rosatus"]
 channels = ["conda-forge"]
 platforms = ["win-64"]
 
-[dependencies]
+[feature.compatibility.dependencies]
 python = "3.11.*"
 pinocchio = "*"
 numpy = "*"
@@ -17,11 +17,24 @@ pytest-asyncio = "*"
 ruff = "*"
 mypy = "*"
 
-[pypi-dependencies]
+[feature.compatibility.pypi-dependencies]
 rerun-sdk = "==0.35.0"
 
-[activation.env]
+[feature.compatibility.activation.env]
 PYTHONPATH = "backend/src"
+
+[feature.gateway.dependencies]
+python = "3.11.*"
+numpy = "*"
+aiohttp = "*"
+jsonschema = "*"
+
+[feature.gateway.activation.env]
+PYTHONPATH = "backend/src"
+
+[environments]
+default = { features = ["compatibility"] }
+gateway = { features = ["gateway"] }
 
 [tasks]
 test-backend = "python -m pytest backend/tests/backend"
@@ -35,7 +48,7 @@ soak-jolt-quick = "python backend/scripts/jolt_product_soak.py --mode quick --qu
 soak-jolt-release = "python backend/scripts/jolt_product_soak.py --mode release --quality-profile balanced"
 soak-jolt-quality-matrix = "python backend/scripts/jolt_product_soak.py --mode quick --quality-profile low balanced high --output artifacts/benchmark/jolt-product-soak-quality-matrix.json"
 verify = { depends-on = ["lint-backend", "typecheck-backend", "test-backend", "verify-provenance", "verify-standalone-paths"] }
-start = "python -m babylon_sim.cli --runtime-profile gateway-only --frontend-dir godot/dist"
+start-gateway = "python -m babylon_sim.cli --runtime-profile gateway-only --frontend-dir godot/dist"
 start-legacy = "python -m babylon_sim.cli --runtime-profile legacy --frontend-dir godot/dist"
 start-python-kinematic = "python -m babylon_sim.cli --runtime-profile motion-only --frontend-dir godot/dist"
 start-motion-only = "python -m babylon_sim.cli --runtime-profile motion-only --frontend-dir godot/dist"

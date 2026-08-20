@@ -40,8 +40,8 @@ const INPUT_ACTIONS := {
 const COMMAND_ACTIONS := {"motion_start": KEY_F6, "motion_pause": KEY_F7, "motion_reset": KEY_F8}
 
 @export var endpoint := DEFAULT_ENDPOINT
-@export var auto_connect := true
-@export var auto_reconnect := true
+@export var auto_connect := false
+@export var auto_reconnect := false
 @export var interpolation_enabled := false
 @export var desired_model_id := "sy205"
 
@@ -98,6 +98,7 @@ func _ready() -> void:
 	_ensure_input_actions()
 	_ensure_preflight_request()
 	endpoint = String(ProjectSettings.get_setting("motion/endpoint", endpoint))
+	auto_connect = bool(ProjectSettings.get_setting("gateway/enabled", auto_connect))
 	auto_reconnect = bool(ProjectSettings.get_setting("motion/auto_reconnect", auto_reconnect))
 	if auto_connect:
 		connect_to_service()

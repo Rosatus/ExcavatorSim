@@ -12,8 +12,8 @@ motion service. It was established by the M2 connected motion vertical slice.
 > compatibility behavior.
 
 The client is a product physics consumer in the default profile: Godot/Jolt is
-authoritative for pose, contact, local terrain and payload. Python remains the
-lifecycle/input/telemetry gateway. In compatibility profiles the client may
+authoritative for pose, contact, local terrain, payload and lifecycle. Python
+is an optional lifecycle/input/telemetry gateway. In compatibility profiles the client may
 consume Python `view_state` according to the selected runtime contract.
 
 ## 2. Signatures
