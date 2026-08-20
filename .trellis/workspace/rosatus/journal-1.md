@@ -1376,3 +1376,36 @@ Made Godot/Jolt the offline default product, separated the optional Python gatew
 ### Next Steps
 
 - None - task complete
+
+
+## Session 36: Stabilize Jolt tracked chassis
+
+**Date**: 2026-08-20
+**Task**: Stabilize Jolt tracked chassis
+**Branch**: `main`
+
+### Summary
+
+Stabilized distributed Jolt track support and traction for SY205/SY135, corrected suspension damping feedback, added hull collision hysteresis, COM traction/yaw handling, attitude stabilization, TerrainState heightfield fallback, and regression telemetry/tests. Godot editor scan and jolt_chassis_track_test pass; user confirmed repeating rearward rocking is gone.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5666554` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
