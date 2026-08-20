@@ -23,6 +23,8 @@ const ACTUATOR_FIELDS := [
 const CHASSIS_DYNAMICS_FIELDS := [
 	"mass_kg", "center_of_mass_m", "inertia_diagonal_kg_m2", "linear_damp",
 	"angular_damp", "max_linear_speed_m_s", "max_angular_speed_rad_s",
+	"attitude_stiffness_nm_per_rad", "attitude_damping_nm_s_per_rad",
+	"max_attitude_torque_nm",
 	"ground_clearance_m", "can_sleep", "continuous_collision_detection",
 	"compound_shapes",
 ]
@@ -30,7 +32,9 @@ const TRACK_FIELDS := [
 	"gauge_m", "contact_length_m", "contact_width_m", "traction_points_per_side",
 	"friction", "max_drive_force_n", "max_belt_speed_m_s", "brake_force_n",
 	"traction_response_n_per_m_s", "lateral_resistance_n_per_m_s",
-	"probe_height_m", "probe_depth_m", "yaw_torque_scale",
+	"probe_height_m", "probe_depth_m", "support_rest_length_m",
+	"support_stiffness_n_per_m", "support_damping_n_s_per_m",
+	"max_support_force_n", "pivot_lateral_resistance_scale", "yaw_assist_scale",
 ]
 const BODY_FRAMES := {
 	"chassis": "base_link",
@@ -316,8 +320,11 @@ func _validate_tracks(value: Variant) -> bool:
 		return _reject("tracks.traction_points_per_side", "must be an integer from 2 to 16")
 	if not _finite_number(tracks.get("friction")) or float(tracks.get("friction")) < 0.0 or float(tracks.get("friction")) > 4.0:
 		return _reject("tracks.friction", "must be finite and between 0 and 4")
-	if float(tracks.get("yaw_torque_scale")) > 1.0:
-		return _reject("tracks.yaw_torque_scale", "must be at most 1")
+	for field in ["pivot_lateral_resistance_scale", "yaw_assist_scale"]:
+		if float(tracks.get(field)) > 1.0:
+			return _reject("tracks.%s" % field, "must be at most 1")
+	if float(tracks.get("pivot_lateral_resistance_scale")) <= 0.0:
+		return _reject("tracks.pivot_lateral_resistance_scale", "must be greater than 0")
 	return true
 
 
@@ -327,7 +334,11 @@ func _validate_chassis_dynamics(value: Variant) -> bool:
 	var dynamics := value as Dictionary
 	if not _exact_fields(dynamics, CHASSIS_DYNAMICS_FIELDS, "chassis_dynamics"):
 		return false
-	for field in ["mass_kg", "max_linear_speed_m_s", "max_angular_speed_rad_s", "ground_clearance_m"]:
+	for field in [
+		"mass_kg", "max_linear_speed_m_s", "max_angular_speed_rad_s",
+		"attitude_stiffness_nm_per_rad", "attitude_damping_nm_s_per_rad",
+		"max_attitude_torque_nm", "ground_clearance_m",
+	]:
 		if not _positive_number(dynamics.get(field)):
 			return _reject("chassis_dynamics.%s" % field, "must be finite and positive")
 	for field in ["linear_damp", "angular_damp"]:

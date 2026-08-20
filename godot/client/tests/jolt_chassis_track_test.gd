@@ -75,18 +75,93 @@ func _test_model(model_id: String) -> void:
 	if not (sanitized["quality_flags"] as Array).has("invalid_linear_velocity_cleared") or not (sanitized["quality_flags"] as Array).has("invalid_angular_velocity_cleared"):
 		failures.append("%s non-finite body velocity did not report quality flags" % model_id)
 	runtime.reset(spawn)
-	for _frame in SETTLE_FRAMES:
+	var settle_heave_sq_sum := 0.0
+	var settle_tilt_sq_sum := 0.0
+	var settle_min_y := INF
+	var settle_max_y := -INF
+	var settle_samples := 0
+	for frame in SETTLE_FRAMES:
 		await physics_frame
+		if frame >= SETTLE_FRAMES / 2:
+			var sample := runtime.get_status_snapshot()
+			var sample_linear := sample["linear_velocity"] as Vector3
+			var sample_angular := sample["angular_velocity"] as Vector3
+			var sample_y := (sample["body_transform"] as Transform3D).origin.y
+			settle_heave_sq_sum += sample_linear.y * sample_linear.y
+			settle_tilt_sq_sum += sample_angular.x * sample_angular.x + sample_angular.z * sample_angular.z
+			settle_min_y = minf(settle_min_y, sample_y)
+			settle_max_y = maxf(settle_max_y, sample_y)
+			settle_samples += 1
 	var settled := runtime.get_status_snapshot()
+	var settle_heave_rms := sqrt(settle_heave_sq_sum / float(settle_samples))
+	var settle_tilt_rms := sqrt(settle_tilt_sq_sum / float(settle_samples))
+	print(
+		"jolt_chassis_track_test: %s settle heave_rms=%.4f tilt_rms=%.4f height_span=%.4f switches=%d support=(%.1f, %.1f)"
+		% [
+			model_id,
+			settle_heave_rms,
+			settle_tilt_rms,
+			settle_max_y - settle_min_y,
+			int(settled.get("hull_collision_switch_count", -1)),
+			float(settled.get("left_support_load_n", 0.0)),
+			float(settled.get("right_support_load_n", 0.0)),
+		]
+	)
+	if settle_heave_rms > 0.08 or settle_tilt_rms > 0.08 or settle_max_y - settle_min_y > 0.08:
+		failures.append(
+			"%s did not settle without visible heave/pitch jitter: heave=%.4f tilt=%.4f span=%.4f"
+			% [model_id, settle_heave_rms, settle_tilt_rms, settle_max_y - settle_min_y]
+		)
+	if int(settled.get("hull_collision_switch_count", 0)) > 1:
+		failures.append("%s hull/probe support ownership oscillated during settle" % model_id)
 	if not bool(settled["terrain_identity_valid"]):
 		failures.append("%s did not accept current terrain identity" % model_id)
 	if int(settled["left_contact_count"]) == 0 or int(settled["right_contact_count"]) == 0:
 		failures.append("%s did not settle on both tracks: %s" % [model_id, settled])
+	var expected_weight := float(descriptor.chassis_dynamics()["mass_kg"]) * 9.80665
+	var support_load := float(settled.get("left_support_load_n", 0.0)) + float(settled.get("right_support_load_n", 0.0))
+	if support_load < expected_weight * 0.65 or support_load > expected_weight * 1.35:
+		failures.append("%s distributed support load is not near chassis weight: %.1f vs %.1f" % [model_id, support_load, expected_weight])
 	var start := runtime.get_body_global_transform()
 	runtime.set_commands(1.0, 1.0)
-	for _frame in DRIVE_FRAMES:
+	var drive_heave_sq_sum := 0.0
+	var drive_tilt_sq_sum := 0.0
+	var drive_min_y := INF
+	var drive_max_y := -INF
+	var drive_samples := 0
+	for frame in DRIVE_FRAMES:
 		await physics_frame
+		if frame >= DRIVE_FRAMES - 60:
+			var sample := runtime.get_status_snapshot()
+			var sample_linear := sample["linear_velocity"] as Vector3
+			var sample_angular := sample["angular_velocity"] as Vector3
+			var sample_y := (sample["body_transform"] as Transform3D).origin.y
+			drive_heave_sq_sum += sample_linear.y * sample_linear.y
+			drive_tilt_sq_sum += sample_angular.x * sample_angular.x + sample_angular.z * sample_angular.z
+			drive_min_y = minf(drive_min_y, sample_y)
+			drive_max_y = maxf(drive_max_y, sample_y)
+			drive_samples += 1
 	var driven := runtime.get_status_snapshot()
+	var drive_heave_rms := sqrt(drive_heave_sq_sum / float(drive_samples))
+	var drive_tilt_rms := sqrt(drive_tilt_sq_sum / float(drive_samples))
+	print(
+		"jolt_chassis_track_test: %s drive heave_rms=%.4f tilt_rms=%.4f height_span=%.4f switches=%d velocity=%s"
+		% [
+			model_id,
+			drive_heave_rms,
+			drive_tilt_rms,
+			drive_max_y - drive_min_y,
+			int(driven.get("hull_collision_switch_count", -1)),
+			driven["linear_velocity"],
+		]
+	)
+	if drive_heave_rms > 0.12 or drive_tilt_rms > 0.12 or drive_max_y - drive_min_y > 0.12:
+		failures.append(
+			"%s straight drive retained visible heave/pitch jitter: heave=%.4f tilt=%.4f span=%.4f"
+			% [model_id, drive_heave_rms, drive_tilt_rms, drive_max_y - drive_min_y]
+		)
+	if int(driven.get("hull_collision_switch_count", 0)) > 1:
+		failures.append("%s hull/probe support ownership oscillated during straight drive" % model_id)
 	var moved := runtime.get_body_global_transform().origin - start.origin
 	if moved.dot(-start.basis.z) < 0.15:
 		failures.append("%s straight drive did not move forward: %s" % [model_id, moved])
@@ -100,7 +175,23 @@ func _test_model(model_id: String) -> void:
 	runtime.set_commands(0.0, 0.0)
 	for _frame in 120:
 		await physics_frame
-	var speed_after_brake := (runtime.get_status_snapshot()["linear_velocity"] as Vector3).length()
+	var brake_status := runtime.get_status_snapshot()
+	var speed_after_brake := (brake_status["linear_velocity"] as Vector3).length()
+	print(
+		"jolt_chassis_track_test: %s brake speed %.4f -> %.4f linear=%s angular=%s contacts=(%d,%d) support=(%.1f,%.1f) switches=%d"
+		% [
+			model_id,
+			speed_before_brake,
+			speed_after_brake,
+			brake_status["linear_velocity"],
+			brake_status["angular_velocity"],
+			int(brake_status["left_contact_count"]),
+			int(brake_status["right_contact_count"]),
+			float(brake_status["left_support_load_n"]),
+			float(brake_status["right_support_load_n"]),
+			int(brake_status.get("hull_collision_switch_count", -1)),
+		]
+	)
 	if speed_after_brake >= speed_before_brake:
 		failures.append("%s braking did not reduce chassis speed" % model_id)
 
@@ -187,6 +278,22 @@ func _test_slope_and_obstacle() -> void:
 	var finish := runtime.get_body_global_transform()
 	var status := runtime.get_status_snapshot()
 	var forward_distance := (finish.origin - start.origin).dot(-start.basis.z)
+	print(
+		"jolt_chassis_track_test: slope start=%s finish=%s forward=%.3f linear=%s angular=%s contacts=(%d,%d) support=(%.1f,%.1f) switches=%d flags=%s"
+		% [
+			start.origin,
+			finish.origin,
+			forward_distance,
+			status["linear_velocity"],
+			status["angular_velocity"],
+			int(status["left_contact_count"]),
+			int(status["right_contact_count"]),
+			float(status["left_support_load_n"]),
+			float(status["right_support_load_n"]),
+			int(status.get("hull_collision_switch_count", -1)),
+			status["quality_flags"],
+		]
+	)
 	if forward_distance < 2.4:
 		failures.append("slope/obstacle traversal stalled at %.3f m" % forward_distance)
 	if finish.origin.y < start.origin.y + 0.08:

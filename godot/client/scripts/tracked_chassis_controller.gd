@@ -522,14 +522,16 @@ func _authoritative_spawn_transform(descriptor: PhysicsRigDescriptor) -> Transfo
 			surface_y = sampled
 	var data := descriptor.to_dictionary()
 	var dynamics := data.get("chassis_dynamics", {}) as Dictionary
-	var minimum_bottom := 0.0
-	for body_value in data.get("bodies", []):
-		if body_value is Dictionary and String((body_value as Dictionary).get("name", "")) == "chassis":
-			var shape := (body_value as Dictionary).get("shape", {}) as Dictionary
-			var center := _vector3(shape.get("center_m", [0.0, 0.0, 0.0]))
-			var size := _vector3(shape.get("size_m", [1.0, 1.0, 1.0]))
-			minimum_bottom = center.y - 0.5 * size.y
-			break
+	var minimum_bottom := INF
+	for shape_value in dynamics.get("compound_shapes", []):
+		if not shape_value is Dictionary:
+			continue
+		var shape := shape_value as Dictionary
+		var center := _vector3(shape.get("center_m", [0.0, 0.0, 0.0]))
+		var size := _vector3(shape.get("size_m", [1.0, 1.0, 1.0]))
+		minimum_bottom = minf(minimum_bottom, center.y - 0.5 * size.y)
+	if is_inf(minimum_bottom):
+		minimum_bottom = 0.0
 	spawn.origin.y = surface_y - minimum_bottom + float(dynamics.get("ground_clearance_m", 0.05))
 	return spawn
 

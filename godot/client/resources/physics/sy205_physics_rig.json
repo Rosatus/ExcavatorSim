@@ -33,6 +33,9 @@
     "angular_damp": 1.8,
     "max_linear_speed_m_s": 2.3,
     "max_angular_speed_rad_s": 1.2,
+    "attitude_stiffness_nm_per_rad": 500000.0,
+    "attitude_damping_nm_s_per_rad": 250000.0,
+    "max_attitude_torque_nm": 300000.0,
     "ground_clearance_m": 0.06,
     "can_sleep": false,
     "continuous_collision_detection": true,
@@ -54,7 +57,12 @@
     "lateral_resistance_n_per_m_s": 160000.0,
     "probe_height_m": 0.45,
     "probe_depth_m": 0.8,
-    "yaw_torque_scale": 0.72
+    "support_rest_length_m": 0.60,
+    "support_stiffness_n_per_m": 400000.0,
+    "support_damping_n_s_per_m": 70000.0,
+    "max_support_force_n": 40000.0,
+    "pivot_lateral_resistance_scale": 0.22,
+    "yaw_assist_scale": 0.12
   },
   "quality_flags": ["validated_visual_rest_anchors", "provisional_mass_properties", "provisional_collision_proxies", "phase1_tuned_track_forces"]
 }
