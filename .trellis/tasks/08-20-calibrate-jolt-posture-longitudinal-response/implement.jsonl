@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Defines the single Jolt chassis writer, terrain-normal/reset posture boundary, support-load traction, braking telemetry, and required tests."}
+{"file":".trellis/tasks/archive/2026-08/08-20-stabilize-jolt-tracked-chassis/design.md","reason":"Records the existing support solver, hull hysteresis, COM traction, attitude stabilization, and known provisional rig assumptions."}
+{"file":"godot/client/tests/jolt_chassis_track_test.gd","reason":"Existing Godot regression harness to extend with posture, acceleration, braking, reverse, and model-switch assertions."}

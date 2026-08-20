@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Quality checks must verify the Jolt-authoritative posture, support ownership, neutral re-arm, and response telemetry contracts."}
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend package guidance requires the client boundary and Godot integration contracts before changing Jolt runtime code."}
