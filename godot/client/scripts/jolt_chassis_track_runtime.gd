@@ -58,6 +58,11 @@ var _right_effort_n := 0.0
 var _equipment_commands := Vector4.ZERO
 var _articulation := KinematicArticulationState.new()
 var _bucket_sweeper := BucketProxySweeper.new()
+
+func collision_layers_snapshot() -> Dictionary:
+	if _descriptor.is_empty():
+		return {}
+	return (_descriptor.get("collision_layers", {}) as Dictionary).duplicate(true)
 var _soil_contract: Dictionary = {}
 var _cut_engagement := 0.0
 var _physics_tick := 0

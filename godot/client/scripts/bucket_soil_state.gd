@@ -116,6 +116,7 @@ func step_fixed() -> Dictionary:
 	var accepted := 0
 	var rejected := 0
 	var reason := ""
+	var cut_events: Array[Dictionary] = []
 	for command in _pending_commands:
 		var sequence := int(command["sequence"])
 		if sequence <= _last_applied_sequence or int(command["generation"]) != world_generation:
@@ -133,6 +134,12 @@ func step_fixed() -> Dictionary:
 			changed = true
 			cut_volume += float(operation.get("cut_volume_m3", 0.0))
 			deposit_volume += float(operation.get("deposit_volume_m3", 0.0))
+			if operation.has("tooth_world"):
+				cut_events.append({
+					"center": operation["center"],
+					"tooth_world": operation["tooth_world"],
+					"volume_m3": float(operation.get("cut_volume_m3", 0.0)),
+				})
 		else:
 			rejected += 1
 			reason = String(operation.get("reason", "rejected"))
@@ -140,6 +147,7 @@ func step_fixed() -> Dictionary:
 	_last_result = _result(changed, cut_volume, deposit_volume, reason)
 	_last_result["accepted_commands"] = accepted
 	_last_result["rejected_commands"] = rejected
+	_last_result["cut_events"] = cut_events
 	return _last_result.duplicate(true)
 
 
@@ -204,9 +212,8 @@ func _apply_cut(command: Dictionary) -> Dictionary:
 	if expected_volume <= EPSILON_M3:
 		return {"accepted": false, "reason": "empty_soil"}
 	# Digging is decoupled from bucket capacity by design: removed soil leaves
-	# the heightfield and spawns particles directly; it never gates the cut,
-	# never fills the bucket, and never feeds payload load. The transfer below
-	# only tracks scheduler commit bookkeeping.
+	# the heightfield and spawns transport parcels downstream; it never gates
+	# the cut. The transfer below only tracks scheduler commit bookkeeping.
 	if terrain_scheduler == null:
 		return {"accepted": false, "reason": "terrain_scheduler_unavailable"}
 	var sequence := int(command["sequence"])
@@ -216,7 +223,14 @@ func _apply_cut(command: Dictionary) -> Dictionary:
 	if not terrain_scheduler.queue_brush(sequence, center, radius, -depth, world_generation, transfer_id, true):
 		return {"accepted": false, "reason": "terrain_rejected"}
 	_active_transfers[transfer_id] = {"state": "bucket_pending_terrain", "volume_m3": expected_volume}
-	return {"accepted": true, "cut_volume_m3": expected_volume, "deposit_volume_m3": 0.0, "transfer_id": transfer_id}
+	return {
+		"accepted": true,
+		"cut_volume_m3": expected_volume,
+		"deposit_volume_m3": 0.0,
+		"transfer_id": transfer_id,
+		"center": center,
+		"tooth_world": current,
+	}
 
 
 func _apply_deposit(command: Dictionary) -> Dictionary:
@@ -285,6 +299,37 @@ func reconcile_transfers(committed_ids: Array, rejected_ids: Array = []) -> void
 
 func commit_transfers(transfer_ids: Array) -> void:
 	reconcile_transfers(transfer_ids)
+
+
+func free_capacity_m3() -> float:
+	return maxf(bucket_capacity_m3 - bucket_volume_m3, 0.0)
+
+
+func credit_captured_volume(volume_m3: float) -> float:
+	# Parcel capture is the only path that fills the bucket again: a parcel
+	# physically contained by the cavity credits its volume up to remaining
+	# capacity and returns whatever was actually credited so partially
+	# captured bodies keep flying with the remainder.
+	var requested := maxf(volume_m3, 0.0)
+	if requested <= EPSILON_M3:
+		return 0.0
+	var credited := minf(requested, free_capacity_m3())
+	if credited <= EPSILON_M3:
+		return 0.0
+	_add_occupancy(credited)
+	return credited
+
+
+func release_poured_volume(volume_m3: float) -> float:
+	# Dump/spill hand ledger volume to transport parcels instead of writing
+	# terrain directly; provenance transfers are consumed like deposits so the
+	# ledger never double-counts poured material.
+	var requested := minf(maxf(volume_m3, 0.0), bucket_volume_m3)
+	if requested <= EPSILON_M3:
+		return 0.0
+	var removed := _remove_occupancy(requested)
+	_consume_bucket_transfers(removed)
+	return removed
 
 
 func _result(changed: bool, cut_volume: float, deposit_volume: float, reason: String) -> Dictionary:

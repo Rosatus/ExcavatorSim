@@ -222,6 +222,10 @@ func sample_terrain_height_for_test(world_xz: Vector2) -> float:
 	return _sample_terrain_height(world_xz)
 
 
+func get_collision_layers() -> Dictionary:
+	return _jolt_runtime.collision_layers_snapshot() if _jolt_runtime != null else {}
+
+
 func get_status_snapshot() -> Dictionary:
 	var status := (
 		(

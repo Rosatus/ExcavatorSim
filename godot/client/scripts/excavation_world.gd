@@ -38,6 +38,7 @@ var _initialized := false
 var _last_interaction_batch: Dictionary = {}
 var _consumed_batch_keys: Dictionary = {}
 var _consumed_batch_order: Array[String] = []
+var _parcel_pool: SoilParcelPool
 
 
 func _ready() -> void:
@@ -62,6 +63,7 @@ func _initialize() -> void:
 	terrain_scheduler = TerrainCommitScheduler.new(terrain_world.terrain_state, terrain_world, terrain_collider)
 	soil_state = BucketSoilState.new(terrain_world.terrain_state, contract, terrain_scheduler)
 	terrain_scheduler.refresh_collider_derivative()
+	_create_parcel_pool()
 	_motion_client = get_node_or_null(motion_client_path) as MotionClient
 	_tracked_chassis_controller = get_node_or_null(tracked_chassis_controller_path) as TrackedChassisController
 	if _motion_client != null:
@@ -84,7 +86,12 @@ func _physics_process(delta: float) -> void:
 		_step_automatic_interaction(delta)
 	var soil_result := soil_state.step_fixed()
 	_last_flow_volume_m3 = float(soil_result.get("cut_volume_m3", 0.0)) + float(soil_result.get("deposit_volume_m3", 0.0))
+	if _parcel_pool != null:
+		_parcel_pool.notify_deposit_accepted(float(soil_result.get("deposit_volume_m3", 0.0)))
 	var cells_changed := _settle_bucket_cells(delta)
+	_spawn_cut_parcels(soil_result)
+	if _parcel_pool != null:
+		_step_parcel_pool(delta)
 	# Force-flush every fixed tick: the analytic dig loop samples TerrainState
 	# as its authority, so cut brushes must land in the same tick they are
 	# queued. Latency batching here starved the invariant (surface yields only
@@ -237,7 +244,12 @@ func step_automatic_snapshot_for_test(snapshot: Dictionary, delta: float = 1.0 /
 	_process_bucket_snapshot(snapshot, delta)
 	var soil_result := soil_state.step_fixed()
 	_last_flow_volume_m3 = float(soil_result.get("cut_volume_m3", 0.0)) + float(soil_result.get("deposit_volume_m3", 0.0))
+	if _parcel_pool != null:
+		_parcel_pool.notify_deposit_accepted(float(soil_result.get("deposit_volume_m3", 0.0)))
 	_settle_bucket_cells(delta)
+	_spawn_cut_parcels(soil_result)
+	if _parcel_pool != null:
+		_step_parcel_pool(delta)
 	var commit_result := terrain_scheduler.step_fixed(delta, true)
 	soil_state.reconcile_transfers(
 		commit_result.get("committed_transfer_ids", []),
@@ -313,7 +325,7 @@ func _process_bucket_snapshot(snapshot: Dictionary, delta: float) -> void:
 	if operation == "dump" and deposit_center is Vector3:
 		var dump_rate := soil_state.bucket_capacity_m3 * lerpf(0.35, 1.4, clampf((opening_down_dot - dump_threshold) / maxf(0.01, 1.0 - dump_threshold), 0.0, 1.0))
 		var requested := minf(soil_state.bucket_volume_m3, dump_rate * delta)
-		if _queue_batch_deposit(batch, deposit_center as Vector3, requested, "dump"):
+		if _pour_from_bucket(batch, requested, (current["opening"] as Transform3D), "dump"):
 			_next_command_sequence += 1
 			_last_interaction = "dump"
 			return
@@ -322,7 +334,7 @@ func _process_bucket_snapshot(snapshot: Dictionary, delta: float) -> void:
 		var exposure := clampf((opening_down_dot - spill_threshold) / maxf(0.01, dump_threshold - spill_threshold), 0.0, 1.0)
 		var spill_rate := soil_state.bucket_capacity_m3 * lerpf(0.04, 0.22, exposure)
 		var spill_volume := minf(soil_state.bucket_volume_m3, spill_rate * delta)
-		if _queue_batch_deposit(batch, deposit_center as Vector3, spill_volume, "spill"):
+		if _pour_from_bucket(batch, spill_volume, (current["opening"] as Transform3D), "spill"):
 			_next_command_sequence += 1
 			_last_interaction = "spill"
 			return
@@ -608,6 +620,72 @@ func _queue_batch_deposit(batch: Dictionary, center: Vector3, volume_m3: float, 
 	return true
 
 
+func _pour_from_bucket(batch: Dictionary, volume_m3: float, opening_transform: Transform3D, operation: String) -> bool:
+	# Dump/spill hand ledger volume to transport parcels at the lip instead of
+	# writing terrain directly; parcels fall under gravity and settle back
+	# through the deposit pipeline where they land.
+	if _parcel_pool == null or not bool(batch.get("eligible", false)) or _consumed_batch_keys.has(String(batch.get("key", ""))):
+		return false
+	var pour_direction := (opening_transform.basis * Vector3.DOWN).normalized()
+	var released := _parcel_pool.release_volume(volume_m3, opening_transform.origin, pour_direction)
+	if released <= BucketSoilState.EPSILON_M3:
+		return false
+	_consume_interaction_batch(batch, operation)
+	return true
+
+
+func _create_parcel_pool() -> void:
+	_parcel_pool = SoilParcelPool.new()
+	_parcel_pool.name = "SoilParcelPool"
+	var layers := {"machine": 2, "terrain": 1}
+	if _tracked_chassis_controller != null:
+		layers.merge(_tracked_chassis_controller.get_collision_layers(), true)
+	var payload_layer := int(layers.get("payload", 6))
+	var machine_layer := int(layers.get("machine", 2))
+	var terrain_layer := int(layers.get("terrain", 1))
+	add_child(_parcel_pool)
+	_parcel_pool.setup({
+		"soil_state": soil_state,
+		"budget": 48,
+		"density_kg_m3": soil_state.material_density_kg_m3,
+		"collision_layer": 1 << (payload_layer - 1),
+		"collision_mask": (1 << (terrain_layer - 1)) | (1 << (machine_layer - 1)),
+		"deposit_sequencer": _allocate_command_sequence,
+	})
+
+
+func _allocate_command_sequence() -> int:
+	var sequence := _next_command_sequence
+	_next_command_sequence += 1
+	return sequence
+
+
+func _spawn_cut_parcels(soil_result: Dictionary) -> void:
+	if _parcel_pool == null:
+		return
+	var chassis_velocity := Vector3.ZERO
+	for event_value in soil_result.get("cut_events", []):
+		var event := event_value as Dictionary
+		_parcel_pool.spawn_from_cut(
+			event.get("tooth_world", Vector3.ZERO) as Vector3,
+			float(event.get("volume_m3", 0.0)),
+			chassis_velocity
+		)
+
+
+func _step_parcel_pool(delta: float) -> void:
+	var current: Dictionary = _last_pose_snapshot.get("current", {})
+	if not current.has("cavity"):
+		return
+	var contract := _presentation.get_soil_contract() if _presentation != null else {}
+	var cavity_proxy: Dictionary = (contract.get("proxies", {}) as Dictionary).get("cavity", {})
+	var size_array: Variant = cavity_proxy.get("size_m", [])
+	var extents := Vector3(0.25, 0.25, 0.35)
+	if size_array is Array and (size_array as Array).size() == 3:
+		extents = Vector3(float(size_array[0]), float(size_array[1]), float(size_array[2])) * 0.5
+	_parcel_pool.step_pool(delta, current["cavity"] as Transform3D, extents)
+
+
 func _consume_interaction_batch(batch: Dictionary, operation: String) -> void:
 	var key := String(batch.get("key", ""))
 	if key.is_empty() or _consumed_batch_keys.has(key):
@@ -736,6 +814,8 @@ func _on_world_reset(generation: int) -> void:
 		terrain_scheduler.reset_for_generation(generation)
 	if soil_state != null:
 		soil_state.reset_for_generation(generation)
+	if _parcel_pool != null:
+		_parcel_pool.clear_all()
 	_next_command_sequence = 0
 	_last_pose_snapshot.clear()
 	_last_interaction = "reset"
@@ -762,6 +842,8 @@ func _clear_local_material(reason: String) -> void:
 			terrain_scheduler.reset_for_generation(terrain_world.terrain_state.world_generation)
 		if soil_state != null:
 			soil_state.reset_for_generation(terrain_world.terrain_state.world_generation)
+	if _parcel_pool != null:
+		_parcel_pool.clear_all()
 	_last_pose_snapshot.clear()
 	_last_interaction = reason
 	_last_support = {"active": false, "penetration_m": 0.0}

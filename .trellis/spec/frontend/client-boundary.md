@@ -258,9 +258,21 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
   depth = min(penetration, `maximum_cut_depth_m`) — pure penetration, never
   padded by the contact tolerance. Cuts are unconditional: bucket capacity,
   payload state, and transfer ledgers never gate or scale them. Removed soil
-  becomes particles directly (the clod spawner consumes `flow_volume_m3`);
-  it never occupies the bucket, so an empty bucket can neither spill nor
-  dump, and cut transfers retire on terrain commit without adding occupancy;
+  enters the bounded parcel transport stage: each accepted cut reports a
+  `cut_event` (tooth position + volume) in the `step_fixed` result and
+  `SoilParcelPool` spawns a volume carrier at the tooth with inherited
+  velocity; decorative GPU clods (`flow_volume_m3`) remain a separate fines
+  layer. Parcels never gate or modify cutting. A parcel captured by the
+  bucket cavity credits occupancy up to remaining capacity via
+  `credit_captured_volume`, restoring fill presentation and payload mass;
+  overflow parcels keep flying past the bucket. Dump/spill hand ledger
+  volume to parcels at the lip (`release_poured_volume` + guarded spawn)
+  instead of writing terrain directly; poured parcels carry a recapture
+  guard. Grounded slow parcels settle back into the loose heightfield through
+  the normal deposit pipeline (`queue_deposit_volume`), so spoil piles are
+  real terrain the machine can re-dig. The pool is budget-capped (steals the
+  oldest parcel when full) and cleared on every generation/reset path.
+  Cut transfers still retire on terrain commit without adding occupancy;
   a validated in-band query
   contact point remains a supplementary trigger for mesh contacts the samples
   cannot see, and such cuts land on the validated contact point. Query
