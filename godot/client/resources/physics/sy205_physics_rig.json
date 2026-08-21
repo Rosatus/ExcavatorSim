@@ -27,7 +27,7 @@
   ],
   "chassis_dynamics": {
     "mass_kg": 21500.0,
-    "center_of_mass_m": [0.0, 1.1, -0.45],
+    "center_of_mass_m": [0.0, 1.1, 0.0],
     "inertia_diagonal_kg_m2": [52000.0, 48000.0, 28000.0],
     "linear_damp": 0.12,
     "angular_damp": 1.8,
@@ -62,7 +62,11 @@
     "support_damping_n_s_per_m": 70000.0,
     "max_support_force_n": 40000.0,
     "pivot_lateral_resistance_scale": 0.22,
-    "yaw_assist_scale": 0.12
+    "yaw_assist_scale": 0.12,
+    "drive_effort_slew_n_per_tick": 12000.0,
+    "brake_effort_slew_n_per_tick": 14000.0,
+    "acceleration_window_s": 3.0,
+    "brake_stop_window_s": 2.5
   },
   "quality_flags": ["validated_visual_rest_anchors", "provisional_mass_properties", "provisional_collision_proxies", "phase1_tuned_track_forces"]
 }

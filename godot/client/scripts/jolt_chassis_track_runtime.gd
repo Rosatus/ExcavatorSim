@@ -48,6 +48,9 @@ var _tracks: Dictionary = {}
 var _spawn_global_transform := Transform3D.IDENTITY
 var _left_command := 0.0
 var _right_command := 0.0
+var _track_neutral_armed := false
+var _left_effort_n := 0.0
+var _right_effort_n := 0.0
 var _equipment_commands := Vector4.ZERO
 var _articulation := KinematicArticulationState.new()
 var _bucket_sweeper := BucketProxySweeper.new()
@@ -93,6 +96,20 @@ var _support_ready_ticks := 0
 var _support_loss_ticks := 0
 var _hull_collision_switch_count := 0
 var _smoothed_support_normal := Vector3.UP
+var _posture_error_rad := 0.0
+var _terrain_normal_alignment_deg := 0.0
+var _lowest_clearance_m := 0.0
+var _acceleration_elapsed_s := 0.0
+var _acceleration_time_s := -1.0
+var _acceleration_direction := 0.0
+var _brake_elapsed_s := 0.0
+var _brake_stop_time_s := -1.0
+var _brake_stop_distance_m := 0.0
+var _brake_start_position := Vector3.ZERO
+var _brake_was_active := false
+var _peak_pitch_angle_rad := 0.0
+var _peak_pitch_rate_rad_s := 0.0
+var _last_fixed_delta_s := 1.0 / 60.0
 
 
 func _ready() -> void:
@@ -102,6 +119,7 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	if not configured or not has_body():
 		return
+	_last_fixed_delta_s = maxf(delta, 0.001)
 	var started_usec := Time.get_ticks_usec()
 	_physics_tick = Engine.get_physics_frames()
 	_update_terrain_identity()
@@ -115,6 +133,7 @@ func _physics_process(delta: float) -> void:
 		_set_hull_terrain_collision_released(false)
 		_quality_flags.append("terrain_collider_unavailable")
 	_clamp_body_velocities()
+	_update_response_telemetry(delta)
 	_collect_bucket_query_contacts()
 	if _left_contact_count + _right_contact_count == 0:
 		_quality_flags.append("no_track_contact")
@@ -194,6 +213,7 @@ func teardown() -> void:
 	_support_loss_ticks = 0
 	_hull_collision_switch_count = 0
 	_smoothed_support_normal = Vector3.UP
+	_reset_response_telemetry()
 	_reset_support_response(true)
 	_clear_tick_telemetry()
 
@@ -214,12 +234,27 @@ func set_enabled(value: bool) -> void:
 	enabled = value and configured
 	if not enabled:
 		stop_motion()
+		_track_neutral_armed = false
+		_left_effort_n = 0.0
+		_right_effort_n = 0.0
 		_set_hull_terrain_collision_released(false)
 
 
 func set_commands(left: float, right: float) -> void:
-	_left_command = clampf(left, -1.0, 1.0) if is_finite(left) else 0.0
-	_right_command = clampf(right, -1.0, 1.0) if is_finite(right) else 0.0
+	var next_left := clampf(left, -1.0, 1.0) if is_finite(left) else 0.0
+	var next_right := clampf(right, -1.0, 1.0) if is_finite(right) else 0.0
+	if absf(next_left) <= 0.001 and absf(next_right) <= 0.001:
+		_track_neutral_armed = true
+		_left_command = 0.0
+		_right_command = 0.0
+		return
+	if not _track_neutral_armed:
+		_left_command = 0.0
+		_right_command = 0.0
+		_quality_flags.append("track_neutral_rearm_required")
+		return
+	_left_command = next_left
+	_right_command = next_right
 
 
 func set_equipment_commands(commands: Vector4, identity: int = -1) -> void:
@@ -299,6 +334,7 @@ func reset(spawn_global_transform := Transform3D.IDENTITY) -> void:
 	_support_loss_ticks = 0
 	_hull_collision_switch_count = 0
 	_smoothed_support_normal = Vector3.UP
+	_reset_response_telemetry()
 	_reset_support_response(true)
 	_clear_tick_telemetry()
 	_capture_post_step_snapshot()
@@ -510,6 +546,8 @@ func _capture_post_step_snapshot() -> void:
 		"applied_chassis_wrench": _applied_support_wrench.duplicate(true),
 		"support_wrench_apply_count": _support_wrench_apply_count,
 		"left_command": _left_command, "right_command": _right_command,
+		"track_neutral_armed": _track_neutral_armed,
+		"left_effort_n": _left_effort_n, "right_effort_n": _right_effort_n,
 		"left_speed_mps": _left_speed_m_s, "right_speed_mps": _right_speed_m_s,
 		"left_slip_ratio": _left_slip_ratio, "right_slip_ratio": _right_slip_ratio,
 		"left_support_load_n": _left_support_load_n, "right_support_load_n": _right_support_load_n,
@@ -522,6 +560,15 @@ func _capture_post_step_snapshot() -> void:
 		"terrain_identity_valid": _terrain_identity_valid,
 		"contacts": _contacts.duplicate(true), "quality_flags": _quality_flags.duplicate(),
 		"last_step_usec": _last_step_usec,
+		"posture_error_rad": _posture_error_rad,
+		"terrain_normal_alignment_deg": _terrain_normal_alignment_deg,
+		"lowest_clearance_m": _lowest_clearance_m,
+		"forward_speed_m_s": _forward_speed_m_s(),
+		"acceleration_time_s": _acceleration_time_s,
+		"brake_stop_time_s": _brake_stop_time_s,
+		"brake_stop_distance_m": _brake_stop_distance_m,
+		"peak_pitch_angle_rad": _peak_pitch_angle_rad,
+		"peak_pitch_rate_rad_s": _peak_pitch_rate_rad_s,
 	}
 
 
@@ -831,6 +878,7 @@ func _apply_track_side(local_x: float, command: float, point_count: int, contact
 	var max_side_force := float(_tracks["max_drive_force_n"])
 	var max_point_force := max_side_force / float(point_count)
 	var ray_hits: Array[Dictionary] = []
+	var samples: Array[Dictionary] = []
 	for index in point_count:
 		var alpha := (float(index) + 0.5) / float(point_count)
 		var hit := _track_raycast(Vector3(local_x, 0.0, lerpf(-0.5 * contact_length, 0.5 * contact_length, alpha)))
@@ -840,7 +888,6 @@ func _apply_track_side(local_x: float, command: float, point_count: int, contact
 		if hit.is_empty():
 			_previous_probe_support_loads.erase("%s:%d" % [side_name, probe_index])
 			continue
-		contacts += 1
 		var point := hit["position"] as Vector3
 		var normal := (hit["normal"] as Vector3).normalized()
 		var ray_start := hit.get("ray_start", point) as Vector3
@@ -871,11 +918,40 @@ func _apply_track_side(local_x: float, command: float, point_count: int, contact
 		if forward.length_squared() < 0.5 or lateral.length_squared() < 0.5:
 			continue
 		var longitudinal_speed := point_velocity.dot(forward)
-		var target_speed := command * float(_tracks["max_belt_speed_m_s"])
+		contacts += 1
+		speed_sum += longitudinal_speed
+		samples.append({
+			"point": point,
+			"normal": normal,
+			"offset": offset,
+			"point_velocity": point_velocity,
+			"forward": forward,
+			"lateral": lateral,
+			"longitudinal_speed": longitudinal_speed,
+			"support_force": support_force,
+			"friction_cap": friction_cap,
+			"collider": hit["collider"],
+		})
+	var average_speed := speed_sum / float(contacts) if contacts > 0 else 0.0
+	var previous_effort := _left_effort_n if side_name == "left" else _right_effort_n
+	var side_effort := _shape_track_effort(command, average_speed, previous_effort, contacts > 0)
+	if side_name == "left":
+		_left_effort_n = side_effort
+	else:
+		_right_effort_n = side_effort
+	var drive_force := side_effort / float(point_count)
+	var target_speed := _effective_track_target_speed(command, average_speed)
+	for sample in samples:
+		var point := sample["point"] as Vector3
+		var normal := sample["normal"] as Vector3
+		var offset := sample["offset"] as Vector3
+		var point_velocity := sample["point_velocity"] as Vector3
+		var forward := sample["forward"] as Vector3
+		var lateral := sample["lateral"] as Vector3
+		var longitudinal_speed := float(sample["longitudinal_speed"])
+		var support_force := float(sample["support_force"])
+		var friction_cap := float(sample["friction_cap"])
 		var speed_error := target_speed - longitudinal_speed
-		var drive_force := speed_error * float(_tracks["traction_response_n_per_m_s"]) / float(point_count)
-		if is_zero_approx(command):
-			drive_force = clampf(-longitudinal_speed * float(_tracks["brake_force_n"]) / float(point_count), -max_point_force, max_point_force)
 		var bounded_drive := clampf(drive_force, -minf(max_point_force, friction_cap), minf(max_point_force, friction_cap))
 		if not is_equal_approx(bounded_drive, drive_force):
 			saturated = true
@@ -889,12 +965,56 @@ func _apply_track_side(local_x: float, command: float, point_count: int, contact
 		var traction_force := forward * bounded_drive + lateral * lateral_force
 		_body.apply_central_force(traction_force)
 		_body.apply_torque((_body.global_basis.x * local_x).cross(traction_force))
-		speed_sum += longitudinal_speed
 		slip_sum += clampf(speed_error / maxf(absf(target_speed), MIN_SPEED_DENOMINATOR), -4.0, 4.0)
 		support_load_sum += support_force
 		normal_sum += normal
-		_contacts.append({"body": "chassis", "other": String((hit["collider"] as Node).name), "point": point, "normal": normal, "impulse_n_s": 0.0, "penetration_m": 0.0, "track_side": side_name})
+		_contacts.append({"body": "chassis", "other": String((sample["collider"] as Node).name), "point": point, "normal": normal, "impulse_n_s": 0.0, "penetration_m": 0.0, "track_side": side_name})
 	return {"contact_count": contacts, "speed_m_s": speed_sum / float(contacts) if contacts > 0 else 0.0, "slip_ratio": slip_sum / float(contacts) if contacts > 0 else 0.0, "support_load_n": support_load_sum, "normal_sum": normal_sum, "saturated": saturated}
+
+
+func _effective_track_target_speed(command: float, longitudinal_speed: float) -> float:
+	if is_zero_approx(command):
+		return 0.0
+	if absf(longitudinal_speed) > 0.05 and signf(command) != signf(longitudinal_speed):
+		return 0.0
+	return command * float(_tracks["max_belt_speed_m_s"])
+
+
+func _shape_track_effort(command: float, longitudinal_speed: float, current_effort: float, has_contact: bool) -> float:
+	var max_side_force := float(_tracks["max_drive_force_n"])
+	var drive_slew := float(_tracks.get("drive_effort_slew_n_per_tick", max_side_force))
+	var brake_slew := float(_tracks.get("brake_effort_slew_n_per_tick", max_side_force))
+	if not has_contact:
+		return move_toward(current_effort, 0.0, brake_slew)
+	var target_speed := _effective_track_target_speed(command, longitudinal_speed)
+	var reversing_to_zero := not is_zero_approx(command) and is_zero_approx(target_speed) and absf(longitudinal_speed) > 0.05
+	var braking := is_zero_approx(command) or reversing_to_zero
+	if braking:
+		if absf(longitudinal_speed) <= 0.05:
+			return 0.0
+		if current_effort * longitudinal_speed > 0.0:
+			current_effort = 0.0
+		var brake_target := -longitudinal_speed * float(_tracks["brake_force_n"])
+		if reversing_to_zero:
+			brake_target = signf(command) * minf(absf(float(_tracks["brake_force_n"])), max_side_force)
+		# Keep the total fixed-tick braking impulse below the current longitudinal
+		# momentum. Each side receives half of the no-crossing budget.
+		var no_cross_force := float(_dynamics["mass_kg"]) * absf(longitudinal_speed) / _last_fixed_delta_s * 0.45
+		brake_target = clampf(brake_target, -no_cross_force, no_cross_force)
+		current_effort = clampf(current_effort, -no_cross_force, no_cross_force)
+		return move_toward(current_effort, brake_target, brake_slew)
+	var drive_target := clampf(
+		(target_speed - longitudinal_speed) * float(_tracks["traction_response_n_per_m_s"]),
+		-max_side_force,
+		max_side_force
+	)
+	if absf(longitudinal_speed) <= 0.05:
+		var no_cross_force := float(_dynamics["mass_kg"]) * absf(longitudinal_speed) / _last_fixed_delta_s * 0.45
+		var launch_force := minf(drive_slew, max_side_force * 0.12)
+		var near_zero_force := maxf(no_cross_force, launch_force)
+		drive_target = clampf(drive_target, -near_zero_force, near_zero_force)
+		current_effort = clampf(current_effort, -near_zero_force, near_zero_force)
+	return move_toward(current_effort, drive_target, drive_slew)
 
 
 func _set_hull_terrain_collision_released(released: bool) -> void:
@@ -1016,6 +1136,118 @@ func _clear_tick_telemetry() -> void:
 	_quality_flags.clear()
 
 
+func _reset_response_telemetry() -> void:
+	_track_neutral_armed = false
+	_left_effort_n = 0.0
+	_right_effort_n = 0.0
+	_posture_error_rad = 0.0
+	_terrain_normal_alignment_deg = 0.0
+	_lowest_clearance_m = 0.0
+	_acceleration_elapsed_s = 0.0
+	_acceleration_time_s = -1.0
+	_acceleration_direction = 0.0
+	_brake_elapsed_s = 0.0
+	_brake_stop_time_s = -1.0
+	_brake_stop_distance_m = 0.0
+	_brake_start_position = _body.global_position if _body != null and is_instance_valid(_body) and _body.is_inside_tree() else Vector3.ZERO
+	_brake_was_active = false
+	_peak_pitch_angle_rad = 0.0
+	_peak_pitch_rate_rad_s = 0.0
+
+
+func _forward_speed_m_s() -> float:
+	if _body == null or not is_instance_valid(_body) or not _body.is_inside_tree():
+		return 0.0
+	return _body.linear_velocity.dot(-_body.global_basis.z)
+
+
+func _update_response_telemetry(delta: float) -> void:
+	if _body == null or not is_instance_valid(_body) or not _body.is_inside_tree():
+		return
+	var forward_speed := _forward_speed_m_s()
+	if is_zero_approx(_left_command) and is_zero_approx(_right_command) and absf(forward_speed) <= 0.05:
+		# The bounded stop window may leave a tiny residual after the last force
+		# tick. Remove only that longitudinal residue so neutral cannot roll back.
+		_body.linear_velocity -= (-_body.global_basis.z).normalized() * forward_speed
+		forward_speed = 0.0
+	var command_axis := 0.5 * (_left_command + _right_command)
+	var straight_command := _left_command * _right_command > 0.0 and absf(_left_command - _right_command) <= 0.1
+	if straight_command and absf(command_axis) > 0.05:
+		var direction := signf(command_axis)
+		if not is_equal_approx(direction, _acceleration_direction):
+			_acceleration_direction = direction
+			_acceleration_elapsed_s = 0.0
+			_acceleration_time_s = -1.0
+		if _acceleration_time_s < 0.0:
+			_acceleration_elapsed_s += delta
+			var target_speed := absf(command_axis) * float(_tracks.get("max_belt_speed_m_s", 0.0))
+			if forward_speed * direction >= target_speed * 0.65:
+				_acceleration_time_s = _acceleration_elapsed_s
+	else:
+		_acceleration_elapsed_s = 0.0
+		_acceleration_direction = 0.0
+	var neutral_command := is_zero_approx(_left_command) and is_zero_approx(_right_command)
+	var braking := neutral_command and absf(forward_speed) > 0.05
+	if braking and not _brake_was_active:
+		_brake_start_position = _body.global_position
+		_brake_elapsed_s = 0.0
+		_brake_stop_time_s = -1.0
+		_brake_stop_distance_m = 0.0
+		_brake_was_active = true
+	if _brake_was_active:
+		_brake_elapsed_s += delta
+		_brake_stop_distance_m = _body.global_position.distance_to(_brake_start_position)
+		if neutral_command and absf(forward_speed) <= 0.05:
+			_brake_stop_time_s = _brake_elapsed_s
+			_brake_was_active = false
+		elif not neutral_command:
+			_brake_was_active = false
+	var terrain_normal := _sample_terrain_normal()
+	if terrain_normal.length_squared() > 0.5:
+		_posture_error_rad = _body.global_basis.y.normalized().angle_to(terrain_normal)
+		_terrain_normal_alignment_deg = rad_to_deg(_posture_error_rad)
+		_lowest_clearance_m = _lowest_shape_clearance()
+	var forward := -_body.global_basis.z
+	var pitch_angle := atan2(forward.y, maxf(Vector2(forward.x, forward.z).length(), 0.001))
+	var pitch_rate := absf(_body.angular_velocity.dot(_body.global_basis.x))
+	_peak_pitch_angle_rad = maxf(_peak_pitch_angle_rad, absf(pitch_angle))
+	_peak_pitch_rate_rad_s = maxf(_peak_pitch_rate_rad_s, pitch_rate)
+
+
+func _sample_terrain_normal() -> Vector3:
+	if _terrain_world == null or _terrain_world.terrain_state == null:
+		return Vector3.UP
+	var state := _terrain_world.terrain_state
+	var p := Vector2(_body.global_position.x, _body.global_position.z)
+	if not state.is_inside_grid(p):
+		return Vector3.UP
+	var spacing := state.spacing_m
+	var left_height := _sample_heightfield_clamped(state, p - Vector2(spacing, 0.0))
+	var right_height := _sample_heightfield_clamped(state, p + Vector2(spacing, 0.0))
+	var rear_height := _sample_heightfield_clamped(state, p - Vector2(0.0, spacing))
+	var front_height := _sample_heightfield_clamped(state, p + Vector2(0.0, spacing))
+	return Vector3((left_height - right_height) / (2.0 * spacing), 1.0, (rear_height - front_height) / (2.0 * spacing)).normalized()
+
+
+func _lowest_shape_clearance() -> float:
+	if _body == null or not is_instance_valid(_body) or _terrain_world == null:
+		return 0.0
+	var state := _terrain_world.terrain_state
+	var lowest := INF
+	for shape_value in _dynamics.get("compound_shapes", []):
+		var shape := shape_value as Dictionary
+		var center := _vector3(shape.get("center_m", [0.0, 0.0, 0.0]))
+		var half := 0.5 * _vector3(shape.get("size_m", [1.0, 1.0, 1.0]))
+		for sx in [-1.0, 1.0]:
+			for sy in [-1.0, 1.0]:
+				for sz in [-1.0, 1.0]:
+					var point_world := _body.global_transform * (center + Vector3(sx * half.x, sy * half.y, sz * half.z))
+					var ground := state.sample_surface_bilinear_at(Vector2(point_world.x, point_world.z))
+					if is_finite(ground):
+						lowest = minf(lowest, point_world.y - ground)
+	return 0.0 if is_inf(lowest) else lowest
+
+
 func _empty_snapshot() -> Dictionary:
 	return {
 		"physics_tick": _physics_tick,
@@ -1029,11 +1261,23 @@ func _empty_snapshot() -> Dictionary:
 		"joints": [],
 		"payload": _articulation.payload_snapshot(),
 		"neutral_armed": false,
+		"track_neutral_armed": false,
+		"left_effort_n": 0.0,
+		"right_effort_n": 0.0,
 		"bucket_query": {},
 		"queued_chassis_wrench": {},
 		"applied_chassis_wrench": {},
 		"left_support_load_n": 0.0,
 		"right_support_load_n": 0.0,
+		"posture_error_rad": 0.0,
+		"terrain_normal_alignment_deg": 0.0,
+		"lowest_clearance_m": 0.0,
+		"forward_speed_m_s": 0.0,
+		"acceleration_time_s": -1.0,
+		"brake_stop_time_s": -1.0,
+		"brake_stop_distance_m": 0.0,
+		"peak_pitch_angle_rad": 0.0,
+		"peak_pitch_rate_rad_s": 0.0,
 		"contacts": [],
 		"quality_flags": ["authoritative_runtime_unavailable"],
 	}

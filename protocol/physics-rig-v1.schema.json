@@ -48,7 +48,7 @@
     "chassis_dynamics": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["mass_kg", "center_of_mass_m", "inertia_diagonal_kg_m2", "linear_damp", "angular_damp", "max_linear_speed_m_s", "max_angular_speed_rad_s", "ground_clearance_m", "can_sleep", "continuous_collision_detection", "compound_shapes"],
+      "required": ["mass_kg", "center_of_mass_m", "inertia_diagonal_kg_m2", "linear_damp", "angular_damp", "max_linear_speed_m_s", "max_angular_speed_rad_s", "attitude_stiffness_nm_per_rad", "attitude_damping_nm_s_per_rad", "max_attitude_torque_nm", "ground_clearance_m", "can_sleep", "continuous_collision_detection", "compound_shapes"],
       "properties": {
         "mass_kg": {"type": "number", "exclusiveMinimum": 0},
         "center_of_mass_m": {"$ref": "#/$defs/vec3"},
@@ -60,13 +60,16 @@
         "ground_clearance_m": {"type": "number", "exclusiveMinimum": 0},
         "can_sleep": {"type": "boolean"},
         "continuous_collision_detection": {"type": "boolean"},
+        "attitude_stiffness_nm_per_rad": {"type": "number", "exclusiveMinimum": 0},
+        "attitude_damping_nm_s_per_rad": {"type": "number", "exclusiveMinimum": 0},
+        "max_attitude_torque_nm": {"type": "number", "exclusiveMinimum": 0},
         "compound_shapes": {"type": "array", "minItems": 2, "maxItems": 8, "items": {"$ref": "#/$defs/phase1_shape"}}
       }
     },
     "tracks": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["gauge_m", "contact_length_m", "contact_width_m", "traction_points_per_side", "friction", "max_drive_force_n", "max_belt_speed_m_s", "brake_force_n", "traction_response_n_per_m_s", "lateral_resistance_n_per_m_s", "probe_height_m", "probe_depth_m", "yaw_torque_scale"],
+      "required": ["gauge_m", "contact_length_m", "contact_width_m", "traction_points_per_side", "friction", "max_drive_force_n", "max_belt_speed_m_s", "brake_force_n", "traction_response_n_per_m_s", "lateral_resistance_n_per_m_s", "probe_height_m", "probe_depth_m", "support_rest_length_m", "support_stiffness_n_per_m", "support_damping_n_s_per_m", "max_support_force_n", "pivot_lateral_resistance_scale", "yaw_assist_scale"],
       "properties": {
         "gauge_m": {"type": "number", "exclusiveMinimum": 0},
         "contact_length_m": {"type": "number", "exclusiveMinimum": 0},
@@ -80,7 +83,16 @@
         "lateral_resistance_n_per_m_s": {"type": "number", "exclusiveMinimum": 0},
         "probe_height_m": {"type": "number", "exclusiveMinimum": 0},
         "probe_depth_m": {"type": "number", "exclusiveMinimum": 0},
-        "yaw_torque_scale": {"type": "number", "exclusiveMinimum": 0, "maximum": 1}
+        "support_rest_length_m": {"type": "number", "exclusiveMinimum": 0},
+        "support_stiffness_n_per_m": {"type": "number", "exclusiveMinimum": 0},
+        "support_damping_n_s_per_m": {"type": "number", "exclusiveMinimum": 0},
+        "max_support_force_n": {"type": "number", "exclusiveMinimum": 0},
+        "pivot_lateral_resistance_scale": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+        "yaw_assist_scale": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+        "drive_effort_slew_n_per_tick": {"type": "number", "exclusiveMinimum": 0},
+        "brake_effort_slew_n_per_tick": {"type": "number", "exclusiveMinimum": 0},
+        "acceleration_window_s": {"type": "number", "exclusiveMinimum": 0},
+        "brake_stop_window_s": {"type": "number", "exclusiveMinimum": 0}
       }
     },
     "quality_flags": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}

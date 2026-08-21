@@ -35,6 +35,10 @@ const TRACK_FIELDS := [
 	"probe_height_m", "probe_depth_m", "support_rest_length_m",
 	"support_stiffness_n_per_m", "support_damping_n_s_per_m",
 	"max_support_force_n", "pivot_lateral_resistance_scale", "yaw_assist_scale",
+	]
+const OPTIONAL_TRACK_RESPONSE_FIELDS := [
+	"drive_effort_slew_n_per_tick", "brake_effort_slew_n_per_tick",
+	"acceleration_window_s", "brake_stop_window_s",
 ]
 const BODY_FRAMES := {
 	"chassis": "base_link",
@@ -308,13 +312,16 @@ func _validate_tracks(value: Variant) -> bool:
 	if not value is Dictionary:
 		return _reject("tracks", "must be an object")
 	var tracks := value as Dictionary
-	if not _exact_fields(tracks, TRACK_FIELDS, "tracks"):
+	if not _fields_with_optional(tracks, TRACK_FIELDS, OPTIONAL_TRACK_RESPONSE_FIELDS, "tracks"):
 		return false
 	for field in TRACK_FIELDS:
 		if field == "traction_points_per_side" or field == "friction":
 			continue
 		if not _positive_number(tracks.get(field)):
 			return _reject("tracks.%s" % field, "must be finite and positive")
+	for field in OPTIONAL_TRACK_RESPONSE_FIELDS:
+		if tracks.has(field) and not _positive_number(tracks.get(field)):
+			return _reject("tracks.%s" % field, "must be finite and positive when present")
 	var points: Variant = tracks.get("traction_points_per_side")
 	if not _integer_in_range(points, 2, 16):
 		return _reject("tracks.traction_points_per_side", "must be an integer from 2 to 16")
@@ -443,6 +450,16 @@ func _exact_fields(value: Dictionary, required: Array, path: String) -> bool:
 			return _reject("%s.%s" % [path, field], "is required")
 	for field in value:
 		if not required.has(field):
+			return _reject("%s.%s" % [path, field], "is not allowed")
+	return true
+
+
+func _fields_with_optional(value: Dictionary, required: Array, optional: Array, path: String) -> bool:
+	for field in required:
+		if not value.has(field):
+			return _reject("%s.%s" % [path, field], "is required")
+	for field in value:
+		if not required.has(field) and not optional.has(field):
 			return _reject("%s.%s" % [path, field], "is not allowed")
 	return true
 

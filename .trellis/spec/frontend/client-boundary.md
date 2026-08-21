@@ -199,6 +199,10 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
   limits, bounded velocity/acceleration/jerk/braking, chassis compound shapes,
   track contacts, and evidence provenance. Dynamic upper/boom/arm/bucket mass,
   inertia, motors, hydraulics, and self-collision are not product authority.
+  The v1 wire schema remains backward-compatible: model-specific response
+  shaping fields (`drive_effort_slew_n_per_tick`, `brake_effort_slew_n_per_tick`,
+  `acceleration_window_s`, `brake_stop_window_s`) are optional extensions and
+  must have bounded runtime defaults when absent.
 - The accepted four-axis command is sampled once per fixed tick. Stale command
   identity is ignored, invalid input disarms, and every rebuild requires a
   neutral sample before movement. `KinematicArticulationState` shapes joint
@@ -210,7 +214,9 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
   bucket physics body because no such body exists.
 - Each track uses four distributed ray contact points. Longitudinal drive,
   braking, coast, lateral resistance, slip, and differential yaw torque are
-  bounded before forces are applied to the body.
+  bounded before forces are applied to the body. Effort shaping is updated once
+  per side per fixed tick, independent of how many probes currently have
+  support; partial contact changes the force budget, not the slew rate.
 - Spawn and reset posture are calibrated from the same descriptor compound
   shapes and the authoritative `TerrainState` surface. The initial transform
   must establish a level/upright chassis relative to the sampled terrain
@@ -221,9 +227,16 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
 - Longitudinal response is evaluated as a measured speed curve, not only by the
   final speed clamp. Drive, coast and braking forces remain bounded by actual
   support load, and brake effort must be slew-limited or otherwise bounded per
-  fixed tick so command release cannot create a one-tick pitch impulse. The
+  fixed tick so command release cannot create a one-tick pitch impulse. A
+  reverse command first brakes toward a bounded zero-crossing and may not apply
+  the opposite drive target while meaningful opposite momentum remains. The
   runtime snapshot should expose enough telemetry to measure acceleration,
   stop time/distance, peak pitch rate and realized slip for each model.
+- Reset clearance is solved against the sampled `TerrainState` height at every
+  rotated compound-shape corner, not only the body origin. The configured
+  clearance is measured after this corner-wise solve and after bounded support
+  settling; tests must check both no penetration and proximity to the descriptor
+  clearance.
 - Track raycasts may hit only the project `TerrainCollider`, and forces activate
   only when its applied `(world_generation, terrain_revision)` matches the
   current `TerrainState`. The heightfield remains the logical terrain authority.

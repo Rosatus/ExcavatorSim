@@ -515,25 +515,76 @@ func _authoritative_spawn_transform(descriptor: PhysicsRigDescriptor) -> Transfo
 	var parent := get_parent_node_3d()
 	var spawn := parent.global_transform if parent != null else Transform3D.IDENTITY
 	spawn.basis = spawn.basis.orthonormalized()
+	var terrain_normal := _sample_authoritative_terrain_normal(spawn.origin)
+	if terrain_normal.length_squared() > 0.5:
+		var forward := (-spawn.basis.z).slide(terrain_normal)
+		if forward.length_squared() < 0.25:
+			forward = spawn.basis.x.cross(terrain_normal)
+		if forward.length_squared() > 0.25:
+			forward = forward.normalized()
+			var right := forward.cross(terrain_normal).normalized()
+			spawn.basis = Basis(right, terrain_normal, -forward).orthonormalized()
 	var surface_y := 0.0
+	var terrain_state: TerrainState = null
 	if _terrain_world != null and _terrain_world.terrain_state != null:
-		var sampled := _terrain_world.terrain_state.sample_surface_bilinear_at(Vector2(spawn.origin.x, spawn.origin.z))
+		terrain_state = _terrain_world.terrain_state
+		var sampled := terrain_state.sample_surface_bilinear_at(Vector2(spawn.origin.x, spawn.origin.z))
 		if is_finite(sampled):
 			surface_y = sampled
 	var data := descriptor.to_dictionary()
 	var dynamics := data.get("chassis_dynamics", {}) as Dictionary
+	var ground_clearance := float(dynamics.get("ground_clearance_m", 0.05))
+	var tracks := data.get("tracks", {}) as Dictionary
+	var stiffness := float(tracks.get("support_stiffness_n_per_m", 0.0))
+	var probe_count := maxi(1, int(tracks.get("traction_points_per_side", 1)) * 2)
+	var support_sag := 0.0
+	if stiffness > 0.0:
+		support_sag = clampf(float(dynamics.get("mass_kg", 0.0)) * 9.80665 / (stiffness * float(probe_count)), 0.0, 0.12)
 	var minimum_bottom := INF
+	var required_origin_y := -INF
 	for shape_value in dynamics.get("compound_shapes", []):
 		if not shape_value is Dictionary:
 			continue
 		var shape := shape_value as Dictionary
 		var center := _vector3(shape.get("center_m", [0.0, 0.0, 0.0]))
 		var size := _vector3(shape.get("size_m", [1.0, 1.0, 1.0]))
-		minimum_bottom = minf(minimum_bottom, center.y - 0.5 * size.y)
+		var half := 0.5 * size
+		for sx in [-1.0, 1.0]:
+			for sy in [-1.0, 1.0]:
+				for sz in [-1.0, 1.0]:
+					var offset := spawn.basis * (center + Vector3(sx * half.x, sy * half.y, sz * half.z))
+					minimum_bottom = minf(minimum_bottom, offset.y)
+					if terrain_state != null:
+						var corner_ground := terrain_state.sample_surface_bilinear_at(
+							Vector2(spawn.origin.x + offset.x, spawn.origin.z + offset.z)
+						)
+						if is_finite(corner_ground):
+							required_origin_y = maxf(required_origin_y, corner_ground + ground_clearance + support_sag - offset.y)
 	if is_inf(minimum_bottom):
 		minimum_bottom = 0.0
-	spawn.origin.y = surface_y - minimum_bottom + float(dynamics.get("ground_clearance_m", 0.05))
+	spawn.origin.y = (
+		required_origin_y
+		if not is_inf(required_origin_y)
+		else surface_y - minimum_bottom + ground_clearance + support_sag
+	)
 	return spawn
+
+
+func _sample_authoritative_terrain_normal(world_position: Vector3) -> Vector3:
+	if _terrain_world == null or _terrain_world.terrain_state == null:
+		return Vector3.UP
+	var state := _terrain_world.terrain_state
+	var p := Vector2(world_position.x, world_position.z)
+	if not state.is_inside_grid(p):
+		return Vector3.UP
+	var spacing := state.spacing_m
+	var left_height := state.sample_surface_bilinear_at(p - Vector2(spacing, 0.0))
+	var right_height := state.sample_surface_bilinear_at(p + Vector2(spacing, 0.0))
+	var rear_height := state.sample_surface_bilinear_at(p - Vector2(0.0, spacing))
+	var front_height := state.sample_surface_bilinear_at(p + Vector2(0.0, spacing))
+	if not is_finite(left_height) or not is_finite(right_height) or not is_finite(rear_height) or not is_finite(front_height):
+		return Vector3.UP
+	return Vector3((left_height - right_height) / (2.0 * spacing), 1.0, (rear_height - front_height) / (2.0 * spacing)).normalized()
 
 
 func _sync_visual_to_jolt_body() -> void:

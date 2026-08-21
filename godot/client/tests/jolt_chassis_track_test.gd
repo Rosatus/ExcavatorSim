@@ -58,6 +58,14 @@ func _test_model(model_id: String) -> void:
 		failures.append("%s descriptor invalid: %s" % [model_id, descriptor.validation_error()])
 		host.queue_free()
 		return
+	var legacy_data := descriptor.to_dictionary()
+	var legacy_tracks := (legacy_data["tracks"] as Dictionary).duplicate(true)
+	for field in ["drive_effort_slew_n_per_tick", "brake_effort_slew_n_per_tick", "acceleration_window_s", "brake_stop_window_s"]:
+		legacy_tracks.erase(field)
+	legacy_data["tracks"] = legacy_tracks
+	var legacy_descriptor := PhysicsRigDescriptor.from_dictionary_for_test(legacy_data)
+	if not legacy_descriptor.is_valid_for(model_id, model_version):
+		failures.append("%s physics-rig-v1 compatibility rejected a descriptor without optional response fields: %s" % [model_id, legacy_descriptor.validation_error()])
 	var runtime := JoltChassisTrackRuntime.new()
 	runtime.name = "JoltChassisTrackRuntime"
 	host.add_child(runtime)
@@ -96,7 +104,7 @@ func _test_model(model_id: String) -> void:
 	var settle_heave_rms := sqrt(settle_heave_sq_sum / float(settle_samples))
 	var settle_tilt_rms := sqrt(settle_tilt_sq_sum / float(settle_samples))
 	print(
-		"jolt_chassis_track_test: %s settle heave_rms=%.4f tilt_rms=%.4f height_span=%.4f switches=%d support=(%.1f, %.1f)"
+		"jolt_chassis_track_test: %s settle heave_rms=%.4f tilt_rms=%.4f height_span=%.4f switches=%d support=(%.1f, %.1f) posture=%.3fdeg clearance=%.4f"
 		% [
 			model_id,
 			settle_heave_rms,
@@ -105,6 +113,8 @@ func _test_model(model_id: String) -> void:
 			int(settled.get("hull_collision_switch_count", -1)),
 			float(settled.get("left_support_load_n", 0.0)),
 			float(settled.get("right_support_load_n", 0.0)),
+			rad_to_deg(float(settled.get("posture_error_rad", 0.0))),
+			float(settled.get("lowest_clearance_m", 0.0)),
 		]
 	)
 	if settle_heave_rms > 0.08 or settle_tilt_rms > 0.08 or settle_max_y - settle_min_y > 0.08:
@@ -122,7 +132,30 @@ func _test_model(model_id: String) -> void:
 	var support_load := float(settled.get("left_support_load_n", 0.0)) + float(settled.get("right_support_load_n", 0.0))
 	if support_load < expected_weight * 0.65 or support_load > expected_weight * 1.35:
 		failures.append("%s distributed support load is not near chassis weight: %.1f vs %.1f" % [model_id, support_load, expected_weight])
+	var posture_error_deg := rad_to_deg(float(settled.get("posture_error_rad", INF)))
+	var clearance := float(settled.get("lowest_clearance_m", NAN))
+	var configured_clearance := float(descriptor.chassis_dynamics()["ground_clearance_m"])
+	if not is_finite(posture_error_deg) or posture_error_deg > 2.0:
+		failures.append("%s reset posture did not follow terrain normal: %.3f deg" % [model_id, posture_error_deg])
+	if not is_finite(clearance) or absf(clearance - configured_clearance) > 0.02:
+		failures.append("%s reset clearance missed configured ground clearance: %.4f vs %.4f" % [model_id, clearance, configured_clearance])
+	for telemetry_value in [
+		float(settled.get("left_support_load_n", NAN)),
+		float(settled.get("right_support_load_n", NAN)),
+		float(settled.get("left_slip_ratio", NAN)),
+		float(settled.get("right_slip_ratio", NAN)),
+	]:
+		if not is_finite(telemetry_value):
+			failures.append("%s reset emitted non-finite support/slip telemetry" % model_id)
+	var neutral_probe_start := runtime.get_body_global_transform().origin
+	runtime.set_commands(1.0, 1.0)
+	for _frame in 10:
+		await physics_frame
+	if runtime.get_body_global_transform().origin.distance_to(neutral_probe_start) > 0.02:
+		failures.append("%s moved before neutral track re-arm" % model_id)
 	var start := runtime.get_body_global_transform()
+	# Reset/model activation requires one explicit neutral track sample before motion.
+	runtime.set_commands(0.0, 0.0)
 	runtime.set_commands(1.0, 1.0)
 	var drive_heave_sq_sum := 0.0
 	var drive_tilt_sq_sum := 0.0
@@ -168,13 +201,49 @@ func _test_model(model_id: String) -> void:
 	var max_speed := float(descriptor.chassis_dynamics()["max_linear_speed_m_s"])
 	if (driven["linear_velocity"] as Vector3).length() > max_speed + 0.01:
 		failures.append("%s exceeded the configured speed bound" % model_id)
+	var track_tuning := descriptor.tracks()
+	var acceleration_time := float(driven.get("acceleration_time_s", -1.0))
+	if acceleration_time <= 0.0 or acceleration_time > float(track_tuning["acceleration_window_s"]):
+		failures.append("%s acceleration missed its descriptor window: %.3f s" % [model_id, acceleration_time])
+	if (driven["quality_flags"] as Array).has("linear_speed_clamped"):
+		failures.append("%s acceleration relied on the linear velocity safety clamp" % model_id)
 	if int(driven["peak_step_usec"]) > 10000:
 		failures.append("%s track force step exceeded 10 ms: %s" % [model_id, driven["peak_step_usec"]])
 	print("jolt_chassis_track_test: %s peak fixed step=%d usec" % [model_id, int(driven["peak_step_usec"])])
 	var speed_before_brake := (driven["linear_velocity"] as Vector3).length()
 	runtime.set_commands(0.0, 0.0)
-	for _frame in 120:
+	var previous_forward_speed := absf(float(driven.get("forward_speed_m_s", 0.0)))
+	var previous_signed_speed := float(driven.get("forward_speed_m_s", 0.0))
+	var brake_pitch_sq_sum := 0.0
+	var brake_pitch_samples := 0
+	var brake_pitch_sign_reversals := 0
+	var previous_pitch_rate_sign := 0
+	var brake_speed_violation := false
+	for _frame in int(ceil(float(track_tuning["brake_stop_window_s"]) * 60.0)) + 15:
 		await physics_frame
+		var brake_sample := runtime.get_status_snapshot()
+		var signed_forward_speed := float(brake_sample.get("forward_speed_m_s", 0.0))
+		var current_forward_speed := absf(signed_forward_speed)
+		if current_forward_speed > previous_forward_speed + 0.03:
+			brake_speed_violation = true
+		if signed_forward_speed < -0.02:
+			brake_speed_violation = true
+		previous_forward_speed = current_forward_speed
+		if previous_signed_speed > 0.02 and signed_forward_speed < -0.02:
+			brake_speed_violation = true
+		previous_signed_speed = signed_forward_speed
+		var brake_body := runtime.get_body_global_transform()
+		var pitch := atan2((-brake_body.basis.z).y, maxf(Vector2((-brake_body.basis.z).x, (-brake_body.basis.z).z).length(), 0.001))
+		var pitch_rate := float((brake_sample.get("angular_velocity", Vector3.ZERO) as Vector3).dot(brake_body.basis.x))
+		brake_pitch_sq_sum += pitch * pitch
+		brake_pitch_samples += 1
+		var pitch_rate_sign := signi(pitch_rate) if absf(pitch_rate) > 0.02 else 0
+		if pitch_rate_sign != 0 and previous_pitch_rate_sign != 0 and pitch_rate_sign != previous_pitch_rate_sign:
+			brake_pitch_sign_reversals += 1
+		if pitch_rate_sign != 0:
+			previous_pitch_rate_sign = pitch_rate_sign
+	if brake_speed_violation:
+		failures.append("%s braking speed was not monotonic or crossed into reverse" % model_id)
 	var brake_status := runtime.get_status_snapshot()
 	var speed_after_brake := (brake_status["linear_velocity"] as Vector3).length()
 	print(
@@ -194,11 +263,43 @@ func _test_model(model_id: String) -> void:
 	)
 	if speed_after_brake >= speed_before_brake:
 		failures.append("%s braking did not reduce chassis speed" % model_id)
+	var brake_stop_time := float(brake_status.get("brake_stop_time_s", -1.0))
+	if brake_stop_time <= 0.0 or brake_stop_time > float(track_tuning["brake_stop_window_s"]):
+		failures.append("%s braking missed its descriptor stop window: %.3f s" % [model_id, brake_stop_time])
+	var brake_stop_distance := float(brake_status.get("brake_stop_distance_m", NAN))
+	if not is_finite(brake_stop_distance) or brake_stop_distance > maxf(0.2, speed_before_brake * float(track_tuning["brake_stop_window_s"]) * 1.5):
+		failures.append("%s braking stop distance was unbounded: %.3f m" % [model_id, brake_stop_distance])
+	if float(brake_status.get("peak_pitch_angle_rad", INF)) > 0.12 or float(brake_status.get("peak_pitch_rate_rad_s", INF)) > 0.65:
+		failures.append("%s hard braking exceeded pitch response bounds" % model_id)
+	var brake_pitch_rms := sqrt(brake_pitch_sq_sum / float(maxi(brake_pitch_samples, 1)))
+	if brake_pitch_rms > 0.06 or brake_pitch_sign_reversals > 2:
+		failures.append("%s hard braking had sustained/repeating pitch response: rms=%.4f reversals=%d" % [model_id, brake_pitch_rms, brake_pitch_sign_reversals])
+	# Reverse must first brake the existing forward motion through a bounded zero crossing.
+	runtime.set_commands(0.0, 0.0)
+	runtime.set_commands(1.0, 1.0)
+	for _frame in 60:
+		await physics_frame
+	var previous_reverse_speed := float(runtime.get_status_snapshot().get("forward_speed_m_s", 0.0))
+	var reverse_crossed_zero := false
+	runtime.set_commands(-1.0, -1.0)
+	for _frame in 120:
+		await physics_frame
+		var reverse_speed := float(runtime.get_status_snapshot().get("forward_speed_m_s", 0.0))
+		if not reverse_crossed_zero and reverse_speed < -0.05 and previous_reverse_speed > 0.05:
+			failures.append("%s reversed through zero without a bounded transition" % model_id)
+		if absf(reverse_speed) <= 0.05:
+			reverse_crossed_zero = true
+		previous_reverse_speed = reverse_speed
+	if not reverse_crossed_zero:
+		failures.append("%s reverse transition never observed the bounded zero-crossing window" % model_id)
+	if float(runtime.get_status_snapshot().get("forward_speed_m_s", 0.0)) > -0.3:
+		failures.append("%s reverse command did not complete its bounded zero crossing" % model_id)
 
 	runtime.reset(spawn)
 	for _frame in 30:
 		await physics_frame
 	var pivot_start := runtime.get_body_global_transform()
+	runtime.set_commands(0.0, 0.0)
 	runtime.set_commands(-1.0, 1.0)
 	for _frame in DRIVE_FRAMES:
 		await physics_frame
@@ -271,10 +372,25 @@ func _test_slope_and_obstacle() -> void:
 		return
 	for _frame in SETTLE_FRAMES:
 		await physics_frame
+	var slope_settled := runtime.get_status_snapshot()
+	if float(slope_settled.get("terrain_normal_alignment_deg", INF)) > 3.0:
+		failures.append("slope reset posture did not follow TerrainState normal")
+	if int(slope_settled.get("hull_collision_switch_count", 0)) > 1:
+		failures.append("slope reset oscillated hull/probe support ownership")
 	var start := runtime.get_body_global_transform()
+	runtime.set_commands(0.0, 0.0)
 	runtime.set_commands(1.0, 1.0)
+	var partial_support_observed := false
 	for _frame in 360:
 		await physics_frame
+		var slope_sample := runtime.get_status_snapshot()
+		if int(slope_sample.get("left_contact_count", 0)) < 4 or int(slope_sample.get("right_contact_count", 0)) < 4:
+			partial_support_observed = true
+		for telemetry_value in [float(slope_sample.get("left_slip_ratio", NAN)), float(slope_sample.get("right_slip_ratio", NAN)), float(slope_sample.get("left_support_load_n", NAN)), float(slope_sample.get("right_support_load_n", NAN))]:
+			if not is_finite(telemetry_value):
+				failures.append("slope traversal emitted non-finite partial-support telemetry")
+	if not partial_support_observed:
+		print("jolt_chassis_track_test: slope did not expose a partial contact tick; bilateral support remained available")
 	var finish := runtime.get_body_global_transform()
 	var status := runtime.get_status_snapshot()
 	var forward_distance := (finish.origin - start.origin).dot(-start.basis.z)
@@ -407,6 +523,19 @@ func _test_controller_authority_lifecycle() -> void:
 				runtime_count += 1
 		if runtime_count != 1:
 			failures.append("model switch left %d Jolt runtimes" % runtime_count)
+		var switch_start := chassis.global_position
+		var switch_forward := -chassis.global_basis.z
+		chassis.set_commands_for_test(1.0, 1.0)
+		for _frame in 10:
+			await physics_frame
+		if (chassis.global_position - switch_start).dot(switch_forward) > 0.02:
+			failures.append("model switch allowed motion before neutral re-arm")
+		chassis.set_commands_for_test(0.0, 0.0)
+		chassis.set_commands_for_test(1.0, 1.0)
+		for _frame in 60:
+			await physics_frame
+		if (chassis.global_position - switch_start).dot(switch_forward) < 0.04:
+			failures.append("model switch neutral re-arm did not restore movement")
 	client.pose_cleared.emit(2, "transport_replaced")
 	var cleared := chassis.get_status_snapshot()
 	if not (cleared["linear_velocity"] as Vector3).is_zero_approx() or not (cleared["angular_velocity"] as Vector3).is_zero_approx():
@@ -533,14 +662,35 @@ func _test_controller_authority_lifecycle() -> void:
 func _spawn_transform(descriptor: PhysicsRigDescriptor, terrain_world: TerrainWorld) -> Transform3D:
 	var data := descriptor.to_dictionary()
 	var dynamics := data["chassis_dynamics"] as Dictionary
-	var minimum_bottom := 0.0
-	for shape in dynamics["compound_shapes"]:
-		var center := _vector3(shape["center_m"])
-		var size := _vector3(shape["size_m"])
-		minimum_bottom = minf(minimum_bottom, center.y - 0.5 * size.y)
+	var state := terrain_world.terrain_state
+	var spacing := state.spacing_m
+	var left_height := state.sample_surface_bilinear_at(Vector2(-spacing, 0.0))
+	var right_height := state.sample_surface_bilinear_at(Vector2(spacing, 0.0))
+	var rear_height := state.sample_surface_bilinear_at(Vector2(0.0, -spacing))
+	var front_height := state.sample_surface_bilinear_at(Vector2(0.0, spacing))
+	var terrain_normal := Vector3((left_height - right_height) / (2.0 * spacing), 1.0, (rear_height - front_height) / (2.0 * spacing)).normalized()
+	var forward := Vector3.FORWARD.slide(terrain_normal).normalized()
+	var basis := Basis(forward.cross(terrain_normal).normalized(), terrain_normal, -forward).orthonormalized()
 	var clearance := float(dynamics["ground_clearance_m"])
 	var surface_y := terrain_world.terrain_state.sample_surface_bilinear_at(Vector2.ZERO)
-	return Transform3D(Basis.IDENTITY, Vector3(0.0, surface_y - minimum_bottom + clearance, 0.0))
+	var tracks := data["tracks"] as Dictionary
+	var stiffness := float(tracks.get("support_stiffness_n_per_m", 0.0))
+	var probe_count := maxi(1, int(tracks.get("traction_points_per_side", 1)) * 2)
+	var support_sag := clampf(float(dynamics["mass_kg"]) * 9.80665 / (stiffness * float(probe_count)), 0.0, 0.12) if stiffness > 0.0 else 0.0
+	var minimum_bottom := INF
+	var required_origin_y := -INF
+	for shape in dynamics["compound_shapes"]:
+		var center := _vector3(shape["center_m"])
+		var half := 0.5 * _vector3(shape["size_m"])
+		for sx in [-1.0, 1.0]:
+			for sy in [-1.0, 1.0]:
+				for sz in [-1.0, 1.0]:
+					var offset := basis * (center + Vector3(sx * half.x, sy * half.y, sz * half.z))
+					minimum_bottom = minf(minimum_bottom, offset.y)
+					var corner_ground := state.sample_surface_bilinear_at(Vector2(offset.x, offset.z))
+					if is_finite(corner_ground):
+						required_origin_y = maxf(required_origin_y, corner_ground + clearance + support_sag - offset.y)
+	return Transform3D(basis, Vector3(0.0, required_origin_y if not is_inf(required_origin_y) else surface_y - minimum_bottom + clearance + support_sag, 0.0))
 
 
 func _vector3(value: Array) -> Vector3:

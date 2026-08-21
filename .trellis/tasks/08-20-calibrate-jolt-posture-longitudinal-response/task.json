@@ -3,7 +3,7 @@
   "name": "calibrate-jolt-posture-longitudinal-response",
   "title": "Calibrate Jolt chassis posture and longitudinal response",
   "description": "Calibrate model-specific Jolt reset posture and tune bounded longitudinal acceleration, inertia feel, and braking without reintroducing chassis rocking.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": "Godot Jolt chassis spawn posture, support alignment, longitudinal drive/brake response, telemetry, and regression tests",
   "package": null,
