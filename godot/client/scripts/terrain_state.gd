@@ -49,7 +49,7 @@ func _init(seed_value: int = DEFAULT_SEED, requested_rows: int = DEFAULT_ROWS, r
 	_generate_baseline()
 
 
-func enqueue_brush(sequence: int, center_xz: Vector2, radius_m: float, delta_m: float) -> bool:
+func enqueue_brush(sequence: int, center_xz: Vector2, radius_m: float, delta_m: float, normalize_center := false) -> bool:
 	if sequence <= _last_enqueued_sequence or radius_m <= 0.0:
 		return false
 	if not _is_finite(center_xz.x) or not _is_finite(center_xz.y) or not _is_finite(radius_m) or not _is_finite(delta_m):
@@ -59,6 +59,7 @@ func enqueue_brush(sequence: int, center_xz: Vector2, radius_m: float, delta_m: 
 		"center_xz": center_xz,
 		"radius_m": radius_m,
 		"delta_m": delta_m,
+		"normalize_center": normalize_center,
 	})
 	_last_enqueued_sequence = sequence
 	return true
@@ -243,10 +244,39 @@ func _apply_brush(command: Dictionary) -> Rect2i:
 	var center: Vector2 = command["center_xz"]
 	var radius: float = command["radius_m"]
 	var delta: float = command["delta_m"]
+	var normalize_center := bool(command.get("normalize_center", false))
 	_last_apply_changed = false
 	var bounds := _brush_cell_bounds(center, radius)
 	if bounds.size.x <= 0 or bounds.size.y <= 0:
 		return Rect2i()
+	# Center-exact normalization: rasterized falloff plus bilinear sampling
+	# otherwise yields only a fraction of the requested delta at the brush
+	# center, which breaks the analytic dig invariant (surface must yield
+	# exactly as deep as the edge presses). Distribute the exact center drop
+	# across the four surrounding cells proportionally to their squared
+	# bilinear weights; all other cells keep the plain falloff.
+	var corner_amounts := {}
+	if normalize_center and not is_zero_approx(delta):
+		var grid_x := (center.x - origin_xz.x) / spacing_m
+		var grid_z := (center.y - origin_xz.y) / spacing_m
+		var column0 := clampi(floori(grid_x), 0, columns - 1)
+		var row0 := clampi(floori(grid_z), 0, rows - 1)
+		var column1 := mini(column0 + 1, columns - 1)
+		var row1 := mini(row0 + 1, rows - 1)
+		var weight_x := clampf(grid_x - float(column0), 0.0, 1.0)
+		var weight_z := clampf(grid_z - float(row0), 0.0, 1.0)
+		var weights := {
+			row0 * columns + column0: (1.0 - weight_x) * (1.0 - weight_z),
+			row0 * columns + column1: weight_x * (1.0 - weight_z),
+			row1 * columns + column0: (1.0 - weight_x) * weight_z,
+			row1 * columns + column1: weight_x * weight_z,
+		}
+		var squared_sum := 0.0
+		for weight_value in weights.values():
+			squared_sum += float(weight_value) * float(weight_value)
+		if squared_sum > 0.000001:
+			for index_key in weights:
+				corner_amounts[index_key] = delta * float(weights[index_key]) / squared_sum
 	for row in range(bounds.position.y, bounds.end.y):
 		var z := origin_xz.y + float(row) * spacing_m
 		for column in range(bounds.position.x, bounds.end.x):
@@ -254,10 +284,12 @@ func _apply_brush(command: Dictionary) -> Rect2i:
 			var distance := Vector2(x, z).distance_to(center)
 			if distance > radius:
 				continue
-			var amount := delta * (1.0 - distance / radius)
+			var index := row * columns + column
+			var amount: float = delta * (1.0 - distance / radius)
+			if corner_amounts.has(index):
+				amount = corner_amounts[index]
 			if is_zero_approx(amount):
 				continue
-			var index := row * columns + column
 			if amount > 0.0:
 				loose_depth[index] += amount
 				_last_apply_changed = true

@@ -247,8 +247,42 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
   soil contract; only cutting/shell/rear can block motion.
 - One query result is immutable and carries authority epoch, physics tick,
   terrain generation/revision, bucket motion sequence, proxy version, accepted
-  fraction, contact IDs/roles and quality. Any initial overlap, stale terrain,
-  non-finite data, or query failure disarms soil classification. Support may use
+  fraction, contact IDs/roles and quality. Queries arbitrate rigid-body
+  semantics only: shell/rear support evidence and obstacle blocking. Soil
+  cutting is an analytic material-removal loop that never depends on query
+  records — every fixed tick `ExcavationWorld` samples the authoritative
+  heightfield bilinearly under the kinematic tooth line (center plus both
+  width ends of the cutting edge), and penetration = surface − tooth Y drives
+  everything: cuts queue when penetration > ~1 mm AND dig intent is active
+  (any work-equipment command including swing, or the movement criteria), with
+  depth = min(penetration, `maximum_cut_depth_m`) — pure penetration, never
+  padded by the contact tolerance. Cuts are unconditional: bucket capacity,
+  payload state, and transfer ledgers never gate or scale them. Removed soil
+  becomes particles directly (the clod spawner consumes `flow_volume_m3`);
+  it never occupies the bucket, so an empty bucket can neither spill nor
+  dump, and cut transfers retire on terrain commit without adding occupancy;
+  a validated in-band query
+  contact point remains a supplementary trigger for mesh contacts the samples
+  cannot see, and such cuts land on the validated contact point. Query
+  failures, stale terrain identity, or initial overlap can never disarm or
+  block cutting — they only gate support transactions. Only
+  `shell`/`rear_support` are motion-blocking proxies; terrain contact never
+  reduces the accepted fraction of the cutting edge. Digging resistance is a
+  saturating speed load computed analytically as well: the runtime low-passes
+  cutting-edge penetration below grade into an engagement value that scales
+  dig-direction work-equipment command velocity toward `MIN_CUT_SPEED_SCALE`
+  — resistance only ever slows a stroke, never stalls it — and is independent
+  of collider availability; retraction keeps full authority. Cut brushes
+  commit to TerrainState in the same fixed tick they are queued (the
+  scheduler force-flushes): the analytic loop samples TerrainState as its
+  authority, so latency batching here would starve the yield-equals-press
+  invariant and stall downward strokes. Presentation coalescing lives
+  downstream in the dirty-rect patchers. Cut brushes enqueue with
+  center-exact normalization: the four cells around
+  the brush center receive bilinear-weight-compensated amounts so the sampled
+  surface drops exactly the requested depth — rasterized falloff alone would
+  yield a fraction of it and break the yield-equals-press invariant.
+  Support may use
   a non-initial shell/rear contact from the same segmented sweep when that
   load-bearing proxy has an upward normal, bounded accepted fraction, and motion
   into the surface; initial overlap on the load-bearing proxy still disarms that
@@ -309,7 +343,11 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
 | Non-neutral first command after rebuild | Hold zero effort until a neutral sample arrives |
 | Stale equipment command identity | Ignore without changing current command state |
 | Invalid payload mass/COM/identity | Reject without changing the applied motion-load factor |
-| Bucket query initial overlap/failure | Accept bounded recovery motion; disarm soil; support requires independent non-initial shell/rear evidence |
+| Bucket query initial overlap/failure | Accept bounded recovery motion; support requires independent non-initial shell/rear evidence; cutting is unaffected (analytic) |
+| Shallow cutting-edge/opening start overlap | Query stays valid; contacts carry `shallow_overlap` quality; cutting never depended on it |
+| Cutting-edge terrain contact during a stroke | Never blocks motion; analytic penetration drives cuts and the saturating resistance load (swing included), stalling at `maximum_cut_depth_m`; retraction unaffected |
+| Slow micro-trim or swing-drag stroke below the per-tick sweep threshold | Engaged tooth plus an active work-equipment command queues a cut every tick; no query needed |
+| Stale collider identity during an engaged stroke | Analytic cutting continues; only support transactions wait for fresh identity |
 | Duplicate interaction key | Report duplicate and queue no second soil transaction or wrench |
 | Early/late/stale support request | Drop it without applying force or changing chassis transform |
 | Track command outside `[-1,1]` | Clamp before force calculation |

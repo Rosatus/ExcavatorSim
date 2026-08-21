@@ -77,33 +77,21 @@ func _test_batched_repeatability_and_occupancy() -> int:
 		return _fail("second terrain batch commits")
 	first.reconcile_transfers(first_cut_commit.get("committed_transfer_ids", []), first_cut_commit.get("rejected_transfer_ids", []))
 	second.reconcile_transfers(second_cut_commit.get("committed_transfer_ids", []), second_cut_commit.get("rejected_transfer_ids", []))
-	var cut_volume := float(first_cut["cut_volume_m3"])
-	if cut_volume <= 0.0 or not is_equal_approx(first.bucket_volume_m3, cut_volume):
-		return _fail("cut volume occupies bucket cells")
-	if int(first.get_status_snapshot()["occupied_cells"]) <= 0:
-		return _fail("bucket payload has occupied cells")
+	# Digging is decoupled from bucket capacity: committed cuts retire their
+	# transfers and become particles directly without ever occupying the bucket.
+	if first.bucket_volume_m3 != 0.0 or second.bucket_volume_m3 != 0.0:
+		return _fail("cut soil does not occupy the bucket")
+	if int(first.get_status_snapshot()["occupied_cells"]) != 0:
+		return _fail("cut leaves no bucket payload cells")
+	if int(first.get_status_snapshot()["active_transfers"]) != 0:
+		return _fail("committed cut retires transfer ownership")
 	var first_surface := first_terrain.sample_surface_at(Vector2.ZERO)
-	var second_surface := second_terrain.sample_surface_at(Vector2.ZERO)
-	if not first.queue_deposit(2, Vector3(0.0, first_surface + 0.2, 0.0)):
-		return _fail("first deposit queues")
-	if not second.queue_deposit(2, Vector3(0.0, second_surface + 0.2, 0.0)):
-		return _fail("second deposit queues")
-	first.step_fixed()
-	second.step_fixed()
-	var first_deposit_commit := first_scheduler.step_fixed(0.0, true)
-	var second_deposit_commit := second_scheduler.step_fixed(0.0, true)
-	first.reconcile_transfers(first_deposit_commit.get("committed_transfer_ids", []), first_deposit_commit.get("rejected_transfer_ids", []))
-	second.reconcile_transfers(second_deposit_commit.get("committed_transfer_ids", []), second_deposit_commit.get("rejected_transfer_ids", []))
+	if first.queue_deposit(2, Vector3(0.0, first_surface + 0.2, 0.0)):
+		return _fail("empty-bucket deposit is rejected")
 	var first_snapshot := first_terrain.surface_snapshot()
 	var second_snapshot := second_terrain.surface_snapshot()
 	if first_snapshot["surface_bytes"] != second_snapshot["surface_bytes"] or first_snapshot["snapshot_sha256"] != second_snapshot["snapshot_sha256"]:
 		return _fail("same transfer batches reproduce coarse terrain")
-	if not is_equal_approx(first.bucket_volume_m3, second.bucket_volume_m3):
-		return _fail("same transfers reproduce bucket occupancy aggregate")
-	if int(first.get_status_snapshot()["active_transfers"]) != 0:
-		return _fail("committed dump retires transfer ownership")
-	if first.bucket_volume_m3 < -BucketSoilState.EPSILON_M3 or first.bucket_volume_m3 > first.bucket_capacity_m3 + BucketSoilState.EPSILON_M3:
-		return _fail("bucket occupancy remains inside model capacity")
 	return 0
 
 
@@ -225,11 +213,11 @@ func _test_automatic_motion_for_both_models() -> int:
 		var cut := excavation.step_automatic_snapshot_for_test(_soil_snapshot(contract, previous_cut, current_cut, Vector3.UP))
 		if (
 			cut.get("interaction_state", "") != "cut"
-			or float(cut.get("bucket_volume_m3", 0.0)) <= 0.0
+			or float(cut.get("bucket_volume_m3", 0.0)) != 0.0
 			or float(cut.get("flow_volume_m3", 0.0)) <= 0.0
 		):
 			scene.queue_free()
-			return _fail("bucket motion alone cuts and retains soil for %s" % contract.get("model_id", ""))
+			return _fail("bucket motion alone cuts; soil leaves as particles for %s" % contract.get("model_id", ""))
 		var batch := cut.get("soil_interaction_batch", {}) as Dictionary
 		if (
 			String(batch.get("key", "")).is_empty()
@@ -243,12 +231,12 @@ func _test_automatic_motion_for_both_models() -> int:
 			return _fail("duplicate soil interaction batch queued a second transaction")
 		var carry := excavation.step_automatic_snapshot_for_test(_soil_snapshot(contract, current_cut, current_cut, Vector3.UP))
 		if (
-			carry.get("interaction_state", "") != "carry"
-			or int(carry.get("occupied_cells", 0)) <= 0
+			carry.get("interaction_state", "") != "idle"
+			or int(carry.get("occupied_cells", 0)) != 0
 			or float(carry.get("flow_volume_m3", -1.0)) != 0.0
 		):
 			scene.queue_free()
-			return _fail("retained occupancy carries with the bucket for %s" % contract.get("model_id", ""))
+			return _fail("empty bucket idles without occupancy for %s" % contract.get("model_id", ""))
 		var volume_before_invalid := float(carry.get("bucket_volume_m3", 0.0))
 		var revision_before_invalid := int(carry.get("terrain_revision", -1))
 		var transfers_before_invalid := int(carry.get("active_transfers", 0))
@@ -261,41 +249,32 @@ func _test_automatic_motion_for_both_models() -> int:
 		):
 			scene.queue_free()
 			return _fail("invalid fixed-step snapshots cannot create or remove material")
-		# Fill through the same motion path before exposing the opening. This keeps
-		# the spill assertion tied to automatic contact rather than a fixed grant.
-		for attempt in 200:
+		# Digging is decoupled from bucket capacity: removed soil becomes
+		# particles directly, so an empty bucket can neither spill nor dump,
+		# and repeated cuts never accrue payload or unbounded transfers.
+		for attempt in 60:
 			var x := float(attempt % 20) * 0.7 - 6.65
 			var z := float(attempt / 20) * 0.7 - 3.45
 			var surface_at_fill := excavation.terrain_world.terrain_state.sample_surface_at(Vector2(x, z))
 			if is_nan(surface_at_fill):
 				continue
 			var fill_point := Vector3(x, surface_at_fill - 0.02, z)
-			var fill_cut := excavation.step_automatic_snapshot_for_test(
+			excavation.step_automatic_snapshot_for_test(
 				_soil_snapshot(contract, fill_point - direction * 0.12, fill_point, Vector3.UP)
 			)
-			if float(fill_cut.get("bucket_volume_m3", 0.0)) >= float(contract.get("nominal_capacity_m3", 0.0)) * 0.46:
-				break
-		var fill_ratio := excavation.soil_state.bucket_volume_m3 / maxf(float(contract.get("nominal_capacity_m3", 0.0)), BucketSoilState.EPSILON_M3)
-		if fill_ratio <= 0.45:
+		if excavation.soil_state.bucket_volume_m3 > BucketSoilState.EPSILON_M3:
 			scene.queue_free()
-			return _fail("automatic cuts fill the bucket before spill for %s" % contract.get("model_id", ""))
+			return _fail("cutting never accrues bucket payload for %s" % contract.get("model_id", ""))
 		var spill_normal := Vector3.RIGHT if contract.get("model_id", "") == "sy205" else Vector3(0.0, 0.3, 0.953939)
-		var volume_before_spill := excavation.soil_state.bucket_volume_m3
 		var spill := excavation.step_automatic_snapshot_for_test(_soil_snapshot(contract, current_cut, current_cut, spill_normal))
-		if spill.get("interaction_state", "") != "spill" or float(spill.get("flow_volume_m3", 0.0)) <= 0.0 or float(spill.get("bucket_volume_m3", 0.0)) >= volume_before_spill:
+		if spill.get("interaction_state", "") == "spill" or float(spill.get("flow_volume_m3", 0.0)) > 0.0:
 			scene.queue_free()
-			return _fail("partially open bucket spills retained soil for %s" % contract.get("model_id", ""))
+			return _fail("empty bucket cannot spill for %s" % contract.get("model_id", ""))
 		var dump_pose := Vector3(current_cut.x, 1.0, current_cut.z)
-		for attempt in 12:
-			var dump := excavation.step_automatic_snapshot_for_test(_soil_snapshot(contract, dump_pose, dump_pose, Vector3.DOWN), 0.15)
-			if dump.get("interaction_state", "") != "dump" and float(dump.get("bucket_volume_m3", 0.0)) > BucketSoilState.EPSILON_M3:
-				scene.queue_free()
-				return _fail("opening exposure enters dump for %s" % contract.get("model_id", ""))
-			if float(dump.get("bucket_volume_m3", 0.0)) <= BucketSoilState.EPSILON_M3:
-				break
-		if excavation.soil_state.bucket_volume_m3 > BucketSoilState.EPSILON_M3 or int(excavation.soil_state.get_status_snapshot()["active_transfers"]) != 0:
+		var dump := excavation.step_automatic_snapshot_for_test(_soil_snapshot(contract, dump_pose, dump_pose, Vector3.DOWN), 0.15)
+		if dump.get("interaction_state", "") == "dump" or float(dump.get("flow_volume_m3", 0.0)) > 0.0:
 			scene.queue_free()
-			return _fail("dump retires payload ownership for %s" % contract.get("model_id", ""))
+			return _fail("empty bucket cannot dump for %s" % contract.get("model_id", ""))
 		# A 30-second fixed-step idle/carry window must not accumulate transfers.
 		for _frame in 1800:
 			var sustained := excavation.step_automatic_snapshot_for_test(_soil_snapshot(contract, current_cut, current_cut, Vector3.UP))

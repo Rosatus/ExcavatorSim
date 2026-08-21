@@ -193,24 +193,27 @@ func _apply_cut(command: Dictionary) -> Dictionary:
 		return {"accepted": false, "reason": "no_contact"}
 	var maximum_depth := float(interaction.get("maximum_cut_depth_m", MAX_CUT_DEPTH_M))
 	var radius := float(interaction.get("cut_radius_m", TOOTH_RADIUS_M))
-	var penetration := surface + tolerance - minf(previous.y, current.y)
-	var depth := clampf(penetration, 0.01, maximum_depth)
+	# Removal depth is pure penetration below the sampled surface. The contact
+	# tolerance above only decides whether the stroke touches at all — adding
+	# it here made terrain yield ~30x faster than the edge pressed, cratering
+	# the hole until the bucket floated above grade and disengaged. The floor
+	# stays sub-millimeter so removal tracks fine presses without over-cutting.
+	var penetration := surface - minf(previous.y, current.y)
+	var depth := clampf(penetration, 0.0005, maximum_depth)
 	var expected_volume := terrain_state.estimate_brush_volume(center, radius, -depth)
 	if expected_volume <= EPSILON_M3:
 		return {"accepted": false, "reason": "empty_soil"}
-	var remaining_capacity := bucket_capacity_m3 - bucket_volume_m3 - _pending_cut_volume()
-	if remaining_capacity <= EPSILON_M3:
-		return {"accepted": false, "reason": "bucket_full"}
-	if expected_volume > remaining_capacity:
-		depth *= remaining_capacity / expected_volume
-		expected_volume = terrain_state.estimate_brush_volume(center, radius, -depth)
+	# Digging is decoupled from bucket capacity by design: removed soil leaves
+	# the heightfield and spawns particles directly; it never gates the cut,
+	# never fills the bucket, and never feeds payload load. The transfer below
+	# only tracks scheduler commit bookkeeping.
 	if terrain_scheduler == null:
 		return {"accepted": false, "reason": "terrain_scheduler_unavailable"}
 	var sequence := int(command["sequence"])
 	var transfer_id := "%d:%d:cut" % [world_generation, sequence]
 	if _active_transfers.size() >= MAX_ACTIVE_TRANSFERS or _active_transfers.has(transfer_id):
 		return {"accepted": false, "reason": "transfer_capacity"}
-	if not terrain_scheduler.queue_brush(sequence, center, radius, -depth, world_generation, transfer_id):
+	if not terrain_scheduler.queue_brush(sequence, center, radius, -depth, world_generation, transfer_id, true):
 		return {"accepted": false, "reason": "terrain_rejected"}
 	_active_transfers[transfer_id] = {"state": "bucket_pending_terrain", "volume_m3": expected_volume}
 	return {"accepted": true, "cut_volume_m3": expected_volume, "deposit_volume_m3": 0.0, "transfer_id": transfer_id}
@@ -264,10 +267,9 @@ func reconcile_transfers(committed_ids: Array, rejected_ids: Array = []) -> void
 			continue
 		var transfer: Dictionary = _active_transfers[transfer_id]
 		if transfer.get("state", "") == "bucket_pending_terrain":
-			var accepted_volume := _add_occupancy(float(transfer.get("volume_m3", 0.0)))
-			transfer["volume_m3"] = accepted_volume
-			transfer["state"] = "bucket"
-			_active_transfers[transfer_id] = transfer
+			# Cut soil becomes particles directly; it never occupies the
+			# bucket. The transfer simply retires once terrain commits it.
+			_active_transfers.erase(transfer_id)
 		else:
 			_active_transfers.erase(transfer_id)
 	for transfer_id_value in rejected_ids:

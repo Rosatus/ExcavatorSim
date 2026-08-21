@@ -168,7 +168,15 @@ func _refresh_bucket_volume() -> void:
 		_bucket_volume_label.text = "Bucket soil: unavailable"
 		return
 	var status := _excavation_world.get_status_snapshot()
-	_bucket_volume_label.text = "Bucket soil: %.3f / %.2f m³" % [
+	var dig := _excavation_world.get_dig_diagnostics()
+	_bucket_volume_label.text = "Bucket soil: %.3f / %.2f m³   Dig: %s pen=%.3f eng=%d%% boomV=%.2f boomPos=%.2f en=%d foc=%d" % [
 		float(status.get("bucket_volume_m3", 0.0)),
 		float(status.get("bucket_capacity_m3", 0.35)),
+		String(dig.get("interaction", "?")),
+		float(dig.get("penetration_m", 0.0)),
+		roundi(float(dig.get("engagement", 0.0)) * 100.0),
+		float(dig.get("boom_velocity", 0.0)),
+		float(dig.get("boom_position", 0.0)),
+		int(bool(dig.get("enabled", false))),
+		int(bool(dig.get("focused", false))),
 	]

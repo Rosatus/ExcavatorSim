@@ -27,6 +27,10 @@ const MIN_SUPPORT_LOAD_TO_RELEASE_HULL_RATIO := 0.72
 const MAX_SUPPORT_LOAD_TO_RESTORE_HULL_RATIO := 0.32
 const SUPPORT_READY_TICKS_TO_RELEASE_HULL := 3
 const SUPPORT_LOSS_TICKS_TO_RESTORE_HULL := 3
+# Cutting resistance: engagement normalizes edge penetration below grade and
+# is low-passed so the load ramps smoothly instead of flickering per tick.
+const MAX_CUT_DEPTH_M := 0.25
+const CUT_ENGAGEMENT_SMOOTH_HZ := 6.0
 
 var configured := false
 var enabled := false
@@ -55,6 +59,7 @@ var _equipment_commands := Vector4.ZERO
 var _articulation := KinematicArticulationState.new()
 var _bucket_sweeper := BucketProxySweeper.new()
 var _soil_contract: Dictionary = {}
+var _cut_engagement := 0.0
 var _physics_tick := 0
 var _terrain_identity := Vector2i(-1, -1)
 var _terrain_identity_valid := false
@@ -193,6 +198,7 @@ func teardown() -> void:
 	_articulation.reset()
 	_bucket_sweeper.reset()
 	_soil_contract.clear()
+	_cut_engagement = 0.0
 	_post_step_snapshot.clear()
 	_pending_payload = {"mass_kg": 0.0, "center_of_mass_local": Vector3.ZERO, "identity": -1}
 	_applied_payload = _pending_payload.duplicate(true)
@@ -443,6 +449,7 @@ func _build_body() -> RigidBody3D:
 
 
 func _update_joint_actuators(delta: float) -> void:
+	_articulation.set_cut_resistance(_cut_engagement)
 	var proposal := _articulation.propose_step(delta, _body.global_transform, enabled)
 	if proposal.is_empty():
 		_quality_flags.append("kinematic_articulation_unavailable")
@@ -466,6 +473,23 @@ func _update_joint_actuators(delta: float) -> void:
 		)
 		_bucket_query["previous_bucket_transform"] = previous_frames["bucket_link"]
 		_bucket_query["candidate_bucket_transform"] = candidate_frames["bucket_link"]
+		# Analytic engagement never depends on query validity: a stale or
+		# disarmed query must not disable the resistance stall while chunks lag.
+		var raw_engagement := 0.0
+		if _terrain_world != null and _terrain_world.terrain_state != null:
+			raw_engagement = clampf(
+				_bucket_sweeper.probe_cut_penetration(
+					candidate_frames["bucket_link"] as Transform3D,
+					_terrain_world.terrain_state
+				) / _max_cut_depth_m(),
+				0.0,
+				1.0
+			)
+		_cut_engagement = lerpf(
+			_cut_engagement,
+			raw_engagement,
+			clampf(1.0 - exp(-CUT_ENGAGEMENT_SMOOTH_HZ * delta), 0.0, 1.0)
+		)
 		var support_queued := false
 		var support_evidence := _has_noninitial_support_contact()
 		if bool(_bucket_query.get("valid", false)) or support_evidence:
@@ -476,6 +500,7 @@ func _update_joint_actuators(delta: float) -> void:
 		for flag in _bucket_query.get("quality_flags", []):
 			_quality_flags.append(String(flag))
 	else:
+		_cut_engagement = lerpf(_cut_engagement, 0.0, clampf(1.0 - exp(-CUT_ENGAGEMENT_SMOOTH_HZ * delta), 0.0, 1.0))
 		_set_invalid_bucket_query(
 			"bucket_query_terrain_identity_mismatch",
 			previous_frames.get("bucket_link", Transform3D.IDENTITY) as Transform3D,
@@ -496,6 +521,11 @@ func _has_noninitial_support_contact() -> bool:
 		):
 			return true
 	return false
+
+
+func _max_cut_depth_m() -> float:
+	var interaction := (_soil_contract.get("interaction", {}) as Dictionary)
+	return maxf(0.01, float(interaction.get("maximum_cut_depth_m", MAX_CUT_DEPTH_M)))
 
 
 func _apply_pending_payload() -> void:
@@ -542,6 +572,7 @@ func _capture_post_step_snapshot() -> void:
 		"command_identity": _command_identity,
 		"bucket_motion_sequence": _bucket_motion_sequence,
 		"bucket_query": _bucket_query.duplicate(true),
+		"cut_engagement": _cut_engagement,
 		"queued_chassis_wrench": _queued_support_wrench.duplicate(true),
 		"applied_chassis_wrench": _applied_support_wrench.duplicate(true),
 		"support_wrench_apply_count": _support_wrench_apply_count,
@@ -607,6 +638,7 @@ func _destroy_rig() -> void:
 	_articulation.reset()
 	_bucket_sweeper.reset()
 	_soil_contract.clear()
+	_cut_engagement = 0.0
 	_bucket_query.clear()
 	_queued_support_wrench.clear()
 	_applied_support_wrench.clear()

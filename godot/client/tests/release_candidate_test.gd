@@ -79,14 +79,11 @@ func _test_connected_operate_reset_reconnect() -> int:
 	if not excavation.queue_cut_world(1, Vector3(0.0, h, 0.0), Vector3(0.0, h - 0.2, 0.0)):
 		return _fail("connected scene queues dig")
 	var cut := excavation.step_fixed_for_test()
-	if not cut.get("changed", false) or float(excavation.soil_state.bucket_volume_m3) <= 0.0:
-		return _fail("connected scene digs and tracks local bucket soil")
+	if not cut.get("changed", false) or float(excavation.soil_state.bucket_volume_m3) != 0.0:
+		return _fail("connected scene digs; soil leaves as particles without payload")
 	var dump_height := excavation.terrain_world.terrain_state.sample_surface_at(Vector2.ZERO) + 0.2
-	if not excavation.queue_deposit_world(2, Vector3(0.0, dump_height, 0.0)):
-		return _fail("connected scene queues deposit")
-	var deposit := excavation.step_fixed_for_test()
-	if not deposit.get("changed", false) or float(excavation.soil_state.bucket_volume_m3) > 0.00001:
-		return _fail("connected scene deposits and clears local bucket soil")
+	if excavation.queue_deposit_world(2, Vector3(0.0, dump_height, 0.0)):
+		return _fail("empty-bucket deposit is rejected in the connected scene")
 	var old_generation := client.get_generation()
 	client.reconnect_now()
 	client.process_for_test(0.01)

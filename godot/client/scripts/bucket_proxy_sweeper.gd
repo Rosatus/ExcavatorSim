@@ -2,11 +2,17 @@ class_name BucketProxySweeper
 extends RefCounted
 
 const PROXY_ORDER := ["cutting_edge", "opening", "cavity", "shell", "rear_support"]
-const BLOCKING_PROXIES := ["cutting_edge", "shell", "rear_support"]
+const BLOCKING_PROXIES := ["shell", "rear_support"]
 const MAX_SEGMENTS := 12
 const MAX_ROTATION_PER_SEGMENT_RAD := deg_to_rad(4.0)
 const MAX_TRANSLATION_PER_SEGMENT_M := 0.08
 const QUERY_MARGIN_M := 0.005
+# Mid-dig the cutting edge rests inside its own fresh cut. A start pose whose
+# penetration clears by lifting at most this base margin plus the proxy's own
+# world-space half height is benign digging contact, not the pathological
+# burial that disarms the query.
+const SHALLOW_CUT_OVERLAP_M := 0.08
+const SHALLOW_CUT_PROXIES := ["cutting_edge", "opening"]
 
 var configured := false
 var model_id := ""
@@ -16,6 +22,9 @@ var _terrain_collider: TerrainCollider
 var _terrain_mask := 1
 var _proxy_contracts: Dictionary = {}
 var _shapes: Dictionary = {}
+# Valid-evidence band for cutting proxies: start poses within the contract's
+# maximum cut depth below grade are working contact, not pathological burial.
+var _cut_band_m := SHALLOW_CUT_OVERLAP_M
 
 
 func configure(
@@ -36,6 +45,11 @@ func configure(
 			return false
 		_proxy_contracts[proxy_name] = proxy.duplicate(true)
 		_shapes[proxy_name] = shape
+	var interaction := soil_contract.get("interaction", {}) as Dictionary
+	_cut_band_m = maxf(
+		SHALLOW_CUT_OVERLAP_M,
+		float(interaction.get("maximum_cut_depth_m", SHALLOW_CUT_OVERLAP_M))
+	)
 	model_id = model
 	proxy_version = "%s:%s" % [String(soil_contract.get("schema_version", "")), model]
 	_terrain_collider = terrain_collider
@@ -50,6 +64,7 @@ func reset() -> void:
 	proxy_version = ""
 	_terrain_collider = null
 	_terrain_mask = 1
+	_cut_band_m = SHALLOW_CUT_OVERLAP_M
 	_proxy_contracts.clear()
 	_shapes.clear()
 
@@ -92,6 +107,7 @@ func sweep(
 	var records: Array[Dictionary] = []
 	var accepted_fraction := 1.0
 	var saw_initial_overlap := false
+	var saw_shallow_overlap := false
 	for proxy_name in PROXY_ORDER:
 		var local_transform := _proxy_local_transform(_proxy_contracts[proxy_name] as Dictionary)
 		var proxy_start := previous_bucket_frame * local_transform
@@ -100,6 +116,7 @@ func sweep(
 			world.direct_space_state,
 			proxy_name,
 			_shapes[proxy_name] as Shape3D,
+			local_transform,
 			proxy_start,
 			proxy_end,
 			segment_count,
@@ -109,6 +126,7 @@ func sweep(
 		for record_value in proxy_result.get("contacts", []):
 			records.append((record_value as Dictionary).duplicate(true))
 		saw_initial_overlap = saw_initial_overlap or bool(proxy_result.get("initial_overlap", false))
+		saw_shallow_overlap = saw_shallow_overlap or bool(proxy_result.get("shallow_overlap", false))
 		if BLOCKING_PROXIES.has(proxy_name):
 			accepted_fraction = minf(accepted_fraction, float(proxy_result.get("accepted_fraction", 1.0)))
 	records.sort_custom(_contact_less)
@@ -116,6 +134,8 @@ func sweep(
 	base["accepted_fraction"] = clampf(accepted_fraction, 0.0, 1.0)
 	base["contacts"] = records
 	base["quality_flags"] = ["bucket_query_initial_overlap"] if saw_initial_overlap else []
+	if saw_shallow_overlap:
+		base["quality_flags"].append("bucket_query_shallow_cutting_overlap")
 	return base
 
 
@@ -123,33 +143,40 @@ func _sweep_proxy(
 	space_state: PhysicsDirectSpaceState3D,
 	proxy_name: String,
 	shape: Shape3D,
+	local_transform: Transform3D,
 	start: Transform3D,
 	finish: Transform3D,
 	segment_count: int,
 	physics_tick: int,
 	motion_sequence: int
 ) -> Dictionary:
-	var result := {"accepted_fraction": 1.0, "initial_overlap": false, "contacts": []}
+	var result := {"accepted_fraction": 1.0, "initial_overlap": false, "shallow_overlap": false, "contacts": []}
 	var initial_query := _query(shape, start, Vector3.ZERO)
 	# The sweep margin is a conservative cast safety band, not penetration.
 	# Reusing it for the zero-motion overlap probe turns a valid resting contact
 	# into an endless recovery state and prevents support force application.
 	initial_query.margin = 0.0
 	var initial_hits := space_state.intersect_shape(initial_query, 8)
+	var shallow_cut := false
+	var shallow_eligible := SHALLOW_CUT_PROXIES.has(proxy_name)
+	var shallow_bound := _shallow_bound(shape, local_transform)
 	if not initial_hits.is_empty():
 		var initial_hit := _first_terrain_hit(initial_hits)
 		if not initial_hit.is_empty():
-			result["initial_overlap"] = true
-			var initial_rest := space_state.get_rest_info(initial_query)
-			(result["contacts"] as Array[Dictionary]).append(
-				_contact_record(proxy_name, 0.0, initial_hit, initial_rest, true, physics_tick, motion_sequence)
-			)
-			# Initial-overlap queries remain invalid evidence, but the kinematic
-			# work-equipment proxy must be allowed one bounded fixed-step to
-			# recover. Soil stays disarmed; support still requires separate,
-			# non-initial shell/rear evidence from the same segmented sweep.
-			result["accepted_fraction"] = 1.0
-			return result
+			if not shallow_eligible or not _overlap_clears_within(start, shape, space_state, shallow_bound):
+				result["initial_overlap"] = true
+				var initial_rest := space_state.get_rest_info(initial_query)
+				(result["contacts"] as Array[Dictionary]).append(
+					_contact_record(proxy_name, 0.0, initial_hit, initial_rest, true, physics_tick, motion_sequence)
+				)
+				# Initial-overlap queries remain invalid evidence, but the kinematic
+				# work-equipment proxy must be allowed one bounded fixed-step to
+				# recover. Soil stays disarmed; support still requires separate,
+				# non-initial shell/rear evidence from the same segmented sweep.
+				result["accepted_fraction"] = 1.0
+				return result
+			shallow_cut = true
+			result["shallow_overlap"] = true
 	for segment_index in segment_count:
 		var alpha_start := float(segment_index) / float(segment_count)
 		var alpha_end := float(segment_index + 1) / float(segment_count)
@@ -182,7 +209,51 @@ func _sweep_proxy(
 		)
 		result["accepted_fraction"] = maxf(0.0, global_fraction - 0.002)
 		break
+	if shallow_cut:
+		for record_value in result["contacts"]:
+			var record := record_value as Dictionary
+			record["shallow_overlap"] = true
+			record["quality"] = "shallow_overlap"
 	return result
+
+
+func probe_cut_penetration(candidate_bucket_frame: Transform3D, terrain_state: TerrainState) -> float:
+	if not configured or terrain_state == null or not candidate_bucket_frame.is_finite():
+		return 0.0
+	var proxy := _proxy_contracts.get("cutting_edge", {}) as Dictionary
+	var shape := _shapes.get("cutting_edge") as Shape3D
+	if proxy.is_empty() or shape == null:
+		return 0.0
+	var local_transform := _proxy_local_transform(proxy)
+	var edge_transform := candidate_bucket_frame * local_transform
+	var half_height := _shallow_bound(shape, local_transform) - _cut_band_m
+	var surface := terrain_state.sample_surface_bilinear_at(Vector2(edge_transform.origin.x, edge_transform.origin.z))
+	return maxf(0.0, surface - (edge_transform.origin.y - half_height))
+
+
+func _overlap_clears_within(
+	start: Transform3D,
+	shape: Shape3D,
+	space_state: PhysicsDirectSpaceState3D,
+	bound: float
+) -> bool:
+	var lifted := _query(shape, start.translated(Vector3.UP * bound), Vector3.ZERO)
+	lifted.margin = 0.0
+	return _first_terrain_hit(space_state.intersect_shape(lifted, 4)).is_empty()
+
+
+func _shallow_bound(shape: Shape3D, local_transform: Transform3D) -> float:
+	var half_height := 0.0
+	var box := shape as BoxShape3D
+	if box != null:
+		var basis := local_transform.basis
+		half_height = (
+			absf(basis.x.y) * box.size.x + absf(basis.y.y) * box.size.y + absf(basis.z.y) * box.size.z
+		) * 0.5
+	var sphere := shape as SphereShape3D
+	if sphere != null:
+		half_height = sphere.radius
+	return _cut_band_m + half_height
 
 
 func _contact_record(

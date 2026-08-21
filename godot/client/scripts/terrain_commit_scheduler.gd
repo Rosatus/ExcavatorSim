@@ -41,7 +41,8 @@ func queue_brush(
 	radius_m: float,
 	delta_m: float,
 	generation: int,
-	transfer_id: String
+	transfer_id: String,
+	normalize_center := false
 ) -> bool:
 	if terrain_state == null or generation != _generation or transfer_id.is_empty():
 		return false
@@ -65,6 +66,7 @@ func queue_brush(
 		"generation": generation,
 		"transfer_id": transfer_id,
 		"estimated_volume_m3": estimated_volume,
+		"normalize_center": normalize_center,
 	})
 	_queued_volume_m3 += estimated_volume
 	return true
@@ -162,7 +164,8 @@ func _flush() -> Dictionary:
 			terrain_sequence,
 			brush["center_xz"],
 			float(brush["radius_m"]),
-			float(brush["delta_m"])
+			float(brush["delta_m"]),
+			bool(brush.get("normalize_center", false))
 		):
 			queued += 1
 			committed_transfer_ids.append(String(brush["transfer_id"]))

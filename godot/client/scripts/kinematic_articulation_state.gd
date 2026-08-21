@@ -5,6 +5,10 @@ const JOINT_NAMES := ["swing_joint", "boom_joint", "arm_joint", "bucket_joint"]
 const BODY_NAMES := ["chassis", "upper", "boom", "arm", "bucket"]
 const MAX_PAYLOAD_MASS_KG := 5000.0
 const JOINT_LIMIT_MARGIN_RAD := 0.08
+# Saturating digging resistance: at full cut engagement the work-equipment
+# joints keep this fraction of their commanded dig speed, mirroring hydraulic
+# relief instead of a geometric wall.
+const MIN_CUT_SPEED_SCALE := 0.15
 
 var configured := false
 var neutral_armed := false
@@ -13,6 +17,7 @@ var payload_identity := -1
 var payload_mass_kg := 0.0
 var payload_center_of_mass_local := Vector3.ZERO
 var motion_load_factor := 1.0
+var cut_engagement := 0.0
 
 var _commands := Vector4.ZERO
 var _body_descriptors: Dictionary = {}
@@ -55,6 +60,7 @@ func reset() -> void:
 	payload_mass_kg = 0.0
 	payload_center_of_mass_local = Vector3.ZERO
 	motion_load_factor = 1.0
+	cut_engagement = 0.0
 	_commands = Vector4.ZERO
 	_body_descriptors.clear()
 	_joint_descriptors.clear()
@@ -69,6 +75,7 @@ func reset_motion(chassis_transform: Transform3D) -> void:
 	_commands = Vector4.ZERO
 	neutral_armed = false
 	command_identity = -1
+	cut_engagement = 0.0
 	for joint_name in JOINT_NAMES:
 		_positions[joint_name] = 0.0
 		_velocities[joint_name] = 0.0
@@ -108,6 +115,10 @@ func set_payload(mass_kg: float, center_of_mass_local: Vector3, identity: int) -
 	return true
 
 
+func set_cut_resistance(engagement: float) -> void:
+	cut_engagement = clampf(engagement if is_finite(engagement) else 0.0, 0.0, 1.0)
+
+
 func propose_step(delta: float, chassis_transform: Transform3D, enabled: bool) -> Dictionary:
 	if not configured or delta <= 0.0 or not is_finite(delta) or not chassis_transform.is_finite():
 		return {}
@@ -130,6 +141,12 @@ func propose_step(delta: float, chassis_transform: Transform3D, enabled: bool) -
 		var load_factor := 1.0 if joint_name == "swing_joint" else motion_load_factor
 		var max_velocity := float(actuator["max_velocity_rad_s"]) * load_factor
 		var desired_velocity := float(commands[index]) * max_velocity
+		# Dig-direction commands (negative per rig convention) slow down with
+		# cut engagement, flooring at MIN_CUT_SPEED_SCALE — resistance only
+		# ever slows the stroke, never stalls it. Retraction and swing stay at
+		# full authority so the operator can always back out of the hole.
+		if joint_name != "swing_joint" and cut_engagement > 0.0 and desired_velocity < 0.0:
+			desired_velocity *= lerpf(1.0, MIN_CUT_SPEED_SCALE, cut_engagement)
 		var position := float(_positions[joint_name])
 		var limits := joint["limit_rad"] as Array
 		if String(joint["type"]) != "continuous_hinge":
@@ -219,6 +236,7 @@ func payload_snapshot() -> Dictionary:
 		"center_of_mass_local": payload_center_of_mass_local,
 		"identity": payload_identity,
 		"motion_load_factor": motion_load_factor,
+		"cut_engagement": cut_engagement,
 	}
 
 

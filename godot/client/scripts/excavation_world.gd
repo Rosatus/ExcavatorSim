@@ -85,7 +85,12 @@ func _physics_process(delta: float) -> void:
 	var soil_result := soil_state.step_fixed()
 	_last_flow_volume_m3 = float(soil_result.get("cut_volume_m3", 0.0)) + float(soil_result.get("deposit_volume_m3", 0.0))
 	var cells_changed := _settle_bucket_cells(delta)
-	var commit_result := terrain_scheduler.step_fixed(delta)
+	# Force-flush every fixed tick: the analytic dig loop samples TerrainState
+	# as its authority, so cut brushes must land in the same tick they are
+	# queued. Latency batching here starved the invariant (surface yields only
+	# after up to 150 ms), ramping engagement and stalling downward strokes.
+	# Presentation coalescing lives downstream in the dirty-rect patchers.
+	var commit_result := terrain_scheduler.step_fixed(delta, true)
 	soil_state.reconcile_transfers(
 		commit_result.get("committed_transfer_ids", []),
 		commit_result.get("rejected_transfer_ids", [])
@@ -203,6 +208,27 @@ func get_status_snapshot() -> Dictionary:
 
 func get_bucket_pose_snapshot_for_test() -> Dictionary:
 	return _last_pose_snapshot.duplicate(true)
+
+
+func get_dig_diagnostics() -> Dictionary:
+	# Live press-block triage: every gate on the downward-dig path in one read.
+	var chassis := _tracked_chassis_controller.get_status_snapshot() if _tracked_chassis_controller != null else {}
+	var boom := {}
+	for state_value in chassis.get("joints", []):
+		var state := state_value as Dictionary
+		if String(state.get("name", "")) == "boom_joint":
+			boom = state
+	var payload := chassis.get("payload", {}) as Dictionary
+	var batch := _last_interaction_batch
+	return {
+		"interaction": _last_interaction,
+		"penetration_m": float(batch.get("analytic_penetration_m", 0.0)),
+		"engagement": float(payload.get("cut_engagement", 0.0)),
+		"boom_velocity": float(boom.get("velocity_rad_s", 0.0)),
+		"boom_position": float(boom.get("position_rad", 0.0)),
+		"enabled": bool(chassis.get("enabled", false)),
+		"focused": bool(chassis.get("focused", false)),
+	}
 
 
 func step_automatic_snapshot_for_test(snapshot: Dictionary, delta: float = 1.0 / 60.0) -> Dictionary:
@@ -336,7 +362,12 @@ func _build_interaction_batch(snapshot: Dictionary) -> Dictionary:
 	var contact_roles: Array[String] = []
 	for contact in contacts:
 		contact_roles.append(String(contact.get("proxy_role", "")))
-	var classifications := _classify_interaction_records(snapshot, contacts, hybrid, identity_valid, physics_tick, motion_sequence)
+	# Analytic soil evidence: penetration sampled straight from the
+	# authoritative heightfield under the kinematic tooth pose. Queries never
+	# arbitrate cutting; they only add supplementary contact evidence and gate
+	# support transactions.
+	var analytic := _analytic_cut_evidence(snapshot, chassis)
+	var classifications := _classify_interaction_records(snapshot, contacts, hybrid, identity_valid, physics_tick, motion_sequence, analytic)
 	var operation := _reduce_soil_operation(classifications)
 	var consumed_contact_ids: Array[String] = []
 	for record in classifications:
@@ -349,7 +380,7 @@ func _build_interaction_batch(snapshot: Dictionary) -> Dictionary:
 		"terrain_generation": terrain_generation,
 		"terrain_revision": terrain_revision,
 		"bucket_motion_sequence": motion_sequence,
-		"eligible": identity_valid,
+		"eligible": identity_valid or bool(analytic.get("cut_ready", false)),
 		"query_required": hybrid,
 		"duplicate": _consumed_batch_keys.has(key),
 		"consumed_contact_ids": consumed_contact_ids,
@@ -357,6 +388,8 @@ func _build_interaction_batch(snapshot: Dictionary) -> Dictionary:
 		"classifications": classifications,
 		"operation": operation,
 		"query_identity_valid": identity_valid,
+		"analytic_engaged": bool(analytic.get("engaged", false)),
+		"analytic_penetration_m": float(analytic.get("penetration_m", 0.0)),
 		"transaction_queued": false,
 	}
 	if bool(batch["duplicate"]):
@@ -371,49 +404,58 @@ func _classify_interaction_records(
 	query_required: bool,
 	query_identity_valid: bool,
 	physics_tick: int,
-	motion_sequence: int
+	motion_sequence: int,
+	analytic: Dictionary
 ) -> Array[Dictionary]:
 	var previous := snapshot.get("previous", {}) as Dictionary
 	var current := snapshot.get("current", {}) as Dictionary
 	var contract := snapshot.get("contract", {}) as Dictionary
 	var interaction := contract.get("interaction", {}) as Dictionary
 	var classifications: Array[Dictionary] = []
-	var minimum_sweep := float(interaction.get("minimum_sweep_m", 0.004))
+	var maximum_cut_depth := float(interaction.get("maximum_cut_depth_m", BucketSoilState.MAX_CUT_DEPTH_M))
 	var previous_cutting := previous.get("cutting_edge", Transform3D.IDENTITY) as Transform3D
 	var current_cutting := current.get("cutting_edge", Transform3D.IDENTITY) as Transform3D
-	var cutting_movement := current_cutting.origin - previous_cutting.origin
 	var center_xz := Vector2(current_cutting.origin.x, current_cutting.origin.z)
 	var surface := terrain_world.terrain_state.sample_surface_bilinear_at(center_xz)
 	var tolerance := float(interaction.get("contact_tolerance_m", BucketSoilState.CONTACT_TOLERANCE_M))
 	var in_contact := not is_nan(surface) and current_cutting.origin.y <= surface + tolerance
-	var cutting_direction := snapshot.get("cutting_direction_world", Vector3.DOWN) as Vector3
-	var forward_cut := cutting_movement.length() >= minimum_sweep and cutting_movement.normalized().dot(cutting_direction) > 0.12
-	var downward_cut := cutting_movement.y < -minimum_sweep * 0.35
+	# Analytic evidence is the primary cutting trigger; a validated in-band
+	# query contact plus intent stays available as a supplementary trigger for
+	# genuine mesh contacts the width samples cannot see.
+	var analytic_cut := bool(analytic.get("cut_ready", false))
+	var intent := bool(analytic.get("intent", false))
 	for contact in contacts:
 		var record := contact.duplicate(true)
 		var role := String(record.get("proxy_role", ""))
 		var classification := "blocked"
 		if not bool(record.get("initial_overlap", false)):
-			var record_in_contact := in_contact
-			if query_required and role == "cutting_edge":
-				var point := record.get("point_world", Vector3.ZERO) as Vector3
-				var point_surface := terrain_world.terrain_state.sample_surface_bilinear_at(Vector2(point.x, point.z))
-				record_in_contact = (
-					query_identity_valid and bool(record.get("point_valid", true)) and point.is_finite()
-					and not is_nan(point_surface) and absf(point.y - point_surface) <= tolerance
-				)
-			if role == "cutting_edge" and record_in_contact and (forward_cut or downward_cut):
-				classification = "cutting"
+			if role == "cutting_edge":
+				var record_in_contact := in_contact
+				if query_required:
+					# Working-band evidence anchored on the authoritative
+					# surface at the contact point; initial overlap can never
+					# disarm analytic cutting, only this supplementary path.
+					var point := record.get("point_world", Vector3.ZERO) as Vector3
+					var point_surface := terrain_world.terrain_state.sample_surface_bilinear_at(Vector2(point.x, point.z))
+					record_in_contact = (
+						bool(record.get("point_valid", true)) and point.is_finite()
+						and not is_nan(point_surface)
+						and point.y <= point_surface + tolerance
+						and point.y >= point_surface - maximum_cut_depth
+					)
+				if analytic_cut or (record_in_contact and intent):
+					classification = "cutting"
 			elif ["shell", "rear_support"].has(role):
-				classification = "support" if _is_support_record(snapshot, record) else "blocked"
+				classification = "support" if (query_identity_valid and _is_support_record(snapshot, record)) else "blocked"
 		record["classification"] = classification
 		classifications.append(record)
-	if not query_required and in_contact and (forward_cut or downward_cut):
+	if analytic_cut or (not query_required and in_contact and intent):
 		classifications.append({
-			"contact_id": "legacy:%d:%d:cutting" % [physics_tick, motion_sequence],
+			"contact_id": "analytic:%d:%d:cutting" % [physics_tick, motion_sequence],
 			"proxy_role": "cutting_edge",
 			"travel_fraction": 1.0,
 			"classification": "cutting",
+			"evidence": "analytic_penetration" if analytic_cut else "legacy_motion",
 		})
 	var bucket_loaded := soil_state.bucket_volume_m3 > BucketSoilState.EPSILON_M3
 	if bucket_loaded and (not query_required or query_identity_valid):
@@ -449,6 +491,67 @@ func _is_support_record(snapshot: Dictionary, record: Dictionary) -> bool:
 	return -movement.dot(normal.normalized()) >= 0.001
 
 
+func _analytic_cut_evidence(snapshot: Dictionary, chassis: Dictionary) -> Dictionary:
+	var result := {"engaged": false, "penetration_m": 0.0, "intent": false, "cut_ready": false}
+	if terrain_world == null or terrain_world.terrain_state == null:
+		return result
+	var previous := snapshot.get("previous", {}) as Dictionary
+	var current := snapshot.get("current", {}) as Dictionary
+	if not previous.has("cutting_edge") or not current.has("cutting_edge"):
+		return result
+	var contract := snapshot.get("contract", {}) as Dictionary
+	var interaction := contract.get("interaction", {}) as Dictionary
+	var maximum_depth := float(interaction.get("maximum_cut_depth_m", BucketSoilState.MAX_CUT_DEPTH_M))
+	var tolerance := float(interaction.get("contact_tolerance_m", BucketSoilState.CONTACT_TOLERANCE_M))
+	var state := terrain_world.terrain_state
+	# Sample the authoritative surface under the tooth center for the previous
+	# and current poses. Width-end samples deliberately do NOT feed this signal:
+	# over untouched ground beside the hole they read runaway penetration and
+	# would permanently disengage a correctly digging bucket. Off-center mesh
+	# contacts remain covered by the supplementary query trigger.
+	var max_penetration := -INF
+	for edge_value in [previous["cutting_edge"], current["cutting_edge"]]:
+		var edge := edge_value as Transform3D
+		if not edge.is_finite():
+			return result
+		var surface := state.sample_surface_bilinear_at(Vector2(edge.origin.x, edge.origin.z))
+		if is_nan(surface):
+			continue
+		max_penetration = maxf(max_penetration, surface - edge.origin.y)
+	# Intent is computed unconditionally: the supplementary query trigger needs
+	# it even when the width samples sit above grade.
+	result["intent"] = _chassis_dig_intent(chassis) or _tooth_movement_intent(snapshot, interaction)
+	# Sub-millimeter penetration is resting-contact noise, not a stroke; below
+	# this the depth floor would over-remove relative to the press rate and
+	# oscillate the loop between cutting and carry.
+	if max_penetration < 0.001 or max_penetration > maximum_depth + tolerance:
+		return result
+	result["engaged"] = true
+	result["penetration_m"] = max_penetration
+	result["cut_ready"] = result["intent"]
+	return result
+
+
+func _chassis_dig_intent(chassis: Dictionary) -> bool:
+	# Any active work-equipment command counts as dig intent, swing included:
+	# dragging an engaged edge sideways through soil is a real cutting stroke.
+	for state_value in chassis.get("joints", []):
+		var state := state_value as Dictionary
+		if float(state.get("target_velocity_rad_s", 0.0)) < -0.01:
+			return true
+	return false
+
+
+func _tooth_movement_intent(snapshot: Dictionary, interaction: Dictionary) -> bool:
+	var previous := snapshot.get("previous", {}) as Dictionary
+	var current := snapshot.get("current", {}) as Dictionary
+	var movement := (current["cutting_edge"] as Transform3D).origin - (previous["cutting_edge"] as Transform3D).origin
+	var minimum_sweep := float(interaction.get("minimum_sweep_m", 0.004))
+	if movement.length() >= minimum_sweep and movement.normalized().dot(snapshot.get("cutting_direction_world", Vector3.DOWN) as Vector3) > 0.12:
+		return true
+	return movement.y < -minimum_sweep * 0.35
+
+
 func _reduce_soil_operation(classifications: Array[Dictionary]) -> String:
 	for operation in ["dump", "spill", "cutting", "carry"]:
 		for record in classifications:
@@ -479,15 +582,20 @@ func _queue_batch_cut(batch: Dictionary, previous_tooth: Vector3, current_tooth:
 
 
 func _cut_motion_from_batch(batch: Dictionary, previous_tooth: Vector3, current_tooth: Vector3) -> Dictionary:
-	if bool(batch.get("query_required", false)):
-		for record_value in batch.get("classifications", []):
-			var record := record_value as Dictionary
-			if String(record.get("classification", "")) != "cutting":
-				continue
-			var contact_point := record.get("point_world", Vector3.ZERO) as Vector3
-			if bool(record.get("point_valid", true)) and contact_point.is_finite():
-				var movement := current_tooth - previous_tooth
-				return {"previous": contact_point - movement, "current": contact_point}
+	# Analytic cuts use the real tooth path. The supplementary query trigger
+	# may validate a contact the width samples cannot see (cross-slope single
+	# edge touch); that cut lands on the validated contact point instead,
+	# otherwise the tooth-height gate in _apply_cut would reject it.
+	if bool(batch.get("analytic_engaged", false)):
+		return {"previous": previous_tooth, "current": current_tooth}
+	for record_value in batch.get("classifications", []):
+		var record := record_value as Dictionary
+		if String(record.get("classification", "")) != "cutting":
+			continue
+		var contact_point := record.get("point_world", Vector3.ZERO) as Vector3
+		if bool(record.get("point_valid", true)) and contact_point.is_finite():
+			var movement := current_tooth - previous_tooth
+			return {"previous": contact_point - movement, "current": contact_point}
 	return {"previous": previous_tooth, "current": current_tooth}
 
 
