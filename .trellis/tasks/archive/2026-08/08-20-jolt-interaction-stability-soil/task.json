@@ -1,0 +1,32 @@
+{
+  "id": "jolt-interaction-stability-soil",
+  "name": "jolt-interaction-stability-soil",
+  "title": "Jolt interaction stability and soil behavior",
+  "description": "Parent plan for tracked-chassis stability, incremental Terrain3D deformation, and AGX-inspired physics-informed bucket soil.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": "Godot/Jolt standalone interaction stability and soil presentation",
+  "package": null,
+  "priority": "P2",
+  "creator": "rosatus",
+  "assignee": "rosatus",
+  "createdAt": "2026-08-20",
+  "completedAt": "2026-08-22",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "08-20-stabilize-jolt-tracked-chassis",
+    "08-20-incremental-terrain3d-deformation",
+    "08-20-physics-informed-bucket-soil",
+    "08-20-calibrate-jolt-posture-longitudinal-response",
+    "08-21-continuous-dig-shallow-overlap"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
