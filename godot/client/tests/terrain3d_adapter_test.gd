@@ -91,14 +91,69 @@ func _test_scene_adapter_seam() -> int:
 	if fallback.visible or foundation.visible:
 		scene.queue_free()
 		return _fail("native Terrain3D hides both legacy ground presentation layers")
-	var queued_snapshot := terrain_world.terrain_state.surface_snapshot()
-	queued_snapshot["terrain_revision"] = int(queued_snapshot["terrain_revision"]) + 1
-	if not adapter.queue_snapshot(queued_snapshot) or not fallback.visible or not foundation.visible:
+	# Incremental revision contract: ordinary edits patch the live native
+	# surface in place. The active native terrain never becomes invisible while
+	# work is queued or applying, dressing nodes stay stable, and only the patch
+	# counter advances.
+	var status_before := adapter.get_status_snapshot()
+	var dressing_node := scene.get_node_or_null("TerrainRoot/Terrain3DAdapter/ConstructionSiteDressing") as Node3D
+	if dressing_node == null:
 		scene.queue_free()
-		return _fail("pending native rebuild restores both fail-open ground layers")
-	if not adapter.apply_pending() or fallback.visible or foundation.visible:
+		return _fail("adapter owns a disposable construction-site dressing layer")
+	var dressing_ids_before := _dressing_instance_ids(dressing_node)
+	var logical_state := terrain_world.terrain_state
+	for _patch_index in 2:
+		if not logical_state.enqueue_brush(logical_state.next_brush_sequence(), Vector2.ZERO, 1.0, 0.05):
+			scene.queue_free()
+			return _fail("incremental brush queues")
+		if not logical_state.step_fixed():
+			scene.queue_free()
+			return _fail("incremental brush changes terrain")
+		if not terrain_world.rebuild_mesh():
+			scene.queue_free()
+			return _fail("terrain world refreshes derivatives")
+		if not adapter.available or not adapter.is_native_mesh_active():
+			scene.queue_free()
+			return _fail("native terrain stays visible during incremental revisions")
+		if fallback.visible or foundation.visible:
+			scene.queue_free()
+			return _fail("no native/fallback flash during incremental revisions")
+	var status_after := adapter.get_status_snapshot()
+	if int(status_after["patch_count"]) != int(status_before["patch_count"]) + 2:
 		scene.queue_free()
-		return _fail("successful native rebuild hides both fail-open ground layers again")
+		return _fail("ordinary revisions increment the patch counter")
+	if int(status_after["full_import_count"]) != int(status_before["full_import_count"]):
+		scene.queue_free()
+		return _fail("ordinary revisions must not increment the full-import counter")
+	if adapter.get_applied_identity() != Vector2i(logical_state.world_generation, logical_state.terrain_revision):
+		scene.queue_free()
+		return _fail("applied identity converges to the accepted revision")
+	if _dressing_instance_ids(dressing_node) != dressing_ids_before:
+		scene.queue_free()
+		return _fail("site dressing nodes stay stable across patches")
+	# The patched native height map matches the logical authority at the brush
+	# center; Terrain3D internal maps never replace the byte digest oracle.
+	var native_data: Variant = (scene.get_node("TerrainRoot/Terrain3DAdapter/Terrain3DNative") as Node3D).get("data")
+	var patched_height: float = native_data.call("get_height", Vector3(0.0, 0.0, 0.0)) if native_data != null and (native_data as Object).has_method("get_height") else NAN
+	if is_nan(patched_height) or not is_equal_approx(patched_height, logical_state.sample_surface_at(Vector2.ZERO)):
+		scene.queue_free()
+		return _fail("patched native height matches the logical surface at the edit")
+	# Reset performs a clean full rebuild and clears stale pending patch work.
+	var full_before_reset := int(status_after["full_import_count"])
+	terrain_world.reset_for_test()
+	var status_reset := adapter.get_status_snapshot()
+	if int(status_reset["full_import_count"]) != full_before_reset + 1:
+		scene.queue_free()
+		return _fail("reset performs a clean full materialization")
+	if int(status_reset["patch_count"]) != int(status_after["patch_count"]):
+		scene.queue_free()
+		return _fail("reset does not count as a patch")
+	if bool(status_reset["resync_requested"]) or not adapter.available:
+		scene.queue_free()
+		return _fail("reset clears stale pending patch work and keeps native active")
+	if adapter.get_applied_identity() != Vector2i(logical_state.world_generation, logical_state.terrain_revision):
+		scene.queue_free()
+		return _fail("reset converges applied identity to the new generation")
 	var dressing := scene.get_node_or_null("TerrainRoot/Terrain3DAdapter/ConstructionSiteDressing")
 	if dressing == null:
 		scene.queue_free()
@@ -181,6 +236,13 @@ func _test_jolt_collision_and_disable() -> int:
 	scene.queue_free()
 	await process_frame
 	return 0
+
+
+func _dressing_instance_ids(dressing: Node3D) -> Array:
+	var ids := []
+	for child in dressing.get_children():
+		ids.append(child.get_instance_id())
+	return ids
 
 
 func _fail(message: String) -> int:

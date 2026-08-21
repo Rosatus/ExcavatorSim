@@ -9,6 +9,9 @@ const DEFAULT_ROWS := 41
 const DEFAULT_COLUMNS := 41
 const DEFAULT_SPACING_M := 0.5
 const MAX_CELLS := 50000
+## One-cell normal/seam halo published with every dirty rectangle so derived
+## mesh/collider consumers can rebuild normals and shared chunk edges.
+const DIRTY_HALO_CELLS := 1
 
 var seed: int
 var rows: int
@@ -24,6 +27,14 @@ var loose_depth := PackedFloat32Array()
 var _baseline_stable := PackedFloat32Array()
 var _pending_brushes: Array[Dictionary] = []
 var _last_enqueued_sequence := -1
+## Dirty bookkeeping for incremental derived updates. Rectangles live in grid
+## space as Rect2i(position=(min_column, min_row), size=(columns, rows)).
+## _dirty_revision records which terrain_revision the rectangles describe;
+## reset invalidates them so the next snapshot requests a full refresh.
+var _dirty_revision := -1
+var _dirty_rect_cells := Rect2i()
+var _dirty_rect_with_halo := Rect2i()
+var _last_apply_changed := false
 
 
 func _init(seed_value: int = DEFAULT_SEED, requested_rows: int = DEFAULT_ROWS, requested_columns: int = DEFAULT_COLUMNS, requested_spacing_m: float = DEFAULT_SPACING_M) -> void:
@@ -62,11 +73,21 @@ func step_fixed() -> bool:
 		return false
 	_pending_brushes.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return int(left["sequence"]) < int(right["sequence"]))
 	var changed := false
+	var batch_min := Vector2i(2147483647, 2147483647)
+	var batch_max := Vector2i(-2147483648, -2147483648)
 	for command in _pending_brushes:
-		if _apply_brush(command):
-			terrain_revision += 1
+		var brush_rect := _apply_brush(command)
+		if brush_rect.size.x > 0 and brush_rect.size.y > 0:
+			batch_min = batch_min.min(brush_rect.position)
+			batch_max = batch_max.max(brush_rect.position + brush_rect.size - Vector2i.ONE)
+		if _last_apply_changed:
 			changed = true
 	_pending_brushes.clear()
+	if changed:
+		# One accepted fixed-step batch advances the revision exactly once so
+		# each scheduler flush produces one contiguous, patchable identity.
+		terrain_revision += 1
+		_publish_dirty_bounds(batch_min, batch_max)
 	return changed
 
 
@@ -76,6 +97,9 @@ func reset() -> void:
 	loose_depth.resize(_baseline_stable.size())
 	_pending_brushes.clear()
 	_last_enqueued_sequence = -1
+	_dirty_revision = -1
+	_dirty_rect_cells = Rect2i()
+	_dirty_rect_with_halo = Rect2i()
 	terrain_revision += 1
 	world_generation += 1
 
@@ -93,6 +117,10 @@ func surface_snapshot() -> Dictionary:
 		"terrain_epoch": terrain_epoch,
 		"terrain_revision": terrain_revision,
 		"world_generation": world_generation,
+		"full_refresh": not is_dirty_rect_current(),
+		"dirty_rect_cells": _dirty_rect_cells,
+		"dirty_rect_with_halo": _dirty_rect_with_halo,
+		"dirty_revision": _dirty_revision,
 		"surface": surface,
 		"surface_bytes": bytes,
 		"snapshot_sha256": _sha256(bytes),
@@ -105,6 +133,21 @@ func get_surface() -> PackedFloat32Array:
 	for index in result.size():
 		result[index] = stable_heights[index] + loose_depth[index]
 	return result
+
+
+## True when the published dirty rectangles describe exactly the transition
+## into the current terrain_revision. Consumers combine this with their own
+## applied identity to decide between patch and full materialization.
+func is_dirty_rect_current() -> bool:
+	return _dirty_revision == terrain_revision
+
+
+func get_dirty_rect_cells() -> Rect2i:
+	return _dirty_rect_cells
+
+
+func get_dirty_rect_with_halo() -> Rect2i:
+	return _dirty_rect_with_halo
 
 
 func is_inside_grid(world_xz: Vector2) -> bool:
@@ -145,9 +188,10 @@ func estimate_brush_volume(center_xz: Vector2, radius_m: float, delta_m: float) 
 		return 0.0
 	var volume := 0.0
 	var cell_area := spacing_m * spacing_m
-	for row in rows:
+	var bounds := _brush_cell_bounds(center_xz, radius_m)
+	for row in range(bounds.position.y, bounds.end.y):
 		var z := origin_xz.y + float(row) * spacing_m
-		for column in columns:
+		for column in range(bounds.position.x, bounds.end.x):
 			var x := origin_xz.x + float(column) * spacing_m
 			var distance := Vector2(x, z).distance_to(center_xz)
 			if distance > radius_m:
@@ -192,14 +236,20 @@ func _generate_baseline() -> void:
 	loose_depth.resize(_baseline_stable.size())
 
 
-func _apply_brush(command: Dictionary) -> bool:
+## Applies one brush bounded to its clamped grid rectangle. Returns the touched
+## cell rectangle (empty when the brush misses the grid) and records whether any
+## cell actually changed in _last_apply_changed.
+func _apply_brush(command: Dictionary) -> Rect2i:
 	var center: Vector2 = command["center_xz"]
 	var radius: float = command["radius_m"]
 	var delta: float = command["delta_m"]
-	var changed := false
-	for row in rows:
+	_last_apply_changed = false
+	var bounds := _brush_cell_bounds(center, radius)
+	if bounds.size.x <= 0 or bounds.size.y <= 0:
+		return Rect2i()
+	for row in range(bounds.position.y, bounds.end.y):
 		var z := origin_xz.y + float(row) * spacing_m
-		for column in columns:
+		for column in range(bounds.position.x, bounds.end.x):
 			var x := origin_xz.x + float(column) * spacing_m
 			var distance := Vector2(x, z).distance_to(center)
 			if distance > radius:
@@ -210,20 +260,50 @@ func _apply_brush(command: Dictionary) -> bool:
 			var index := row * columns + column
 			if amount > 0.0:
 				loose_depth[index] += amount
-				changed = true
+				_last_apply_changed = true
 			else:
 				var remaining := -amount
 				var loose_taken := minf(loose_depth[index], remaining)
 				if loose_taken > 0.0:
 					loose_depth[index] -= loose_taken
 					remaining -= loose_taken
-					changed = true
+					_last_apply_changed = true
 				if remaining > 0.0:
 					var lowered := maxf(_baseline_stable[index] - 3.0, stable_heights[index] - remaining)
 					if lowered != stable_heights[index]:
 						stable_heights[index] = lowered
-						changed = true
-	return changed
+						_last_apply_changed = true
+	return bounds
+
+
+## Clamped grid-cell bounding rectangle for a circular brush. Grid space is
+## Rect2i(position=(min_column, min_row), size=(columns, rows)).
+func _brush_cell_bounds(center_xz: Vector2, radius_m: float) -> Rect2i:
+	if not _is_finite(center_xz.x) or not _is_finite(center_xz.y) or not _is_finite(radius_m) or radius_m <= 0.0:
+		return Rect2i()
+	var min_column := clampi(floori((center_xz.x - radius_m - origin_xz.x) / spacing_m), 0, columns - 1)
+	var max_column := clampi(ceili((center_xz.x + radius_m - origin_xz.x) / spacing_m), 0, columns - 1)
+	var min_row := clampi(floori((center_xz.y - radius_m - origin_xz.y) / spacing_m), 0, rows - 1)
+	var max_row := clampi(ceili((center_xz.y + radius_m - origin_xz.y) / spacing_m), 0, rows - 1)
+	if max_column < min_column or max_row < min_row:
+		return Rect2i()
+	return Rect2i(min_column, min_row, max_column - min_column + 1, max_row - min_row + 1)
+
+
+func _publish_dirty_bounds(min_cell: Vector2i, max_cell: Vector2i) -> void:
+	if max_cell.x < min_cell.x or max_cell.y < min_cell.y:
+		return
+	_dirty_rect_cells = Rect2i(min_cell, max_cell - min_cell + Vector2i.ONE)
+	var halo_min := Vector2i(
+		maxi(min_cell.x - DIRTY_HALO_CELLS, 0),
+		maxi(min_cell.y - DIRTY_HALO_CELLS, 0)
+	)
+	var halo_max := Vector2i(
+		mini(max_cell.x + DIRTY_HALO_CELLS, columns - 1),
+		mini(max_cell.y + DIRTY_HALO_CELLS, rows - 1)
+	)
+	_dirty_rect_with_halo = Rect2i(halo_min, halo_max - halo_min + Vector2i.ONE)
+	_dirty_revision = terrain_revision
 
 
 func _sha256(bytes: PackedByteArray) -> String:

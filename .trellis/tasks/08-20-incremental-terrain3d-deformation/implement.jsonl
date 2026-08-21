@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/client-boundary.md", "reason": "Terrain revision authority and client boundary contracts updated by the previous jolt task"}
+{"file": ".trellis/spec/frontend/godot-mcp.md", "reason": "How to drive Godot MCP live smoke for the no-flicker acceptance criterion"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Reuse existing TerrainState/scheduler/adapter helpers before adding new update paths"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Dirty bounds must flow consistently from logical state through adapter to collider and renderer"}

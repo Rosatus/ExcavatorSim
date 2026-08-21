@@ -15,6 +15,10 @@ var terrain_state: TerrainState
 @onready var terrain3d_adapter := get_node_or_null(terrain3d_adapter_path) as Terrain3DAdapter
 @onready var foundation_ground := get_node_or_null(foundation_ground_path) as MeshInstance3D
 
+## Latest accepted snapshot, kept so the fail-open fallback renderer can catch
+## up in one full rebuild if the native backend ever deactivates.
+var _latest_snapshot: Dictionary = {}
+
 
 func _ready() -> void:
 	terrain_state = TerrainState.new(terrain_seed, terrain_rows, terrain_columns, terrain_spacing_m)
@@ -71,13 +75,20 @@ func rebuild_mesh_from_snapshot(snapshot: Dictionary) -> bool:
 		return false
 	if int(snapshot.get("terrain_revision", -1)) != terrain_state.terrain_revision:
 		return false
+	_latest_snapshot = snapshot
 	var native_applied := false
+	var native_active := false
 	if terrain3d_adapter != null:
 		terrain3d_adapter.queue_snapshot(snapshot)
 		native_applied = terrain3d_adapter.apply_pending()
-		_on_terrain3d_backend_changed(terrain3d_adapter.is_native_mesh_active())
+		native_active = terrain3d_adapter.is_native_mesh_active()
 	var fallback_applied := false
 	if terrain_renderer != null:
+		if native_active and _is_ordinary_patch_snapshot(snapshot):
+			# Native Terrain3D owns presentation for ordinary revisions; the
+			# hidden fallback mesh need not rebuild every patch. It catches up
+			# in full if the native backend ever deactivates.
+			return native_applied
 		if not terrain_renderer.queue_snapshot(snapshot) and terrain_renderer.get_applied_identity() != Vector2i(int(snapshot["world_generation"]), int(snapshot["terrain_revision"])):
 			return native_applied
 		fallback_applied = terrain_renderer.apply_pending()
@@ -89,3 +100,21 @@ func _on_terrain3d_backend_changed(active: bool) -> void:
 		terrain_renderer.visible = not active
 	if foundation_ground != null:
 		foundation_ground.visible = not active
+	if not active:
+		_sync_fallback_to_latest()
+
+
+## Full fallback rebuild from the latest accepted snapshot so there is always
+## one visible valid surface when the native backend is gone.
+func _sync_fallback_to_latest() -> void:
+	if terrain_renderer == null or _latest_snapshot.is_empty():
+		return
+	var identity := Vector2i(int(_latest_snapshot.get("world_generation", -1)), int(_latest_snapshot.get("terrain_revision", -1)))
+	if terrain_renderer.visible and terrain_renderer.get_applied_identity() == identity:
+		return
+	terrain_renderer.queue_snapshot(_latest_snapshot)
+	terrain_renderer.apply_pending()
+
+
+func _is_ordinary_patch_snapshot(snapshot: Dictionary) -> bool:
+	return not bool(snapshot.get("full_refresh", true))

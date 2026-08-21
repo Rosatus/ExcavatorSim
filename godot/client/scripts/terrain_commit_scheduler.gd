@@ -24,6 +24,8 @@ var _generation := 0
 var _flush_count := 0
 var _last_flush_brushes := 0
 var _last_flush_revision := -1
+var _last_flush_dirty_rect := Rect2i()
+var _last_flush_dirty_halo := Rect2i()
 
 
 func _init(state: TerrainState, world: TerrainWorld = null, collider: TerrainCollider = null) -> void:
@@ -92,6 +94,8 @@ func reset_for_generation(generation: int) -> void:
 	_oldest_age_s = 0.0
 	_generation = maxi(generation, 0)
 	_last_flush_brushes = 0
+	_last_flush_dirty_rect = Rect2i()
+	_last_flush_dirty_halo = Rect2i()
 
 
 func reset_world() -> bool:
@@ -118,6 +122,8 @@ func get_status_snapshot() -> Dictionary:
 		"flush_count": _flush_count,
 		"last_flush_brushes": _last_flush_brushes,
 		"last_flush_revision": _last_flush_revision,
+		"last_flush_dirty_rect_cells": _last_flush_dirty_rect,
+		"last_flush_dirty_rect_with_halo": _last_flush_dirty_halo,
 	}
 
 
@@ -175,6 +181,8 @@ func _flush() -> Dictionary:
 	_flush_count += 1
 	_last_flush_brushes = queued
 	_last_flush_revision = terrain_state.terrain_revision
+	_last_flush_dirty_rect = terrain_state.get_dirty_rect_cells()
+	_last_flush_dirty_halo = terrain_state.get_dirty_rect_with_halo()
 	var result := _result(true, "committed")
 	result["committed_transfer_ids"] = committed_transfer_ids
 	result["rejected_transfer_ids"] = rejected_transfer_ids

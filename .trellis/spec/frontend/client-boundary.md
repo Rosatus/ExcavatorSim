@@ -391,9 +391,44 @@ The snapshot must contain `terrain_epoch`, `terrain_revision`,
 `world_generation`, `rows`, `columns`, `spacing_m`, `origin_xz`, `surface`, and
 `surface_bytes`. The adapter deep-copies `surface` and `surface_bytes`, rejects
 older `(epoch, generation, revision)` work, and only marks `available=true`
-after `Terrain3DData.import_images` successfully materializes the accepted
-height map. `TerrainState.surface_bytes` and its digest remain the parity oracle;
-Terrain3D's internal maps never replace them.
+after the accepted height map is materialized. `TerrainState.surface_bytes` and
+its digest remain the parity oracle; Terrain3D's internal maps never replace
+them.
+
+#### Incremental revision contract
+
+`TerrainState` publishes `full_refresh`, `dirty_rect_cells`, and
+`dirty_rect_with_halo` (one-cell normal/seam halo, clamped to the grid) with
+every snapshot; a rectangle is trustworthy only when its `dirty_revision`
+equals the snapshot's `terrain_revision`. Startup, reset, generation change,
+stale recovery, and explicit resync take the full `build_maps`/`import_images`
+path. Ordinary contiguous revisions (`revision == applied + 1`) patch in place:
+the adapter edits existing region height-map images for the mapped dirty
+pixels plus halo, marks those regions edited/modified with refreshed height
+bounds, and calls `Terrain3DData.update_maps(TYPE_HEIGHT, false, false)` so
+only edited regions refresh. Dressing nodes are rebuilt only on the full path.
+Counters expose `full_import_count` versus `patch_count`; ordinary revisions
+increment only the patch counter.
+
+No-flicker invariant: there is always one visible valid surface — previous
+native, new native, or fallback. Queued or applying work (patch or full) never
+hides the active native terrain; visibility changes only after a real success
+or a hard failure. A failed patch leaves the previous surface visible,
+schedules a full resync, and retries the same snapshot through the full path;
+a failed full materialization restores the custom renderer and foundation
+ground. While native Terrain3D owns presentation, ordinary patches skip
+fallback mesh rebuilds; on native deactivation the fallback catches up in one
+full rebuild from the latest accepted snapshot.
+
+`TerrainCollider` partitions the logical grid into stable chunks under one
+static body. Ordinary revisions build replacement shapes before touching
+nodes, swap only chunks overlapped by the dirty halo rectangle (which already
+includes the shared-edge ring), and advance the applied identity only after
+all dirty chunks are installed; unchanged chunks keep their shape identity. A
+failed install retains the old chunks, reports unavailable/stale, and lags the
+applied identity so bucket queries and tracked support fail closed until a
+full rebuild succeeds. A skipped (non-contiguous) revision forces a safe full
+chunk rebuild.
 
 Terrain3D initializes native rendering when the node enters the scene tree.
 Configure non-null `assets` and `material` before `add_child()` so the first
@@ -417,9 +452,13 @@ failed collision setup keeps `TerrainRenderer`/`TerrainCollider` usable.
 | Native class unavailable | `available=false`; retain custom renderer |
 | Invalid dimensions/bytes | reject snapshot without mutating authority |
 | Stale epoch/generation/revision | reject queue; preserve newer pending work |
-| Map import succeeds | hide custom mesh and foundation ground only after native snapshot is applied |
-| Native work becomes pending/fails | restore custom mesh and foundation ground immediately |
+| Map import succeeds | native stays/becomes visible; custom mesh and foundation ground hide only then |
+| Native work pending | active native terrain remains visible; no fallback flash |
+| Patch fails | previous surface stays visible; schedule full resync and retry fully |
+| Full materialization fails | restore custom mesh and foundation ground immediately |
 | Collision disabled or fails | `collision_available=false`; excavation/motion continue |
+| Collider chunk install fails | retain old chunks; applied identity lags so queries fail closed |
+| Skipped/non-contiguous revision | derived consumers take the safe full path |
 
 #### Wrong vs correct
 

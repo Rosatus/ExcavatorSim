@@ -22,6 +22,7 @@ $tests = @(
     "construction_site_terrain_test.gd",
     "terrain3d_adapter_test.gd",
     "terrain_state_test.gd",
+    "terrain_collider_chunk_test.gd",
     "excavation_gameplay_test.gd",
     "visual_pass_test.gd",
     "release_candidate_test.gd",
