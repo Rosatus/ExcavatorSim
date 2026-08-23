@@ -229,6 +229,9 @@ func _test_automatic_motion_for_both_models() -> int:
 		if excavation._queue_batch_cut(batch, previous_cut, current_cut):
 			scene.queue_free()
 			return _fail("duplicate soil interaction batch queued a second transaction")
+		# Carry/idle must stay quiet; clear flying cut parcels first so the
+		# occupancy read reflects only capture, never in-flight spray.
+		excavation._parcel_pool.clear_all()
 		var carry := excavation.step_automatic_snapshot_for_test(_soil_snapshot(contract, current_cut, current_cut, Vector3.UP))
 		if (
 			carry.get("interaction_state", "") != "idle"
@@ -249,9 +252,8 @@ func _test_automatic_motion_for_both_models() -> int:
 		):
 			scene.queue_free()
 			return _fail("invalid fixed-step snapshots cannot create or remove material")
-		# Digging is decoupled from bucket capacity: removed soil becomes
-		# particles directly, so an empty bucket can neither spill nor dump,
-		# and repeated cuts never accrue payload or unbounded transfers.
+		# Digging stays decoupled from the ledger: repeated cuts spawn
+		# transport parcels but never accrue payload or unbounded transfers.
 		for attempt in 60:
 			var x := float(attempt % 20) * 0.7 - 6.65
 			var z := float(attempt / 20) * 0.7 - 3.45
@@ -265,6 +267,13 @@ func _test_automatic_motion_for_both_models() -> int:
 		if excavation.soil_state.bucket_volume_m3 > BucketSoilState.EPSILON_M3:
 			scene.queue_free()
 			return _fail("cutting never accrues bucket payload for %s" % contract.get("model_id", ""))
+		var transport := excavation._parcel_pool.get_pool_snapshot()
+		if int(transport.get("active", 0)) <= 0 or float(transport.get("volume_m3", 0.0)) <= 0.0:
+			scene.queue_free()
+			return _fail("repeated cuts feed the parcel transport pool for %s" % contract.get("model_id", ""))
+		# An empty ledger still cannot pour: spill and dump stay silent until
+		# parcels have actually been captured into the cavity.
+		excavation._parcel_pool.clear_all()
 		var spill_normal := Vector3.RIGHT if contract.get("model_id", "") == "sy205" else Vector3(0.0, 0.3, 0.953939)
 		var spill := excavation.step_automatic_snapshot_for_test(_soil_snapshot(contract, current_cut, current_cut, spill_normal))
 		if spill.get("interaction_state", "") == "spill" or float(spill.get("flow_volume_m3", 0.0)) > 0.0:

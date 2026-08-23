@@ -79,11 +79,35 @@ func _test_connected_operate_reset_reconnect() -> int:
 	if not excavation.queue_cut_world(1, Vector3(0.0, h, 0.0), Vector3(0.0, h - 0.2, 0.0)):
 		return _fail("connected scene queues dig")
 	var cut := excavation.step_fixed_for_test()
-	if not cut.get("changed", false) or float(excavation.soil_state.bucket_volume_m3) != 0.0:
-		return _fail("connected scene digs; soil leaves as particles without payload")
+	var pool := excavation._parcel_pool as SoilParcelPool
+	var cut_transport := pool.get_pool_snapshot()
+	if (
+		not cut.get("changed", false)
+		or float(excavation.soil_state.bucket_volume_m3) != 0.0
+		or int(cut_transport.get("active", 0)) <= 0
+		or float(cut_transport.get("volume_m3", 0.0)) <= 0.0
+	):
+		return _fail("connected scene dig feeds the parcel transport stage")
+	var parcel_index := _first_active(pool)
+	if parcel_index < 0:
+		return _fail("cut parcel resolves for capture")
+	var parcel_body := pool.get_body(parcel_index)
+	parcel_body.linear_velocity = Vector3.ZERO
+	var cavity := Transform3D(Basis.IDENTITY, parcel_body.global_position)
+	for _tick in 20:
+		pool.step_pool(1.0 / 60.0, cavity, Vector3(0.25, 0.25, 0.35))
+	if excavation.soil_state.bucket_volume_m3 <= BucketSoilState.EPSILON_M3:
+		return _fail("captured parcel becomes carried bucket payload")
+	var carried_volume := excavation.soil_state.bucket_volume_m3
 	var dump_height := excavation.terrain_world.terrain_state.sample_surface_at(Vector2.ZERO) + 0.2
-	if excavation.queue_deposit_world(2, Vector3(0.0, dump_height, 0.0)):
-		return _fail("empty-bucket deposit is rejected in the connected scene")
+	var released := pool.release_volume(carried_volume, Vector3(0.0, dump_height, 0.0), Vector3.DOWN)
+	var dump_transport := pool.get_pool_snapshot()
+	if (
+		released <= BucketSoilState.EPSILON_M3
+		or excavation.soil_state.bucket_volume_m3 >= carried_volume
+		or int(dump_transport.get("guarded", 0)) <= 0
+	):
+		return _fail("connected scene carry/dump hands payload back to guarded parcels")
 	var old_generation := client.get_generation()
 	client.reconnect_now()
 	client.process_for_test(0.01)
@@ -91,7 +115,11 @@ func _test_connected_operate_reset_reconnect() -> int:
 	await process_frame
 	if client.get_generation() <= old_generation or client.get_pose_buffer_size() != 0:
 		return _fail("authority epoch change clears motion generation: old=%d new=%d poses=%d" % [old_generation, client.get_generation(), client.get_pose_buffer_size()])
-	if excavation.soil_state.bucket_volume_m3 != 0.0 or effects.get_effect_snapshot()["generation"] <= 0:
+	if (
+		excavation.soil_state.bucket_volume_m3 != 0.0
+		or pool.active_count() != 0
+		or effects.get_effect_snapshot()["generation"] <= 0
+	):
 		return _fail("authority epoch change clears local inventory and effects")
 	excavation.reset_for_test()
 	if excavation.soil_state.bucket_volume_m3 != 0.0 or excavation.terrain_world.terrain_state.world_generation <= 0:
@@ -104,6 +132,13 @@ func _test_connected_operate_reset_reconnect() -> int:
 func _new_transport() -> FakeTransport:
 	_transport = FakeTransport.new()
 	return _transport
+
+
+func _first_active(pool: SoilParcelPool) -> int:
+	for index in pool._records.size():
+		if bool(pool._records[index].get("active", false)):
+			return index
+	return -1
 
 
 func _hello_ack(session: String, epoch: String, lifecycle: String) -> Dictionary:

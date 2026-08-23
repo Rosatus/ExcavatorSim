@@ -101,6 +101,26 @@ func queue_deposit_volume(sequence: int, center: Vector3, requested_volume_m3: f
 	return true
 
 
+func queue_parcel_deposit_volume(sequence: int, center: Vector3, requested_volume_m3: float) -> bool:
+	# A parcel has already left the bucket ledger (or came straight from a cut).
+	# Settling it must therefore add terrain without consuming bucket occupancy
+	# a second time. Keep this as an explicit entry point so ordinary bucket
+	# deposits retain their existing ownership semantics.
+	if not _can_queue(sequence) or not _is_finite_vector(center):
+		return false
+	if not _is_finite(requested_volume_m3) or requested_volume_m3 <= EPSILON_M3:
+		return false
+	_pending_commands.append({
+		"sequence": sequence,
+		"generation": world_generation,
+		"kind": "parcel_deposit",
+		"center": center,
+		"requested_volume_m3": requested_volume_m3,
+	})
+	_last_queued_sequence = sequence
+	return true
+
+
 func step_fixed() -> Dictionary:
 	if terrain_state == null:
 		return _result(false, 0.0, 0.0, "terrain_unavailable")
@@ -117,18 +137,36 @@ func step_fixed() -> Dictionary:
 	var rejected := 0
 	var reason := ""
 	var cut_events: Array[Dictionary] = []
+	var parcel_deposit_results: Array[Dictionary] = []
 	for command in _pending_commands:
 		var sequence := int(command["sequence"])
+		var command_kind := String(command["kind"])
 		if sequence <= _last_applied_sequence or int(command["generation"]) != world_generation:
 			rejected += 1
 			reason = "stale_command"
+			if command_kind == "parcel_deposit":
+				parcel_deposit_results.append({
+					"sequence": sequence,
+					"accepted": false,
+					"volume_m3": 0.0,
+					"transfer_id": "",
+					"reason": reason,
+				})
 			continue
 		_last_applied_sequence = sequence
 		var operation: Dictionary
-		if String(command["kind"]) == "cut":
+		if command_kind == "cut":
 			operation = _apply_cut(command)
 		else:
 			operation = _apply_deposit(command)
+		if command_kind == "parcel_deposit":
+			parcel_deposit_results.append({
+				"sequence": sequence,
+				"accepted": bool(operation.get("accepted", false)),
+				"volume_m3": float(operation.get("deposit_volume_m3", 0.0)),
+				"transfer_id": String(operation.get("transfer_id", "")),
+				"reason": String(operation.get("reason", "")),
+			})
 		if bool(operation.get("accepted", false)):
 			accepted += 1
 			changed = true
@@ -139,6 +177,7 @@ func step_fixed() -> Dictionary:
 					"center": operation["center"],
 					"tooth_world": operation["tooth_world"],
 					"volume_m3": float(operation.get("cut_volume_m3", 0.0)),
+					"tooth_velocity": operation.get("tooth_velocity", Vector3.ZERO),
 				})
 		else:
 			rejected += 1
@@ -148,6 +187,7 @@ func step_fixed() -> Dictionary:
 	_last_result["accepted_commands"] = accepted
 	_last_result["rejected_commands"] = rejected
 	_last_result["cut_events"] = cut_events
+	_last_result["parcel_deposit_results"] = parcel_deposit_results
 	return _last_result.duplicate(true)
 
 
@@ -230,44 +270,60 @@ func _apply_cut(command: Dictionary) -> Dictionary:
 		"transfer_id": transfer_id,
 		"center": center,
 		"tooth_world": current,
+		"tooth_velocity": (current - previous) * float(Engine.get_physics_ticks_per_second()),
 	}
 
 
 func _apply_deposit(command: Dictionary) -> Dictionary:
 	var center: Vector3 = command["center"]
 	var center_xz := Vector2(center.x, center.z)
-	if bucket_volume_m3 <= EPSILON_M3 or not terrain_state.is_inside_grid(center_xz):
-		return {"accepted": false, "reason": "empty_bucket" if bucket_volume_m3 <= EPSILON_M3 else "outside_grid"}
+	var consumes_bucket := String(command.get("kind", "deposit")) == "deposit"
+	if not terrain_state.is_inside_grid(center_xz):
+		return {"accepted": false, "reason": "outside_grid"}
+	if consumes_bucket and bucket_volume_m3 <= EPSILON_M3:
+		return {"accepted": false, "reason": "empty_bucket"}
 	var surface := terrain_state.sample_surface_at(center_xz)
 	if not _is_finite(surface) or center.y < surface + DUMP_CLEARANCE_M:
 		return {"accepted": false, "reason": "insufficient_clearance"}
 	var interaction: Dictionary = soil_contract.get("interaction", {})
 	var maximum_depth := float(interaction.get("maximum_cut_depth_m", MAX_CUT_DEPTH_M))
 	var radius := float(interaction.get("deposit_radius_m", DEPOSIT_RADIUS_M))
-	var requested_from_bucket := minf(bucket_volume_m3, float(command.get("requested_volume_m3", bucket_volume_m3)))
+	var requested_volume := float(command.get("requested_volume_m3", bucket_volume_m3))
+	var available_volume := minf(bucket_volume_m3, requested_volume) if consumes_bucket else requested_volume
 	var full_brush_volume := terrain_state.estimate_brush_volume(center_xz, radius, maximum_depth)
-	if full_brush_volume <= EPSILON_M3 or requested_from_bucket <= EPSILON_M3:
+	if full_brush_volume <= EPSILON_M3 or available_volume <= EPSILON_M3:
 		return {"accepted": false, "reason": "invalid_deposit"}
-	var depth := maximum_depth * minf(1.0, requested_from_bucket / full_brush_volume)
-	var actual_volume := minf(requested_from_bucket, terrain_state.estimate_brush_volume(center_xz, radius, depth))
+	var depth := maximum_depth * minf(1.0, available_volume / full_brush_volume)
+	var actual_volume := minf(available_volume, terrain_state.estimate_brush_volume(center_xz, radius, depth))
 	if actual_volume <= EPSILON_M3:
 		return {"accepted": false, "reason": "invalid_deposit"}
 	if terrain_scheduler == null:
 		return {"accepted": false, "reason": "terrain_scheduler_unavailable"}
 	var sequence := int(command["sequence"])
-	var transfer_id := "%d:%d:deposit" % [world_generation, sequence]
+	var transfer_kind := "deposit" if consumes_bucket else "parcel_deposit"
+	var transfer_id := "%d:%d:%s" % [world_generation, sequence, transfer_kind]
 	if _active_transfers.size() >= MAX_ACTIVE_TRANSFERS or _active_transfers.has(transfer_id):
 		return {"accepted": false, "reason": "transfer_capacity"}
 	if not terrain_scheduler.queue_brush(sequence, center_xz, radius, depth, world_generation, transfer_id):
 		return {"accepted": false, "reason": "terrain_rejected"}
-	var removed_volume := _remove_occupancy(actual_volume)
-	var consumed_sources := _consume_bucket_transfers(removed_volume)
+	var committed_volume := actual_volume
+	var consumed_sources: Array[Dictionary] = []
+	var transfer_state := "parcel_settled_pending_terrain"
+	if consumes_bucket:
+		committed_volume = _remove_occupancy(actual_volume)
+		consumed_sources = _consume_bucket_transfers(committed_volume)
+		transfer_state = "settled_pending_terrain"
 	_active_transfers[transfer_id] = {
-		"state": "settled_pending_terrain",
-		"volume_m3": removed_volume,
+		"state": transfer_state,
+		"volume_m3": committed_volume,
 		"consumed_sources": consumed_sources,
 	}
-	return {"accepted": true, "cut_volume_m3": 0.0, "deposit_volume_m3": removed_volume, "transfer_id": transfer_id}
+	return {
+		"accepted": true,
+		"cut_volume_m3": 0.0,
+		"deposit_volume_m3": committed_volume,
+		"transfer_id": transfer_id,
+	}
 
 
 func _can_queue(sequence: int) -> bool:

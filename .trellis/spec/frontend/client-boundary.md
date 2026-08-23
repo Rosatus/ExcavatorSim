@@ -183,6 +183,10 @@ KinematicArticulationState.accept_step(proposal: Dictionary, accepted_fraction: 
 BucketProxySweeper.sweep(space_owner: Node3D, previous_bucket: Transform3D, candidate_bucket: Transform3D, terrain_identity: Vector2i, physics_tick: int, authority_epoch: String, motion_sequence: int) -> Dictionary
 MotionPresentation.apply_physics_snapshot(snapshot: Dictionary) -> bool
 PhysicsRigDescriptor.is_valid_for(model_id: String, model_version: String) -> bool
+BucketSoilState.queue_parcel_deposit_volume(sequence: int, center: Vector3, requested_volume_m3: float) -> bool
+SoilParcelPool.configure_barrier_extents(extents: Vector3) -> bool
+SoilParcelPool.notify_deposit_results(results: Variant) -> void
+SoilParcelPool.notify_deposit_commits(committed_ids: Variant, rejected_ids: Variant) -> void
 ```
 
 `TrackedChassisController` selects this runtime by profile and remains the only
@@ -269,10 +273,30 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
   volume to parcels at the lip (`release_poured_volume` + guarded spawn)
   instead of writing terrain directly; poured parcels carry a recapture
   guard. Grounded slow parcels settle back into the loose heightfield through
-  the normal deposit pipeline (`queue_deposit_volume`), so spoil piles are
-  real terrain the machine can re-dig. The pool is budget-capped (steals the
-  oldest parcel when full) and cleared on every generation/reset path.
-  Cut transfers still retire on terrain commit without adding occupancy;
+  the explicit `queue_parcel_deposit_volume` path, so spoil piles are real
+  terrain the machine can re-dig. That path is distinct from
+  `queue_deposit_volume`: parcel volume has already left the bucket ledger (or
+  came straight from a cut), so settling may add terrain but may never require
+  or remove bucket occupancy. Each result carries its parcel sequence and
+  transfer ID; the pool freezes the matching body until that exact terrain
+  transfer commits, retries an explicit rejection without destroying material,
+  and consumes only the accepted portion. Missing/delayed results retain the
+  frozen sequence identity; a local timeout must never infer cancellation of a
+  transfer that may commit later. Aggregate per-tick deposit volume is not
+  parcel identity. The body pool is budget-capped; accepted cut volume that
+  exceeds its free carriers enters one bounded aggregate backlog and is spawned
+  into the next free carriers instead of stealing material. The pool and backlog
+  are cleared on every generation/reset path. An
+  open-mouthed kinematic barrier (floor/back/sides from the cavity contract,
+  machine layer only) mirrors the cavity frame so parcels rest against the
+  shell instead of passing through work-equipment transforms; capture is a
+  ~0.18 s progressive absorption whose remainder stays physical when
+  capacity stalls, and cut spray inherits tooth velocity with an upward
+  bias. `SoilParcelPool.setup()` must reapply the configured collision layer
+  and mask to already-created pooled bodies because `_ready()` can build them
+  before the production owner calls setup. Model activation must reconfigure
+  all four barrier planes from the newly active cavity extents. Cut transfers
+  still retire on terrain commit without adding occupancy;
   a validated in-band query
   contact point remains a supplementary trigger for mesh contacts the samples
   cannot see, and such cuts land on the validated contact point. Query
@@ -361,6 +385,12 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
 | Slow micro-trim or swing-drag stroke below the per-tick sweep threshold | Engaged tooth plus an active work-equipment command queues a cut every tick; no query needed |
 | Stale collider identity during an engaged stroke | Analytic cutting continues; only support transactions wait for fresh identity |
 | Duplicate interaction key | Report duplicate and queue no second soil transaction or wrench |
+| Parcel settles after a full bucket pour | Queue terrain deposit with parcel provenance; bucket occupancy remains zero |
+| Parcel deposit is partially accepted | Consume only the committed portion; resize and retry the physical remainder |
+| Parcel terrain transfer is rejected/stale | Keep the parcel physical and retry; never debit bucket occupancy or silently recycle it |
+| Parcel result/commit is delayed | Preserve the frozen sequence/transfer identity until an explicit commit or rejection; never timer-retry it |
+| Cut arrives while the parcel body pool is full | Add its volume to the bounded aggregate cut backlog and drain into the next free carrier; never steal an authoritative parcel |
+| Model activation changes cavity dimensions | Retarget floor/back/side barrier shapes before the new model can transport parcels |
 | Early/late/stale support request | Drop it without applying force or changing chassis transform |
 | Track command outside `[-1,1]` | Clamp before force calculation |
 | Speed/angular limit reached | Clamp body velocity and report a quality flag |
@@ -396,6 +426,11 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
 - Query/gameplay tests assert actual Jolt terrain hits, segmented motion,
   accepted fraction, stale/initial-overlap failure, duplicate batch rejection,
   one soil transaction, and next-tick bounded chassis wrench.
+- Parcel tests throw real rigid bodies against floor/back/side plates and out
+  the open mouth, assert progressive absorption at an intermediate tick,
+  preserve `ledger + visible remainder`, retarget model-specific extents, and
+  prove a full pour settles with released volume equal to committed terrain
+  volume while bucket occupancy stays zero throughout.
 - Controller/presentation tests assert exactly one writer, Python pose rejection,
   empty pivot diagnostics and visual-only SY205 passive linkage.
 - Truth tests assert one body/four kinematic frames/four joints plus
@@ -423,6 +458,9 @@ Correct: both consume the runtime's single post-step snapshot
 
 Wrong: kinematic bucket RigidBody3D pushes the chassis with uncapped impulse
 Correct: query evidence queues one identity-checked, capped next-tick chassis wrench
+
+Wrong: poured parcel settles through queue_deposit_volume and debits the bucket twice
+Correct: parcel sequence -> queue_parcel_deposit_volume -> matching terrain transfer commit -> recycle only that parcel volume
 ```
 
 ### Terrain3D derived-backend contract

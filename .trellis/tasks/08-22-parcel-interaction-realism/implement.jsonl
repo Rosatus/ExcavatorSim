@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Godot parcel, bucket-ledger, terrain-transfer, collision-layer, and lifecycle contracts."}
+{"file":"docs/godot-integration.md","reason":"Authoritative Godot terrain/bucket ownership and one-way derived-physics boundary."}

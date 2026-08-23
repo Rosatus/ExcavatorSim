@@ -63,7 +63,7 @@ func _initialize() -> void:
 	terrain_scheduler = TerrainCommitScheduler.new(terrain_world.terrain_state, terrain_world, terrain_collider)
 	soil_state = BucketSoilState.new(terrain_world.terrain_state, contract, terrain_scheduler)
 	terrain_scheduler.refresh_collider_derivative()
-	_create_parcel_pool()
+	_create_parcel_pool(contract)
 	_motion_client = get_node_or_null(motion_client_path) as MotionClient
 	_tracked_chassis_controller = get_node_or_null(tracked_chassis_controller_path) as TrackedChassisController
 	if _motion_client != null:
@@ -87,7 +87,7 @@ func _physics_process(delta: float) -> void:
 	var soil_result := soil_state.step_fixed()
 	_last_flow_volume_m3 = float(soil_result.get("cut_volume_m3", 0.0)) + float(soil_result.get("deposit_volume_m3", 0.0))
 	if _parcel_pool != null:
-		_parcel_pool.notify_deposit_accepted(float(soil_result.get("deposit_volume_m3", 0.0)))
+		_parcel_pool.notify_deposit_results(soil_result.get("parcel_deposit_results", []))
 	var cells_changed := _settle_bucket_cells(delta)
 	_spawn_cut_parcels(soil_result)
 	if _parcel_pool != null:
@@ -102,6 +102,11 @@ func _physics_process(delta: float) -> void:
 		commit_result.get("committed_transfer_ids", []),
 		commit_result.get("rejected_transfer_ids", [])
 	)
+	if _parcel_pool != null:
+		_parcel_pool.notify_deposit_commits(
+			commit_result.get("committed_transfer_ids", []),
+			commit_result.get("rejected_transfer_ids", [])
+		)
 	_queue_backend_feedback()
 	if bool(soil_result.get("changed", false)) or cells_changed or bool(commit_result.get("changed", false)):
 		excavation_changed.emit(get_status_snapshot())
@@ -126,11 +131,19 @@ func step_fixed_for_test() -> Dictionary:
 		return {"changed": false, "reason": "unavailable"}
 	var result := soil_state.step_fixed()
 	_last_flow_volume_m3 = float(result.get("cut_volume_m3", 0.0)) + float(result.get("deposit_volume_m3", 0.0))
+	if _parcel_pool != null:
+		_parcel_pool.notify_deposit_results(result.get("parcel_deposit_results", []))
+	_spawn_cut_parcels(result)
 	var commit := terrain_scheduler.step_fixed(0.0, true)
 	soil_state.reconcile_transfers(
 		commit.get("committed_transfer_ids", []),
 		commit.get("rejected_transfer_ids", [])
 	)
+	if _parcel_pool != null:
+		_parcel_pool.notify_deposit_commits(
+			commit.get("committed_transfer_ids", []),
+			commit.get("rejected_transfer_ids", [])
+		)
 	result["bucket_volume_m3"] = soil_state.bucket_volume_m3
 	result["terrain_committed"] = bool(commit.get("changed", false))
 	result["terrain_commit"] = commit
@@ -245,7 +258,7 @@ func step_automatic_snapshot_for_test(snapshot: Dictionary, delta: float = 1.0 /
 	var soil_result := soil_state.step_fixed()
 	_last_flow_volume_m3 = float(soil_result.get("cut_volume_m3", 0.0)) + float(soil_result.get("deposit_volume_m3", 0.0))
 	if _parcel_pool != null:
-		_parcel_pool.notify_deposit_accepted(float(soil_result.get("deposit_volume_m3", 0.0)))
+		_parcel_pool.notify_deposit_results(soil_result.get("parcel_deposit_results", []))
 	_settle_bucket_cells(delta)
 	_spawn_cut_parcels(soil_result)
 	if _parcel_pool != null:
@@ -255,6 +268,11 @@ func step_automatic_snapshot_for_test(snapshot: Dictionary, delta: float = 1.0 /
 		commit_result.get("committed_transfer_ids", []),
 		commit_result.get("rejected_transfer_ids", [])
 	)
+	if _parcel_pool != null:
+		_parcel_pool.notify_deposit_commits(
+			commit_result.get("committed_transfer_ids", []),
+			commit_result.get("rejected_transfer_ids", [])
+		)
 	var result := get_status_snapshot()
 	result["changed"] = bool(soil_result.get("changed", false)) or bool(commit_result.get("changed", false))
 	result["terrain_commit_result"] = commit_result
@@ -634,7 +652,7 @@ func _pour_from_bucket(batch: Dictionary, volume_m3: float, opening_transform: T
 	return true
 
 
-func _create_parcel_pool() -> void:
+func _create_parcel_pool(contract: Dictionary) -> void:
 	_parcel_pool = SoilParcelPool.new()
 	_parcel_pool.name = "SoilParcelPool"
 	var layers := {"machine": 2, "terrain": 1}
@@ -650,6 +668,8 @@ func _create_parcel_pool() -> void:
 		"density_kg_m3": soil_state.material_density_kg_m3,
 		"collision_layer": 1 << (payload_layer - 1),
 		"collision_mask": (1 << (terrain_layer - 1)) | (1 << (machine_layer - 1)),
+		"barrier_layer": 1 << (machine_layer - 1),
+		"barrier_extents": _cavity_extents_from_contract(contract),
 		"deposit_sequencer": _allocate_command_sequence,
 	})
 
@@ -663,13 +683,12 @@ func _allocate_command_sequence() -> int:
 func _spawn_cut_parcels(soil_result: Dictionary) -> void:
 	if _parcel_pool == null:
 		return
-	var chassis_velocity := Vector3.ZERO
 	for event_value in soil_result.get("cut_events", []):
 		var event := event_value as Dictionary
 		_parcel_pool.spawn_from_cut(
 			event.get("tooth_world", Vector3.ZERO) as Vector3,
 			float(event.get("volume_m3", 0.0)),
-			chassis_velocity
+			event.get("tooth_velocity", Vector3.ZERO) as Vector3
 		)
 
 
@@ -678,12 +697,15 @@ func _step_parcel_pool(delta: float) -> void:
 	if not current.has("cavity"):
 		return
 	var contract := _presentation.get_soil_contract() if _presentation != null else {}
+	_parcel_pool.step_pool(delta, current["cavity"] as Transform3D, _cavity_extents_from_contract(contract))
+
+
+func _cavity_extents_from_contract(contract: Dictionary) -> Vector3:
 	var cavity_proxy: Dictionary = (contract.get("proxies", {}) as Dictionary).get("cavity", {})
 	var size_array: Variant = cavity_proxy.get("size_m", [])
-	var extents := Vector3(0.25, 0.25, 0.35)
 	if size_array is Array and (size_array as Array).size() == 3:
-		extents = Vector3(float(size_array[0]), float(size_array[1]), float(size_array[2])) * 0.5
-	_parcel_pool.step_pool(delta, current["cavity"] as Transform3D, extents)
+		return Vector3(float(size_array[0]), float(size_array[1]), float(size_array[2])) * 0.5
+	return Vector3(0.25, 0.25, 0.35)
 
 
 func _consume_interaction_batch(batch: Dictionary, operation: String) -> void:
@@ -796,9 +818,12 @@ func _on_authority_changed(_session_id: String, _simulation_epoch: String, gener
 
 
 func _on_model_activated(_model_id: String, _asset_root: Node3D) -> void:
-	_sync_local_tooth_offset(_presentation.get_soil_contract())
+	var contract := _presentation.get_soil_contract()
+	_sync_local_tooth_offset(contract)
 	if soil_state != null:
-		soil_state.configure_contract(_presentation.get_soil_contract())
+		soil_state.configure_contract(contract)
+	if _parcel_pool != null:
+		_parcel_pool.configure_barrier_extents(_cavity_extents_from_contract(contract))
 	_clear_local_material("model_activated")
 
 

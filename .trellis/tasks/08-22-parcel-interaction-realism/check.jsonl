@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Verify parcel identity, bucket occupancy, terrain commit, collision, model-switch, and lifecycle assertions."}
+{"file":"docs/godot-integration.md","reason":"Verify the implementation preserves Godot ownership and one-way terrain/physics flow."}
