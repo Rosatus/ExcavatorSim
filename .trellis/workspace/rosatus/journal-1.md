@@ -1443,3 +1443,36 @@ Added reproducible dual-model visual evidence capture, froze the 34-artifact leg
 ### Next Steps
 
 - None - task complete
+
+
+## Session 38: Implement full bucket soil tool contract
+
+**Date**: 2026-08-24
+**Task**: Implement full bucket soil tool contract
+**Branch**: `main`
+
+### Summary
+
+Added strict hash-bound full-bucket semantic regions for SY205/SY135, accepted-pose bounded sweep and read-only classification telemetry, shared presentation/Jolt loading, non-colliding debug geometry, and schema/tests without changing legacy soil authority.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4889ea0` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
