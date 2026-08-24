@@ -26,9 +26,10 @@ $tests = @(
     "bucket_shallow_overlap_test.gd",
     "cut_resistance_test.gd",
     "analytic_dig_test.gd",
-"soil_parcel_test.gd",
+    "soil_parcel_test.gd",
     "excavation_gameplay_test.gd",
     "visual_pass_test.gd",
+    "visual_evidence_capture_test.gd",
     "release_candidate_test.gd",
     "offline_product_test.gd"
 )
