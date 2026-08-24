@@ -705,6 +705,27 @@ Wrong: quality profile -> silently skip missing Sky3D -> report success
 Correct: quality profile -> VisualEnvironment -> Sky3D or explicit failure
 ```
 
+### Visual verification operating policy
+
+- Feature implementation prioritizes executable contracts, deterministic tests,
+  error-free Forward+ runs, artifact integrity, and performance telemetry.
+- Routine commits do not require repeated subjective screenshot inspection.
+  Automated captures may establish state, dimensions, nonblank output, hashes,
+  and before/after provenance without claiming aesthetic quality.
+- Composition, realism, material appeal, animation feel, legibility, and audio
+  mix are human judgments. Batch them at an explicit visual milestone and give
+  the reviewer the smallest representative model/profile/checkpoint set that can
+  answer the decision.
+- If a release criterion genuinely depends on a subjective visual judgment,
+  leave that criterion pending and request human review; do not substitute pixel
+  thresholds or assistant confidence. Full evidence matrices remain appropriate
+  for final validation or a suspected renderer regression, not every code task.
+
+```text
+Wrong: every soil implementation commit -> assistant screenshot review -> code blocked
+Correct: deterministic code gates -> milestone evidence -> focused human review
+```
+
 The M7 release candidate retains the legacy Python terrain/recording/replay
 profile for compatibility; removal or deprecation requires a separate approved
 migration decision and client inventory.

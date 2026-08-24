@@ -12,9 +12,11 @@ setup may use existing test seams, but lifecycle/model transitions must use the
 real offline product control plane and every image must render the production
 presentation path.
 
-An interactive smoke run separately evaluates discoverability, input, camera
-occlusion, and recovery because those qualities cannot be inferred from static
-pixels. Its observations use the same checkpoint names and scorecard.
+A batched human milestone separately evaluates discoverability, input, camera
+occlusion, recovery, realism, and composition because those qualities cannot be
+inferred from static pixels. Routine code children retain automated state and
+artifact checks but do not repeatedly perform assistant-led visual inspection.
+The human review uses the same checkpoint names and scorecard.
 
 ## Artifact layout
 
@@ -33,5 +35,7 @@ pixels. Its observations use the same checkpoint names and scorecard.
 
 Automation verifies file completeness, dimensions, metadata, nonblank renders,
 and deterministic scene state. A human side-by-side review owns composition,
-legibility, realism, and interaction judgments. No pixel threshold is introduced
-until repeat captures quantify normal variance.
+legibility, realism, audio mix, and interaction judgments. Human review is
+batched at declared visual milestones and must not block unrelated soil/code
+implementation. No pixel threshold is introduced until repeat captures quantify
+normal variance.

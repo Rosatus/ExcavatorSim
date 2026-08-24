@@ -30,23 +30,26 @@ task tree.
   behavior merely to create a better baseline image.
 - Document capture nondeterminism and decide which checkpoints can support future
   automated comparison versus mandatory human review.
+- Keep subjective visual review batched and human-owned. Routine soil/code tasks
+  use objective artifact/state/performance gates and do not pause for repeated
+  assistant-led screenshot inspection.
 
 ## Acceptance criteria
 
-- [ ] The 24-cell core matrix and ten balanced-only journey captures exist with
+- [x] The 24-cell core matrix and ten balanced-only journey captures exist with
       complete metadata and can be regenerated from one documented runbook.
-- [ ] Every matrix cell links a visual-defect result, captured Godot error-log
+- [x] Every matrix cell links a visual-defect result, captured Godot error-log
       result, and comparable performance sample including sampling window,
       hardware, command, timestamp, FPS, and frame-time summary.
-- [ ] The scorecard contains all nine dimensions for both models with evidence,
+- [x] The scorecard contains all nine dimensions for both models with evidence,
       not unanchored aesthetic claims.
-- [ ] The backlog has no uncategorized P0/P1 issue and maps every P0/P1 to exactly
+- [x] The backlog has no uncategorized P0/P1 issue and maps every P0/P1 to exactly
       one later visual child or gameplay-soil task plus an observable acceptance
       target.
-- [ ] Current no-audio, diagnostic-first HUD, single non-collision camera,
+- [x] Current no-audio, diagnostic-first HUD, single non-collision camera,
       placeholder soil close-up, limited site scale cues, and fallback terrain
       parity are explicitly evaluated.
-- [ ] Capture additions pass focused tests, the standalone matrix remains green,
+- [x] Capture additions pass focused tests, the standalone matrix remains green,
       task context validates, and `git diff --check` is clean.
 
 ## In scope

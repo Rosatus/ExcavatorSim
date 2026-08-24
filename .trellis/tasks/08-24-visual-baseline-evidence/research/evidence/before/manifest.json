@@ -1,0 +1,2993 @@
+{
+  "actual_capture_count": 34,
+  "all_scenarios_achieved": false,
+  "artifact_integrity_errors": [],
+  "balanced_journey": [
+    "startup",
+    "controls-visible",
+    "travel",
+    "dig",
+    "carry",
+    "dump",
+    "reset"
+  ],
+  "capture_command": "capture_visual_baseline.ps1 -Model all -QualityProfile all -OutputDir \"E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\"",
+  "commit": "a60454186832626f900545f3ba4b94623a90be2e",
+  "complete": true,
+  "core_checkpoints": [
+    "carry",
+    "dump",
+    "terrain",
+    "support"
+  ],
+  "entries": [
+    {
+      "all_scenarios_achieved": false,
+      "artifact_count": 4,
+      "authority_profile": "jolt_authoritative",
+      "capture_errors": [],
+      "checkpoints": [
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy205-low-carry.png",
+            "saved": true,
+            "sha256": "ec96efc02d44dbd682dfef67a897a0e1e243265be2fdea4182caf72abc0f3525",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "capture_outcome": {
+            "achieved": false,
+            "diagnostic": "parcel capture timeout while holding the cut pose",
+            "frames": 120,
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0
+          },
+          "checkpoint": "carry",
+          "finding": "dig attempt did not produce a visible carried payload",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 60.0018450567355,
+            "mean_render_frame_ms": 16.6661541666667,
+            "node_count": 431.0,
+            "physics_frames": 240,
+            "physics_process_time_ms": 3.638,
+            "process_time_ms": 1.54,
+            "render_frames": 240,
+            "sampling_window_s": 3.999877,
+            "static_memory_bytes": 114272481.0
+          },
+          "session": {
+            "active_model_id": "sy205",
+            "authority_epoch": "godot-local-authority-2572916",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 2,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy205",
+              "movement_world": "(0.0, 0.000866, -0.000523)",
+              "opening_down_dot": -0.703559577465057,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(-0.061, 2.62751, 3.439139)",
+              "surface_y": -0.020265106758872,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 69
+          },
+          "state_achieved": false,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy205-low-dump.png",
+            "saved": true,
+            "sha256": "1c1287c21cf130095f888527dd8daa4632ac2d8bd3b84b561241a5457472eff2",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "dump",
+          "finding": "dump stage lacked a nonzero payload-to-release transition",
+          "ok": true,
+          "payload_before_dump_kg": 0.0,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 60.4835766233062,
+            "mean_render_frame_ms": 16.5334137931034,
+            "node_count": 431.0,
+            "physics_frames": 240,
+            "physics_process_time_ms": 3.174,
+            "process_time_ms": 1.558,
+            "render_frames": 232,
+            "sampling_window_s": 3.835752,
+            "static_memory_bytes": 114276497.0
+          },
+          "session": {
+            "active_model_id": "sy205",
+            "authority_epoch": "godot-local-authority-2572916",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 2,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy205",
+              "movement_world": "(0.0, 0.000017, -0.000033)",
+              "opening_down_dot": 0.278206706047058,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(-0.061, 2.570559, 2.59258)",
+              "surface_y": -0.000373105374097651,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 69
+          },
+          "state_achieved": false,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy205-low-terrain.png",
+            "saved": true,
+            "sha256": "d6a210c0f72e0483cf6a823f287b05d0dd5ce966284a8e79c857823d96f5b0c2",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "terrain",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 60.4089103970355,
+            "mean_render_frame_ms": 16.5538493150685,
+            "node_count": 431.0,
+            "physics_frames": 300,
+            "physics_process_time_ms": 3.851,
+            "process_time_ms": 1.557,
+            "render_frames": 292,
+            "sampling_window_s": 4.833724,
+            "static_memory_bytes": 114309625.0
+          },
+          "session": {
+            "active_model_id": "sy205",
+            "authority_epoch": "godot-local-authority-2572916",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 2,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy205",
+              "movement_world": "(0.0, 0.000309, 0.00039)",
+              "opening_down_dot": -0.689470231533051,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(-0.061, 2.65818, 3.394643)",
+              "surface_y": -0.0184158871359391,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 69
+          },
+          "state_achieved": true,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy205-low-support.png",
+            "saved": true,
+            "sha256": "4532ca88e41a7a3a9d5220fbe4e9a37171f5828bf96251da81c6e30e5b9c1185",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "support",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 60.9565117413144,
+            "mean_render_frame_ms": 16.4051382113821,
+            "node_count": 431.0,
+            "physics_frames": 129,
+            "physics_process_time_ms": 3.833,
+            "process_time_ms": 1.405,
+            "render_frames": 123,
+            "sampling_window_s": 2.017832,
+            "static_memory_bytes": 114352793.0
+          },
+          "session": {
+            "active_model_id": "sy205",
+            "authority_epoch": "godot-local-authority-2572916",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 2,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "push",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy205",
+              "movement_world": "(0.0, -0.007042, -0.001579)",
+              "opening_down_dot": 0.178639650344849,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(-0.061, 0.72232, 3.587247)",
+              "surface_y": -0.0193571484981932,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 69
+          },
+          "state_achieved": true,
+          "support_case": "bucket-ground support/contact transfer",
+          "support_wrench": {
+            "authority_epoch": "sy205:2647427",
+            "blocked_distance_m": 0.00139431492704898,
+            "classification": "support",
+            "eligible_apply_tick": 1696,
+            "expiry_tick": 1697,
+            "model_id": "sy205",
+            "normal_world": "(0.004827, 0.999167, -0.040514)",
+            "point_world": "(-0.000003, -0.021444, 3.519964)",
+            "request_id": "sy205:2647427:1695:1679",
+            "requested_force": "(1.615314, 334.3569, -13.55743)",
+            "requested_torque": "(-1175.493, 5.68581, 0.169635)",
+            "source_physics_tick": 1695,
+            "support_contact_ticks": 1,
+            "terrain_generation": 2,
+            "terrain_revision": 69
+          },
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        }
+      ],
+      "expected_checkpoints": [
+        "carry",
+        "dump",
+        "terrain",
+        "support"
+      ],
+      "metadata_path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy205-low.json",
+      "model_id": "sy205",
+      "ok": true,
+      "quality": {
+        "applied": true,
+        "camera_far": 80.0,
+        "last_error": "",
+        "particles": 500,
+        "profile": "low",
+        "shadows": false,
+        "target_fps": 60
+      },
+      "quality_profile": "low",
+      "reason": "",
+      "run": {
+        "capture_command": "capture_visual_baseline.ps1 -Model all -QualityProfile all -OutputDir \"E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\"",
+        "captured_at_utc": "2026-08-24T02:57:19",
+        "commit": "a60454186832626f900545f3ba4b94623a90be2e",
+        "error_log_path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\run-summary.json",
+        "godot": {
+          "build": "official",
+          "hash": "a13da4feb8d8aefc283c3763d33a2f170a18d541",
+          "hex": 263937,
+          "major": 4,
+          "minor": 7,
+          "patch": 1,
+          "status": "stable",
+          "string": "4.7.1-stable (official)",
+          "timestamp": 0
+        },
+        "hardware": {
+          "processor": "AMD Ryzen 7 9700X 8-Core Processor",
+          "video_adapter": "AMD Radeon RX 9070 XT"
+        },
+        "os": {
+          "name": "Windows",
+          "version": "10.0.26200"
+        },
+        "resolution": [
+          1920,
+          1080
+        ],
+        "run_id": "20260824T025647Z-a6045418"
+      },
+      "scenario_findings": [
+        {
+          "checkpoint": "carry",
+          "finding": "dig attempt did not produce a visible carried payload"
+        },
+        {
+          "checkpoint": "dump",
+          "finding": "dump stage lacked a nonzero payload-to-release transition"
+        }
+      ],
+      "schema_version": "excavator-sim-visual-evidence-v2",
+      "session": {
+        "active_model_id": "sy205",
+        "authority_epoch": "godot-local-authority-2572916",
+        "focused": true,
+        "gateway_enabled": false,
+        "generation": 2,
+        "last_error": {},
+        "lifecycle": "running",
+        "session_id": "godot-local-authority"
+      },
+      "soil_authority_mode": "legacy_analytic_parcel",
+      "error_log_result": {
+        "status": "clean",
+        "match_count": 0,
+        "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+        "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+        "process_exit_code": 0
+      }
+    },
+    {
+      "all_scenarios_achieved": false,
+      "artifact_count": 9,
+      "authority_profile": "jolt_authoritative",
+      "capture_errors": [],
+      "checkpoints": [
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy205-balanced-startup.png",
+            "saved": true,
+            "sha256": "c787617f84190c9e7bb136d7f58120b23042d50ce8ab7330e87f81086d2a609c",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "startup",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 59.99988000024,
+            "mean_render_frame_ms": 16.6667,
+            "node_count": 431.0,
+            "physics_frames": 30,
+            "physics_process_time_ms": 3.377,
+            "process_time_ms": 1.695,
+            "render_frames": 30,
+            "sampling_window_s": 0.500001,
+            "static_memory_bytes": 113751985.0
+          },
+          "session": {
+            "active_model_id": "sy205",
+            "authority_epoch": "godot-local-authority-31807396",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 5,
+            "last_error": {},
+            "lifecycle": "stopped",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy205",
+              "movement_world": "(0.0, 0.0, 0.0)",
+              "opening_down_dot": -0.707106828689575,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(-0.060967, 2.621439, 3.409985)",
+              "surface_y": 0.0,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 69
+          },
+          "state_achieved": true,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy205-balanced-controls-visible.png",
+            "saved": true,
+            "sha256": "882c6c549c939a43e0825b3ec7b36ebd4b236a2059cd4be3bede21e89f3bd9b5",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "controls-visible",
+          "finding": "essential operator controls are absent from the baseline HUD",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 95.6754688097972,
+            "mean_render_frame_ms": 10.452,
+            "node_count": 431.0,
+            "physics_frames": 13,
+            "physics_process_time_ms": 3.377,
+            "process_time_ms": 1.695,
+            "render_frames": 5,
+            "sampling_window_s": 0.05226,
+            "static_memory_bytes": 113759389.0
+          },
+          "session": {
+            "active_model_id": "sy205",
+            "authority_epoch": "godot-local-authority-31807396",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 5,
+            "last_error": {},
+            "lifecycle": "stopped",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy205",
+              "movement_world": "(0.0, 0.0, -0.0)",
+              "opening_down_dot": -0.707106828689575,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(-0.060963, 2.621439, 3.409984)",
+              "surface_y": 0.0,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 69
+          },
+          "state_achieved": false,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy205-balanced-travel.png",
+            "saved": true,
+            "sha256": "0b9c7db92ca9609695d4877f8c6a5a70f201b7a5268c0b69fb27d956d2c9f6b7",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "travel",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 59.9924009625448,
+            "mean_render_frame_ms": 16.6687777777778,
+            "node_count": 431.0,
+            "physics_frames": 45,
+            "physics_process_time_ms": 3.536,
+            "process_time_ms": 6.934,
+            "render_frames": 45,
+            "sampling_window_s": 0.750095,
+            "static_memory_bytes": 113770289.0
+          },
+          "session": {
+            "active_model_id": "sy205",
+            "authority_epoch": "godot-local-authority-31807396",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 5,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy205",
+              "movement_world": "(0.0, 0.000002, -0.009566)",
+              "opening_down_dot": -0.707106828689575,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(-0.060956, 2.676139, 3.037028)",
+              "surface_y": 0.0,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 69
+          },
+          "state_achieved": true,
+          "travel_distance_m": 0.382529139518738,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy205-balanced-dig.png",
+            "saved": true,
+            "sha256": "1047c4a8805a9cfef6b47d027d34b4120c05323e588d942e7d6e150043e37709",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "dig",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 60.00117602305,
+            "mean_render_frame_ms": 16.66634,
+            "node_count": 431.0,
+            "physics_frames": 500,
+            "physics_process_time_ms": 3.521,
+            "process_time_ms": 1.797,
+            "render_frames": 500,
+            "sampling_window_s": 8.33317,
+            "static_memory_bytes": 113875385.0
+          },
+          "session": {
+            "active_model_id": "sy205",
+            "authority_epoch": "godot-local-authority-31807396",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 5,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy205",
+              "movement_world": "(0.0, 0.000261, 0.00009)",
+              "opening_down_dot": -0.991396844387054,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(-0.060912, 1.291926, 4.991341)",
+              "surface_y": -0.00243343350684662,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 121
+          },
+          "state_achieved": true,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy205-balanced-carry.png",
+            "saved": true,
+            "sha256": "fc4d3fb9129a1de21c333310203c65fc2c1580d5856745c2f3ae192ca43ce8b7",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "capture_outcome": {
+            "achieved": false,
+            "diagnostic": "parcel capture timeout while holding the cut pose",
+            "frames": 120,
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0
+          },
+          "checkpoint": "carry",
+          "finding": "dig attempt did not produce a visible carried payload",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 60.0026851201591,
+            "mean_render_frame_ms": 16.6659208333333,
+            "node_count": 431.0,
+            "physics_frames": 240,
+            "physics_process_time_ms": 3.966,
+            "process_time_ms": 1.766,
+            "render_frames": 240,
+            "sampling_window_s": 3.999821,
+            "static_memory_bytes": 113888173.0
+          },
+          "session": {
+            "active_model_id": "sy205",
+            "authority_epoch": "godot-local-authority-31807396",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 5,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy205",
+              "movement_world": "(0.0, 0.000893, -0.00053)",
+              "opening_down_dot": -0.703401446342468,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(-0.060884, 2.627408, 3.007623)",
+              "surface_y": -0.0236221782081771,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 138
+          },
+          "state_achieved": false,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy205-balanced-dump.png",
+            "saved": true,
+            "sha256": "60ed6679ee6aa292bdac719a5474f94a3bd6ea9278c608d580eed4284de183e0",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "dump",
+          "finding": "dump stage lacked a nonzero payload-to-release transition",
+          "ok": true,
+          "payload_before_dump_kg": 0.0,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 60.4631793633672,
+            "mean_render_frame_ms": 16.5389913419913,
+            "node_count": 431.0,
+            "physics_frames": 240,
+            "physics_process_time_ms": 3.631,
+            "process_time_ms": 1.725,
+            "render_frames": 231,
+            "sampling_window_s": 3.820507,
+            "static_memory_bytes": 113894301.0
+          },
+          "session": {
+            "active_model_id": "sy205",
+            "authority_epoch": "godot-local-authority-31807396",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 5,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy205",
+              "movement_world": "(0.0, 0.000017, -0.000033)",
+              "opening_down_dot": 0.278244078159332,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(-0.060865, 2.570545, 2.161106)",
+              "surface_y": -0.000412173274860148,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 138
+          },
+          "state_achieved": false,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy205-balanced-terrain.png",
+            "saved": true,
+            "sha256": "af9af7384082b4c479412adc66c29927320d4f3b96235301e0331a1d312002ee",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "terrain",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 60.4072108004783,
+            "mean_render_frame_ms": 16.5543150684932,
+            "node_count": 431.0,
+            "physics_frames": 300,
+            "physics_process_time_ms": 3.423,
+            "process_time_ms": 1.44,
+            "render_frames": 292,
+            "sampling_window_s": 4.83386,
+            "static_memory_bytes": 113926437.0
+          },
+          "session": {
+            "active_model_id": "sy205",
+            "authority_epoch": "godot-local-authority-31807396",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 5,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy205",
+              "movement_world": "(0.0, 0.000338, 0.000425)",
+              "opening_down_dot": -0.689875245094299,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(-0.06084, 2.658588, 2.963228)",
+              "surface_y": -0.0222461028851502,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 138
+          },
+          "state_achieved": true,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy205-balanced-support.png",
+            "saved": true,
+            "sha256": "189a74cbe9ec6b7f52aadac72c5487bc157cdc74583deeb44e8c6991641bdc31",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "support",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 60.9623826537636,
+            "mean_render_frame_ms": 16.4035583333333,
+            "node_count": 431.0,
+            "physics_frames": 128,
+            "physics_process_time_ms": 4.287,
+            "process_time_ms": 1.866,
+            "render_frames": 120,
+            "sampling_window_s": 1.968427,
+            "static_memory_bytes": 113984749.0
+          },
+          "session": {
+            "active_model_id": "sy205",
+            "authority_epoch": "godot-local-authority-31807396",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 5,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "push",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy205",
+              "movement_world": "(0.0, -0.006603, -0.001451)",
+              "opening_down_dot": 0.175110816955566,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(-0.060828, 0.724054, 3.156712)",
+              "surface_y": -0.0179774599257204,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 138
+          },
+          "state_achieved": true,
+          "support_case": "bucket-ground support/contact transfer",
+          "support_wrench": {
+            "authority_epoch": "sy205:31878562",
+            "blocked_distance_m": 0.00130770056066103,
+            "classification": "support",
+            "eligible_apply_tick": 3483,
+            "expiry_tick": 3484,
+            "model_id": "sy205",
+            "normal_world": "(0.00235, 0.999283, -0.037792)",
+            "point_world": "(-0.000003, -0.020076, 3.09043)",
+            "request_id": "sy205:31878562:3482:1786",
+            "requested_force": "(0.737423, 313.6231, -11.86099)",
+            "requested_torque": "(-1103.313, 2.595052, 0.021926)",
+            "source_physics_tick": 3482,
+            "support_contact_ticks": 1,
+            "terrain_generation": 5,
+            "terrain_revision": 138
+          },
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy205-balanced-reset.png",
+            "saved": true,
+            "sha256": "33398650b94e1c90214d60b073384f2906bee33895f3f00ce9df28b81817456a",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "reset",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 56.8505730064004,
+            "mean_render_frame_ms": 17.5899722222222,
+            "node_count": 431.0,
+            "physics_frames": 120,
+            "physics_process_time_ms": 3.214,
+            "process_time_ms": 1.556,
+            "render_frames": 108,
+            "sampling_window_s": 1.899717,
+            "static_memory_bytes": 113888281.0
+          },
+          "session": {
+            "active_model_id": "sy205",
+            "authority_epoch": "godot-local-authority-63398024",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 6,
+            "last_error": {},
+            "lifecycle": "stopped",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy205",
+              "movement_world": "(0.007628, -0.011244, 0.005139)",
+              "opening_down_dot": -0.707675099372864,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(-0.064091, 2.596265, 3.363072)",
+              "surface_y": 0.0,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 138
+          },
+          "state_achieved": true,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        }
+      ],
+      "expected_checkpoints": [
+        "startup",
+        "controls-visible",
+        "travel",
+        "dig",
+        "carry",
+        "dump",
+        "terrain",
+        "support",
+        "reset"
+      ],
+      "metadata_path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy205-balanced.json",
+      "model_id": "sy205",
+      "ok": true,
+      "quality": {
+        "applied": true,
+        "camera_far": 140.0,
+        "last_error": "",
+        "particles": 1800,
+        "profile": "balanced",
+        "shadows": true,
+        "target_fps": 60
+      },
+      "quality_profile": "balanced",
+      "reason": "",
+      "run": {
+        "capture_command": "capture_visual_baseline.ps1 -Model all -QualityProfile all -OutputDir \"E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\"",
+        "captured_at_utc": "2026-08-24T02:57:53",
+        "commit": "a60454186832626f900545f3ba4b94623a90be2e",
+        "error_log_path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\run-summary.json",
+        "godot": {
+          "build": "official",
+          "hash": "a13da4feb8d8aefc283c3763d33a2f170a18d541",
+          "hex": 263937,
+          "major": 4,
+          "minor": 7,
+          "patch": 1,
+          "status": "stable",
+          "string": "4.7.1-stable (official)",
+          "timestamp": 0
+        },
+        "hardware": {
+          "processor": "AMD Ryzen 7 9700X 8-Core Processor",
+          "video_adapter": "AMD Radeon RX 9070 XT"
+        },
+        "os": {
+          "name": "Windows",
+          "version": "10.0.26200"
+        },
+        "resolution": [
+          1920,
+          1080
+        ],
+        "run_id": "20260824T025647Z-a6045418"
+      },
+      "scenario_findings": [
+        {
+          "checkpoint": "controls-visible",
+          "finding": "essential operator controls are absent from the baseline HUD"
+        },
+        {
+          "checkpoint": "carry",
+          "finding": "dig attempt did not produce a visible carried payload"
+        },
+        {
+          "checkpoint": "dump",
+          "finding": "dump stage lacked a nonzero payload-to-release transition"
+        }
+      ],
+      "schema_version": "excavator-sim-visual-evidence-v2",
+      "session": {
+        "active_model_id": "sy205",
+        "authority_epoch": "godot-local-authority-63398024",
+        "focused": true,
+        "gateway_enabled": false,
+        "generation": 6,
+        "last_error": {},
+        "lifecycle": "stopped",
+        "session_id": "godot-local-authority"
+      },
+      "soil_authority_mode": "legacy_analytic_parcel",
+      "error_log_result": {
+        "status": "clean",
+        "match_count": 0,
+        "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+        "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+        "process_exit_code": 0
+      }
+    },
+    {
+      "all_scenarios_achieved": false,
+      "artifact_count": 4,
+      "authority_profile": "jolt_authoritative",
+      "capture_errors": [],
+      "checkpoints": [
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy205-high-carry.png",
+            "saved": true,
+            "sha256": "54f507b74a9d5eb9464604ff5396c4d408a88ac0e55219d43e359f8a0f4ffbf1",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "capture_outcome": {
+            "achieved": false,
+            "diagnostic": "parcel capture timeout while holding the cut pose",
+            "frames": 120,
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0
+          },
+          "checkpoint": "carry",
+          "finding": "dig attempt did not produce a visible carried payload",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 60.0043353132264,
+            "mean_render_frame_ms": 16.6654625,
+            "node_count": 431.0,
+            "physics_frames": 240,
+            "physics_process_time_ms": 3.391,
+            "process_time_ms": 1.908,
+            "render_frames": 240,
+            "sampling_window_s": 3.999711,
+            "static_memory_bytes": 113967973.0
+          },
+          "session": {
+            "active_model_id": "sy205",
+            "authority_epoch": "godot-local-authority-65877815",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 9,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy205",
+              "movement_world": "(0.0, 0.000876, -0.000526)",
+              "opening_down_dot": -0.703522026538849,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(-0.061, 2.627326, 3.439187)",
+              "surface_y": -0.0198464741611709,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 209
+          },
+          "state_achieved": false,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy205-high-dump.png",
+            "saved": true,
+            "sha256": "8aa83b763da79e8139531f661c831f25f626241930261459632189f2464fa007",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "dump",
+          "finding": "dump stage lacked a nonzero payload-to-release transition",
+          "ok": true,
+          "payload_before_dump_kg": 0.0,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 60.5147352076034,
+            "mean_render_frame_ms": 16.524900862069,
+            "node_count": 431.0,
+            "physics_frames": 240,
+            "physics_process_time_ms": 3.07,
+            "process_time_ms": 1.33,
+            "render_frames": 232,
+            "sampling_window_s": 3.833777,
+            "static_memory_bytes": 113972525.0
+          },
+          "session": {
+            "active_model_id": "sy205",
+            "authority_epoch": "godot-local-authority-65877815",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 9,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy205",
+              "movement_world": "(0.0, 0.000017, -0.000033)",
+              "opening_down_dot": 0.278245478868485,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(-0.061, 2.570451, 2.592614)",
+              "surface_y": -0.00058387414612553,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 209
+          },
+          "state_achieved": false,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy205-high-terrain.png",
+            "saved": true,
+            "sha256": "593a8e5f4b39da15f0853deb58fc8c83f9ca386cad9696c809c113f07d335f9c",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "terrain",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 60.4102226509785,
+            "mean_render_frame_ms": 16.5534897260274,
+            "node_count": 431.0,
+            "physics_frames": 300,
+            "physics_process_time_ms": 3.276,
+            "process_time_ms": 1.683,
+            "render_frames": 292,
+            "sampling_window_s": 4.833619,
+            "static_memory_bytes": 114004877.0
+          },
+          "session": {
+            "active_model_id": "sy205",
+            "authority_epoch": "godot-local-authority-65877815",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 9,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy205",
+              "movement_world": "(0.0, 0.000344, 0.000397)",
+              "opening_down_dot": -0.689372599124908,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(-0.061, 2.658166, 3.394597)",
+              "surface_y": -0.0181515096823493,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 209
+          },
+          "state_achieved": true,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy205-high-support.png",
+            "saved": true,
+            "sha256": "66f3ccd103dd9c8d46032cc85881e485c291383d9fed791312094f819a653e50",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "support",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 60.9898091573426,
+            "mean_render_frame_ms": 16.3961818181818,
+            "node_count": 431.0,
+            "physics_frames": 129,
+            "physics_process_time_ms": 3.537,
+            "process_time_ms": 1.937,
+            "render_frames": 121,
+            "sampling_window_s": 1.983938,
+            "static_memory_bytes": 114051081.0
+          },
+          "session": {
+            "active_model_id": "sy205",
+            "authority_epoch": "godot-local-authority-65877815",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 9,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "push",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy205",
+              "movement_world": "(0.0, -0.006011, -0.001338)",
+              "opening_down_dot": 0.171331152319908,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(-0.061, 0.723692, 3.59008)",
+              "surface_y": -0.0184365136036645,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 209
+          },
+          "state_achieved": true,
+          "support_case": "bucket-ground support/contact transfer",
+          "support_wrench": {
+            "authority_epoch": "sy205:65951661",
+            "blocked_distance_m": 0.00213206766173244,
+            "classification": "support",
+            "eligible_apply_tick": 5283,
+            "expiry_tick": 5284,
+            "model_id": "sy205",
+            "normal_world": "(0.008723, 0.99905, -0.042691)",
+            "point_world": "(-0.000003, -0.020464, 3.524919)",
+            "request_id": "sy205:65951661:5282:1679",
+            "requested_force": "(4.463579, 511.2102, -21.8446)",
+            "requested_torque": "(-1799.689, 15.73369, 0.465405)",
+            "source_physics_tick": 5282,
+            "support_contact_ticks": 1,
+            "terrain_generation": 9,
+            "terrain_revision": 209
+          },
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        }
+      ],
+      "expected_checkpoints": [
+        "carry",
+        "dump",
+        "terrain",
+        "support"
+      ],
+      "metadata_path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy205-high.json",
+      "model_id": "sy205",
+      "ok": true,
+      "quality": {
+        "applied": true,
+        "camera_far": 220.0,
+        "last_error": "",
+        "particles": 4200,
+        "profile": "high",
+        "shadows": true,
+        "target_fps": 60
+      },
+      "quality_profile": "high",
+      "reason": "",
+      "run": {
+        "capture_command": "capture_visual_baseline.ps1 -Model all -QualityProfile all -OutputDir \"E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\"",
+        "captured_at_utc": "2026-08-24T02:58:22",
+        "commit": "a60454186832626f900545f3ba4b94623a90be2e",
+        "error_log_path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\run-summary.json",
+        "godot": {
+          "build": "official",
+          "hash": "a13da4feb8d8aefc283c3763d33a2f170a18d541",
+          "hex": 263937,
+          "major": 4,
+          "minor": 7,
+          "patch": 1,
+          "status": "stable",
+          "string": "4.7.1-stable (official)",
+          "timestamp": 0
+        },
+        "hardware": {
+          "processor": "AMD Ryzen 7 9700X 8-Core Processor",
+          "video_adapter": "AMD Radeon RX 9070 XT"
+        },
+        "os": {
+          "name": "Windows",
+          "version": "10.0.26200"
+        },
+        "resolution": [
+          1920,
+          1080
+        ],
+        "run_id": "20260824T025647Z-a6045418"
+      },
+      "scenario_findings": [
+        {
+          "checkpoint": "carry",
+          "finding": "dig attempt did not produce a visible carried payload"
+        },
+        {
+          "checkpoint": "dump",
+          "finding": "dump stage lacked a nonzero payload-to-release transition"
+        }
+      ],
+      "schema_version": "excavator-sim-visual-evidence-v2",
+      "session": {
+        "active_model_id": "sy205",
+        "authority_epoch": "godot-local-authority-65877815",
+        "focused": true,
+        "gateway_enabled": false,
+        "generation": 9,
+        "last_error": {},
+        "lifecycle": "running",
+        "session_id": "godot-local-authority"
+      },
+      "soil_authority_mode": "legacy_analytic_parcel",
+      "error_log_result": {
+        "status": "clean",
+        "match_count": 0,
+        "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+        "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+        "process_exit_code": 0
+      }
+    },
+    {
+      "all_scenarios_achieved": false,
+      "artifact_count": 4,
+      "authority_profile": "jolt_authoritative",
+      "capture_errors": [],
+      "checkpoints": [
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy135-low-carry.png",
+            "saved": true,
+            "sha256": "67c80eb3d6b200566cf6d9253e819adaf8b84c64f51e5934e9ca7f6e13f84cb6",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "capture_outcome": {
+            "achieved": false,
+            "diagnostic": "parcel capture timeout while holding the cut pose",
+            "frames": 120,
+            "interaction_state": "blocked",
+            "payload_mass_kg": 0.0
+          },
+          "checkpoint": "carry",
+          "finding": "dig attempt did not produce a visible carried payload",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 60.0052054515729,
+            "mean_render_frame_ms": 16.6652208333333,
+            "node_count": 446.0,
+            "physics_frames": 240,
+            "physics_process_time_ms": 2.986,
+            "process_time_ms": 1.24,
+            "render_frames": 240,
+            "sampling_window_s": 3.999653,
+            "static_memory_bytes": 115444998.0
+          },
+          "session": {
+            "active_model_id": "sy135",
+            "authority_epoch": "godot-local-authority-95215425",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 12,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy135",
+              "movement_world": "(0.0, 0.00237, 0.000184)",
+              "opening_down_dot": -0.999515891075134,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(0.0, 4.138062, -6.059371)",
+              "surface_y": 0.0,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 428
+          },
+          "state_achieved": false,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy135-low-dump.png",
+            "saved": true,
+            "sha256": "229bcd8463176687852ae205ea762c9cbfba745fc0af0d2bc2729bf340e1534e",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "dump",
+          "finding": "dump stage lacked a nonzero payload-to-release transition",
+          "ok": true,
+          "payload_before_dump_kg": 0.0,
+          "performance": {
+            "engine_fps": 61.0,
+            "mean_render_fps": 60.4306097709003,
+            "mean_render_frame_ms": 16.5479051724138,
+            "node_count": 446.0,
+            "physics_frames": 240,
+            "physics_process_time_ms": 3.815,
+            "process_time_ms": 1.382,
+            "render_frames": 232,
+            "sampling_window_s": 3.839114,
+            "static_memory_bytes": 115450458.0
+          },
+          "session": {
+            "active_model_id": "sy135",
+            "authority_epoch": "godot-local-authority-95215425",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 12,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy135",
+              "movement_world": "(0.0, -0.000684, 0.000087)",
+              "opening_down_dot": -0.101742185652256,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(0.0, 0.674685, -5.388613)",
+              "surface_y": 0.0,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 428
+          },
+          "state_achieved": false,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy135-low-terrain.png",
+            "saved": true,
+            "sha256": "3f75182abb2b98a3d44fa1f230eebc379abf3007ffa0c0f5b4fe3cfd4d03f824",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "terrain",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 60.3604594340504,
+            "mean_render_frame_ms": 16.5671369863014,
+            "node_count": 446.0,
+            "physics_frames": 300,
+            "physics_process_time_ms": 4.561,
+            "process_time_ms": 1.829,
+            "render_frames": 292,
+            "sampling_window_s": 4.837604,
+            "static_memory_bytes": 115479870.0
+          },
+          "session": {
+            "active_model_id": "sy135",
+            "authority_epoch": "godot-local-authority-95215425",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 12,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy135",
+              "movement_world": "(0.0, 0.000666, 0.00003)",
+              "opening_down_dot": -0.487728416919708,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(0.0, 1.627912, -5.806242)",
+              "surface_y": 0.0,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 428
+          },
+          "state_achieved": true,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy135-low-support.png",
+            "saved": true,
+            "sha256": "1c642b741e1cc9352b8e49bdc87fab6695c51ae68cb693a9b8345fa4e3875503",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "support",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 60.3105759686113,
+            "mean_render_frame_ms": 16.5808398268398,
+            "node_count": 446.0,
+            "physics_frames": 240,
+            "physics_process_time_ms": 4.775,
+            "process_time_ms": 2.277,
+            "render_frames": 231,
+            "sampling_window_s": 3.830174,
+            "static_memory_bytes": 115496186.0
+          },
+          "session": {
+            "active_model_id": "sy135",
+            "authority_epoch": "godot-local-authority-95215425",
+            "focused": false,
+            "gateway_enabled": false,
+            "generation": 12,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "push",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy135",
+              "movement_world": "(0.0, 0.0, 0.0)",
+              "opening_down_dot": 0.092386394739151,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(0.0, 0.427059, -5.342584)",
+              "surface_y": 0.0,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 428
+          },
+          "state_achieved": true,
+          "support_case": "bucket-ground support/contact transfer",
+          "support_wrench": {},
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        }
+      ],
+      "expected_checkpoints": [
+        "carry",
+        "dump",
+        "terrain",
+        "support"
+      ],
+      "metadata_path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy135-low.json",
+      "model_id": "sy135",
+      "ok": true,
+      "quality": {
+        "applied": true,
+        "camera_far": 80.0,
+        "last_error": "",
+        "particles": 500,
+        "profile": "low",
+        "shadows": false,
+        "target_fps": 60
+      },
+      "quality_profile": "low",
+      "reason": "",
+      "run": {
+        "capture_command": "capture_visual_baseline.ps1 -Model all -QualityProfile all -OutputDir \"E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\"",
+        "captured_at_utc": "2026-08-24T02:58:53",
+        "commit": "a60454186832626f900545f3ba4b94623a90be2e",
+        "error_log_path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\run-summary.json",
+        "godot": {
+          "build": "official",
+          "hash": "a13da4feb8d8aefc283c3763d33a2f170a18d541",
+          "hex": 263937,
+          "major": 4,
+          "minor": 7,
+          "patch": 1,
+          "status": "stable",
+          "string": "4.7.1-stable (official)",
+          "timestamp": 0
+        },
+        "hardware": {
+          "processor": "AMD Ryzen 7 9700X 8-Core Processor",
+          "video_adapter": "AMD Radeon RX 9070 XT"
+        },
+        "os": {
+          "name": "Windows",
+          "version": "10.0.26200"
+        },
+        "resolution": [
+          1920,
+          1080
+        ],
+        "run_id": "20260824T025647Z-a6045418"
+      },
+      "scenario_findings": [
+        {
+          "checkpoint": "carry",
+          "finding": "dig attempt did not produce a visible carried payload"
+        },
+        {
+          "checkpoint": "dump",
+          "finding": "dump stage lacked a nonzero payload-to-release transition"
+        }
+      ],
+      "schema_version": "excavator-sim-visual-evidence-v2",
+      "session": {
+        "active_model_id": "sy135",
+        "authority_epoch": "godot-local-authority-95215425",
+        "focused": false,
+        "gateway_enabled": false,
+        "generation": 12,
+        "last_error": {},
+        "lifecycle": "running",
+        "session_id": "godot-local-authority"
+      },
+      "soil_authority_mode": "legacy_analytic_parcel",
+      "error_log_result": {
+        "status": "clean",
+        "match_count": 0,
+        "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+        "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+        "process_exit_code": 0
+      }
+    },
+    {
+      "all_scenarios_achieved": false,
+      "artifact_count": 9,
+      "authority_profile": "jolt_authoritative",
+      "capture_errors": [],
+      "checkpoints": [
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy135-balanced-startup.png",
+            "saved": true,
+            "sha256": "e72db95a8ab67e2c76bca5a25caaae2851cbf85264ad2d9f2dd4fabb1f019c55",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "startup",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 60.0033601881705,
+            "mean_render_frame_ms": 16.6657333333333,
+            "node_count": 446.0,
+            "physics_frames": 30,
+            "physics_process_time_ms": 3.328,
+            "process_time_ms": 1.762,
+            "render_frames": 30,
+            "sampling_window_s": 0.499972,
+            "static_memory_bytes": 115267950.0
+          },
+          "session": {
+            "active_model_id": "sy135",
+            "authority_epoch": "godot-local-authority-125974941",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 15,
+            "last_error": {},
+            "lifecycle": "stopped",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy135",
+              "movement_world": "(0.0, 0.0, 0.0)",
+              "opening_down_dot": -0.500000715255737,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(-0.0, 1.609691, -5.814407)",
+              "surface_y": 0.0,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 428
+          },
+          "state_achieved": true,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy135-balanced-controls-visible.png",
+            "saved": true,
+            "sha256": "1cb2bbb01aef980eafc1212fa87d06e736bef710137ac7dd1ae086729a1474f6",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "controls-visible",
+          "finding": "essential operator controls are absent from the baseline HUD",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 95.5146328417514,
+            "mean_render_frame_ms": 10.4696,
+            "node_count": 446.0,
+            "physics_frames": 13,
+            "physics_process_time_ms": 3.328,
+            "process_time_ms": 1.762,
+            "render_frames": 5,
+            "sampling_window_s": 0.052348,
+            "static_memory_bytes": 115275354.0
+          },
+          "session": {
+            "active_model_id": "sy135",
+            "authority_epoch": "godot-local-authority-125974941",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 15,
+            "last_error": {},
+            "lifecycle": "stopped",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy135",
+              "movement_world": "(0.0, 0.0, 0.0)",
+              "opening_down_dot": -0.500000715255737,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(-0.0, 1.609691, -5.814407)",
+              "surface_y": 0.0,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 428
+          },
+          "state_achieved": false,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy135-balanced-travel.png",
+            "saved": true,
+            "sha256": "3413b6fb2a88c62f6eddda0a6bd6e8af4b7d4ad2286e97f2ec69997a87cb8cf5",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "travel",
+          "ok": true,
+          "performance": {
+            "engine_fps": 53.0,
+            "mean_render_fps": 59.9875225953002,
+            "mean_render_frame_ms": 16.6701333333333,
+            "node_count": 446.0,
+            "physics_frames": 45,
+            "physics_process_time_ms": 2.644,
+            "process_time_ms": 5.892,
+            "render_frames": 45,
+            "sampling_window_s": 0.750156,
+            "static_memory_bytes": 115290718.0
+          },
+          "session": {
+            "active_model_id": "sy135",
+            "authority_epoch": "godot-local-authority-125974941",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 15,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy135",
+              "movement_world": "(0.0, 0.000003, -0.010219)",
+              "opening_down_dot": -0.500000715255737,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(-0.0, 1.676358, -6.212757)",
+              "surface_y": 0.0,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 428
+          },
+          "state_achieved": true,
+          "travel_distance_m": 0.408579498529434,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy135-balanced-dig.png",
+            "saved": true,
+            "sha256": "e1934a5a0bc5020dd9a2134acf4f444c62ff209ae5a7b9ddab0f699d5e615fbf",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "dig",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 60.0011544222111,
+            "mean_render_frame_ms": 16.666346,
+            "node_count": 446.0,
+            "physics_frames": 500,
+            "physics_process_time_ms": 3.447,
+            "process_time_ms": 1.664,
+            "render_frames": 500,
+            "sampling_window_s": 8.333173,
+            "static_memory_bytes": 115476614.0
+          },
+          "session": {
+            "active_model_id": "sy135",
+            "authority_epoch": "godot-local-authority-125974941",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 15,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "blocked",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy135",
+              "movement_world": "(0.0, -0.00041, 0.000308)",
+              "opening_down_dot": -0.460210144519806,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(0.0, 0.42457, -4.855468)",
+              "surface_y": -0.0193689070665151,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 611
+          },
+          "state_achieved": true,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy135-balanced-carry.png",
+            "saved": true,
+            "sha256": "1b6ef97f84765bab4cfae5ce137fad5b0661f13b4bc9d678f511fdd7f03bab1d",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "capture_outcome": {
+            "achieved": false,
+            "diagnostic": "parcel capture timeout while holding the cut pose",
+            "frames": 120,
+            "interaction_state": "blocked",
+            "payload_mass_kg": 0.0
+          },
+          "checkpoint": "carry",
+          "finding": "dig attempt did not produce a visible carried payload",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 60.0032401749694,
+            "mean_render_frame_ms": 16.6657666666667,
+            "node_count": 446.0,
+            "physics_frames": 240,
+            "physics_process_time_ms": 3.072,
+            "process_time_ms": 1.559,
+            "render_frames": 240,
+            "sampling_window_s": 3.999784,
+            "static_memory_bytes": 115478730.0
+          },
+          "session": {
+            "active_model_id": "sy135",
+            "authority_epoch": "godot-local-authority-125974941",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 15,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy135",
+              "movement_world": "(0.0, 0.001928, 0.000239)",
+              "opening_down_dot": -0.999518394470215,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(0.0, 4.13761, -6.51636)",
+              "surface_y": 0.0,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 631
+          },
+          "state_achieved": false,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy135-balanced-dump.png",
+            "saved": true,
+            "sha256": "99ef70b0d6f202cbe60ba7874eb83090c37d623b805c75fd8611fe310f19c3cd",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "dump",
+          "finding": "dump stage lacked a nonzero payload-to-release transition",
+          "ok": true,
+          "payload_before_dump_kg": 0.0,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 60.5135355998261,
+            "mean_render_frame_ms": 16.5252284482759,
+            "node_count": 446.0,
+            "physics_frames": 240,
+            "physics_process_time_ms": 3.179,
+            "process_time_ms": 1.698,
+            "render_frames": 232,
+            "sampling_window_s": 3.833853,
+            "static_memory_bytes": 115487054.0
+          },
+          "session": {
+            "active_model_id": "sy135",
+            "authority_epoch": "godot-local-authority-125974941",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 15,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy135",
+              "movement_world": "(0.0, -0.000675, 0.000087)",
+              "opening_down_dot": -0.101630710065365,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(0.0, 0.674474, -5.845665)",
+              "surface_y": 0.0,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 631
+          },
+          "state_achieved": false,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy135-balanced-terrain.png",
+            "saved": true,
+            "sha256": "79fb20d32d74140d5f5d00caf8c4707f5c302badb5090d7e1165a218200fe83a",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "terrain",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 60.4026887003622,
+            "mean_render_frame_ms": 16.5555544217687,
+            "node_count": 446.0,
+            "physics_frames": 300,
+            "physics_process_time_ms": 2.942,
+            "process_time_ms": 1.49,
+            "render_frames": 294,
+            "sampling_window_s": 4.867333,
+            "static_memory_bytes": 115517390.0
+          },
+          "session": {
+            "active_model_id": "sy135",
+            "authority_epoch": "godot-local-authority-125974941",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 15,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy135",
+              "movement_world": "(0.0, 0.000665, 0.000029)",
+              "opening_down_dot": -0.487564414739609,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(0.0, 1.627762, -6.263571)",
+              "surface_y": 0.0,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 631
+          },
+          "state_achieved": true,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy135-balanced-support.png",
+            "saved": true,
+            "sha256": "908e5185955e91f36e1611966e86d1a9742bb654a4c211e3f565488f17da442d",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "support",
+          "ok": true,
+          "performance": {
+            "engine_fps": 61.0,
+            "mean_render_fps": 61.6512397810959,
+            "mean_render_frame_ms": 16.2202739726027,
+            "node_count": 446.0,
+            "physics_frames": 81,
+            "physics_process_time_ms": 3.543,
+            "process_time_ms": 2.82,
+            "render_frames": 73,
+            "sampling_window_s": 1.18408,
+            "static_memory_bytes": 115587934.0
+          },
+          "session": {
+            "active_model_id": "sy135",
+            "authority_epoch": "godot-local-authority-125974941",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 15,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "push",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy135",
+              "movement_world": "(0.0, -0.003998, 0.001975)",
+              "opening_down_dot": 0.117194890975952,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(0.0, 0.352982, -5.763671)",
+              "surface_y": 0.0,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 631
+          },
+          "state_achieved": true,
+          "support_case": "bucket-ground support/contact transfer",
+          "support_wrench": {
+            "authority_epoch": "sy135:126048744",
+            "blocked_distance_m": 0.00460508911311626,
+            "classification": "support",
+            "eligible_apply_tick": 8814,
+            "expiry_tick": 8815,
+            "model_id": "sy135",
+            "normal_world": "(0.0, 1.0, -0.0)",
+            "point_world": "(0.318422, 0.0, -5.740134)",
+            "request_id": "sy135:126048744:8813:1739",
+            "requested_force": "(0.0, 1105.221, -0.000066)",
+            "requested_torque": "(5838.707, 0.000021, 351.9264)",
+            "source_physics_tick": 8813,
+            "support_contact_ticks": 1,
+            "terrain_generation": 15,
+            "terrain_revision": 631
+          },
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy135-balanced-reset.png",
+            "saved": true,
+            "sha256": "8e740aec910042e2f500cc57e97941978f80a86e49955e6646f831fc0d48441c",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "reset",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 56.9295414118423,
+            "mean_render_frame_ms": 17.5655727272727,
+            "node_count": 446.0,
+            "physics_frames": 120,
+            "physics_process_time_ms": 2.312,
+            "process_time_ms": 1.344,
+            "render_frames": 110,
+            "sampling_window_s": 1.932213,
+            "static_memory_bytes": 115458938.0
+          },
+          "session": {
+            "active_model_id": "sy135",
+            "authority_epoch": "godot-local-authority-156531787",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 16,
+            "last_error": {},
+            "lifecycle": "stopped",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy135",
+              "movement_world": "(0.0, 0.0, 0.0)",
+              "opening_down_dot": -0.500000715255737,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(-0.0, 1.609691, -5.814407)",
+              "surface_y": 0.0,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 631
+          },
+          "state_achieved": true,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        }
+      ],
+      "expected_checkpoints": [
+        "startup",
+        "controls-visible",
+        "travel",
+        "dig",
+        "carry",
+        "dump",
+        "terrain",
+        "support",
+        "reset"
+      ],
+      "metadata_path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy135-balanced.json",
+      "model_id": "sy135",
+      "ok": true,
+      "quality": {
+        "applied": true,
+        "camera_far": 140.0,
+        "last_error": "",
+        "particles": 1800,
+        "profile": "balanced",
+        "shadows": true,
+        "target_fps": 60
+      },
+      "quality_profile": "balanced",
+      "reason": "",
+      "run": {
+        "capture_command": "capture_visual_baseline.ps1 -Model all -QualityProfile all -OutputDir \"E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\"",
+        "captured_at_utc": "2026-08-24T02:59:26",
+        "commit": "a60454186832626f900545f3ba4b94623a90be2e",
+        "error_log_path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\run-summary.json",
+        "godot": {
+          "build": "official",
+          "hash": "a13da4feb8d8aefc283c3763d33a2f170a18d541",
+          "hex": 263937,
+          "major": 4,
+          "minor": 7,
+          "patch": 1,
+          "status": "stable",
+          "string": "4.7.1-stable (official)",
+          "timestamp": 0
+        },
+        "hardware": {
+          "processor": "AMD Ryzen 7 9700X 8-Core Processor",
+          "video_adapter": "AMD Radeon RX 9070 XT"
+        },
+        "os": {
+          "name": "Windows",
+          "version": "10.0.26200"
+        },
+        "resolution": [
+          1920,
+          1080
+        ],
+        "run_id": "20260824T025647Z-a6045418"
+      },
+      "scenario_findings": [
+        {
+          "checkpoint": "controls-visible",
+          "finding": "essential operator controls are absent from the baseline HUD"
+        },
+        {
+          "checkpoint": "carry",
+          "finding": "dig attempt did not produce a visible carried payload"
+        },
+        {
+          "checkpoint": "dump",
+          "finding": "dump stage lacked a nonzero payload-to-release transition"
+        }
+      ],
+      "schema_version": "excavator-sim-visual-evidence-v2",
+      "session": {
+        "active_model_id": "sy135",
+        "authority_epoch": "godot-local-authority-156531787",
+        "focused": true,
+        "gateway_enabled": false,
+        "generation": 16,
+        "last_error": {},
+        "lifecycle": "stopped",
+        "session_id": "godot-local-authority"
+      },
+      "soil_authority_mode": "legacy_analytic_parcel",
+      "error_log_result": {
+        "status": "clean",
+        "match_count": 0,
+        "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+        "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+        "process_exit_code": 0
+      }
+    },
+    {
+      "all_scenarios_achieved": false,
+      "artifact_count": 4,
+      "authority_profile": "jolt_authoritative",
+      "capture_errors": [],
+      "checkpoints": [
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy135-high-carry.png",
+            "saved": true,
+            "sha256": "d17df8e8f693e6dd2da86bf9eb0a0e302a89ab186a99d5590384d2d8cdb2daa5",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "capture_outcome": {
+            "achieved": false,
+            "diagnostic": "parcel capture timeout while holding the cut pose",
+            "frames": 120,
+            "interaction_state": "blocked",
+            "payload_mass_kg": 0.0
+          },
+          "checkpoint": "carry",
+          "finding": "dig attempt did not produce a visible carried payload",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 60.0035702124276,
+            "mean_render_frame_ms": 16.665675,
+            "node_count": 461.0,
+            "physics_frames": 240,
+            "physics_process_time_ms": 4.142,
+            "process_time_ms": 1.708,
+            "render_frames": 240,
+            "sampling_window_s": 3.999762,
+            "static_memory_bytes": 115582526.0
+          },
+          "session": {
+            "active_model_id": "sy135",
+            "authority_epoch": "godot-local-authority-159000253",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 19,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy135",
+              "movement_world": "(0.0, 0.002288, 0.000178)",
+              "opening_down_dot": -0.999508619308472,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(0.0, 4.138072, -6.059206)",
+              "surface_y": 0.0,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 851
+          },
+          "state_achieved": false,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy135-high-dump.png",
+            "saved": true,
+            "sha256": "0af8bf5c9f54b84114c86665ded5c897b41962180a14f26306817a638f3097b9",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "dump",
+          "finding": "dump stage lacked a nonzero payload-to-release transition",
+          "ok": true,
+          "payload_before_dump_kg": 0.0,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 60.5088323334162,
+            "mean_render_frame_ms": 16.5265129310345,
+            "node_count": 461.0,
+            "physics_frames": 240,
+            "physics_process_time_ms": 3.137,
+            "process_time_ms": 1.549,
+            "render_frames": 232,
+            "sampling_window_s": 3.834151,
+            "static_memory_bytes": 115589322.0
+          },
+          "session": {
+            "active_model_id": "sy135",
+            "authority_epoch": "godot-local-authority-159000253",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 19,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy135",
+              "movement_world": "(0.0, -0.000639, 0.000082)",
+              "opening_down_dot": -0.10152318328619,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(0.0, 0.673956, -5.388193)",
+              "surface_y": 0.0,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 851
+          },
+          "state_achieved": false,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy135-high-terrain.png",
+            "saved": true,
+            "sha256": "a1d619f4bed787d8cce3ca0ddd980269d1ce3f0e111735fe99673c5fca13df7c",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "terrain",
+          "ok": true,
+          "performance": {
+            "engine_fps": 60.0,
+            "mean_render_fps": 60.4052613810132,
+            "mean_render_frame_ms": 16.5548493150685,
+            "node_count": 461.0,
+            "physics_frames": 300,
+            "physics_process_time_ms": 3.379,
+            "process_time_ms": 1.829,
+            "render_frames": 292,
+            "sampling_window_s": 4.834016,
+            "static_memory_bytes": 115618114.0
+          },
+          "session": {
+            "active_model_id": "sy135",
+            "authority_epoch": "godot-local-authority-159000253",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 19,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "idle",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy135",
+              "movement_world": "(0.0, 0.000704, 0.000032)",
+              "opening_down_dot": -0.487622439861298,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(0.0, 1.627938, -5.806136)",
+              "surface_y": 0.0,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 851
+          },
+          "state_achieved": true,
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        },
+        {
+          "artifact": {
+            "error": "",
+            "height": 1080,
+            "ok": true,
+            "path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy135-high-support.png",
+            "saved": true,
+            "sha256": "9e5400c5c53f1c6c1bea9d5fe7820f84e8ea54692065077545b14dc89ef79f51",
+            "validation_errors": [],
+            "visual_content": true,
+            "width": 1920
+          },
+          "checkpoint": "support",
+          "ok": true,
+          "performance": {
+            "engine_fps": 40.0,
+            "mean_render_fps": 61.6577488164668,
+            "mean_render_frame_ms": 16.2185616438356,
+            "node_count": 461.0,
+            "physics_frames": 81,
+            "physics_process_time_ms": 3.1,
+            "process_time_ms": 364.165,
+            "render_frames": 73,
+            "sampling_window_s": 1.183955,
+            "static_memory_bytes": 115688670.0
+          },
+          "session": {
+            "active_model_id": "sy135",
+            "authority_epoch": "godot-local-authority-159000253",
+            "focused": true,
+            "gateway_enabled": false,
+            "generation": 19,
+            "last_error": {},
+            "lifecycle": "running",
+            "session_id": "godot-local-authority"
+          },
+          "simulation": {
+            "interaction_state": "push",
+            "payload_mass_kg": 0.0,
+            "soil_authority_mode": "legacy_analytic_parcel",
+            "support_contact": {
+              "active": false,
+              "authority_generation": 0,
+              "classification": "none",
+              "eligible": false,
+              "model_id": "sy135",
+              "movement_world": "(0.0, -0.009627, 0.004697)",
+              "opening_down_dot": 0.118787258863449,
+              "penetration_m": 0.0,
+              "physics_hint_status": "heightfield_fallback",
+              "point_world": "(0.0, 0.350053, -5.303912)",
+              "surface_y": 0.0,
+              "terrain_normal_world": "(0.0, 1.0, 0.0)"
+            },
+            "terrain_revision": 851
+          },
+          "state_achieved": true,
+          "support_case": "bucket-ground support/contact transfer",
+          "support_wrench": {
+            "authority_epoch": "sy135:159070760",
+            "blocked_distance_m": 1.70142222195864E-05,
+            "classification": "support",
+            "eligible_apply_tick": 10566,
+            "expiry_tick": 10567,
+            "model_id": "sy135",
+            "normal_world": "(0.0, 1.0, 0.0)",
+            "point_world": "(-0.000003, -0.0, -5.2802)",
+            "request_id": "sy135:159070760:10565:1631",
+            "requested_force": "(0.0, 4.083413, 0.0)",
+            "requested_torque": "(21.56124, 0.0, -0.000012)",
+            "source_physics_tick": 10565,
+            "support_contact_ticks": 1,
+            "terrain_generation": 19,
+            "terrain_revision": 851
+          },
+          "validation_errors": [],
+          "error_log_result": {
+            "status": "clean",
+            "match_count": 0,
+            "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+            "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+            "process_exit_code": 0
+          }
+        }
+      ],
+      "expected_checkpoints": [
+        "carry",
+        "dump",
+        "terrain",
+        "support"
+      ],
+      "metadata_path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418/sy135-high.json",
+      "model_id": "sy135",
+      "ok": true,
+      "quality": {
+        "applied": true,
+        "camera_far": 220.0,
+        "last_error": "",
+        "particles": 4200,
+        "profile": "high",
+        "shadows": true,
+        "target_fps": 60
+      },
+      "quality_profile": "high",
+      "reason": "",
+      "run": {
+        "capture_command": "capture_visual_baseline.ps1 -Model all -QualityProfile all -OutputDir \"E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\"",
+        "captured_at_utc": "2026-08-24T02:59:54",
+        "commit": "a60454186832626f900545f3ba4b94623a90be2e",
+        "error_log_path": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\run-summary.json",
+        "godot": {
+          "build": "official",
+          "hash": "a13da4feb8d8aefc283c3763d33a2f170a18d541",
+          "hex": 263937,
+          "major": 4,
+          "minor": 7,
+          "patch": 1,
+          "status": "stable",
+          "string": "4.7.1-stable (official)",
+          "timestamp": 0
+        },
+        "hardware": {
+          "processor": "AMD Ryzen 7 9700X 8-Core Processor",
+          "video_adapter": "AMD Radeon RX 9070 XT"
+        },
+        "os": {
+          "name": "Windows",
+          "version": "10.0.26200"
+        },
+        "resolution": [
+          1920,
+          1080
+        ],
+        "run_id": "20260824T025647Z-a6045418"
+      },
+      "scenario_findings": [
+        {
+          "checkpoint": "carry",
+          "finding": "dig attempt did not produce a visible carried payload"
+        },
+        {
+          "checkpoint": "dump",
+          "finding": "dump stage lacked a nonzero payload-to-release transition"
+        }
+      ],
+      "schema_version": "excavator-sim-visual-evidence-v2",
+      "session": {
+        "active_model_id": "sy135",
+        "authority_epoch": "godot-local-authority-159000253",
+        "focused": true,
+        "gateway_enabled": false,
+        "generation": 19,
+        "last_error": {},
+        "lifecycle": "running",
+        "session_id": "godot-local-authority"
+      },
+      "soil_authority_mode": "legacy_analytic_parcel",
+      "error_log_result": {
+        "status": "clean",
+        "match_count": 0,
+        "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+        "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+        "process_exit_code": 0
+      }
+    }
+  ],
+  "expected_capture_count": 34,
+  "failures": [],
+  "models": [
+    "sy205",
+    "sy135"
+  ],
+  "partial": false,
+  "quality_profiles": [
+    "low",
+    "balanced",
+    "high"
+  ],
+  "resolution": [
+    1920,
+    1080
+  ],
+  "run_id": "20260824T025647Z-a6045418",
+  "scenario_failure_count": 14,
+  "schema_version": "excavator-sim-visual-evidence-manifest-v1",
+  "selection_complete": true,
+  "support_case": "bucket-ground support/contact transfer",
+  "error_log_result": {
+    "status": "clean",
+    "match_count": 0,
+    "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+    "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+    "process_exit_code": 0
+  }
+}

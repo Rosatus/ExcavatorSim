@@ -1,0 +1,21 @@
+{
+  "schema_version": "excavator-sim-visual-evidence-run-v1",
+  "run_id": "20260824T025647Z-a6045418",
+  "captured_at_utc": "2026-08-24T02:59:55.4890308Z",
+  "commit": "a60454186832626f900545f3ba4b94623a90be2e",
+  "command": "capture_visual_baseline.ps1 -Model all -QualityProfile all -OutputDir \"E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\"",
+  "model_selection": "sy205,sy135",
+  "quality_selection": "low,balanced,high",
+  "partial": false,
+  "resolution": [
+    1920,
+    1080
+  ],
+  "error_log_result": {
+    "status": "clean",
+    "match_count": 0,
+    "stdout_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stdout.log",
+    "stderr_log": "E:\\projects\\ExcavatorSim\\artifacts\\benchmark\\visual-baseline-before-raw\\20260824T025647Z-a6045418\\godot.stderr.log",
+    "process_exit_code": 0
+  }
+}
