@@ -65,6 +65,7 @@ func collision_layers_snapshot() -> Dictionary:
 	return (_descriptor.get("collision_layers", {}) as Dictionary).duplicate(true)
 var _soil_contract: Dictionary = {}
 var _cut_engagement := 0.0
+var _external_digging_response_enabled := false
 var _physics_tick := 0
 var _terrain_identity := Vector2i(-1, -1)
 var _terrain_identity_valid := false
@@ -301,6 +302,12 @@ func set_bucket_payload(mass_kg: float, center_of_mass_local: Vector3, identity:
 	return true
 
 
+func set_external_digging_response_enabled(value: bool) -> void:
+	_external_digging_response_enabled = value
+	if value:
+		_articulation.set_cut_resistance(0.0)
+
+
 func _payload_center_in_bucket(center: Vector3) -> bool:
 	var bucket_data := _body_descriptors.get("bucket", {}) as Dictionary
 	if bucket_data.is_empty():
@@ -454,7 +461,7 @@ func _build_body() -> RigidBody3D:
 
 
 func _update_joint_actuators(delta: float) -> void:
-	_articulation.set_cut_resistance(_cut_engagement)
+	_articulation.set_cut_resistance(0.0 if _external_digging_response_enabled else _cut_engagement)
 	var proposal := _articulation.propose_step(delta, _body.global_transform, enabled)
 	if proposal.is_empty():
 		_quality_flags.append("kinematic_articulation_unavailable")

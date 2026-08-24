@@ -864,6 +864,104 @@ Wrong: selected payload = legacy mass + shadow mass
 Correct: selected source=legacy; publish shadow under a separate ledger identity
 ```
 
+## Scenario: Game-feel digging response
+
+### 1. Scope / Trigger
+
+Use this contract when soil contact and bucket loading should feel heavy through
+bounded work-equipment speed reduction. It is a normalized game response, not a
+hydraulic, structural, engine, pump, valve, cylinder-force, or stress model.
+
+### 2. Signatures
+
+```text
+DiggingResponseShaper.configure(model_id: String) -> bool
+DiggingResponseShaper.set_enabled(value: bool) -> void
+DiggingResponseShaper.reset_response(reason: String = "reset") -> void
+DiggingResponseShaper.step_fixed(delta: float, raw_commands: Vector4,
+  soil_status: Dictionary) -> Dictionary
+TrackedChassisController.set_digging_response_enabled(value: bool) -> void
+JoltChassisTrackRuntime.set_external_digging_response_enabled(value: bool) -> void
+```
+
+Profiles live in
+`res://resources/physics/digging_response_profiles.json`; compact telemetry is
+the optional strict `simulation-truth-v1.digging_response` field.
+
+### 3. Contracts
+
+- Phases are `free`, `contact`, `scrape`, `cut`, `load`, `overflow`, `blocked`,
+  `dump`, and `escape`. Inputs are semantic tool action/contact, accepted ledger
+  flow, stable/active scope, material preset, fill ratio, overflow, and command
+  direction. Presentation quality is not an input.
+- Response profiles share semantics across SY205/SY135 and tune only minimum
+  scale, attack/release, scale slew, hysteresis, blocked delay, flow reference,
+  and per-axis weights. Material presets contribute normalized intensity only.
+- `TrackedChassisController` shapes raw equipment axes immediately before the
+  existing Jolt equipment-command boundary. Swing always has scale 1. Only
+  negative boom/arm/bucket commands (the rig's into-work convention) may slow.
+  Positive commands always retain escape/retraction authority.
+- Speed scales are finite, never exceed 1, never reach zero, and are filtered by
+  phase-aware attack/release plus an explicit maximum scale slew per second.
+  Blocked contact cannot stall a joint; positive escape selects the faster
+  recovery path.
+- When the external shaper is configured, Jolt keeps its penetration engagement
+  as diagnostic evidence but disables the old articulation-level second scale.
+  Direct/fallback users that do not enable the shaper retain the old bounded
+  penetration response.
+- Disable, stop, focus loss, neutral re-arm, reset, model/authority change, and
+  runtime rebuild restore phase `free` and scale 1 without changing a soil
+  transaction, payload, or terrain snapshot.
+- Telemetry includes phase, intensity, four scales, flow, fill, overflow,
+  sequence, model, and source ledger identity. HUD/VFX/audio/camera may read or
+  smooth a copy but cannot feed it back into motion or the material ledger.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Missing/invalid model profile or finite input | Reject configuration/input; return unavailable and do not scale |
+| No contact or free motion | Phase `free`; scales release toward 1 |
+| Stable contact with low/no flow | `contact`, then `blocked` after bounded delay; nonzero clamp remains |
+| Scrape/grade/push while working inward | `scrape`; scale only negative working axes |
+| Productive cut and rising fill | `cut` then `load`; smooth stronger response |
+| Capacity overflow | `overflow`; retain nonzero control and expose overflow |
+| Dump or positive retract/escape | Faster release toward scale 1; never apply inward resistance |
+| Feature disabled, reset, neutral, or model switch | Immediate logical reset to free/unit scale; soil state unchanged |
+
+### 5. Good / Base / Bad Cases
+
+- Good: ledger/tool snapshot -> normalized phase/intensity -> hysteretic shaper
+  -> raw equipment axes scaled once -> Jolt safe articulation boundary.
+- Base: response disabled/unavailable -> raw equipment axes pass through exactly
+  and existing safety/neutral behavior remains active.
+- Bad: fabricate pump pressure, slow positive retraction, alter presentation
+  transforms after accepted motion, or apply both old and new speed scales.
+
+### 6. Tests Required
+
+- Record deterministic free/contact/scrape/cut/load/overflow/dump/blocked/escape
+  curves for both models and assert productive cut is slower than free motion.
+- Assert model minimum scale, unit maximum, per-tick scale-slew ceiling, no
+  chatter, phase hysteresis, blocked delay, and prompt escape recovery.
+- Verify disabling or presentation mutation cannot change commands, ledger,
+  payload, terrain, or accepted material transactions.
+- Keep direct cut-resistance fallback, neutral/re-arm, model switch, both-model
+  Jolt, lifecycle, simulation-truth schema, standalone, and backend gates green.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: soil intensity -> invented hydraulic pressure -> Jolt force
+Correct: normalized soil phase/intensity -> bounded command speed scale
+
+Wrong: inward scale * old penetration scale -> accidental double slowdown
+Correct: external shaper active -> old engagement remains telemetry-only
+
+Wrong: positive retraction slowed because contact is still present
+Correct: positive retraction -> escape phase -> rapid unit-scale recovery
+```
+
 ## Scenario: Construction-site Terrain3D presentation
 
 ### 1. Scope / Trigger

@@ -220,6 +220,9 @@ func build_snapshot() -> SimulationTruthSnapshot:
 	var soil_lifecycle_shadow := excavation.get("soil_lifecycle_shadow", {}) as Dictionary
 	if bool(soil_lifecycle_shadow.get("configured", false)):
 		quality_flags.append("conservative_soil_lifecycle_shadow")
+	var digging_response := chassis.get("digging_response", {}) as Dictionary
+	if bool(digging_response.get("configured", false)):
+		quality_flags.append("game_feel_digging_response")
 	var applied_payload := chassis.get("payload", {}) as Dictionary if authoritative else {}
 	var center := (
 		applied_payload.get("center_of_mass_local", Vector3.ZERO)
@@ -280,6 +283,8 @@ func build_snapshot() -> SimulationTruthSnapshot:
 		result["applied_chassis_wrench"] = _canonical_support_wrench(chassis.get("applied_chassis_wrench", {}) as Dictionary)
 	if bool(soil_lifecycle_shadow.get("configured", false)):
 		result["soil_lifecycle_shadow"] = _canonical_soil_lifecycle_shadow(soil_lifecycle_shadow)
+	if bool(digging_response.get("configured", false)):
+		result["digging_response"] = _canonical_digging_response(digging_response)
 	_sequence += 1
 	return SimulationTruthSnapshot.from_dictionary(result)
 
@@ -590,6 +595,23 @@ func _canonical_soil_lifecycle_shadow(shadow: Dictionary) -> Dictionary:
 			"transaction_sha256": String(transaction.get("transaction_sha256", "")),
 		}
 	return result
+
+
+func _canonical_digging_response(response: Dictionary) -> Dictionary:
+	var scales := response.get("speed_scales", Vector4.ONE) as Vector4
+	return {
+		"schema_version": String(response.get("schema_version", DiggingResponseShaper.SCHEMA_VERSION)),
+		"model_id": String(response.get("model_id", "unknown")),
+		"sequence": maxi(0, int(response.get("sequence", 0))),
+		"phase": String(response.get("phase", "free")),
+		"intensity": clampf(float(response.get("intensity", 0.0)), 0.0, 1.0),
+		"speed_scales": [scales.x, scales.y, scales.z, scales.w],
+		"ledger_identity": String(response.get("ledger_identity", "unavailable")),
+		"flow_volume_m3": maxf(0.0, float(response.get("flow_volume_m3", 0.0))),
+		"fill_ratio": clampf(float(response.get("fill_ratio", 0.0)), 0.0, 1.5),
+		"overflow_volume_m3": maxf(0.0, float(response.get("overflow_volume_m3", 0.0))),
+		"reason": String(response.get("reason", "unavailable")),
+	}
 
 
 func _canonical_support_wrench(wrench: Dictionary) -> Variant:

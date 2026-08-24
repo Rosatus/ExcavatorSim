@@ -14,6 +14,7 @@ const INPUT_ACTIONS := {
 @export var use_project_authority_profile := true
 @export var ground_lift_enabled := true
 @export var use_jolt_support_hints := true
+@export var digging_response_enabled := true
 @export var jolt_probe_height_m := 4.0
 @export var jolt_hint_max_error_m := 0.2
 @export_flags_3d_physics var terrain_collision_mask := 1
@@ -45,6 +46,7 @@ var _test_equipment_commands := Vector4.ZERO
 var _test_input_focus_bypass := false
 var _payload_identity := -1
 var _last_payload_sample: Dictionary = {}
+var _digging_response := DiggingResponseShaper.new()
 
 
 func _ready() -> void:
@@ -64,7 +66,7 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	if AuthorityProfile.writes_product_pose(authority_profile):
-		_step_authoritative_chassis()
+		_step_authoritative_chassis(delta)
 		return
 	if not controller_enabled or not locomotion_state.configured or _terrain_world == null:
 		return
@@ -126,6 +128,7 @@ func stop_product_motion() -> void:
 	locomotion_state.stop_motion()
 	_test_commands = Vector2.ZERO
 	_test_equipment_commands = Vector4.ZERO
+	_digging_response.reset_response("stop_motion")
 	if _jolt_runtime != null:
 		_jolt_runtime.stop_motion()
 		_jolt_runtime.set_commands(0.0, 0.0)
@@ -247,7 +250,15 @@ func get_status_snapshot() -> Dictionary:
 		else ground_lift_reaction.get_status_snapshot()
 	)
 	status["authority_profile"] = authority_profile
+	status["digging_response"] = _digging_response.get_status_snapshot()
 	return status
+
+
+func set_digging_response_enabled(value: bool) -> void:
+	digging_response_enabled = value
+	_digging_response.set_enabled(value)
+	if _jolt_runtime != null:
+		_jolt_runtime.set_external_digging_response_enabled(value and _digging_response.configured)
 
 
 func _empty_authoritative_status() -> Dictionary:
@@ -314,6 +325,12 @@ func _configure_model(model_id: String) -> bool:
 				return false
 			active_model_id = model_id
 			contract_error = ""
+			if not _digging_response.configure(model_id):
+				contract_error = "model_contract_mismatch: invalid digging response for %s" % model_id
+				active_model_id = ""
+				_reset_motion()
+				return false
+			_digging_response.set_enabled(digging_response_enabled)
 			_base_local_transform = locomotion_state.chassis_transform
 			ground_lift_reaction.configure(parameters as Dictionary)
 			if AuthorityProfile.writes_product_pose(authority_profile):
@@ -384,6 +401,7 @@ func _reset_motion() -> void:
 	_test_commands = Vector2.ZERO
 	_use_test_equipment_commands = false
 	_test_equipment_commands = Vector4.ZERO
+	_digging_response.reset_response("motion_reset")
 	if AuthorityProfile.writes_product_pose(authority_profile) and _jolt_runtime != null:
 		var descriptor := PhysicsRigDescriptor.load_for_model(active_model_id)
 		var spawn := _authoritative_spawn_transform(descriptor) if descriptor != null else Transform3D.IDENTITY
@@ -412,7 +430,7 @@ func _on_world_reset(_generation: int) -> void:
 	_reset_motion()
 
 
-func _step_authoritative_chassis() -> void:
+func _step_authoritative_chassis(delta: float) -> void:
 	if _jolt_runtime == null or not _jolt_runtime.configured:
 		return
 	var left := 0.0
@@ -441,7 +459,11 @@ func _step_authoritative_chassis() -> void:
 				else (_motion_client.get_authoritative_input_axes() if _motion_client != null else Vector4.ZERO)
 			)
 		)
-	_jolt_runtime.set_equipment_commands(equipment_axes, Engine.get_physics_frames())
+	var soil_status := _excavation_world.get_status_snapshot() if _excavation_world != null else {}
+	var response := _digging_response.step_fixed(delta, equipment_axes, soil_status)
+	var scaled_axes := response.get("scaled_commands", equipment_axes) as Vector4
+	_jolt_runtime.set_external_digging_response_enabled(digging_response_enabled and _digging_response.configured)
+	_jolt_runtime.set_equipment_commands(scaled_axes, Engine.get_physics_frames())
 	_submit_authoritative_payload()
 
 
@@ -485,6 +507,7 @@ func _configure_jolt_runtime(catalog_entry: Dictionary) -> bool:
 		_destroy_jolt_runtime()
 		return false
 	_jolt_runtime.set_enabled(controller_enabled)
+	_jolt_runtime.set_external_digging_response_enabled(digging_response_enabled and _digging_response.configured)
 	_on_jolt_post_step_snapshot(_jolt_runtime.get_post_step_snapshot())
 	return true
 

@@ -302,6 +302,8 @@ func get_status_snapshot() -> Dictionary:
 	status["collider_available"] = terrain_collider != null and terrain_collider.available
 	status["collider_enabled"] = terrain_collider != null and terrain_collider.enabled
 	status["terrain3d"] = terrain_world.terrain3d_adapter.get_status_snapshot() if terrain_world != null and terrain_world.terrain3d_adapter != null else {"enabled": false, "available": false}
+	var chassis_status := _tracked_chassis_controller.get_status_snapshot() if _tracked_chassis_controller != null else {}
+	status["digging_response"] = chassis_status.get("digging_response", {"configured": false})
 	status["physics_fail_open"] = true
 	return status
 
@@ -395,6 +397,7 @@ func _bucket_tooth_world() -> Variant:
 func get_soil_visual_snapshot() -> Dictionary:
 	var status := soil_state.get_status_snapshot() if soil_state != null else {}
 	var lifecycle_shadow := _soil_interaction_authority.get_status_snapshot() if _soil_interaction_authority != null else {}
+	var chassis_status := _tracked_chassis_controller.get_status_snapshot() if _tracked_chassis_controller != null else {}
 	return {
 		"world_generation": int(status.get("world_generation", -1)),
 		"authority_generation": authority_generation,
@@ -409,6 +412,7 @@ func get_soil_visual_snapshot() -> Dictionary:
 		"bucket_pose": _last_pose_snapshot.duplicate(true),
 		"soil_material_lifecycle_mode": soil_material_lifecycle_mode,
 		"lifecycle_shadow": lifecycle_shadow,
+		"digging_response": (chassis_status.get("digging_response", {}) as Dictionary).duplicate(true),
 	}
 
 

@@ -1,0 +1,46 @@
+{
+  "schema_version": "digging-response-profiles-v1",
+  "models": {
+    "sy205": {
+      "minimum_speed_scale": 0.34,
+      "attack_hz": 5.5,
+      "release_hz": 11.0,
+      "escape_release_hz": 19.0,
+      "maximum_scale_slew_per_s": 4.8,
+      "engage_threshold": 0.12,
+      "disengage_threshold": 0.06,
+      "blocked_delay_s": 0.32,
+      "flow_reference_m3_per_tick": 0.006,
+      "axis_weights": [0.0, 0.78, 0.90, 1.0]
+    },
+    "sy135": {
+      "minimum_speed_scale": 0.38,
+      "attack_hz": 6.2,
+      "release_hz": 12.0,
+      "escape_release_hz": 20.0,
+      "maximum_scale_slew_per_s": 5.1,
+      "engage_threshold": 0.11,
+      "disengage_threshold": 0.055,
+      "blocked_delay_s": 0.28,
+      "flow_reference_m3_per_tick": 0.004,
+      "axis_weights": [0.0, 0.76, 0.88, 1.0]
+    }
+  },
+  "materials": {
+    "loose": {"intensity_scale": 0.80},
+    "compact": {"intensity_scale": 1.05},
+    "sand": {"intensity_scale": 0.72},
+    "damp": {"intensity_scale": 0.96}
+  },
+  "phases": {
+    "free": {"strength": 0.0},
+    "contact": {"strength": 0.34},
+    "scrape": {"strength": 0.56},
+    "cut": {"strength": 0.82},
+    "load": {"strength": 0.92},
+    "overflow": {"strength": 1.0},
+    "blocked": {"strength": 1.0},
+    "dump": {"strength": 0.0},
+    "escape": {"strength": 0.0}
+  }
+}

@@ -3,7 +3,7 @@
   "name": "game-feel-digging-response",
   "title": "Game feel digging response",
   "description": "Turn soil engagement and bucket load into bounded work-equipment speed reduction and presentation telemetry without professional hydraulic simulation.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": "frontend/godot",
   "package": null,
