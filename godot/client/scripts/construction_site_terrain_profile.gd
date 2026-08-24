@@ -101,6 +101,48 @@ func build_dressing(maps: Dictionary) -> Dictionary:
 	}
 
 
+func build_worksite_layout(maps: Dictionary) -> Dictionary:
+	if not maps.has_all(["rows", "columns", "spacing_m", "origin_xz", "surface", "logical_origin_xz", "logical_max_xz"]):
+		return {}
+	var result := {
+		"barriers": [],
+		"stakes": [],
+		"route_markers": [],
+		"track_marks": [],
+		"pipes": [],
+		"aggregate": [],
+		"signs": [],
+	}
+	for position in [Vector2(-14.0, -8.0), Vector2(-14.0, 0.0), Vector2(-14.0, 8.0)]:
+		(result["barriers"] as Array).append(_layout_entry(position, maps, 0.0))
+	for x in [-9.0, -4.5, 0.0, 4.5, 9.0]:
+		(result["stakes"] as Array).append(_layout_entry(Vector2(x, -12.5), maps, 0.0))
+		(result["stakes"] as Array).append(_layout_entry(Vector2(x, 12.5), maps, PI))
+	var route_start := Vector2(13.0, 7.0)
+	var route_end := Vector2(30.0, 19.0)
+	var route_direction := (route_end - route_start).normalized()
+	var route_side := Vector2(-route_direction.y, route_direction.x)
+	for step in 4:
+		var center := route_start.lerp(route_end, (float(step) + 0.5) / 4.0)
+		(result["route_markers"] as Array).append(_layout_entry(center + route_side * 4.25, maps, -route_direction.angle()))
+		(result["route_markers"] as Array).append(_layout_entry(center - route_side * 4.25, maps, -route_direction.angle()))
+	for z in [11.5, 13.0, 14.5, 16.0, 17.5, 19.0]:
+		(result["track_marks"] as Array).append(_layout_entry(Vector2(-1.15, z), maps, 0.0))
+		(result["track_marks"] as Array).append(_layout_entry(Vector2(1.15, z), maps, 0.0))
+	for layer in 2:
+		for column in 3:
+			var offset := Vector2(float(column) * 1.45, float(layer) * 0.78)
+			(result["pipes"] as Array).append(_layout_entry(Vector2(-22.0, 18.0) + offset, maps, PI * 0.5))
+	for offset in [Vector2.ZERO, Vector2(1.4, 0.3), Vector2(-1.2, 0.5), Vector2(0.6, 1.2), Vector2(-0.5, 1.4)]:
+		(result["aggregate"] as Array).append(_layout_entry(Vector2(20.5, -18.5) + offset, maps, 0.0))
+	(result["signs"] as Array).append(_layout_entry(Vector2(-14.0, 13.0), maps, PI * 0.5))
+	return result
+
+
+func sample_presentation_height(maps: Dictionary, position: Vector2) -> float:
+	return _sample_map_height(maps, position)
+
+
 static func decode_control(code: int) -> Dictionary:
 	return {
 		"base_id": (code >> 27) & 0x1f,
@@ -228,6 +270,13 @@ func _dressing_entries(layout: Array, maps: Dictionary, seed: int, scale_range: 
 			"scale": lerpf(scale_range.x, scale_range.y, scale_noise),
 		})
 	return entries
+
+
+func _layout_entry(position: Vector2, maps: Dictionary, yaw: float) -> Dictionary:
+	return {
+		"position": Vector3(position.x, _sample_map_height(maps, position), position.y),
+		"yaw": yaw,
+	}
 
 
 func _sample_map_height(maps: Dictionary, position: Vector2) -> float:

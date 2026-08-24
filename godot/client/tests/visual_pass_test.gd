@@ -70,8 +70,12 @@ func _test_scene_visual_nodes() -> int:
 	await process_frame
 	var visual_environment := scene.get_node_or_null("VisualEnvironment") as VisualEnvironment
 	var quality := scene.get_node_or_null("VisualQualityController") as VisualQualityController
-	if visual_environment == null or quality == null or scene.get_node_or_null("SoilEffects") == null:
+	var dressing := scene.get_node_or_null("TerrainRoot/ConstructionSiteDressing") as ConstructionSiteDressing
+	if visual_environment == null or quality == null or dressing == null or scene.get_node_or_null("SoilEffects") == null:
 		return _fail("visual environment, quality and effects nodes exist")
+	var terrain_renderer := scene.get_node_or_null("TerrainRoot/TerrainWorld/TerrainMesh") as TerrainRenderer
+	if terrain_renderer == null or terrain_renderer.get_status_snapshot().get("material_kind", "") != "procedural_worksite_soil":
+		return _fail("fallback terrain retains the procedural worksite material identity")
 	var attribution := scene.get_node_or_null("OperatorUI/SkyAttribution") as Label
 	if attribution == null or "ESO/S. Brunier" not in attribution.text or "CC BY 4.0" not in attribution.text:
 		return _fail("running client exposes the required Milky Way attribution")
@@ -94,8 +98,19 @@ func _test_scene_visual_nodes() -> int:
 		return _fail("Sky3D SunLight is the single active daytime light")
 	if not quality.apply_profile("low") or sky.clouds_enabled or sky.fog_enabled or sky.sun.shadow_enabled:
 		return _fail("low quality disables clouds, fog, and sun shadows")
+	var low_site := dressing.get_status_snapshot()
+	if int(low_site["visible_cues"]) != 14 or int(low_site["shadow_instances"]) != 0:
+		return _fail("low quality keeps primary non-shadowing worksite cues")
+	if not quality.apply_profile("balanced"):
+		return _fail("balanced quality restores worksite context")
+	var balanced_site := dressing.get_status_snapshot()
+	if int(balanced_site["visible_cues"]) != 28 or int(balanced_site["shadow_instances"]) <= 0:
+		return _fail("balanced quality applies its context and shadow budget")
 	if not quality.apply_profile("high") or not sky.clouds_enabled or not sky.fog_enabled or not sky.sun.shadow_enabled:
 		return _fail("high quality restores bounded Sky3D atmosphere and shadows")
+	var high_site := dressing.get_status_snapshot()
+	if int(high_site["visible_cues"]) != 45 or int(high_site["collision_objects"]) != 0 or not bool(high_site["code_native"]):
+		return _fail("high quality exposes all code-native cues without collision")
 	if sky.game_time_enabled or sky.tod.system_sync:
 		return _fail("quality changes never enable Sky3D time authority")
 	var camera := scene.get_node_or_null("Camera3D") as CameraRig

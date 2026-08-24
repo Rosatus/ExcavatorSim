@@ -2,9 +2,9 @@ class_name VisualQualityController
 extends Node
 
 const PROFILES := {
-	"low": {"particles": 500, "camera_far": 80.0, "shadows": false},
-	"balanced": {"particles": 1800, "camera_far": 140.0, "shadows": true},
-	"high": {"particles": 4200, "camera_far": 220.0, "shadows": true},
+	"low": {"particles": 500, "camera_far": 80.0, "shadows": false, "site_cues": 14, "site_shadows": false},
+	"balanced": {"particles": 1800, "camera_far": 140.0, "shadows": true, "site_cues": 28, "site_shadows": true},
+	"high": {"particles": 4200, "camera_far": 220.0, "shadows": true, "site_cues": 45, "site_shadows": true},
 }
 
 @export var profile := "balanced"
@@ -41,6 +41,11 @@ func apply_profile(profile_name: String) -> bool:
 	var effects := get_node_or_null("../SoilEffects") as SoilEffects
 	if effects != null:
 		effects.set_budget(int(settings["particles"]))
+	var site_dressing := get_node_or_null("../TerrainRoot/ConstructionSiteDressing")
+	if site_dressing != null and site_dressing.has_method("set_quality_profile") and not bool(site_dressing.call("set_quality_profile", profile_name)):
+		_applied = false
+		last_error = "site_dressing_profile_failed"
+		return false
 	Engine.max_fps = target_fps
 	_applied = true
 	last_error = ""
@@ -55,6 +60,8 @@ func get_quality_snapshot() -> Dictionary:
 		"particles": int(settings.get("particles", 0)),
 		"camera_far": float(settings.get("camera_far", 0.0)),
 		"shadows": bool(settings.get("shadows", false)),
+		"site_cues": int(settings.get("site_cues", 0)),
+		"site_shadows": bool(settings.get("site_shadows", false)),
 		"applied": _applied,
 		"last_error": last_error,
 	}

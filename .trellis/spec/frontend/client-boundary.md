@@ -1365,6 +1365,83 @@ Wrong: hard-coded SY205 child path -> camera target across model switches
 Correct: model_activated -> current semantic frame -> preset -> read-only safety query
 ```
 
+## Scenario: Shared construction-site presentation
+
+### 1. Scope / Trigger
+
+Use this contract for code-native worksite composition, fallback terrain
+material, fixed-daylight tuning, and quality-bounded site dressing.
+
+### 2. Signatures
+
+```text
+ConstructionSiteTerrainProfile.build_worksite_layout(maps: Dictionary) -> Dictionary
+ConstructionSiteDressing.set_quality_profile(profile: String) -> bool
+ConstructionSiteDressing.get_status_snapshot() -> Dictionary
+TerrainRenderer.get_status_snapshot() -> Dictionary
+```
+
+### 3. Contracts
+
+- `TerrainState` and the selected soil authority remain the only material truth.
+  Terrain3D, fallback mesh, procedural shader, and site cues consume accepted
+  snapshot derivatives and never write terrain, ledger, payload, or physics.
+- `ConstructionSiteDressing` is a sibling of Terrain3D and fallback rendering.
+  Its barrier, stake, route, track, pipe, aggregate, and sign layout is seeded,
+  height-sampled from the shared presentation map, model-independent, and
+  stable across reset/model changes.
+- Every code-native cue lies outside the central logical excavation patch and
+  contains no CollisionObject3D. It must not obstruct spawn, haul corridor,
+  camera queries, tracks, bucket, or Jolt layers.
+- Low/balanced/high expose exactly 14/28/45 worksite cues. Low disables cue
+  shadows; balanced adds route/stored-material context and bounded shadows;
+  high enables deterministic track/aggregate detail. Quality changes alter
+  visibility/shadows only, never placement identity.
+- Fallback `TerrainRenderer` uses accepted vertices/normals with a procedural
+  `procedural_worksite_soil` material for compacted, disturbed/loose, damp, and
+  macro-distance variation. Shader classifications are visual and cannot enter
+  soil material accounting.
+- Terrain3D retains only already-provenanced official demo ground/rock/grass
+  assets. Demo height, navigation, UI, and gameplay remain excluded.
+- Sky3D remains fixed at 10:30 with one warm daytime sun, deterministic
+  atmosphere, bounded SSAO/contact shadow tuning, and no dynamic time/weather.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Snapshot/layout invalid | Create no cues; preserve terrain authority and product startup |
+| Native Terrain3D activates/deactivates | Shared dressing identity stays visible and unchanged |
+| Model switch or terrain reset | Re-sample height, retain deterministic layout, create no collision |
+| Unknown quality | Reject and preserve prior profile/visibility |
+| Low/balanced/high | Apply exact cue and shadow budgets |
+| Fallback renderer active | Use procedural worksite soil material on accepted mesh topology |
+
+### 5. Good / Base / Bad Cases
+
+- Good: accepted terrain snapshot -> shared height map -> disposable site cues;
+  accepted mesh -> procedural earth material.
+- Base: Terrain3D unavailable -> fallback soil + same code-native worksite cues.
+- Bad: prop body enters Jolt, or shader-derived color becomes soil inventory.
+
+### 6. Tests Required
+
+- `construction_site_terrain_test.gd` asserts logical parity, material zones,
+  deterministic cue layout/counts, finite heights, and excavation exclusion.
+- `visual_pass_test.gd` asserts procedural fallback identity, 14/28/45 quality
+  budgets, zero cue collision, shadow policy, fixed Sky3D, and one sun.
+- Offline/model tests assert site placement does not depend on SY205/SY135 and
+  remains deterministic across clean generation resets.
+- Subjective work-zone legibility, palette, depth, and silhouette separation
+  require the final focused human product-experience review.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: Terrain3D-only props/materials -> different fallback product
+Correct: shared code-native dressing + accepted snapshot derivatives -> both backends
+```
+
 ### Visual verification operating policy
 
 - Feature implementation prioritizes executable contracts, deterministic tests,

@@ -21,7 +21,8 @@ func _run() -> void:
 	var presentation := scene.get_node_or_null("MotionPresentation") as MotionPresentation
 	var truth := scene.get_node_or_null("SimulationTruthPublisher") as SimulationTruthPublisher
 	var excavation := scene.get_node_or_null("TerrainRoot/ExcavationWorld") as ExcavationWorld
-	if session == null or client == null or chassis == null or presentation == null or truth == null or excavation == null:
+	var dressing := scene.get_node_or_null("TerrainRoot/ConstructionSiteDressing") as ConstructionSiteDressing
+	if session == null or client == null or chassis == null or presentation == null or truth == null or excavation == null or dressing == null:
 		_fail("offline main scene is missing a required product node")
 	else:
 		if client.connection_state != MotionClient.STATE_DISCONNECTED:
@@ -30,6 +31,9 @@ func _run() -> void:
 			_fail("offline startup did not begin stopped")
 		if presentation.get_active_model_id() != "sy205":
 			_fail("offline startup did not activate SY205")
+		var site_identity := String(dressing.get_status_snapshot().get("layout_identity", ""))
+		if site_identity.is_empty() or int(dressing.get_status_snapshot().get("collision_objects", -1)) != 0:
+			_fail("offline worksite dressing was not deterministic and collision-free")
 		if not bool(chassis.get_status_snapshot().get("configured", false)):
 			_fail("offline Jolt chassis was not configured")
 		var local_truth := truth.build_snapshot()
@@ -67,6 +71,8 @@ func _run() -> void:
 			_fail("offline pause failed")
 		if not session.request_model_switch("sy135") or presentation.get_active_model_id() != "sy135":
 			_fail("offline SY135 switch failed")
+		if String(dressing.get_status_snapshot().get("layout_identity", "")) != site_identity:
+			_fail("model switch changed model-independent worksite placement")
 		if _visible_model_count(scene.get_node("ChassisMotionRoot/PresentationRoot")) != 1:
 			_fail("offline model switch was not singular")
 		var epoch_before := session.authority_epoch

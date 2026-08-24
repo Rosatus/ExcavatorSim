@@ -27,6 +27,9 @@ func _run() -> int:
 	var dressing_error := _check_dressing(profile, maps)
 	if dressing_error != "":
 		return _fail(dressing_error)
+	var layout_error := _check_worksite_layout(profile, maps)
+	if layout_error != "":
+		return _fail(layout_error)
 	var assets := profile.create_assets()
 	if assets == null or not assets.has_method("get_texture_count") or int(assets.call("get_texture_count")) != 2:
 		return _fail("construction site loads the two official Terrain3D demo texture assets")
@@ -108,6 +111,36 @@ func _check_texture_detail(assets: Object) -> String:
 	var albedo: Variant = (texture as Object).get("albedo_texture")
 	if not (albedo is Texture2D) or (albedo as Texture2D).get_size() != Vector2(1024.0, 1024.0):
 		return "official demo PBR texture detail remains available"
+	return ""
+
+
+func _check_worksite_layout(profile: ConstructionSiteTerrainProfile, maps: Dictionary) -> String:
+	var first := profile.build_worksite_layout(maps)
+	var second := profile.build_worksite_layout(maps)
+	var expected := {
+		"barriers": 3,
+		"stakes": 10,
+		"route_markers": 8,
+		"track_marks": 12,
+		"pipes": 6,
+		"aggregate": 5,
+		"signs": 1,
+	}
+	if first != second:
+		return "code-native worksite layout is deterministic"
+	var logical_minimum := maps["logical_origin_xz"] as Vector2
+	var logical_maximum := maps["logical_max_xz"] as Vector2
+	for key in expected:
+		var entries := first.get(key, []) as Array
+		if entries.size() != int(expected[key]):
+			return "%s uses its bounded cue count" % key
+		for entry in entries:
+			var position := (entry as Dictionary)["position"] as Vector3
+			if not is_finite(position.y):
+				return "%s samples finite shared presentation height" % key
+			if position.x >= logical_minimum.x and position.x <= logical_maximum.x \
+				and position.z >= logical_minimum.y and position.z <= logical_maximum.y:
+				return "%s remains outside the logical excavation patch" % key
 	return ""
 
 

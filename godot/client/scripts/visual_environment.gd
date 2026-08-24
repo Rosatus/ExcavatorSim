@@ -8,7 +8,8 @@ const FIXED_UTC_OFFSET_HOURS := 7.0
 const HORIZON_GROUND_COLOR := Color("#46513d")
 const SKY_PROFILES := {
 	"low": {
-		"ambient_energy": 0.65,
+		"ambient_energy": 0.58,
+		"sun_energy": 1.02,
 		"cloud_intensity": 0.0,
 		"cirrus_intensity": 0.0,
 		"clouds": false,
@@ -17,7 +18,8 @@ const SKY_PROFILES := {
 		"shadows": false,
 	},
 	"balanced": {
-		"ambient_energy": 0.8,
+		"ambient_energy": 0.72,
+		"sun_energy": 1.16,
 		"cloud_intensity": 0.65,
 		"cirrus_intensity": 1.15,
 		"clouds": true,
@@ -26,7 +28,8 @@ const SKY_PROFILES := {
 		"shadows": true,
 	},
 	"high": {
-		"ambient_energy": 0.9,
+		"ambient_energy": 0.78,
+		"sun_energy": 1.2,
 		"cloud_intensity": 0.78,
 		"cirrus_intensity": 1.35,
 		"clouds": true,
@@ -63,18 +66,22 @@ func apply_profile(profile_name: String) -> bool:
 	world.fog_enabled = bool(settings["fog"])
 	world.ambient_energy = float(settings["ambient_energy"])
 	world.cloud_intensity = float(settings["cloud_intensity"])
-	world.sun_energy = 1.15 if profile_name == "high" else 1.05
+	world.sun_energy = float(settings["sun_energy"])
 	world.sun_shadow_opacity = 1.0 if bool(settings["shadows"]) else 0.0
 	var environment := world.environment
 	if environment == null or environment.sky == null:
 		return false
 	environment.ambient_light_energy = float(settings["ambient_energy"])
-	environment.tonemap_exposure = 1.0
-	environment.tonemap_white = 6.0
+	environment.tonemap_exposure = 0.96
+	environment.tonemap_white = 5.5
 	environment.glow_enabled = profile == "high"
 	environment.ssao_enabled = profile != "low"
-	environment.ssao_radius = 1.5
-	environment.ssao_intensity = 1.4
+	environment.ssao_radius = 1.25
+	environment.ssao_intensity = 1.62
+	environment.adjustment_enabled = true
+	environment.adjustment_brightness = 1.01
+	environment.adjustment_contrast = 1.06
+	environment.adjustment_saturation = 0.94
 	# Sky3D owns the screen-space atmosphere. Built-in fog remains off so the
 	# two fog systems never stack.
 	environment.fog_enabled = false
@@ -91,6 +98,10 @@ func apply_profile(profile_name: String) -> bool:
 		world.sun.shadow_enabled = bool(settings["shadows"])
 		world.sun.directional_shadow_max_distance = 80.0 if profile_name == "high" else 55.0
 		world.sun.light_angular_distance = 0.35
+		world.sun.light_color = Color("fff1dc")
+		world.sun.shadow_bias = 0.035
+		world.sun.shadow_normal_bias = 1.15
+		world.sun.shadow_blur = 0.85
 	if world.moon != null:
 		world.moon.visible = false
 		world.moon.shadow_enabled = false

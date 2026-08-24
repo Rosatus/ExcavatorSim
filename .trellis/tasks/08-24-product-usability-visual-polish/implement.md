@@ -8,14 +8,14 @@
        control discovery, warnings, recovery, and diagnostics toggle.
 3. [x] `08-24-camera-workflow-presets`: implement four double-model camera
        workflows with collision-safe framing and discoverable input.
-4. [ ] Begin the soil-independent portion of
+4. [x] Begin the soil-independent portion of
        `08-24-construction-site-visual-polish`: composition, scale cues, props,
        lighting, base materials, and fallback parity. Keep the child open.
 5. [x] Complete the separate `08-24-gameplay-soil-interaction-rebuild` children:
        full-bucket tool contract and active-patch prototype may proceed in
        parallel, followed by conservative lifecycle, game-feel response, and
        generation-safe migration validation.
-6. [ ] Finish `08-24-construction-site-visual-polish` by integrating the stable
+6. [x] Finish `08-24-construction-site-visual-polish` by integrating the stable
        persistent-field/active-patch dirty snapshots and close its seam/double-
        pile acceptance gates.
 7. [ ] `08-24-soil-effects-audio-feedback`: consume stabilized soil transfer,
