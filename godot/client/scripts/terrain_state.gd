@@ -49,6 +49,39 @@ func _init(seed_value: int = DEFAULT_SEED, requested_rows: int = DEFAULT_ROWS, r
 	_generate_baseline()
 
 
+## Materializes an isolated terrain authority from an immutable surface
+## snapshot. Shadow simulations use this instead of borrowing the product
+## TerrainState, so their scheduler can exercise the real terrain transaction
+## path without acquiring product write authority.
+static func from_surface_snapshot(snapshot: Dictionary) -> TerrainState:
+	var snapshot_rows := int(snapshot.get("rows", 0))
+	var snapshot_columns := int(snapshot.get("columns", 0))
+	var snapshot_spacing := float(snapshot.get("spacing_m", 0.0))
+	var surface: PackedFloat32Array = snapshot.get("surface", PackedFloat32Array())
+	if snapshot_rows < 2 or snapshot_columns < 2 or surface.size() != snapshot_rows * snapshot_columns:
+		return null
+	var clone := TerrainState.new(
+		int(snapshot.get("seed", DEFAULT_SEED)),
+		snapshot_rows,
+		snapshot_columns,
+		snapshot_spacing,
+	)
+	clone.origin_xz = snapshot.get("origin_xz", clone.origin_xz) as Vector2
+	clone.terrain_epoch = String(snapshot.get("terrain_epoch", clone.terrain_epoch))
+	clone.terrain_revision = maxi(0, int(snapshot.get("terrain_revision", 0)))
+	clone.world_generation = maxi(0, int(snapshot.get("world_generation", 0)))
+	clone.stable_heights = surface.duplicate()
+	clone._baseline_stable = surface.duplicate()
+	clone.loose_depth = PackedFloat32Array()
+	clone.loose_depth.resize(surface.size())
+	clone._pending_brushes.clear()
+	clone._last_enqueued_sequence = -1
+	clone._dirty_revision = -1
+	clone._dirty_rect_cells = Rect2i()
+	clone._dirty_rect_with_halo = Rect2i()
+	return clone
+
+
 func enqueue_brush(sequence: int, center_xz: Vector2, radius_m: float, delta_m: float, normalize_center := false) -> bool:
 	if sequence <= _last_enqueued_sequence or radius_m <= 0.0:
 		return false

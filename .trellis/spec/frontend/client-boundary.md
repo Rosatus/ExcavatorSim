@@ -651,6 +651,105 @@ Wrong: Jolt runtime guesses res://resources/models/<id>_soil_contract.json
 Correct: model catalog path + SHA-256 -> one SoilContractDescriptor validator
 ```
 
+## Scenario: Bounded active-soil patch shadow
+
+### 1. Scope / Trigger
+
+Use this contract when cut material needs local gravity, bucket contact,
+containment, flow, pile, sleep, and settlement before the active patch owns
+product soil authority. The prototype is an optional visual shadow over the
+legacy analytic/parcel path.
+
+### 2. Signatures
+
+```text
+TerrainState.from_surface_snapshot(snapshot: Dictionary) -> TerrainState
+ActiveSoilPersistentField.configure(source_snapshot: Dictionary,
+  preset: String = "loose") -> bool
+ActiveSoilPersistentField.activate_volume(center_xz: Vector2,
+  requested_volume_m3: float, radius_m: float,
+  transfer_hint: String = "") -> Dictionary
+ActiveSoilPersistentField.settle_volume(center_xz: Vector2,
+  requested_volume_m3: float, radius_m: float,
+  transfer_hint: String = "") -> Dictionary
+ActiveSoilPatch.configure(source_snapshot: Dictionary,
+  quality: String = "balanced", material: String = "loose") -> bool
+ActiveSoilPatch.inject_cut_event(event: Dictionary,
+  aggregate_hint: String = "") -> Dictionary
+ActiveSoilPatch.step_fixed(delta: float, focus_world: Vector3,
+  soil_tool_snapshot: Dictionary = {}) -> Dictionary
+ExcavationWorld.set_active_soil_patch_prototype_enabled(value: bool) -> void
+```
+
+### 3. Contracts
+
+- `active_soil_patch_prototype_enabled` defaults false. Enabling clones the
+  current immutable product surface into an isolated `TerrainState`; only that
+  clone is passed to the patch `TerrainCommitScheduler`.
+- Accepted legacy `cut_events` are copied into generation-scoped aggregate IDs.
+  The copy may debit the shadow field and create representatives, but it cannot
+  credit/debit `BucketSoilState`, spawn authoritative parcels, mutate accepted
+  equipment state, or write the product `TerrainState`.
+- The local window is 3/4/5 metres for low/balanced/high. Each profile fixes
+  representative, substep, neighbor, settlement, memory, and tick-time budgets.
+  Quality changes may merge representatives but must preserve aggregate volume.
+- `loose`, `compact`, `sand`, and `damp` are game-feel presets with distinct
+  friction, cohesion, damping, sleep, compaction, and repose values. They are
+  not calibrated geotechnical material claims.
+- Representatives use gravity, the shadow terrain floor, full-bucket semantic
+  proxy contact, spatially bounded neighbor displacement, inner-shell
+  containment, and opening-oriented release. Sleeping or window-evicted volume
+  settles through `ActiveSoilPersistentField.settle_volume()` and its scheduler.
+- `ActiveSoilPatchPresenter` is a disposable `MultiMeshInstance3D` derivative.
+  Its instance count, transforms, visibility, or loss never changes volume.
+- Model switch, pose clear, authority/world generation change, reset, disable,
+  or material reconfiguration drops the old shadow generation and its visual
+  derivative. Default-off product snapshots remain byte-identical.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Invalid snapshot dimensions/surface length, quality, or material preset | Reject configuration; allocate no patch authority |
+| Empty/non-finite/out-of-grid activation or settlement | Reject transaction and report rejected volume |
+| Duplicate aggregate ID or exhausted representative budget | Reject before shadow terrain debit; never lose volume |
+| Shadow scheduler rejects a brush | Retain representative/source state and report rejection |
+| Generation or material changes | Clear prior representatives and re-clone current product truth |
+| Missing/invalid bucket semantic snapshot | Keep terrain/gravity motion; skip bucket collision for that tick |
+| Presenter missing or hidden | Continue fixed-step material behavior unchanged |
+
+### 5. Good / Base / Bad Cases
+
+- Good: accepted cut copy -> shadow scheduler debit -> bounded active
+  representatives -> bucket push/contain -> sleep -> shadow scheduler settle.
+- Base: flag disabled or prototype unavailable -> unchanged legacy analytic and
+  parcel behavior with no active-soil allocation.
+- Bad: share the product `TerrainState` with the prototype, delete an aggregate
+  when a budget is full, or treat representative count as physical volume.
+
+### 6. Tests Required
+
+- Assert product terrain digest/revision invariance while each material preset
+  activates, moves, and settles shadow volume.
+- Assert injected volume equals active plus settled volume within tolerance,
+  including flush, quality merge, window eviction, and generation cleanup.
+- Exercise full-bucket inner-shell containment plus floor/outer proxy collision;
+  missing proxy data must fail open without mutation.
+- Benchmark low/balanced/high against 2/4/6 ms p95 and 96/256/512 MiB memory
+  gates with representative counts never exceeding their fixed caps.
+- Keep legacy excavation, bucket-tool, model-switch, offline-product, and
+  backend verification green with the prototype default false.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: accepted cut -> same TerrainState is debited again by active particles
+Correct: accepted cut event copy -> isolated shadow TerrainState debit
+
+Wrong: overflow particles are silently dropped to hold frame time
+Correct: reject before debit, or merge representatives while preserving volume
+```
+
 ## Scenario: Construction-site Terrain3D presentation
 
 ### 1. Scope / Trigger

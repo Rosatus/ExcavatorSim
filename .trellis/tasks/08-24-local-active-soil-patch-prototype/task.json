@@ -3,7 +3,7 @@
   "name": "local-active-soil-patch-prototype",
   "title": "Local active soil patch prototype",
   "description": "Prototype a bounded local active-soil patch that converts persistent terrain material into visually dynamic soil and settles it back without taking product authority yet.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": "frontend/godot",
   "package": null,

@@ -15,6 +15,8 @@ const SOIL_PROXY_ORDER := ["cutting_edge", "opening", "cavity", "shell", "rear_s
 @export var hero_clods_enabled := true
 @export var backend_feedback_enabled := false
 @export var soil_tool_shadow_enabled := false
+@export var active_soil_patch_prototype_enabled := false
+@export_enum("loose", "compact", "sand", "damp") var active_soil_material_preset := "loose"
 @export_enum("low", "balanced", "high") var feedback_quality := "balanced"
 @export var local_tooth_offset := Vector3(0.0, -0.55, 0.0)
 
@@ -41,6 +43,9 @@ var _consumed_batch_keys: Dictionary = {}
 var _consumed_batch_order: Array[String] = []
 var _parcel_pool: SoilParcelPool
 var _soil_tool_classifier := BucketSoilTool.new()
+var _active_soil_patch: ActiveSoilPatch
+var _active_soil_presenter: ActiveSoilPatchPresenter
+var _active_soil_event_sequence := 0
 
 
 func _ready() -> void:
@@ -79,6 +84,8 @@ func _initialize() -> void:
 	if not terrain_world.world_reset.is_connected(_on_world_reset):
 		terrain_world.world_reset.connect(_on_world_reset)
 	_initialized = true
+	if active_soil_patch_prototype_enabled:
+		_ensure_active_soil_patch()
 	excavation_changed.emit(get_status_snapshot())
 
 
@@ -93,6 +100,7 @@ func _physics_process(delta: float) -> void:
 		_parcel_pool.notify_deposit_results(soil_result.get("parcel_deposit_results", []))
 	var cells_changed := _settle_bucket_cells(delta)
 	_spawn_cut_parcels(soil_result)
+	_step_active_soil_patch(soil_result, delta)
 	if _parcel_pool != null:
 		_step_parcel_pool(delta)
 	# Force-flush every fixed tick: the analytic dig loop samples TerrainState
@@ -137,6 +145,7 @@ func step_fixed_for_test() -> Dictionary:
 	if _parcel_pool != null:
 		_parcel_pool.notify_deposit_results(result.get("parcel_deposit_results", []))
 	_spawn_cut_parcels(result)
+	_step_active_soil_patch(result, 1.0 / 60.0)
 	var commit := terrain_scheduler.step_fixed(0.0, true)
 	soil_state.reconcile_transfers(
 		commit.get("committed_transfer_ids", []),
@@ -214,6 +223,17 @@ func set_soil_tool_shadow_enabled(value: bool) -> void:
 		_last_interaction_batch.erase("soil_tool_shadow")
 
 
+func set_active_soil_patch_prototype_enabled(value: bool) -> void:
+	if active_soil_patch_prototype_enabled == value:
+		return
+	active_soil_patch_prototype_enabled = value
+	if value:
+		_ensure_active_soil_patch()
+	else:
+		_reset_active_soil_patch(false)
+	excavation_changed.emit(get_status_snapshot())
+
+
 func get_status_snapshot() -> Dictionary:
 	var status := soil_state.get_status_snapshot() if soil_state != null else {"bucket_volume_m3": 0.0, "world_generation": -1}
 	status["authority_generation"] = authority_generation
@@ -222,6 +242,9 @@ func get_status_snapshot() -> Dictionary:
 	status["hero_clods_enabled"] = hero_clods_enabled
 	status["backend_feedback_enabled"] = backend_feedback_enabled
 	status["soil_tool_shadow_enabled"] = soil_tool_shadow_enabled
+	status["active_soil_patch_prototype_enabled"] = active_soil_patch_prototype_enabled
+	status["soil_authority_mode"] = "active_patch_shadow" if active_soil_patch_prototype_enabled else "legacy_analytic_parcel"
+	status["active_soil_patch"] = _active_soil_patch.get_status_snapshot() if _active_soil_patch != null else {"configured": false}
 	status["interaction_state"] = _last_interaction
 	status["material_generation"] = _material_generation
 	status["flow_volume_m3"] = _last_flow_volume_m3
@@ -271,6 +294,7 @@ func step_automatic_snapshot_for_test(snapshot: Dictionary, delta: float = 1.0 /
 		_parcel_pool.notify_deposit_results(soil_result.get("parcel_deposit_results", []))
 	_settle_bucket_cells(delta)
 	_spawn_cut_parcels(soil_result)
+	_step_active_soil_patch(soil_result, delta)
 	if _parcel_pool != null:
 		_step_parcel_pool(delta)
 	var commit_result := terrain_scheduler.step_fixed(delta, true)
@@ -713,6 +737,68 @@ func _spawn_cut_parcels(soil_result: Dictionary) -> void:
 		)
 
 
+func _ensure_active_soil_patch() -> bool:
+	if not active_soil_patch_prototype_enabled or terrain_world == null or terrain_world.terrain_state == null:
+		return false
+	if _active_soil_patch != null:
+		var status := _active_soil_patch.get_status_snapshot()
+		if (
+			int(status.get("generation", -1)) == terrain_world.terrain_state.world_generation
+			and String(status.get("material_preset", "")) == active_soil_material_preset
+		):
+			_active_soil_patch.set_quality_profile(feedback_quality)
+			return true
+		_reset_active_soil_patch(false)
+	_active_soil_patch = ActiveSoilPatch.new()
+	if not _active_soil_patch.configure(
+		terrain_world.terrain_state.surface_snapshot(),
+		feedback_quality,
+		active_soil_material_preset,
+	):
+		_active_soil_patch = null
+		return false
+	if _active_soil_presenter == null or not is_instance_valid(_active_soil_presenter):
+		_active_soil_presenter = ActiveSoilPatchPresenter.new()
+		_active_soil_presenter.name = "ActiveSoilPatchPresenter"
+		add_child(_active_soil_presenter)
+	_active_soil_presenter.visible = true
+	_active_soil_event_sequence = 0
+	return true
+
+
+func _step_active_soil_patch(soil_result: Dictionary, delta: float) -> void:
+	if not active_soil_patch_prototype_enabled or not _ensure_active_soil_patch():
+		return
+	var latest_event_position := Vector3.ZERO
+	var has_event_position := false
+	for event_value in soil_result.get("cut_events", []):
+		var event := event_value as Dictionary
+		var aggregate_id := "%d:%d" % [terrain_world.terrain_state.world_generation, _active_soil_event_sequence]
+		_active_soil_event_sequence += 1
+		_active_soil_patch.inject_cut_event(event, aggregate_id)
+		latest_event_position = event.get("tooth_world", Vector3.ZERO) as Vector3
+		has_event_position = true
+	var current := _last_pose_snapshot.get("current", {}) as Dictionary
+	var focus := latest_event_position if has_event_position else _active_soil_patch.get_status_snapshot().get("focus_world", Vector3.ZERO) as Vector3
+	if current.has("opening"):
+		focus = (current["opening"] as Transform3D).origin
+	elif current.has("cutting_edge"):
+		focus = (current["cutting_edge"] as Transform3D).origin
+	var soil_tool_snapshot := _last_pose_snapshot.get("soil_tool", {}) as Dictionary
+	_active_soil_patch.step_fixed(delta, focus, soil_tool_snapshot)
+	if _active_soil_presenter != null:
+		_active_soil_presenter.apply_snapshot(_active_soil_patch.get_visual_snapshot())
+
+
+func _reset_active_soil_patch(settle_active: bool) -> void:
+	if _active_soil_patch != null:
+		_active_soil_patch.clear(settle_active)
+	_active_soil_patch = null
+	_active_soil_event_sequence = 0
+	if _active_soil_presenter != null:
+		_active_soil_presenter.clear()
+
+
 func _step_parcel_pool(delta: float) -> void:
 	var current: Dictionary = _last_pose_snapshot.get("current", {})
 	if not current.has("cavity"):
@@ -880,6 +966,9 @@ func _on_world_reset(generation: int) -> void:
 	_material_generation += 1
 	if _presentation != null:
 		_presentation.clear_bucket_pose_history()
+	_reset_active_soil_patch(false)
+	if active_soil_patch_prototype_enabled:
+		_ensure_active_soil_patch()
 	excavation_changed.emit(get_status_snapshot())
 
 
@@ -907,4 +996,7 @@ func _clear_local_material(reason: String) -> void:
 	_material_generation += 1
 	if _presentation != null:
 		_presentation.clear_bucket_pose_history()
+	_reset_active_soil_patch(false)
+	if active_soil_patch_prototype_enabled:
+		_ensure_active_soil_patch()
 	excavation_changed.emit(get_status_snapshot())
