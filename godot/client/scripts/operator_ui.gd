@@ -11,12 +11,14 @@ const CONFIG_GUIDE_DISMISSED := "guide_dismissed"
 @export var excavation_world_path := NodePath("../TerrainRoot/ExcavationWorld")
 @export var chassis_path := NodePath("../ChassisMotionRoot")
 @export var camera_path := NodePath("../Camera3D")
+@export var feedback_path := NodePath("../MachineFeedback")
 
 var _motion_client: MotionClient
 var _product_session: ProductSession
 var _excavation_world: ExcavationWorld
 var _chassis: TrackedChassisController
 var _camera: CameraRig
+var _feedback: MachineFeedback
 var _prompt_mode := "keyboard"
 var _ignore_model_selection := false
 var _pending_action := ""
@@ -51,6 +53,7 @@ var _current_fill_ratio := 0.0
 @onready var _reset_button: Button = $StatusPanel/Margin/VBox/Actions/Reset
 @onready var _guide_button: Button = $StatusPanel/Margin/VBox/Tools/Guide
 @onready var _advanced_button: CheckButton = $StatusPanel/Margin/VBox/Tools/Advanced
+@onready var _mute_audio_button: CheckButton = $StatusPanel/Margin/VBox/Tools/MuteAudio
 @onready var _guide_panel: PanelContainer = $GuidePanel
 @onready var _guide_title_label: Label = $GuidePanel/Margin/VBox/Title
 @onready var _guide_intro_label: Label = $GuidePanel/Margin/VBox/Intro
@@ -67,6 +70,7 @@ func _ready() -> void:
 	_excavation_world = get_node_or_null(excavation_world_path) as ExcavationWorld
 	_chassis = get_node_or_null(chassis_path) as TrackedChassisController
 	_camera = get_node_or_null(camera_path) as CameraRig
+	_feedback = get_node_or_null(feedback_path) as MachineFeedback
 	_apply_static_copy()
 	_configure_model_selector()
 	_configure_camera_selector()
@@ -75,6 +79,7 @@ func _ready() -> void:
 	_reset_button.pressed.connect(_on_reset_pressed)
 	_guide_button.pressed.connect(show_control_guide)
 	_advanced_button.toggled.connect(_on_advanced_toggled)
+	_mute_audio_button.toggled.connect(_on_audio_muted)
 	_guide_close_button.pressed.connect(_on_guide_closed)
 	_reset_view_button.pressed.connect(_on_reset_view_pressed)
 	_confirmation.confirmed.connect(_on_destructive_confirmed)
@@ -108,6 +113,7 @@ func _apply_static_copy() -> void:
 	_reset_button.text = UIStrings.BUTTON_RESET
 	_guide_button.text = UIStrings.BUTTON_GUIDE
 	_advanced_button.text = UIStrings.BUTTON_ADVANCED
+	_mute_audio_button.text = UIStrings.BUTTON_MUTE_AUDIO
 	_guide_title_label.text = UIStrings.GUIDE_TITLE
 	_guide_intro_label.text = UIStrings.GUIDE_INTRO
 	_guide_recovery_label.text = UIStrings.GUIDE_RECOVERY
@@ -250,6 +256,11 @@ func _on_destructive_canceled() -> void:
 
 func _on_advanced_toggled(pressed: bool) -> void:
 	_advanced_panel.visible = pressed
+
+
+func _on_audio_muted(pressed: bool) -> void:
+	if _feedback != null:
+		_feedback.set_muted(pressed)
 
 
 func show_control_guide() -> void:

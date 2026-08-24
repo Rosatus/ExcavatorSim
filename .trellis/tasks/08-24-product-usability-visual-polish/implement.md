@@ -18,7 +18,7 @@
 6. [x] Finish `08-24-construction-site-visual-polish` by integrating the stable
        persistent-field/active-patch dirty snapshots and close its seam/double-
        pile acceptance gates.
-7. [ ] `08-24-soil-effects-audio-feedback`: consume stabilized soil transfer,
+7. [x] `08-24-soil-effects-audio-feedback`: consume stabilized soil transfer,
        patch, ledger, and response snapshots; replace placeholder-looking
        feedback and add a quality-bounded runtime audio mix.
 8. [ ] `08-24-product-experience-validation`: record after evidence, execute the

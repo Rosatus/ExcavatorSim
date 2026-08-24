@@ -27,6 +27,7 @@
 [ext_resource type="Script" path="res://scripts/simulation_truth_publisher.gd" id="16_truth_publisher"]
 [ext_resource type="Script" path="res://scripts/product_session.gd" id="17_product_session"]
 [ext_resource type="Script" path="res://scripts/construction_site_dressing.gd" id="18_site_dressing"]
+[ext_resource type="Script" path="res://scripts/machine_feedback.gd" id="19_machine_feedback"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_qkpxi"]
 shader = ExtResource("1_pm3ni")
@@ -309,6 +310,10 @@ presentation_root_path = NodePath("../ChassisMotionRoot/PresentationRoot")
 
 [node name="SimulationTruthPublisher" type="Node" parent="."]
 script = ExtResource("16_truth_publisher")
+
+[node name="MachineFeedback" type="Node" parent="."]
+script = ExtResource("19_machine_feedback")
+
 [node name="OperatorUI" type="CanvasLayer" parent="." unique_id=232332145]
 script = ExtResource("4_operator_ui")
 
@@ -440,6 +445,11 @@ text = "Controls"
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Advanced"
+
+[node name="MuteAudio" type="CheckButton" parent="OperatorUI/StatusPanel/Margin/VBox/Tools"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Mute Audio"
 
 [node name="AdvancedPanel" type="VBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox"]
 visible = false

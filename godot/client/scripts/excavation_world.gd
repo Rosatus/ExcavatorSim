@@ -432,16 +432,26 @@ func get_soil_visual_snapshot() -> Dictionary:
 	var status := get_selected_soil_payload_snapshot()
 	var lifecycle_shadow := _soil_interaction_authority.get_status_snapshot() if _soil_interaction_authority != null else {}
 	var chassis_status := _tracked_chassis_controller.get_status_snapshot() if _tracked_chassis_controller != null else {}
+	var last_transaction := lifecycle_shadow.get("last_transaction", {}) as Dictionary
 	return {
 		"world_generation": int(status.get("world_generation", -1)),
 		"authority_generation": authority_generation,
 		"material_generation": _material_generation,
 		"fill_ratio": float(status.get("fill_ratio", 0.0)),
+		"bucket_volume_m3": float(status.get("bucket_volume_m3", 0.0)),
+		"payload_mass_kg": float(status.get("payload_mass_kg", 0.0)),
+		"selected_source": String(status.get("source", "legacy")),
+		"selected_ledger_identity": String(status.get("ledger_identity", "legacy:unavailable")),
 		"fill_profile": status.get("fill_profile", PackedFloat32Array()),
 		"cell_grid": status.get("cell_grid", [1, 1, 1]),
 		"center_of_mass_local": status.get("center_of_mass_local", Vector3.ZERO),
 		"flow_volume_m3": _last_flow_volume_m3,
 		"interaction_state": _last_interaction,
+		"interaction_batch_key": String(_last_interaction_batch.get("key", "")),
+		"interaction_operation": String(_last_interaction_batch.get("operation", _last_interaction)),
+		"interaction_penetration_m": float(_last_interaction_batch.get("analytic_penetration_m", 0.0)),
+		"transaction_queued": bool(_last_interaction_batch.get("transaction_queued", false)),
+		"last_transaction": last_transaction.duplicate(true),
 		"hero_clods_enabled": hero_clods_enabled,
 		"bucket_pose": _last_pose_snapshot.duplicate(true),
 		"soil_material_lifecycle_mode": _selected_soil_mode(),

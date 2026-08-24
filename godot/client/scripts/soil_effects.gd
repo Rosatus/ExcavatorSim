@@ -8,6 +8,8 @@ extends Node3D
 
 var _flow_particles: GPUParticles3D
 var _flow_material: ParticleProcessMaterial
+var _dust_particles: GPUParticles3D
+var _dust_material: ParticleProcessMaterial
 var _fill_mesh: MeshInstance3D
 var _fill_material: StandardMaterial3D
 var _last_fill_ratio := -1.0
@@ -20,11 +22,13 @@ var _clod_ages: Dictionary = {}
 var _active_clod_cap := 32
 var _clod_spawn_accumulator := 0.0
 var _last_visual_snapshot: Dictionary = {}
+var _spawn_sequence := 0
 
 
 func _ready() -> void:
 	_build_fill_mesh()
 	_build_particles()
+	_build_dust_particles()
 	_build_clod_pool()
 	_connect_excavation()
 
@@ -40,6 +44,8 @@ func set_budget(count: int) -> void:
 	_budget = clampi(count, 0, max_particles)
 	if _flow_particles != null:
 		_flow_particles.amount = maxi(_budget, 1)
+	if _dust_particles != null:
+		_dust_particles.amount = maxi(1, mini(720, _budget / 4))
 	_active_clod_cap = 0 if _budget < 1000 else (32 if _budget < 3000 else max_clods)
 
 
@@ -50,6 +56,9 @@ func clear_for_generation(generation: int) -> void:
 	if _flow_particles != null:
 		_flow_particles.emitting = false
 		_flow_particles.restart()
+	if _dust_particles != null:
+		_dust_particles.emitting = false
+		_dust_particles.restart()
 	if _fill_mesh != null:
 		_fill_mesh.visible = false
 	_last_fill_ratio = -1.0
@@ -65,6 +74,8 @@ func get_effect_snapshot() -> Dictionary:
 		"generation": _generation,
 		"particle_node": _flow_particles != null,
 		"particles_emitting": _flow_particles != null and _flow_particles.emitting,
+		"dust_node": _dust_particles != null,
+		"dust_emitting": _dust_particles != null and _dust_particles.emitting,
 		"fill_visible": _fill_mesh != null and _fill_mesh.visible,
 		"active_clods": _active_clod_count(),
 		"clod_cap": _active_clod_cap,
@@ -74,14 +85,14 @@ func get_effect_snapshot() -> Dictionary:
 func _build_fill_mesh() -> void:
 	_fill_mesh = MeshInstance3D.new()
 	_fill_mesh.name = "BucketSoilFill"
-	_fill_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_fill_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	_fill_mesh.visible = false
 	_fill_material = StandardMaterial3D.new()
-	_fill_material.albedo_color = Color("#5d3f28")
-	_fill_material.roughness = 1.0
+	_fill_material.albedo_color = Color("#62442e")
+	_fill_material.roughness = 0.94
 	_fill_material.metallic = 0.0
 	_fill_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	_fill_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_fill_material.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
 	add_child(_fill_mesh)
 
 
@@ -107,9 +118,8 @@ func _build_particles() -> void:
 	_flow_material.scale_min = 0.45
 	_flow_material.scale_max = 1.25
 	_flow_particles.process_material = _flow_material
-	var grain := SphereMesh.new()
-	grain.radius = 0.028
-	grain.height = 0.056
+	var grain := BoxMesh.new()
+	grain.size = Vector3(0.046, 0.028, 0.061)
 	var material := StandardMaterial3D.new()
 	material.albedo_color = Color("#875a34")
 	material.roughness = 1.0
@@ -117,6 +127,39 @@ func _build_particles() -> void:
 	_flow_particles.draw_pass_1 = grain
 	_flow_particles.visibility_aabb = AABB(Vector3(-4.0, -4.0, -4.0), Vector3(8.0, 8.0, 8.0))
 	add_child(_flow_particles)
+
+
+func _build_dust_particles() -> void:
+	_dust_particles = GPUParticles3D.new()
+	_dust_particles.name = "ContactDust"
+	_dust_particles.amount = mini(720, _budget / 4)
+	_dust_particles.lifetime = 1.35
+	_dust_particles.randomness = 0.72
+	_dust_particles.fixed_fps = 24
+	_dust_particles.emitting = false
+	_dust_material = ParticleProcessMaterial.new()
+	_dust_material.direction = Vector3.UP
+	_dust_material.spread = 48.0
+	_dust_material.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	_dust_material.emission_box_extents = Vector3(0.22, 0.035, 0.16)
+	_dust_material.initial_velocity_min = 0.18
+	_dust_material.initial_velocity_max = 0.72
+	_dust_material.gravity = Vector3(0.0, -0.35, 0.0)
+	_dust_material.scale_min = 0.35
+	_dust_material.scale_max = 1.4
+	_dust_particles.process_material = _dust_material
+	var mote := QuadMesh.new()
+	mote.size = Vector2(0.18, 0.18)
+	var dust_color := StandardMaterial3D.new()
+	dust_color.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	dust_color.albedo_color = Color(0.55, 0.39, 0.24, 0.26)
+	dust_color.roughness = 1.0
+	dust_color.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	dust_color.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mote.material = dust_color
+	_dust_particles.draw_pass_1 = mote
+	_dust_particles.visibility_aabb = AABB(Vector3(-5.0, -2.0, -5.0), Vector3(10.0, 7.0, 10.0))
+	add_child(_dust_particles)
 
 
 func _build_clod_pool() -> void:
@@ -130,9 +173,8 @@ func _build_clod_pool() -> void:
 		body.visible = false
 		body.can_sleep = true
 		var mesh_instance := MeshInstance3D.new()
-		var mesh := SphereMesh.new()
-		mesh.radius = 0.045
-		mesh.height = 0.09
+		var mesh := BoxMesh.new()
+		mesh.size = Vector3(0.09, 0.065, 0.11)
 		var material := StandardMaterial3D.new()
 		material.albedo_color = Color("#59402e")
 		material.roughness = 1.0
@@ -140,8 +182,8 @@ func _build_clod_pool() -> void:
 		mesh_instance.mesh = mesh
 		body.add_child(mesh_instance)
 		var collision := CollisionShape3D.new()
-		var shape := SphereShape3D.new()
-		shape.radius = 0.045
+		var shape := BoxShape3D.new()
+		shape.size = Vector3(0.085, 0.06, 0.105)
 		collision.shape = shape
 		body.add_child(collision)
 		add_child(body)
@@ -178,6 +220,7 @@ func _apply_visual_snapshot(status: Dictionary) -> void:
 	var contract: Dictionary = pose.get("contract", {})
 	_update_fill(status, current, contract)
 	_update_flow(status, current, pose)
+	_update_dust(status, current)
 
 
 func _update_fill(status: Dictionary, current: Dictionary, contract: Dictionary) -> void:
@@ -236,6 +279,24 @@ func _update_flow(status: Dictionary, current: Dictionary, pose: Dictionary) -> 
 	_flow_particles.emitting = true
 
 
+func _update_dust(status: Dictionary, current: Dictionary) -> void:
+	if not emission_enabled or _budget < 400 or _dust_particles == null:
+		if _dust_particles != null:
+			_dust_particles.emitting = false
+		return
+	var response := status.get("digging_response", {}) as Dictionary
+	var phase := String(response.get("phase", response.get("raw_phase", "free")))
+	var intensity := clampf(float(response.get("intensity", 0.0)), 0.0, 1.0)
+	if phase not in ["contact", "scrape", "cut", "load", "blocked"] or intensity < 0.12 or not current.has("cutting_edge"):
+		_dust_particles.emitting = false
+		return
+	var source := current["cutting_edge"] as Transform3D
+	_dust_particles.global_position = source.origin
+	_dust_material.initial_velocity_max = lerpf(0.42, 1.05, intensity)
+	_dust_material.scale_max = lerpf(0.75, 1.8, intensity)
+	_dust_particles.emitting = true
+
+
 func _update_clods(delta: float, status: Dictionary) -> void:
 	for clod in _clods:
 		if clod.freeze:
@@ -279,13 +340,18 @@ func _spawn_clod(status: Dictionary, interaction: String) -> bool:
 		var opening_normal := pose.get("opening_normal_world", Vector3.DOWN) as Vector3
 		if not opening_normal.is_zero_approx():
 			source_origin += opening_normal.normalized() * 0.2
-	available.global_position = source_origin + Vector3(randf_range(-0.08, 0.08), 0.04, randf_range(-0.08, 0.08))
+	_spawn_sequence += 1
+	var noise_x := _spawn_noise(_spawn_sequence, 17)
+	var noise_y := _spawn_noise(_spawn_sequence, 29)
+	var noise_z := _spawn_noise(_spawn_sequence, 43)
+	available.global_position = source_origin + Vector3(noise_x * 0.08, 0.04, noise_z * 0.08)
+	available.scale = Vector3(0.72 + absf(noise_x) * 0.48, 0.62 + absf(noise_y) * 0.5, 0.78 + absf(noise_z) * 0.45)
 	available.freeze = false
 	available.sleeping = false
 	available.visible = true
-	var lateral := Vector3(randf_range(-0.35, 0.35), randf_range(0.1, 0.45), randf_range(-0.35, 0.35))
+	var lateral := Vector3(noise_x * 0.35, lerpf(0.1, 0.45, (noise_y + 1.0) * 0.5), noise_z * 0.35)
 	available.linear_velocity = lateral if interaction == "cut" else lateral + Vector3.DOWN * 0.8
-	available.angular_velocity = Vector3(randf_range(-4.0, 4.0), randf_range(-4.0, 4.0), randf_range(-4.0, 4.0))
+	available.angular_velocity = Vector3(noise_z, noise_x, noise_y) * 4.0
 	_clod_ages[available.get_instance_id()] = 0.0
 	return true
 
@@ -305,6 +371,13 @@ func _active_clod_count() -> int:
 		if not clod.freeze:
 			count += 1
 	return count
+
+
+func _spawn_noise(sequence: int, salt: int) -> float:
+	var value := sequence * 374761393 + salt * 668265263
+	value = (value ^ (value >> 13)) * 1274126177
+	value = value ^ (value >> 16)
+	return float(value & 0xffff) / 32767.5 - 1.0
 
 
 func _rebuild_fill_surface(

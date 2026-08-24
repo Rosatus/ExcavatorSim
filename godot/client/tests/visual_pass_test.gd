@@ -71,8 +71,11 @@ func _test_scene_visual_nodes() -> int:
 	var visual_environment := scene.get_node_or_null("VisualEnvironment") as VisualEnvironment
 	var quality := scene.get_node_or_null("VisualQualityController") as VisualQualityController
 	var dressing := scene.get_node_or_null("TerrainRoot/ConstructionSiteDressing") as ConstructionSiteDressing
-	if visual_environment == null or quality == null or dressing == null or scene.get_node_or_null("SoilEffects") == null:
+	var scene_effects := scene.get_node_or_null("SoilEffects") as SoilEffects
+	if visual_environment == null or quality == null or dressing == null or scene_effects == null:
 		return _fail("visual environment, quality and effects nodes exist")
+	if not bool(scene_effects.get_effect_snapshot()["dust_node"]):
+		return _fail("soil effects include a bounded contact-dust pool")
 	var terrain_renderer := scene.get_node_or_null("TerrainRoot/TerrainWorld/TerrainMesh") as TerrainRenderer
 	if terrain_renderer == null or terrain_renderer.get_status_snapshot().get("material_kind", "") != "procedural_worksite_soil":
 		return _fail("fallback terrain retains the procedural worksite material identity")

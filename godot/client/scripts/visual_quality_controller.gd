@@ -2,9 +2,9 @@ class_name VisualQualityController
 extends Node
 
 const PROFILES := {
-	"low": {"particles": 500, "camera_far": 80.0, "shadows": false, "site_cues": 14, "site_shadows": false},
-	"balanced": {"particles": 1800, "camera_far": 140.0, "shadows": true, "site_cues": 28, "site_shadows": true},
-	"high": {"particles": 4200, "camera_far": 220.0, "shadows": true, "site_cues": 45, "site_shadows": true},
+	"low": {"particles": 500, "camera_far": 80.0, "shadows": false, "site_cues": 14, "site_shadows": false, "audio_loops": 1, "audio_voices": 2},
+	"balanced": {"particles": 1800, "camera_far": 140.0, "shadows": true, "site_cues": 28, "site_shadows": true, "audio_loops": 3, "audio_voices": 4},
+	"high": {"particles": 4200, "camera_far": 220.0, "shadows": true, "site_cues": 45, "site_shadows": true, "audio_loops": 3, "audio_voices": 6},
 }
 
 @export var profile := "balanced"
@@ -46,6 +46,11 @@ func apply_profile(profile_name: String) -> bool:
 		_applied = false
 		last_error = "site_dressing_profile_failed"
 		return false
+	var feedback := get_node_or_null("../MachineFeedback")
+	if feedback != null and feedback.has_method("set_quality_profile") and not bool(feedback.call("set_quality_profile", profile_name)):
+		_applied = false
+		last_error = "feedback_profile_failed"
+		return false
 	Engine.max_fps = target_fps
 	_applied = true
 	last_error = ""
@@ -62,6 +67,8 @@ func get_quality_snapshot() -> Dictionary:
 		"shadows": bool(settings.get("shadows", false)),
 		"site_cues": int(settings.get("site_cues", 0)),
 		"site_shadows": bool(settings.get("site_shadows", false)),
+		"audio_loops": int(settings.get("audio_loops", 0)),
+		"audio_voices": int(settings.get("audio_voices", 0)),
 		"applied": _applied,
 		"last_error": last_error,
 	}

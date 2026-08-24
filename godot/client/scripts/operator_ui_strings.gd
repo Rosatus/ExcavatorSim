@@ -18,6 +18,7 @@ const BUTTON_GUIDE := "Controls"
 const BUTTON_ADVANCED := "Advanced"
 const BUTTON_CLOSE := "Continue"
 const BUTTON_RESET_VIEW := "Reset View  C"
+const BUTTON_MUTE_AUDIO := "Mute Audio"
 
 const WARNING_FOCUS := "Window focus lost — motion is safely stopped. Click the simulator to continue."
 const WARNING_PAUSED := "Machine paused — press Start when the work area is clear."

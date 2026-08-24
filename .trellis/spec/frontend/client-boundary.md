@@ -1442,6 +1442,81 @@ Wrong: Terrain3D-only props/materials -> different fallback product
 Correct: shared code-native dressing + accepted snapshot derivatives -> both backends
 ```
 
+## Scenario: Bounded machine/soil feedback presentation
+
+### 1. Scope / Trigger
+
+Use this contract for selected-soil visual effects, procedural machine/effect
+audio, mix/mute state, event deduplication, and lifecycle cleanup.
+
+### 2. Signatures
+
+```text
+ExcavationWorld.get_soil_visual_snapshot() -> Dictionary
+SoilEffects.set_budget(count: int) -> void
+SoilEffects.clear_for_generation(generation: int) -> void
+MachineFeedback.set_quality_profile(profile: String) -> bool
+MachineFeedback.set_muted(value: bool) -> void
+MachineFeedback.stop_all(reason: String = "stop") -> void
+MachineFeedback.get_feedback_snapshot() -> Dictionary
+```
+
+### 3. Contracts
+
+- Feedback reads selected source/ledger identity, accepted transaction ID/kind/
+  volume, interaction batch key, bucket payload, normalized digging response,
+  chassis track speed/slip/contact, and ProductSession lifecycle. It cannot call
+  terrain, ledger, parcel, patch, Jolt command, or payload write APIs.
+- Soil flow, dust, fill, and hero clods are disposable derivatives. Fill is
+  shaded irregular geometry; flow grains and clods are nonuniform, deterministic
+  shapes; contact dust is a separate bounded pool. None represents inventory.
+- Engine, tracks, and work equipment use three preallocated 11.025 kHz
+  AudioStreamGenerator loops. Gain/pitch derive from lifecycle, speed/slip,
+  commands, and normalized intensity and remain inside -80..-4 dB / 0.62..1.45.
+  They are game feedback, not hydraulic/engine/pump/cylinder simulation.
+- Accepted cut/dump/spill/settle plus contact/warning/lifecycle cues use a fixed
+  six-voice pool and code-generated PCM. Transaction/batch identity and explicit
+  cooldowns prevent duplicate/chattering events. No external recording is used.
+- Runtime Machine/Effects buses feed Master. Project settings own default dB;
+  HUD mute silences players without changing authoritative state or VFX.
+- Pause, stop, focus loss, reset, model switch, authority generation, and
+  teardown stop loops, clear buffers/cooldowns, and recycle voices/effects.
+- Low/balanced/high allow 1/3/3 loops, 2/4/6 voices, particles 500/1800/4200,
+  clods 0/32/48, and correspondingly bounded dust counts.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Duplicate transaction/batch identity | Emit no second cue |
+| Voice/cooldown exhausted | Drop/merge cue; never allocate a new player |
+| Muted or dummy device | Preserve feedback state/VFX; output stays silent/fails soft |
+| Pause/focus loss/reset/model switch | Zero active loops/voices and clear event transient |
+| Unknown profile | Reject and preserve prior caps |
+| Presentation disabled/quality reduced | Material ledger, terrain, payload, and commands remain unchanged |
+
+### 5. Good / Base / Bad Cases
+
+- Good: accepted snapshot identities -> bounded state mapping -> pooled VFX/audio.
+- Base: dummy/missing audio -> state and visuals continue without authority impact.
+- Bad: visible clod/voice count -> soil volume, or per-event player allocation.
+
+### 6. Tests Required
+
+- `machine_feedback_test.gd` asserts layer mapping, clamps, identity dedupe,
+  quality caps, mute, buses, generation/focus/pause cleanup without listening.
+- Visual/offline/soil tests assert dust/fill/clod budgets and unchanged selected
+  authority/conservation behavior across lifecycle/model boundaries.
+- Human final review owns subjective sound mix, clicks, action distinction, and
+  close-range effect appeal.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: penetration -> fake soil event -> new volume and new AudioStreamPlayer
+Correct: accepted transaction ID -> cooldown -> fixed visual/voice pool
+```
+
 ### Visual verification operating policy
 
 - Feature implementation prioritizes executable contracts, deterministic tests,
