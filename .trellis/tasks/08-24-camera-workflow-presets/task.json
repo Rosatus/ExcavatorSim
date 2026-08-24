@@ -3,7 +3,7 @@
   "name": "camera-workflow-presets",
   "title": "Camera workflow presets",
   "description": "Deliver stable operator, orbit, work-tool, and inspection camera modes with usable transitions, framing, occlusion handling, and input discoverability.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

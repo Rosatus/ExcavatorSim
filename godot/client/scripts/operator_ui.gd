@@ -10,11 +10,13 @@ const CONFIG_GUIDE_DISMISSED := "guide_dismissed"
 @export var product_session_path := NodePath("../ProductSession")
 @export var excavation_world_path := NodePath("../TerrainRoot/ExcavationWorld")
 @export var chassis_path := NodePath("../ChassisMotionRoot")
+@export var camera_path := NodePath("../Camera3D")
 
 var _motion_client: MotionClient
 var _product_session: ProductSession
 var _excavation_world: ExcavationWorld
 var _chassis: TrackedChassisController
+var _camera: CameraRig
 var _prompt_mode := "keyboard"
 var _ignore_model_selection := false
 var _pending_action := ""
@@ -33,6 +35,9 @@ var _current_fill_ratio := 0.0
 @onready var _bucket_fill: ProgressBar = $StatusPanel/Margin/VBox/BucketFill
 @onready var _control_hint: Label = $StatusPanel/Margin/VBox/ControlHint
 @onready var _automatic_soil_hint: Label = $StatusPanel/Margin/VBox/AutomaticSoilHint
+@onready var _camera_mode_label: Label = $StatusPanel/Margin/VBox/CameraRow/Mode
+@onready var _camera_selector: OptionButton = $StatusPanel/Margin/VBox/CameraRow/Selector
+@onready var _reset_view_button: Button = $StatusPanel/Margin/VBox/CameraRow/ResetView
 @onready var _warning_label: Label = $StatusPanel/Margin/VBox/Warning
 @onready var _completion_label: Label = $StatusPanel/Margin/VBox/Completion
 @onready var _connection_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/Connection
@@ -61,14 +66,17 @@ func _ready() -> void:
 	_product_session = get_node_or_null(product_session_path) as ProductSession
 	_excavation_world = get_node_or_null(excavation_world_path) as ExcavationWorld
 	_chassis = get_node_or_null(chassis_path) as TrackedChassisController
+	_camera = get_node_or_null(camera_path) as CameraRig
 	_apply_static_copy()
 	_configure_model_selector()
+	_configure_camera_selector()
 	_start_button.pressed.connect(_on_start_pressed)
 	_pause_button.pressed.connect(_on_pause_pressed)
 	_reset_button.pressed.connect(_on_reset_pressed)
 	_guide_button.pressed.connect(show_control_guide)
 	_advanced_button.toggled.connect(_on_advanced_toggled)
 	_guide_close_button.pressed.connect(_on_guide_closed)
+	_reset_view_button.pressed.connect(_on_reset_view_pressed)
 	_confirmation.confirmed.connect(_on_destructive_confirmed)
 	_confirmation.canceled.connect(_on_destructive_canceled)
 	if _excavation_world != null:
@@ -83,6 +91,8 @@ func _ready() -> void:
 	if _product_session != null:
 		_product_session.status_changed.connect(_on_product_status_changed)
 		_product_session.model_changed.connect(_on_product_model_changed)
+	if _camera != null:
+		_camera.mode_changed.connect(_on_camera_mode_changed)
 	_advanced_panel.visible = false
 	_guide_panel.visible = not _guide_was_dismissed()
 	_refresh_prompt_copy()
@@ -102,6 +112,7 @@ func _apply_static_copy() -> void:
 	_guide_intro_label.text = UIStrings.GUIDE_INTRO
 	_guide_recovery_label.text = UIStrings.GUIDE_RECOVERY
 	_guide_close_button.text = UIStrings.BUTTON_CLOSE
+	_reset_view_button.text = UIStrings.BUTTON_RESET_VIEW
 
 
 func _process(_delta: float) -> void:
@@ -128,6 +139,42 @@ func _configure_model_selector() -> void:
 	_model_selector.set_item_metadata(1, "sy135")
 	_model_selector.tooltip_text = "Choose an excavator model. Switching starts a fresh work session."
 	_model_selector.item_selected.connect(_on_model_selected)
+
+
+func _configure_camera_selector() -> void:
+	_camera_selector.clear()
+	for mode in CameraRig.MODES:
+		_camera_selector.add_item(String(CameraRig.MODE_NAMES[mode]))
+		_camera_selector.set_item_metadata(_camera_selector.item_count - 1, mode)
+	_camera_selector.item_selected.connect(_on_camera_mode_selected)
+	_refresh_camera_selector()
+
+
+func _on_camera_mode_selected(index: int) -> void:
+	if _camera != null:
+		_camera.set_mode(String(_camera_selector.get_item_metadata(index)))
+
+
+func _on_reset_view_pressed() -> void:
+	if _camera != null:
+		_camera.reset_view()
+
+
+func _on_camera_mode_changed(_mode: String, _display_name: String) -> void:
+	_refresh_camera_selector()
+
+
+func _refresh_camera_selector() -> void:
+	if _camera == null:
+		_camera_mode_label.text = "VIEW UNAVAILABLE"
+		_camera_selector.disabled = true
+		_reset_view_button.disabled = true
+		return
+	_camera_mode_label.text = "VIEW"
+	for index in range(_camera_selector.item_count):
+		if String(_camera_selector.get_item_metadata(index)) == _camera.get_mode():
+			_camera_selector.select(index)
+			break
 
 
 func _on_start_pressed() -> void:
@@ -258,6 +305,7 @@ func _on_gateway_model_changed(_model_id: String) -> void:
 
 func _on_excavation_changed(_status: Dictionary) -> void:
 	_refresh_soil()
+	_refresh_camera_selector()
 
 
 func _refresh() -> void:

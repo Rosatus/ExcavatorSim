@@ -1291,6 +1291,80 @@ Wrong: particle count -> bucket fill; F8 -> reset immediately; diagnostics alway
 Correct: selected ledger -> operator state; confirm -> authority transition -> completion
 ```
 
+## Scenario: Semantic camera workflow presets
+
+### 1. Scope / Trigger
+
+Use this contract for product camera mode selection, framing, reset, model/
+generation cleanup, quality distance, and read-only occlusion behavior.
+
+### 2. Signatures
+
+```text
+CameraRig.set_mode(mode: String) -> bool
+CameraRig.reset_view() -> void
+CameraRig.get_mode() -> String
+CameraRig.set_quality_distance_for_test(max_distance: float) -> void
+CameraRig.get_view_snapshot_for_test() -> Dictionary
+```
+
+### 3. Contracts
+
+- One Camera3D owns `operator`, `chase`, `work_tool`, and `inspection`. Presets
+  resolve only current `MotionPresentation` semantic frames and model-specific
+  framing data; missing mode anchors fall back to the current `base_link`.
+- Chase uses base heading, operator uses upper-structure heading, work-tool
+  follows the current bucket/contact while retaining machine context, and
+  inspection preserves bounded free orbit/zoom.
+- Model activation invalidates cached anchors before resolving the new model.
+  Model/authority generation reset restores the current mode preset and clears
+  drag/occlusion transients. A queued-for-free visual node is never followed.
+- Camera actions are runtime-registered: 1/2/3/4 and gamepad D-pad select modes;
+  C and right-stick-click reset. Middle-drag and wheel retain orbit/zoom. Input
+  remains `_unhandled_input`, so events consumed by product UI do not move it.
+- Occlusion performs one read-only terrain/machine-mask ray from outside the
+  mode minimum radius. A hit shortens to a clearance; inward correction is
+  immediate and outward recovery is bounded. Queries never change physics
+  layers, bodies, terrain state, or articulation.
+- Missing collision data fails open to finite preset framing. Near clip remains
+  in the 0.08–0.22 m safety band. Active quality profiles continue to clamp far
+  and maximum intended distance.
+- Operator HUD reports and selects the active mode and exposes Reset View;
+  diagnostics or screenshot state are not camera authority.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Unknown mode | Reject and preserve current mode |
+| Anchor missing or freed | Resolve current base fallback; never dereference old model |
+| Terrain/machine query hit | Shorten before hit with minimum radius/clearance |
+| Query unavailable or no hit | Recover smoothly to bounded desired position |
+| Model/generation reset | Restore current model preset and clear orbit/occlusion transient |
+| Quality maximum below preset | Clamp intended distance without changing mode semantics |
+
+### 5. Good / Base / Bad Cases
+
+- Good: current semantic frames + model preset -> bounded focus/position ->
+  read-only occlusion -> Camera3D.
+- Base: bucket anchor/query absent -> current base fallback and finite view.
+- Bad: cache old GLB child, or rewrite a collision mask/body to improve framing.
+
+### 6. Tests Required
+
+- `camera_workflow_test.gd` covers all modes × both models, semantic anchors,
+  freed-node switching, keyboard/gamepad actions, orbit/reset, generation reset,
+  HUD reporting, deterministic occlusion/recovery, near clip, and quality clamp.
+- Offline/UI/visual-state tests retain the main scene and active-mode product
+  boundary. Subjective framing is a focused human check at final validation.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: hard-coded SY205 child path -> camera target across model switches
+Correct: model_activated -> current semantic frame -> preset -> read-only safety query
+```
+
 ### Visual verification operating policy
 
 - Feature implementation prioritizes executable contracts, deterministic tests,

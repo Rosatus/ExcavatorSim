@@ -1,17 +1,17 @@
 # Implementation plan
 
-1. [ ] `08-24-visual-baseline-evidence`: capture the full double-model,
+1. [x] `08-24-visual-baseline-evidence`: capture the full double-model,
        triple-quality core before matrix plus the balanced operator journey,
        error/performance evidence, rubric scores, defect backlog, and measurable
        targets. Mark this as legacy soil before/fallback evidence.
-2. [ ] `08-24-operator-onboarding-hud`: establish product information hierarchy,
+2. [x] `08-24-operator-onboarding-hud`: establish product information hierarchy,
        control discovery, warnings, recovery, and diagnostics toggle.
-3. [ ] `08-24-camera-workflow-presets`: implement four double-model camera
+3. [x] `08-24-camera-workflow-presets`: implement four double-model camera
        workflows with collision-safe framing and discoverable input.
 4. [ ] Begin the soil-independent portion of
        `08-24-construction-site-visual-polish`: composition, scale cues, props,
        lighting, base materials, and fallback parity. Keep the child open.
-5. [ ] Complete the separate `08-24-gameplay-soil-interaction-rebuild` children:
+5. [x] Complete the separate `08-24-gameplay-soil-interaction-rebuild` children:
        full-bucket tool contract and active-patch prototype may proceed in
        parallel, followed by conservative lifecycle, game-feel response, and
        generation-safe migration validation.

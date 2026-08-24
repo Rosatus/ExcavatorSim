@@ -312,7 +312,7 @@ script = ExtResource("4_operator_ui")
 offset_left = 16.0
 offset_top = 16.0
 offset_right = 486.0
-offset_bottom = 452.0
+offset_bottom = 500.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_operator_panel")
 
 [node name="Margin" type="MarginContainer" parent="OperatorUI/StatusPanel" unique_id=2021519112]
@@ -373,6 +373,23 @@ theme_override_colors/font_color = Color(0.75, 0.82, 0.88, 1)
 theme_override_font_sizes/font_size = 12
 text = "Use the bucket edge and shell directly—cut, carry and dump are automatic."
 autowrap_mode = 2
+
+[node name="CameraRow" type="HBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Mode" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox/CameraRow"]
+layout_mode = 2
+text = "VIEW"
+vertical_alignment = 1
+
+[node name="Selector" type="OptionButton" parent="OperatorUI/StatusPanel/Margin/VBox/CameraRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ResetView" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/CameraRow"]
+layout_mode = 2
+text = "Reset View  C"
 
 [node name="Warning" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
 custom_minimum_size = Vector2(0, 36)
