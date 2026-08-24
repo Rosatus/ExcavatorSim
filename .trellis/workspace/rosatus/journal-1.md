@@ -1409,3 +1409,37 @@ Stabilized distributed Jolt track support and traction for SY205/SY135, correcte
 ### Next Steps
 
 - None - task complete
+
+
+## Session 37: Freeze visual baseline evidence
+
+**Date**: 2026-08-24
+**Task**: Freeze visual baseline evidence
+**Branch**: `main`
+
+### Summary
+
+Added reproducible dual-model visual evidence capture, froze the 34-artifact legacy soil baseline, recorded the evidence-linked backlog, and established code-first automated gates with batched human visual review.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a604541` | (see git log) |
+| `86eed3c` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
