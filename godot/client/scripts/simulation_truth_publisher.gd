@@ -218,8 +218,11 @@ func build_snapshot() -> SimulationTruthSnapshot:
 	else:
 		quality_flags.append_array(["shadow_observation", "kinematic_body_velocity_unavailable", "jolt_contact_manifold_unavailable"])
 	var soil_lifecycle_shadow := excavation.get("soil_lifecycle_shadow", {}) as Dictionary
+	var soil_lifecycle_active := excavation.get("soil_lifecycle_active", {}) as Dictionary
 	if bool(soil_lifecycle_shadow.get("configured", false)):
 		quality_flags.append("conservative_soil_lifecycle_shadow")
+	if bool(soil_lifecycle_active.get("configured", false)):
+		quality_flags.append("conservative_soil_lifecycle_active")
 	var digging_response := chassis.get("digging_response", {}) as Dictionary
 	if bool(digging_response.get("configured", false)):
 		quality_flags.append("game_feel_digging_response")
@@ -282,7 +285,9 @@ func build_snapshot() -> SimulationTruthSnapshot:
 		result["queued_chassis_wrench"] = _canonical_support_wrench(chassis.get("queued_chassis_wrench", {}) as Dictionary)
 		result["applied_chassis_wrench"] = _canonical_support_wrench(chassis.get("applied_chassis_wrench", {}) as Dictionary)
 	if bool(soil_lifecycle_shadow.get("configured", false)):
-		result["soil_lifecycle_shadow"] = _canonical_soil_lifecycle_shadow(soil_lifecycle_shadow)
+		result["soil_lifecycle_shadow"] = _canonical_soil_lifecycle(soil_lifecycle_shadow, "shadow")
+	if bool(soil_lifecycle_active.get("configured", false)):
+		result["soil_lifecycle_active"] = _canonical_soil_lifecycle(soil_lifecycle_active, "active_patch")
 	if bool(digging_response.get("configured", false)):
 		result["digging_response"] = _canonical_digging_response(digging_response)
 	_sequence += 1
@@ -556,16 +561,16 @@ func _canonical_soil_tool_shadow(shadow: Dictionary) -> Dictionary:
 	}
 
 
-func _canonical_soil_lifecycle_shadow(shadow: Dictionary) -> Dictionary:
-	var compartments := shadow.get("compartments_m3", {}) as Dictionary
+func _canonical_soil_lifecycle(lifecycle: Dictionary, mode: String) -> Dictionary:
+	var compartments := lifecycle.get("compartments_m3", {}) as Dictionary
 	var result := {
-		"schema_version": String(shadow.get("schema_version", SoilInteractionAuthority.SCHEMA_VERSION)),
-		"mode": "shadow",
-		"model_id": String(shadow.get("model_id", "unknown")),
-		"generation": maxi(0, int(shadow.get("generation", 0))),
-		"ledger_identity": String(shadow.get("ledger_identity", "unavailable")),
-		"transaction_sequence": maxi(0, int(shadow.get("transaction_sequence", 0))),
-		"material_preset": String(shadow.get("material_preset", "loose")),
+		"schema_version": String(lifecycle.get("schema_version", SoilInteractionAuthority.SCHEMA_VERSION)),
+		"mode": mode,
+		"model_id": String(lifecycle.get("model_id", "unknown")),
+		"generation": maxi(0, int(lifecycle.get("generation", 0))),
+		"ledger_identity": String(lifecycle.get("ledger_identity", "unavailable")),
+		"transaction_sequence": maxi(0, int(lifecycle.get("transaction_sequence", 0))),
+		"material_preset": String(lifecycle.get("material_preset", "loose")),
 		"compartments_m3": {
 			"persistent_stable": float(compartments.get("persistent_stable", 0.0)),
 			"persistent_loose": float(compartments.get("persistent_loose", 0.0)),
@@ -573,15 +578,15 @@ func _canonical_soil_lifecycle_shadow(shadow: Dictionary) -> Dictionary:
 			"bucket": maxf(0.0, float(compartments.get("bucket", 0.0))),
 			"released": maxf(0.0, float(compartments.get("released", 0.0))),
 		},
-		"conservation_drift_m3": float(shadow.get("conservation_drift_m3", 0.0)),
-		"bucket_volume_m3": maxf(0.0, float(shadow.get("bucket_volume_m3", 0.0))),
-		"payload_mass_kg": maxf(0.0, float(shadow.get("payload_mass_kg", 0.0))),
-		"fill_ratio": clampf(float(shadow.get("fill_ratio", 0.0)), 0.0, 1.5),
-		"center_of_mass_m": MotionProtocol.vector_to_canonical_array(shadow.get("center_of_mass_local", Vector3.ZERO) as Vector3),
-		"invariant_failure_count": maxi(0, int(shadow.get("invariant_failure_count", 0))),
-		"snapshot_sha256": String(shadow.get("snapshot_sha256", "")),
+		"conservation_drift_m3": float(lifecycle.get("conservation_drift_m3", 0.0)),
+		"bucket_volume_m3": maxf(0.0, float(lifecycle.get("bucket_volume_m3", 0.0))),
+		"payload_mass_kg": maxf(0.0, float(lifecycle.get("payload_mass_kg", 0.0))),
+		"fill_ratio": clampf(float(lifecycle.get("fill_ratio", 0.0)), 0.0, 1.5),
+		"center_of_mass_m": MotionProtocol.vector_to_canonical_array(lifecycle.get("center_of_mass_local", Vector3.ZERO) as Vector3),
+		"invariant_failure_count": maxi(0, int(lifecycle.get("invariant_failure_count", 0))),
+		"snapshot_sha256": String(lifecycle.get("snapshot_sha256", "")),
 	}
-	var transaction := shadow.get("last_transaction", {}) as Dictionary
+	var transaction := lifecycle.get("last_transaction", {}) as Dictionary
 	if not transaction.is_empty():
 		result["last_transaction"] = {
 			"transaction_id": String(transaction.get("transaction_id", "")),

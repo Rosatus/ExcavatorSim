@@ -10,6 +10,9 @@ func _run() -> void:
 		var result := _run_journey(model_id, "balanced")
 		if not bool(result.get("passed", false)):
 			return _fail("%s lifecycle journey failed: %s" % [model_id, result.get("reason", "unknown")])
+		var active_result := _run_journey(model_id, "balanced", "active_patch")
+		if not bool(active_result.get("passed", false)):
+			return _fail("%s active product journey failed: %s" % [model_id, active_result.get("reason", "unknown")])
 
 	var low := _run_journey("sy205", "low")
 	var high := _run_journey("sy205", "high")
@@ -19,15 +22,26 @@ func _run() -> void:
 		return _fail("quality profile changed accepted displacement")
 	if absf(float(low["peak_bucket_volume_m3"]) - float(high["peak_bucket_volume_m3"])) > 0.00001:
 		return _fail("quality profile changed bucket opening flux")
+	var active_low := _run_journey("sy205", "low", "active_patch")
+	var active_high := _run_journey("sy205", "high", "active_patch")
+	if not bool(active_low.get("passed", false)) or not bool(active_high.get("passed", false)):
+		return _fail("active quality comparison journey failed")
+	if absf(float(active_low["cut_volume_m3"]) - float(active_high["cut_volume_m3"])) > 0.00001:
+		return _fail("active quality profile changed accepted displacement")
+	if absf(float(active_low["peak_bucket_volume_m3"]) - float(active_high["peak_bucket_volume_m3"])) > 0.00001:
+		return _fail("active quality profile changed bucket opening flux")
 	var repeated := _run_repeated_cycles("sy205", 20)
 	if not bool(repeated.get("passed", false)):
 		return _fail("20-cycle lifecycle failed: %s" % repeated.get("reason", "unknown"))
+	var active_repeated := _run_repeated_cycles("sy205", 20, "active_patch")
+	if not bool(active_repeated.get("passed", false)):
+		return _fail("active 20-cycle lifecycle failed: %s" % active_repeated.get("reason", "unknown"))
 
 	print("soil_interaction_authority_test: PASS")
 	quit(0)
 
 
-func _run_journey(model_id: String, quality: String) -> Dictionary:
+func _run_journey(model_id: String, quality: String, mode: String = "shadow") -> Dictionary:
 	var descriptor := SoilContractDescriptor.load_for_model(model_id)
 	if descriptor == null or not descriptor.is_valid_for(model_id):
 		return {"passed": false, "reason": "contract_unavailable"}
@@ -35,10 +49,16 @@ func _run_journey(model_id: String, quality: String) -> Dictionary:
 	var source := TerrainState.new(1937, 41, 41, 0.25)
 	var source_before := source.surface_snapshot()
 	var patch := ActiveSoilPatch.new()
-	if not patch.configure(source_before, quality, "loose"):
+	var scheduler := TerrainCommitScheduler.new(source)
+	var patch_configured := (
+		patch.configure_product(source, scheduler, quality, "loose")
+		if mode == "active_patch"
+		else patch.configure(source_before, quality, "loose")
+	)
+	if not patch_configured:
 		return {"passed": false, "reason": "patch_configure"}
 	var authority := SoilInteractionAuthority.new()
-	if not authority.configure(contract, source.world_generation, "loose"):
+	if not authority.configure(contract, source.world_generation, "loose", mode):
 		return {"passed": false, "reason": "authority_configure"}
 	var tool := BucketSoilTool.new()
 	if not tool.configure(contract):
@@ -109,8 +129,11 @@ func _run_journey(model_id: String, quality: String) -> Dictionary:
 		if not kinds.has(required_kind):
 			return {"passed": false, "reason": "missing_%s" % required_kind}
 	var source_after := source.surface_snapshot()
-	if source_after["snapshot_sha256"] != source_before["snapshot_sha256"] or source_after["terrain_revision"] != source_before["terrain_revision"]:
+	var terrain_mutated: bool = String(source_after["snapshot_sha256"]) != String(source_before["snapshot_sha256"]) and int(source_after["terrain_revision"]) > int(source_before["terrain_revision"])
+	if mode == "shadow" and terrain_mutated:
 		return {"passed": false, "reason": "product_terrain_mutated"}
+	if mode == "active_patch" and not terrain_mutated:
+		return {"passed": false, "reason": "product_terrain_not_mutated"}
 	return {
 		"passed": true,
 		"cut_volume_m3": cut_volume,
@@ -119,7 +142,7 @@ func _run_journey(model_id: String, quality: String) -> Dictionary:
 	}
 
 
-func _run_repeated_cycles(model_id: String, cycle_count: int) -> Dictionary:
+func _run_repeated_cycles(model_id: String, cycle_count: int, mode: String = "shadow") -> Dictionary:
 	var descriptor := SoilContractDescriptor.load_for_model(model_id)
 	if descriptor == null or not descriptor.is_valid_for(model_id):
 		return {"passed": false, "reason": "contract_unavailable"}
@@ -127,9 +150,13 @@ func _run_repeated_cycles(model_id: String, cycle_count: int) -> Dictionary:
 	var source := TerrainState.new(991, 41, 41, 0.25)
 	var product_digest := String(source.surface_snapshot()["snapshot_sha256"])
 	var patch := ActiveSoilPatch.new()
-	patch.configure(source.surface_snapshot(), "low", "loose")
+	var scheduler := TerrainCommitScheduler.new(source)
+	if mode == "active_patch":
+		patch.configure_product(source, scheduler, "low", "loose")
+	else:
+		patch.configure(source.surface_snapshot(), "low", "loose")
 	var authority := SoilInteractionAuthority.new()
-	authority.configure(contract, source.world_generation, "loose")
+	authority.configure(contract, source.world_generation, "loose", mode)
 	var tool := BucketSoilTool.new()
 	tool.configure(contract)
 	var identity := tool.compose_snapshot(Transform3D.IDENTITY, Transform3D.IDENTITY, true, "repeat:identity")
@@ -179,8 +206,11 @@ func _run_repeated_cycles(model_id: String, cycle_count: int) -> Dictionary:
 		return {"passed": false, "reason": "drift_%.9f" % float(final_status["conservation_drift_m3"])}
 	if int(final_status["invariant_failure_count"]) != 0:
 		return {"passed": false, "reason": "invariant_failures"}
-	if source.surface_snapshot()["snapshot_sha256"] != product_digest:
+	var product_changed := String(source.surface_snapshot()["snapshot_sha256"]) != product_digest
+	if mode == "shadow" and product_changed:
 		return {"passed": false, "reason": "product_terrain_mutated"}
+	if mode == "active_patch" and not product_changed:
+		return {"passed": false, "reason": "product_terrain_not_mutated"}
 	return {"passed": true, "final_status": final_status}
 
 

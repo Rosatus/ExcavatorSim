@@ -160,6 +160,7 @@ func _test_scene_nodes_and_production_controls() -> int:
 	if packed == null:
 		return _fail("main scene loads")
 	var scene := packed.instantiate()
+	(scene.get_node("TerrainRoot/ExcavationWorld") as ExcavationWorld).soil_material_lifecycle_mode = "legacy"
 	root.add_child(scene)
 	await process_frame
 	await process_frame
@@ -194,6 +195,7 @@ func _test_automatic_motion_for_both_models() -> int:
 	if packed == null:
 		return _fail("main scene loads for automatic soil scenarios")
 	var scene := packed.instantiate()
+	(scene.get_node("TerrainRoot/ExcavationWorld") as ExcavationWorld).soil_material_lifecycle_mode = "legacy"
 	root.add_child(scene)
 	await process_frame
 	await process_frame
@@ -298,6 +300,7 @@ func _test_automatic_motion_for_both_models() -> int:
 func _test_hybrid_query_batch_identity() -> int:
 	var packed := load(MAIN_SCENE) as PackedScene
 	var scene := packed.instantiate()
+	(scene.get_node("TerrainRoot/ExcavationWorld") as ExcavationWorld).soil_material_lifecycle_mode = "legacy"
 	root.add_child(scene)
 	await process_frame
 	await process_frame

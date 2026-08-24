@@ -72,28 +72,41 @@ profile teardown stops forces and clears or rebuilds the complete dynamic rig.
 SY205 and SY135 use separate hash-bound rig and track descriptors with no
 cross-model fallback.
 
-The excavation path keeps `BucketSoilState` as the one local inventory owner.
+The excavation path selects one generation-scoped local material owner. The
+product default is `active_patch`: `SoilInteractionAuthority` owns the complete
+stable/loose -> active -> bucket -> released -> settled ledger and borrows the
+product `TerrainState` only through its `TerrainCommitScheduler`. `legacy` keeps
+`BucketSoilState` plus parcel transport as an explicit compatibility fallback;
+`shadow` runs the conservative chain against an isolated clone while legacy
+remains selected.
 In authoritative hybrid mode, query-only cutting/opening/cavity/shell/rear
 proxies sweep previous-to-candidate bucket FK against the exact applied terrain
 collider revision. They own no scene body and cannot inject an uncapped impulse.
 The accepted result carries authority/tick/terrain/motion identity and reduces
 to one idempotent soil batch: `dump -> spill -> cutting -> carry`, at most one
 existing bucket/terrain transaction, and at most one capped next-tick chassis
-wrench from shell/rear support. Visible fill and payload aggregates come from
-the same bounded cellular occupancy. Direct cut/deposit queues remain test/debug
-seams only.
+wrench from shell/rear support. Visible fill, Jolt payload, response shaping,
+and truth aggregates come from the selected bounded cellular occupancy. Direct
+legacy cut/deposit queues are rejected in active mode and remain compatibility
+test/debug seams only.
 
 The per-model soil contract also carries a hash-bound
 `bucket-soil-tool-v1` semantic description of the complete bucket: teeth/main
 edge, both side cutters, floor/wear plate, outer back/sides, inner shell, and
 opening. `SoilContractDescriptor` is the shared presentation/Jolt loader.
 `BucketSoilTool` composes bounded previous-to-current swept regions from the
-accepted `bucket_link` frame and can publish default-off, read-only shadow
-candidates for cut, scrape, push, grade, containment, entry, spill, and dump.
-Inner/opening regions have no stable-terrain role. This shadow path has no
-terrain, inventory, parcel, support-wrench, or articulation mutation API; the
-legacy analytic/parcel path remains authoritative until the later soil
-authority migration.
+accepted `bucket_link` frame and publishes candidates for cut, side cut, scrape,
+push, grade, containment, entry, spill, and dump. Inner/opening regions have no
+stable-terrain role. The classifier remains read-only; the generation-selected
+authority alone may turn candidates into material transactions.
+
+`legacy`, `shadow`, and `active_patch` requests never hot-switch a live bucket.
+Reset, model activation, or an authority/material-generation boundary applies
+the requested mode. Active initialization failure may select legacy only before
+the clean generation begins; runtime failure pauses material writes and requests
+legacy for the next reset. In active mode all legacy parcel material callbacks
+are disabled and patch representatives are presentation plus conservative
+transport, not a second owner.
 
 The canonical authoritative truth keeps that bucket-query identity structured
 as `authority_epoch`, `physics_tick`, terrain generation/revision, and motion
@@ -214,8 +227,9 @@ or failed physics backend must leave the Python service and visual state usable.
 The optional `Terrain3DAdapter` is another derived backend. It receives copied
 `TerrainState.surface_snapshot()` data only after the fixed-step logical edit has
 been accepted. `TerrainState` keeps the stable/loose Float32 layers, revision
-and generation guards, while `BucketSoilState` remains responsible for bucket
-capacity and grid-cell volume accounting. Terrain3D is therefore a rendering,
+and generation guards, while the selected `SoilInteractionAuthority` or legacy
+`BucketSoilState` is responsible for bucket capacity and grid-cell volume
+accounting. Terrain3D is therefore a rendering,
 heightmap materialization, and optional collision provider; editor sculpting or
 direct native height edits are not gameplay mutation paths. If its GDExtension,
 map import, or collision mode is unavailable, the custom mesh/collider path
@@ -254,7 +268,7 @@ sole revision writer. Jolt never owns bucket inventory, replay, or Python state.
 The terrain data flow remains one-way:
 
 ```text
-fixed-step command -> bucket query -> BucketSoilState/TerrainState transaction
+fixed-step command -> bucket query -> selected soil ledger/TerrainState transaction
                    -> copied snapshot -> Terrain3D/TerrainCollider -> later query
 ```
 

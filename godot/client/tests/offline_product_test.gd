@@ -20,7 +20,8 @@ func _run() -> void:
 	var chassis := scene.get_node_or_null("ChassisMotionRoot") as TrackedChassisController
 	var presentation := scene.get_node_or_null("MotionPresentation") as MotionPresentation
 	var truth := scene.get_node_or_null("SimulationTruthPublisher") as SimulationTruthPublisher
-	if session == null or client == null or chassis == null or presentation == null or truth == null:
+	var excavation := scene.get_node_or_null("TerrainRoot/ExcavationWorld") as ExcavationWorld
+	if session == null or client == null or chassis == null or presentation == null or truth == null or excavation == null:
 		_fail("offline main scene is missing a required product node")
 	else:
 		if client.connection_state != MotionClient.STATE_DISCONNECTED:
@@ -34,6 +35,29 @@ func _run() -> void:
 		var local_truth := truth.build_snapshot()
 		if local_truth == null or local_truth.to_dictionary().get("identity", {}).get("session_id", "") != ProductSession.LOCAL_SESSION_ID:
 			_fail("offline truth did not use local authority identity")
+		var initial_selection := excavation.get_status_snapshot().get("soil_authority_selection", {}) as Dictionary
+		if String(initial_selection.get("selected_mode", "")) != "active_patch" or not bool(initial_selection.get("single_owner_valid", false)):
+			_fail("offline product did not start with one active-patch material owner")
+		if not excavation.set_soil_material_lifecycle_mode("legacy"):
+			_fail("offline legacy fallback request was rejected")
+		if String(excavation.get_status_snapshot().get("soil_material_lifecycle_mode", "")) != "active_patch":
+			_fail("soil authority changed before a clean generation boundary")
+		if not session.request_reset():
+			_fail("offline reset could not apply legacy fallback")
+		var legacy_status := excavation.get_status_snapshot()
+		if String(legacy_status.get("soil_material_lifecycle_mode", "")) != "legacy":
+			_fail("offline clean boundary did not apply legacy fallback")
+		if not excavation.set_soil_material_lifecycle_mode("active_patch") or not session.request_reset():
+			_fail("offline reset could not restore active soil authority")
+		var active_status := excavation.get_status_snapshot()
+		var active_selection := active_status.get("soil_authority_selection", {}) as Dictionary
+		if String(active_selection.get("selected_mode", "")) != "active_patch" or not bool(active_selection.get("single_owner_valid", false)):
+			_fail("offline reset did not select one active-patch material owner")
+		if String((active_status.get("selected_soil_payload", {}) as Dictionary).get("source", "")) != "active_patch":
+			_fail("offline Jolt payload source did not follow active soil authority")
+		var active_truth := truth.build_snapshot()
+		if active_truth == null or not active_truth.to_dictionary().has("soil_lifecycle_active"):
+			_fail("offline truth did not publish the selected active lifecycle")
 		if not session.request_start() or session.lifecycle != ProductSession.LIFECYCLE_RUNNING:
 			_fail("offline start failed")
 		await physics_frame

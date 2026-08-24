@@ -34,11 +34,14 @@ deterministic-enough terrain/world state, bucket convenience state and
 presentation. `TerrainState` keeps stable and loose Float32 layers;
 `TerrainRenderer` only consumes copied snapshots and is generation-gated.
 
-`BucketSoilState` is the single local bucket-inventory owner in this profile. In
-production, `ExcavationWorld` derives cut, carry, spill, and dump from swept
-articulated bucket proxies; direct monotonic cut/deposit queues are test/debug
-seams only. The cellular occupancy derives volume, mass, fill, and center of
-mass, while `TerrainCommitScheduler` is the sole runtime owner of coarse
+The generation-selected soil ledger is the single local bucket-inventory owner
+in this profile. Product-default `active_patch` uses
+`SoilInteractionAuthority`; explicit legacy/shadow compatibility keeps
+`BucketSoilState`. `ExcavationWorld` derives cut, carry, spill, and dump from
+swept articulated bucket proxies; direct monotonic legacy cut/deposit queues are
+test/debug seams only. The selected cellular occupancy derives volume, mass,
+fill, and center of mass, while `TerrainCommitScheduler` is the sole runtime
+owner of coarse
 `TerrainState` deltas and derived mesh/collider updates. The client may publish
 only the optional, latest-value `bucket_load_feedback_v1` observation after
 positive capability negotiation; it never publishes terrain edits or replay
@@ -212,7 +215,7 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
   neutral sample before movement. `KinematicArticulationState` shapes joint
   target velocity, acceleration and jerk, anticipates limits, computes candidate
   FK, and accepts one common motion fraction before recomputing accepted FK.
-- `BucketSoilState` remains payload authority. The controller submits mass,
+- The selected soil ledger remains payload authority. The controller submits mass,
   local COM and monotonic material identity; the runtime converts them at a tick
   boundary into bounded joint motion-load multipliers. Payload never mutates a
   bucket physics body because no such body exists.
@@ -656,9 +659,9 @@ Correct: model catalog path + SHA-256 -> one SoilContractDescriptor validator
 ### 1. Scope / Trigger
 
 Use this contract when cut material needs local gravity, bucket contact,
-containment, flow, pile, sleep, and settlement before the active patch owns
-product soil authority. The prototype is an optional visual shadow over the
-legacy analytic/parcel path.
+containment, flow, pile, sleep, and settlement. `configure()` remains an
+optional visual shadow over legacy; `configure_product()` is reserved for a
+generation where `active_patch` has already been selected as product owner.
 
 ### 2. Signatures
 
@@ -666,6 +669,8 @@ legacy analytic/parcel path.
 TerrainState.from_surface_snapshot(snapshot: Dictionary) -> TerrainState
 ActiveSoilPersistentField.configure(source_snapshot: Dictionary,
   preset: String = "loose") -> bool
+ActiveSoilPersistentField.configure_product(state: TerrainState,
+  scheduler: TerrainCommitScheduler, preset: String = "loose") -> bool
 ActiveSoilPersistentField.activate_volume(center_xz: Vector2,
   requested_volume_m3: float, radius_m: float,
   transfer_hint: String = "") -> Dictionary
@@ -674,6 +679,9 @@ ActiveSoilPersistentField.settle_volume(center_xz: Vector2,
   transfer_hint: String = "") -> Dictionary
 ActiveSoilPatch.configure(source_snapshot: Dictionary,
   quality: String = "balanced", material: String = "loose") -> bool
+ActiveSoilPatch.configure_product(state: TerrainState,
+  scheduler: TerrainCommitScheduler, quality: String = "balanced",
+  material: String = "loose") -> bool
 ActiveSoilPatch.inject_cut_event(event: Dictionary,
   aggregate_hint: String = "") -> Dictionary
 ActiveSoilPatch.step_fixed(delta: float, focus_world: Vector3,
@@ -683,9 +691,10 @@ ExcavationWorld.set_active_soil_patch_prototype_enabled(value: bool) -> void
 
 ### 3. Contracts
 
-- `active_soil_patch_prototype_enabled` defaults false. Enabling clones the
-  current immutable product surface into an isolated `TerrainState`; only that
-  clone is passed to the patch `TerrainCommitScheduler`.
+- `active_soil_patch_prototype_enabled` defaults false. Enabling the prototype
+  clones the current immutable product surface into an isolated `TerrainState`;
+  only an already-selected `active_patch` generation may borrow product state
+  and its sole scheduler through the explicit product configuration entrypoint.
 - Accepted legacy `cut_events` are copied into generation-scoped aggregate IDs.
   The copy may debit the shadow field and create representatives, but it cannot
   credit/debit `BucketSoilState`, spawn authoritative parcels, mutate accepted
@@ -724,7 +733,7 @@ ExcavationWorld.set_active_soil_patch_prototype_enabled(value: bool) -> void
   representatives -> bucket push/contain -> sleep -> shadow scheduler settle.
 - Base: flag disabled or prototype unavailable -> unchanged legacy analytic and
   parcel behavior with no active-soil allocation.
-- Bad: share the product `TerrainState` with the prototype, delete an aggregate
+- Bad: share the product `TerrainState` with the prototype/shadow, delete an aggregate
   when a budget is full, or treat representative count as physical volume.
 
 ### 6. Tests Required
@@ -756,14 +765,15 @@ Correct: reject before debit, or merge representatives while preserving volume
 
 Use this contract when stable/loose terrain, active soil, bucket payload, and
 released/settling soil must participate in one generation-scoped transaction
-ledger. `shadow` observes and simulates the new chain while `legacy` remains the
-selected product writer; authority migration is a separate task.
+ledger. `shadow` observes the same chain while legacy remains selected;
+`active_patch` uses the migration contract below.
 
 ### 2. Signatures
 
 ```text
 SoilInteractionAuthority.configure(contract: Dictionary,
-  generation: int, material: String = "loose") -> bool
+  generation: int, material: String = "loose",
+  mode: String = "shadow") -> bool
 SoilInteractionAuthority.step_fixed(delta: float, tick: int,
   tool_snapshot: Dictionary, tool_classification: Dictionary,
   patch: ActiveSoilPatch, focus_world: Vector3) -> Dictionary
@@ -862,6 +872,98 @@ Correct: merge only same-compartment reps; preserve aggregate provenance
 
 Wrong: selected payload = legacy mass + shadow mass
 Correct: selected source=legacy; publish shadow under a separate ledger identity
+```
+
+## Scenario: Generation-locked soil authority migration
+
+### 1. Scope / Trigger
+
+Use this contract whenever selecting `legacy`, `shadow`, or `active_patch` for
+product excavation. `active_patch` is the product default; legacy remains an
+explicit compatibility fallback and shadow remains observational.
+
+### 2. Signatures
+
+```text
+SoilAuthorityModeController.set_requested_mode(value: String) -> bool
+SoilAuthorityModeController.begin_generation(key: String) -> bool
+SoilAuthorityModeController.bind_product_writers(
+  legacy_enabled: bool, active_patch_enabled: bool) -> bool
+SoilAuthorityModeController.report_runtime_failure(reason: String) -> bool
+SoilAuthorityModeController.get_status_snapshot() -> Dictionary
+ExcavationWorld.set_soil_material_lifecycle_mode(value: String) -> bool
+ExcavationWorld.get_selected_soil_payload_snapshot() -> Dictionary
+```
+
+Active lifecycle truth is the optional strict
+`simulation-truth-v1.soil_lifecycle_active` sibling; the existing shadow field
+retains `mode=shadow` and is never reused for product authority.
+
+### 3. Contracts
+
+- One immutable selection is locked per material generation. A mode request
+  updates only the next selection; reset, model activation, pose/authority clear,
+  or another explicit material-generation boundary applies it.
+- `legacy` and `shadow` register legacy as the sole cut, bucket-entry, release,
+  and settlement writer. `shadow` may compute against an isolated terrain copy.
+  `active_patch` registers the conservative lifecycle for all four stages.
+  Writer binding must report exactly one enabled owner or fail closed.
+- In `active_patch`, no legacy `BucketSoilState.step_fixed`, cut/deposit queue,
+  parcel capture/release/settlement callback, or transfer reconcile may run.
+  The legacy parcel pool is cleared/absent; patch representatives provide the
+  bounded visual clod layer and cannot create a second ledger.
+- The product-backed persistent field borrows, but never resets or owns, the
+  product `TerrainState` and `TerrainCommitScheduler`. Detach uses
+  `ActiveSoilPatch.clear(false)`; settlement is always an explicit transaction.
+- Selected payload, Jolt bucket mass/COM, digging response, visual fill, backend
+  feedback, and top-level truth all project from the selected ledger. Legacy and
+  active masses are never added together.
+- Initialization failure may choose legacy only before the clean generation is
+  used. An active runtime failure pauses material writes, records the reason,
+  requests legacy for the next generation, and never hot-switches live material.
+- Low/balanced/high may change representative density and tick cost only. They
+  cannot change accepted volume, ledger totals, selected payload, or final
+  terrain outside the declared tolerance.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Mode request during a live generation | Record requested mode; retain selected owner and material |
+| Both legacy and active writers registered | Reject binding, increment owner violation, pause use |
+| Active initialization fails before first write | Select legacy in the same clean generation and expose fallback reason |
+| Active runtime fails after any write | Pause writes; request legacy; require reset/new generation |
+| Reset/model/authority boundary | Clear payload, reps, parcels, transactions, response, then create one new selection |
+| Presenter/quality/hero-clod setting changes | Preserve ledger and product terrain totals |
+
+### 5. Good / Base / Bad Cases
+
+- Good: generation selects active -> full tool debits product terrain -> active
+  representatives -> bucket ledger -> release -> loose terrain settlement.
+- Base: clean boundary selects legacy -> unchanged analytic/parcel compatibility
+  chain with no active product writes.
+- Bad: active failure silently starts legacy callbacks in the same generation,
+  or a visual parcel independently credits bucket/terrain material.
+
+### 6. Tests Required
+
+- Assert mode requests are boundary-applied, double-writer binding is rejected,
+  runtime failure pauses, and next-generation fallback is legacy.
+- Run SY205/SY135 cut, bucket entry, carry, dump, and settle in shadow and active
+  modes; shadow keeps product digest fixed while active changes product terrain.
+- Compare low/high accepted displacement and opening flux, then run 20 active
+  cycles within `max(1e-5 m³, 0.5% bucket capacity)` drift and zero invariants.
+- Validate default active startup, Jolt selected payload, strict active truth,
+  model/reset cleanup, manual legacy fallback, and restoration to active.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: requested_mode changes -> replace the live writer immediately
+Correct: requested_mode changes -> next clean generation selects one writer
+
+Wrong: active cut -> legacy parcel capture -> second bucket credit
+Correct: active cut -> active aggregate -> one conservative bucket transaction
 ```
 
 ## Scenario: Game-feel digging response

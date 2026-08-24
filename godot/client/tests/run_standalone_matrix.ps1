@@ -25,6 +25,8 @@ $tests = @(
     "terrain_collider_chunk_test.gd",
     "bucket_shallow_overlap_test.gd",
     "bucket_soil_tool_test.gd",
+    "soil_authority_migration_test.gd",
+    "soil_interaction_authority_test.gd",
     "cut_resistance_test.gd",
     "analytic_dig_test.gd",
     "soil_parcel_test.gd",

@@ -56,6 +56,7 @@ func _test_connected_operate_reset_reconnect() -> int:
 	if packed == null:
 		return _fail("main scene loads")
 	var instance := packed.instantiate()
+	(instance.get_node("TerrainRoot/ExcavationWorld") as ExcavationWorld).soil_material_lifecycle_mode = "legacy"
 	var client := instance.get_node("MotionClient") as MotionClient
 	client.auto_connect = false
 	client.set_transport_factory_for_test(Callable(self, "_new_transport"))

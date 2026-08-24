@@ -3,7 +3,7 @@ extends RefCounted
 
 ## Deterministic bounded CPU reference for visually active soil. Representative
 ## count is a quality choice; aggregate volume remains exact and is settled
-## through ActiveSoilPersistentField's shadow scheduler.
+## through ActiveSoilPersistentField's selected shadow or product scheduler.
 
 const SCHEMA_VERSION := "active-soil-patch-v1"
 const MIN_VOLUME_M3 := 0.000001
@@ -118,7 +118,26 @@ func configure(source_snapshot: Dictionary, requested_quality: String = "balance
 	return generation >= 0
 
 
-func clear(settle_active: bool = true) -> void:
+func configure_product(
+	state: TerrainState,
+	product_scheduler: TerrainCommitScheduler,
+	requested_quality: String = "balanced",
+	requested_material: String = "loose"
+) -> bool:
+	clear(false)
+	if not QUALITY_PROFILES.has(requested_quality) or not MATERIAL_RESPONSE.has(requested_material):
+		return false
+	if not persistent_field.configure_product(state, product_scheduler, requested_material):
+		return false
+	quality_profile = requested_quality
+	material_preset = requested_material
+	_profile = (QUALITY_PROFILES[quality_profile] as Dictionary).duplicate(true)
+	_material = (MATERIAL_RESPONSE[material_preset] as Dictionary).duplicate(true)
+	generation = state.world_generation
+	return generation >= 0
+
+
+func clear(settle_active: bool = false) -> void:
 	if settle_active and persistent_field.terrain_state != null:
 		flush_all()
 	_representatives.clear()

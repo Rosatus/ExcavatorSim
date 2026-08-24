@@ -109,6 +109,32 @@ def _identity(
     )
 
 
+def _soil_lifecycle(mode: str) -> dict[str, Any]:
+    return {
+        "schema_version": "soil-interaction-authority-v1",
+        "mode": mode,
+        "model_id": "sy205",
+        "generation": 3,
+        "ledger_identity": "sy205:3:1",
+        "transaction_sequence": 1,
+        "material_preset": "loose",
+        "compartments_m3": {
+            "persistent_stable": -0.01,
+            "persistent_loose": 0.0,
+            "active": 0.01,
+            "bucket": 0.0,
+            "released": 0.0,
+        },
+        "conservation_drift_m3": 0.0,
+        "bucket_volume_m3": 0.0,
+        "payload_mass_kg": 0.0,
+        "fill_ratio": 0.0,
+        "center_of_mass_m": [0.0, 0.0, 0.0],
+        "invariant_failure_count": 0,
+        "snapshot_sha256": "0" * 64,
+    }
+
+
 def _authoritative_snapshot(identity: ShadowTruthIdentity) -> dict[str, Any]:
     snapshot = _snapshot(identity)
     snapshot["authority_profile"] = "jolt_authoritative"
@@ -248,7 +274,12 @@ def test_authoritative_truth_schema_requires_exact_hybrid_identity_sets() -> Non
         ],
         "quality_flags": [],
     }
+    valid["soil_lifecycle_active"] = _soil_lifecycle("active_patch")
     validator.validate(valid)
+
+    wrong_lifecycle_mode = json.loads(json.dumps(valid))
+    wrong_lifecycle_mode["soil_lifecycle_active"]["mode"] = "shadow"
+    assert list(validator.iter_errors(wrong_lifecycle_mode))
 
     wrong_body = json.loads(json.dumps(valid))
     wrong_body["bodies"][0]["name"] = "upper"

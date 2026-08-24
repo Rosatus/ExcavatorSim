@@ -3,7 +3,7 @@
   "name": "soil-authority-migration-validation",
   "title": "Soil authority migration validation",
   "description": "Cut over the new soil authority at lifecycle boundaries, retain the old parcel path as a fallback and visual accent, and validate both models end to end.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": "frontend/godot",
   "package": null,

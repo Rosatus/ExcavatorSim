@@ -1,10 +1,9 @@
 class_name SoilInteractionAuthority
 extends RefCounted
 
-## Generation-scoped sole writer for the conservative material lifecycle.
-## This task runs it in shadow mode: its transactions, bucket ledger, and
-## ActiveSoilPatch are internally authoritative but never replace the selected
-## legacy product writer.
+## Generation-scoped sole writer for the conservative material lifecycle. In
+## shadow mode it observes beside legacy product truth; in active_patch mode its
+## ledger and ActiveSoilPatch are the selected product material authority.
 
 const SCHEMA_VERSION := "soil-interaction-authority-v1"
 const TRANSACTION_SCHEMA_VERSION := "soil-material-transaction-v1"
@@ -44,12 +43,18 @@ var _invariant_failure_count := 0
 var _overflow_volume_m3 := 0.0
 
 
-func configure(contract: Dictionary, requested_generation: int, requested_material: String = "loose") -> bool:
+func configure(
+	contract: Dictionary,
+	requested_generation: int,
+	requested_material: String = "loose",
+	requested_mode: String = "shadow"
+) -> bool:
 	clear()
 	if (
 		contract.get("schema_version", "") != "excavator-soil-contract-v1"
 		or requested_generation < 0
 		or requested_material not in ["loose", "compact", "sand", "damp"]
+		or requested_mode not in ["shadow", "active_patch"]
 	):
 		return false
 	var grid := contract.get("cell_grid", []) as Array
@@ -69,11 +74,13 @@ func configure(contract: Dictionary, requested_generation: int, requested_materi
 	model_id = String(contract.get("model_id", ""))
 	generation = requested_generation
 	material_preset = requested_material
+	mode = requested_mode
 	configured = not model_id.is_empty()
 	return configured
 
 
 func clear() -> void:
+	mode = "shadow"
 	configured = false
 	model_id = ""
 	generation = -1
@@ -104,7 +111,7 @@ func step_fixed(
 	patch: ActiveSoilPatch,
 	focus_world: Vector3
 ) -> Dictionary:
-	if not configured or patch == null or patch.generation != generation:
+	if not configured or patch == null or patch.generation < 0:
 		return {"changed": false, "reason": "authority_unavailable"}
 	if tick < _last_tick:
 		return {"changed": false, "reason": "stale_tick"}

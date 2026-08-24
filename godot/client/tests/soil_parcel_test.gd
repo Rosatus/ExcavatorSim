@@ -43,6 +43,7 @@ func _run() -> void:
 	if packed == null:
 		return _fail("main scene loads")
 	var scene := packed.instantiate()
+	(scene.get_node("TerrainRoot/ExcavationWorld") as ExcavationWorld).soil_material_lifecycle_mode = "legacy"
 	root.add_child(scene)
 	await process_frame
 	await process_frame

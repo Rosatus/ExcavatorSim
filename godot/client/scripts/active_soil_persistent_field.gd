@@ -1,9 +1,9 @@
 class_name ActiveSoilPersistentField
 extends RefCounted
 
-## Shadow-only persistent material field used by the bounded active-soil
-## prototype. Every height mutation still crosses TerrainCommitScheduler; the
-## scheduler owns an isolated TerrainState cloned from product truth.
+## Persistent material field used by the bounded active-soil patch. Shadow mode
+## owns an isolated clone; product mode borrows the selected TerrainState and its
+## sole TerrainCommitScheduler without taking lifecycle ownership of either.
 
 const SCHEMA_VERSION := "active-soil-persistent-field-v1"
 const MIN_VOLUME_M3 := 0.000001
@@ -21,6 +21,7 @@ var material_preset := "loose"
 var source_epoch := ""
 var source_revision := -1
 var source_generation := -1
+var write_scope := "shadow"
 
 var _material_ids := PackedByteArray()
 var _compaction := PackedFloat32Array()
@@ -37,14 +38,29 @@ func configure(source_snapshot: Dictionary, preset: String = "loose") -> bool:
 	terrain_state = TerrainState.from_surface_snapshot(source_snapshot)
 	if terrain_state == null:
 		return false
-	material_preset = preset
-	source_epoch = String(source_snapshot.get("terrain_epoch", ""))
-	source_revision = int(source_snapshot.get("terrain_revision", -1))
-	source_generation = int(source_snapshot.get("world_generation", -1))
 	scheduler = TerrainCommitScheduler.new(terrain_state)
 	scheduler.commit_interval_s = 0.0
 	scheduler.maximum_latency_s = 0.0
 	scheduler.volume_threshold_m3 = 0.0
+	write_scope = "shadow"
+	return _configure_metadata(source_snapshot, preset)
+
+
+func configure_product(state: TerrainState, product_scheduler: TerrainCommitScheduler, preset: String = "loose") -> bool:
+	clear()
+	if state == null or product_scheduler == null or product_scheduler.terrain_state != state or not MATERIAL_PRESETS.has(preset):
+		return false
+	terrain_state = state
+	scheduler = product_scheduler
+	write_scope = "product"
+	return _configure_metadata(state.surface_snapshot(), preset)
+
+
+func _configure_metadata(source_snapshot: Dictionary, preset: String) -> bool:
+	material_preset = preset
+	source_epoch = String(source_snapshot.get("terrain_epoch", ""))
+	source_revision = int(source_snapshot.get("terrain_revision", -1))
+	source_generation = int(source_snapshot.get("world_generation", -1))
 	var cell_count := terrain_state.rows * terrain_state.columns
 	_material_ids.resize(cell_count)
 	_compaction.resize(cell_count)
@@ -61,6 +77,7 @@ func clear() -> void:
 	source_epoch = ""
 	source_revision = -1
 	source_generation = -1
+	write_scope = "shadow"
 	_material_ids = PackedByteArray()
 	_compaction = PackedFloat32Array()
 	_transaction_sequence = 0
@@ -100,11 +117,14 @@ func get_status_snapshot() -> Dictionary:
 		"schema_version": SCHEMA_VERSION,
 		"configured": terrain_state != null and scheduler != null,
 		"material_preset": material_preset,
+		"write_scope": write_scope,
 		"source_epoch": source_epoch,
 		"source_revision": source_revision,
 		"source_generation": source_generation,
-		"shadow_revision": terrain_state.terrain_revision if terrain_state != null else -1,
-		"shadow_generation": terrain_state.world_generation if terrain_state != null else -1,
+		"field_revision": terrain_state.terrain_revision if terrain_state != null else -1,
+		"field_generation": terrain_state.world_generation if terrain_state != null else -1,
+		"shadow_revision": terrain_state.terrain_revision if terrain_state != null and write_scope == "shadow" else -1,
+		"shadow_generation": terrain_state.world_generation if terrain_state != null and write_scope == "shadow" else -1,
 		"activated_volume_m3": _activated_volume_m3,
 		"settled_volume_m3": _settled_volume_m3,
 		"rejected_volume_m3": _rejected_volume_m3,

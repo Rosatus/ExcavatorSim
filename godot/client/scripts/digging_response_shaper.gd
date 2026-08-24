@@ -175,7 +175,9 @@ func get_status_snapshot() -> Dictionary:
 
 
 func _derive_inputs(commands: Vector4, status: Dictionary) -> Dictionary:
-	var lifecycle := status.get("soil_lifecycle_shadow", {}) as Dictionary
+	var lifecycle := status.get("soil_lifecycle_active", {}) as Dictionary
+	if not bool(lifecycle.get("configured", false)):
+		lifecycle = status.get("soil_lifecycle_shadow", {}) as Dictionary
 	var lifecycle_available := bool(lifecycle.get("configured", false))
 	var selected := status.get("selected_soil_payload", {}) as Dictionary
 	var fill_ratio := float(lifecycle.get("fill_ratio", selected.get("fill_ratio", status.get("fill_ratio", 0.0)))) if lifecycle_available else float(selected.get("fill_ratio", status.get("fill_ratio", 0.0)))
@@ -187,7 +189,7 @@ func _derive_inputs(commands: Vector4, status: Dictionary) -> Dictionary:
 	var transaction_kind := String(last_transaction.get("kind", ""))
 	var accepted_flow := float(last_transaction.get("accepted_volume_m3", status.get("flow_volume_m3", 0.0))) if lifecycle_available else float(status.get("flow_volume_m3", 0.0))
 	var batch := status.get("soil_interaction_batch", {}) as Dictionary
-	var tool := batch.get("soil_tool_shadow", {}) as Dictionary
+	var tool := batch.get("soil_tool_classification", batch.get("soil_tool_shadow", {})) as Dictionary
 	var maximum_penetration := maxf(0.0, float(batch.get("analytic_penetration_m", 0.0)))
 	var stable_action := ""
 	var persistent_contact := maximum_penetration > 0.001
