@@ -232,7 +232,39 @@
         "operation": {"enum": ["none", "cutting", "carry", "spill", "dump", "push", "idle"]},
         "transaction_queued": {"type": "boolean"},
         "consumed_contact_ids": {"type": "array", "maxItems": 16, "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
-        "classifications": {"type": "array", "maxItems": 16, "items": {"$ref": "#/$defs/interaction_classification"}}
+        "classifications": {"type": "array", "maxItems": 16, "items": {"$ref": "#/$defs/interaction_classification"}},
+        "soil_tool_shadow": {"$ref": "#/$defs/soil_tool_shadow"}
+      }
+    },
+    "soil_tool_candidate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["region_id", "region_kind", "classification", "role_scope", "overlap", "penetration_m", "motion_m", "moving_into_surface_m", "travel_fraction", "quality"],
+      "properties": {
+        "region_id": {"enum": ["teeth_main_edge", "left_side_cutter", "right_side_cutter", "floor_wear_plate", "outer_back", "outer_left_side", "outer_right_side", "inner_shell", "opening"]},
+        "region_kind": {"enum": ["teeth", "side_cutter", "floor", "outer_shell", "inner_shell", "opening"]},
+        "classification": {"enum": ["cut", "side_cut", "scrape", "push", "back_drag", "grade", "compact", "contain", "entry", "spill", "dump", "none"]},
+        "role_scope": {"enum": ["stable", "active", "none"]},
+        "overlap": {"type": "boolean"},
+        "penetration_m": {"type": "number", "minimum": 0},
+        "motion_m": {"type": "number", "minimum": 0},
+        "moving_into_surface_m": {"type": "number"},
+        "travel_fraction": {"type": "number", "minimum": 0, "maximum": 1},
+        "quality": {"enum": ["terrain_sample", "terrain_unavailable"]}
+      }
+    },
+    "soil_tool_shadow": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "valid", "reason", "model_id", "identity", "sweep_sample_count", "fill_ratio", "candidates", "quality_flags"],
+      "properties": {
+        "schema_version": {"const": "bucket-soil-tool-shadow-v1"},
+        "valid": {"type": "boolean"},
+        "reason": {"type": "string", "minLength": 1},
+        "model_id": {"enum": ["sy205", "sy135", "unknown"]},
+        "identity": {"type": "string", "minLength": 1},
+        "sweep_sample_count": {"type": "integer", "minimum": 0, "maximum": 24},
+        "fill_ratio": {"type": "number", "minimum": 0, "maximum": 1.5},
+        "candidates": {"type": "array", "maxItems": 9, "items": {"$ref": "#/$defs/soil_tool_candidate"}},
+        "quality_flags": {"type": "array", "maxItems": 8, "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
       }
     },
     "support_wrench": {

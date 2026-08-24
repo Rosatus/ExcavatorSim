@@ -12,7 +12,12 @@ from jsonschema import Draft202012Validator
 
 from babylon_sim.calibration import MachineCalibration
 from babylon_sim.model import ExcavatorModel
-from babylon_sim.paths import PHYSICS_RIG_SCHEMA_PATH, PROJECT_ROOT, SIMULATION_TRUTH_SCHEMA_PATH
+from babylon_sim.paths import (
+    PHYSICS_RIG_SCHEMA_PATH,
+    PROJECT_ROOT,
+    SIMULATION_TRUTH_SCHEMA_PATH,
+    SOIL_CONTRACT_SCHEMA_PATH,
+)
 from babylon_sim.protocol import ProtocolError, SimulationTruthShadowMessage, decode_client_message
 from babylon_sim.runtime import RuntimeController
 from babylon_sim.shadow_state import (
@@ -181,11 +186,68 @@ def test_rig_descriptors_match_strict_schema() -> None:
         assert any(identity[field] != expected[field] for field in expected)
 
 
+def test_soil_contracts_match_full_bucket_schema() -> None:
+    schema = json.loads(SOIL_CONTRACT_SCHEMA_PATH.read_text(encoding="utf-8"))
+    Draft202012Validator.check_schema(schema)
+    validator = Draft202012Validator(schema)
+    expected_regions = {
+        "teeth_main_edge",
+        "left_side_cutter",
+        "right_side_cutter",
+        "floor_wear_plate",
+        "outer_back",
+        "outer_left_side",
+        "outer_right_side",
+        "inner_shell",
+        "opening",
+    }
+    for model_id in ("sy205", "sy135"):
+        contract_path = (
+            PROJECT_ROOT / f"godot/client/resources/models/{model_id}_soil_contract.json"
+        )
+        contract = json.loads(
+            contract_path.read_text(encoding="utf-8")
+        )
+        validator.validate(contract)
+        regions = contract["bucket_tool"]["regions"]
+        assert {region["region_id"] for region in regions} == expected_regions
+        assert not next(region for region in regions if region["region_id"] == "inner_shell")[
+            "stable_soil_roles"
+        ]
+        assert not next(region for region in regions if region["region_id"] == "opening")[
+            "stable_soil_roles"
+        ]
+
+
 def test_authoritative_truth_schema_requires_exact_hybrid_identity_sets() -> None:
     schema = json.loads(SIMULATION_TRUTH_SCHEMA_PATH.read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(schema)
     validator = Draft202012Validator(schema)
     valid = _authoritative_snapshot(_identity())
+    valid["soil_interaction_batch"]["soil_tool_shadow"] = {
+        "schema_version": "bucket-soil-tool-shadow-v1",
+        "valid": True,
+        "reason": "ok",
+        "model_id": "sy205",
+        "identity": "authority-a|10|3|2|1",
+        "sweep_sample_count": 2,
+        "fill_ratio": 0.0,
+        "candidates": [
+            {
+                "region_id": "teeth_main_edge",
+                "region_kind": "teeth",
+                "classification": "cut",
+                "role_scope": "stable",
+                "overlap": True,
+                "penetration_m": 0.01,
+                "motion_m": 0.02,
+                "moving_into_surface_m": 0.02,
+                "travel_fraction": 0.5,
+                "quality": "terrain_sample",
+            }
+        ],
+        "quality_flags": [],
+    }
     validator.validate(valid)
 
     wrong_body = json.loads(json.dumps(valid))

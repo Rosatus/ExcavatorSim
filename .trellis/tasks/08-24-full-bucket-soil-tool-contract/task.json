@@ -3,7 +3,7 @@
   "name": "full-bucket-soil-tool-contract",
   "title": "Full bucket soil tool contract",
   "description": "Define model-specific full-bucket interaction proxies and surface roles for cutting, side cutting, scraping, pushing, grading, containment, and release.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": "frontend/godot",
   "package": null,

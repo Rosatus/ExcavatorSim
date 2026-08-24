@@ -501,7 +501,7 @@ func _canonical_soil_batch(batch: Dictionary) -> Dictionary:
 				"classification": String(record.get("classification", "blocked")),
 				"travel_fraction": float(record.get("travel_fraction", 1.0)),
 			})
-	return {
+	var result := {
 		"key": String(batch.get("key", "unavailable")),
 		"eligible": bool(batch.get("eligible", false)),
 		"duplicate": bool(batch.get("duplicate", false)),
@@ -509,6 +509,40 @@ func _canonical_soil_batch(batch: Dictionary) -> Dictionary:
 		"transaction_queued": bool(batch.get("transaction_queued", false)),
 		"consumed_contact_ids": Array(batch.get("consumed_contact_ids", []), TYPE_STRING, "", null),
 		"classifications": classifications,
+	}
+	if batch.has("soil_tool_shadow"):
+		result["soil_tool_shadow"] = _canonical_soil_tool_shadow(batch.get("soil_tool_shadow", {}) as Dictionary)
+	return result
+
+
+func _canonical_soil_tool_shadow(shadow: Dictionary) -> Dictionary:
+	var candidates: Array[Dictionary] = []
+	for candidate_value in shadow.get("candidates", []):
+		if not candidate_value is Dictionary:
+			continue
+		var candidate := candidate_value as Dictionary
+		candidates.append({
+			"region_id": String(candidate.get("region_id", "")),
+			"region_kind": String(candidate.get("region_kind", "")),
+			"classification": String(candidate.get("classification", "none")),
+			"role_scope": String(candidate.get("role_scope", "none")),
+			"overlap": bool(candidate.get("overlap", false)),
+			"penetration_m": maxf(0.0, float(candidate.get("penetration_m", 0.0))),
+			"motion_m": maxf(0.0, float(candidate.get("motion_m", 0.0))),
+			"moving_into_surface_m": float(candidate.get("moving_into_surface_m", 0.0)),
+			"travel_fraction": clampf(float(candidate.get("travel_fraction", 1.0)), 0.0, 1.0),
+			"quality": String(candidate.get("quality", "terrain_unavailable")),
+		})
+	return {
+		"schema_version": String(shadow.get("schema_version", BucketSoilTool.TELEMETRY_SCHEMA_VERSION)),
+		"valid": bool(shadow.get("valid", false)),
+		"reason": String(shadow.get("reason", "unavailable")),
+		"model_id": String(shadow.get("model_id", "unknown")),
+		"identity": String(shadow.get("identity", "unavailable")),
+		"sweep_sample_count": maxi(0, int(shadow.get("sweep_sample_count", 0))),
+		"fill_ratio": clampf(float(shadow.get("fill_ratio", 0.0)), 0.0, 1.5),
+		"candidates": candidates,
+		"quality_flags": Array(shadow.get("quality_flags", []), TYPE_STRING, "", null),
 	}
 
 

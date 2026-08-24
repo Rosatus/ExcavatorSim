@@ -14,7 +14,7 @@
       "parity_fixture_path": "res://tests/fixtures/sy205_frame_parity_cases.json",
       "parity_fixture_sha256": "873c06951ca317b6e4205b867e7c475eb924374a59b2d21dda87e65bb340d738",
       "soil_contract_path": "res://resources/models/sy205_soil_contract.json",
-      "soil_contract_sha256": "7a6f864fa8f2bcce45d4199830c3c753d24061b6f4913831c3d097b95e8c4bd9",
+      "soil_contract_sha256": "e6718da8cb8d581c2fafc2e83c45a04642538fbf5bf78d2a03b4a04c33169161",
       "physics_rig_path": "res://resources/physics/sy205_physics_rig.json",
       "physics_rig_sha256": "df89aed0b0363864529712446900b35454aea0a884154f76ccdfdd64a702595f",
       "tracked_locomotion": {
@@ -49,7 +49,7 @@
       "parity_fixture_path": "res://tests/fixtures/sy135_frame_parity_cases.json",
       "parity_fixture_sha256": "9c099db5db72e6006baccd56259e752f7a1bdfd836b9ba83d70be0ad01c13460",
       "soil_contract_path": "res://resources/models/sy135_soil_contract.json",
-      "soil_contract_sha256": "448d5574f52384bfc8166c03e7f12caaed31ba87f33607102bd9d7aeceae3ae3",
+      "soil_contract_sha256": "3c85562eb0332259dd67aa2ba16a63a2a216aa5e23b6d99e8357a0dbd5749bab",
       "physics_rig_path": "res://resources/physics/sy135_physics_rig.json",
       "physics_rig_sha256": "893633b5a4488910d7d67711a677d5964b3a08f1d1e66db87c68543966562958",
       "tracked_locomotion": {

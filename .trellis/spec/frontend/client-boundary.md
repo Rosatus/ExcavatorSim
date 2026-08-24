@@ -555,6 +555,102 @@ Wrong: bucket contact -> Terrain3D editor sculpt -> infer bucket volume later
 Correct: bucket command -> BucketSoilState/TerrainState -> copied snapshot -> Terrain3D
 ```
 
+## Scenario: Full-bucket semantic soil tool shadow
+
+### 1. Scope / Trigger
+
+Use this contract when code needs to describe or observe how the complete
+bucket surface cuts, side-cuts, scrapes, pushes, back-drags, grades, compacts,
+contains, admits, spills, or dumps material. This first stage is diagnostic
+only; the legacy analytic/parcel chain remains the material authority.
+
+### 2. Signatures
+
+```text
+SoilContractDescriptor.load_for_model(model_id: String) -> SoilContractDescriptor
+SoilContractDescriptor.is_valid_for(model_id: String) -> bool
+BucketSoilTool.configure(contract: Dictionary) -> bool
+BucketSoilTool.compose_snapshot(previous_bucket_frame: Transform3D,
+  current_bucket_frame: Transform3D, has_previous: bool,
+  identity: String) -> Dictionary
+BucketSoilTool.classify(snapshot: Dictionary, terrain_state: TerrainState,
+  fill_ratio: float, interaction: Dictionary) -> Dictionary
+ExcavationWorld.set_soil_tool_shadow_enabled(value: bool) -> void
+```
+
+### 3. Contracts
+
+- `excavator-soil-contract-v1` is hash-bound through `model_catalog.json` and
+  validated once by `SoilContractDescriptor`. Both `MotionPresentation` and
+  `JoltChassisTrackRuntime` use that loader; runtime path conventions are not a
+  second loader.
+- `bucket_tool.schema_version` is `bucket-soil-tool-v1`, its semantic frame is
+  `bucket_link`, and regions appear in canonical order: teeth/main edge, left
+  and right side cutters, floor/wear plate, outer back, outer left/right sides,
+  inner shell, and opening.
+- Every region has finite local center, unit outward normal, a bounded segment,
+  box, or plane shape, and separate stable/active soil roles. `inner_shell` and
+  `opening` have no stable-soil role; enclosed overlap can never authorize a
+  stable-terrain erase.
+- Tool nominal/heaped capacities exactly match the existing inventory values;
+  inner-shell dimensions match the cavity proxy and opening dimensions/normal
+  match the opening proxy.
+- `MotionPresentation` composes from the accepted fixed-step `bucket_link`
+  frame. Previous/current identity includes model, session, simulation epoch,
+  world generation, and authority generation. Translation/rotation are sampled
+  at descriptor-bounded intervals and capped at 24 samples.
+- `BucketSoilTool` is a pure observer. It has no access to terrain brushes,
+  bucket credit/debit, parcels, support wrench, or articulation acceptance.
+  Candidates are canonical-order data, not transactions.
+- `soil_tool_shadow_enabled` defaults false. When enabled, compact telemetry is
+  attached to the existing interaction batch and optional
+  `simulation-truth-v1` field. Disable, model switch, pose clear, reset, or
+  generation change drops prior pose/debug observation state.
+- Debug shapes are hidden, non-colliding `MeshInstance3D` children. They never
+  enter Jolt layers or terrain/support queries.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Catalog hash, schema, model ID, region set/order, finite geometry, role, capacity, or cavity/opening consistency invalid | Reject the new contract; do not approximate another model |
+| First pose, generation/model change, discontinuity, or non-finite transform | Publish unavailable/history reason; classify no candidate |
+| Resting or separating stable-soil region | Emit `none`; never cut |
+| Inner/opening overlaps stable terrain | May report overlap evidence but cannot acquire a stable role or transaction authority |
+| Shadow flag disabled | Omit shadow telemetry; preserve legacy behavior |
+| Terrain sampler unavailable | Preserve composed geometry, mark classification quality unavailable, and perform no mutation |
+
+### 5. Good / Base / Bad Cases
+
+- Good: catalog entry -> strict shared loader -> accepted bucket frame -> bounded
+  swept regions -> immutable candidate telemetry.
+- Base: invalid/missing semantic tool -> feature unavailable while the explicit
+  legacy soil path remains usable.
+- Bad: copy an entire bucket-shell overlap into a terrain brush, or feed a
+  semantic candidate into Jolt accepted fraction during the shadow phase.
+
+### 6. Tests Required
+
+- Validate both model contracts plus invalid inner-shell stable role and
+  capacity/cavity mismatch.
+- Prove long translation/rotation sweep, canonical ordering, forward cut,
+  side-cut, floor scrape/grade, outer push/back-drag/compact, containment,
+  opening entry/spill/dump, and resting/separating `none` candidates.
+- Compare terrain revision/digest and bucket inventory before/after pure shadow
+  classification; existing parcel/motion tests remain unchanged.
+- Keep model-switch history cleanup, strict simulation-truth schema, standalone
+  matrix, and backend verification green.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: raw mesh triangles or one tooth origin -> infer the whole bucket's soil role
+Correct: model bucket_tool regions -> accepted-frame bounded sweep -> read-only candidates
+
+Wrong: Jolt runtime guesses res://resources/models/<id>_soil_contract.json
+Correct: model catalog path + SHA-256 -> one SoilContractDescriptor validator
+```
+
 ## Scenario: Construction-site Terrain3D presentation
 
 ### 1. Scope / Trigger

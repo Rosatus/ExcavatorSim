@@ -14,6 +14,7 @@ const SOIL_PROXY_ORDER := ["cutting_edge", "opening", "cavity", "shell", "rear_s
 @export var debug_manual_controls := false
 @export var hero_clods_enabled := true
 @export var backend_feedback_enabled := false
+@export var soil_tool_shadow_enabled := false
 @export_enum("low", "balanced", "high") var feedback_quality := "balanced"
 @export var local_tooth_offset := Vector3(0.0, -0.55, 0.0)
 
@@ -39,6 +40,7 @@ var _last_interaction_batch: Dictionary = {}
 var _consumed_batch_keys: Dictionary = {}
 var _consumed_batch_order: Array[String] = []
 var _parcel_pool: SoilParcelPool
+var _soil_tool_classifier := BucketSoilTool.new()
 
 
 func _ready() -> void:
@@ -60,6 +62,7 @@ func _initialize() -> void:
 		call_deferred("_initialize")
 		return
 	_sync_local_tooth_offset(contract)
+	_soil_tool_classifier.configure(contract)
 	terrain_scheduler = TerrainCommitScheduler.new(terrain_world.terrain_state, terrain_world, terrain_collider)
 	soil_state = BucketSoilState.new(terrain_world.terrain_state, contract, terrain_scheduler)
 	terrain_scheduler.refresh_collider_derivative()
@@ -205,6 +208,12 @@ func set_backend_feedback_enabled(value: bool) -> void:
 		_motion_client.clear_bucket_load_feedback()
 
 
+func set_soil_tool_shadow_enabled(value: bool) -> void:
+	soil_tool_shadow_enabled = value
+	if not value:
+		_last_interaction_batch.erase("soil_tool_shadow")
+
+
 func get_status_snapshot() -> Dictionary:
 	var status := soil_state.get_status_snapshot() if soil_state != null else {"bucket_volume_m3": 0.0, "world_generation": -1}
 	status["authority_generation"] = authority_generation
@@ -212,6 +221,7 @@ func get_status_snapshot() -> Dictionary:
 	status["debug_manual_controls"] = debug_manual_controls
 	status["hero_clods_enabled"] = hero_clods_enabled
 	status["backend_feedback_enabled"] = backend_feedback_enabled
+	status["soil_tool_shadow_enabled"] = soil_tool_shadow_enabled
 	status["interaction_state"] = _last_interaction
 	status["material_generation"] = _material_generation
 	status["flow_volume_m3"] = _last_flow_volume_m3
@@ -399,6 +409,15 @@ func _build_interaction_batch(snapshot: Dictionary) -> Dictionary:
 	var analytic := _analytic_cut_evidence(snapshot, chassis)
 	var classifications := _classify_interaction_records(snapshot, contacts, hybrid, identity_valid, physics_tick, motion_sequence, analytic)
 	var operation := _reduce_soil_operation(classifications)
+	var soil_tool_shadow := {}
+	if soil_tool_shadow_enabled:
+		var soil_status := soil_state.get_status_snapshot() if soil_state != null else {}
+		soil_tool_shadow = _soil_tool_classifier.classify(
+			snapshot.get("soil_tool", {}) as Dictionary,
+			terrain_world.terrain_state if terrain_world != null else null,
+			float(soil_status.get("fill_ratio", 0.0)),
+			(snapshot.get("contract", {}) as Dictionary).get("interaction", {}) as Dictionary,
+		)
 	var consumed_contact_ids: Array[String] = []
 	for record in classifications:
 		if String(record.get("classification", "blocked")) != "blocked":
@@ -422,6 +441,8 @@ func _build_interaction_batch(snapshot: Dictionary) -> Dictionary:
 		"analytic_penetration_m": float(analytic.get("penetration_m", 0.0)),
 		"transaction_queued": false,
 	}
+	if soil_tool_shadow_enabled:
+		batch["soil_tool_shadow"] = soil_tool_shadow.duplicate(true)
 	if bool(batch["duplicate"]):
 		batch["eligible"] = false
 	_last_interaction_batch = batch.duplicate(true)
@@ -820,6 +841,7 @@ func _on_authority_changed(_session_id: String, _simulation_epoch: String, gener
 func _on_model_activated(_model_id: String, _asset_root: Node3D) -> void:
 	var contract := _presentation.get_soil_contract()
 	_sync_local_tooth_offset(contract)
+	_soil_tool_classifier.configure(contract)
 	if soil_state != null:
 		soil_state.configure_contract(contract)
 	if _parcel_pool != null:

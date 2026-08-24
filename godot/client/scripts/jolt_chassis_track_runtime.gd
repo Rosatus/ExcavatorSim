@@ -1328,16 +1328,13 @@ func _reject(message: String) -> bool:
 
 
 func _load_soil_contract() -> Dictionary:
-	var path := "res://resources/models/%s_soil_contract.json" % model_id
-	if not FileAccess.file_exists(path):
+	var descriptor := SoilContractDescriptor.load_for_model(model_id)
+	if descriptor == null or not descriptor.is_valid_for(model_id):
+		contract_error = "soil_contract: %s" % (
+			"descriptor_unavailable" if descriptor == null else descriptor.validation_error()
+		)
 		return {}
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
-	if not parsed is Dictionary:
-		return {}
-	var contract := parsed as Dictionary
-	if String(contract.get("model_id", "")) != model_id:
-		return {}
-	return contract.duplicate(true)
+	return descriptor.to_dictionary()
 
 
 func _rows_to_transform(value: Variant) -> Transform3D:

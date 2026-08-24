@@ -25,3 +25,9 @@ child.
 Missing/invalid descriptors fail closed for the new path and leave legacy mode
 available. Debug geometry uses non-colliding presentation nodes and clears on
 generation/model/disable boundaries.
+
+The implemented owner is `SoilContractDescriptor`, shared by presentation and
+Jolt through the hash-bound model catalog. `BucketSoilTool` is a pure observer:
+it composes bounded swept samples from accepted `bucket_link` frames and emits
+canonical-order candidates. `ExcavationWorld` attaches them only when the
+default-off shadow flag is enabled; existing soil reducers never consume them.

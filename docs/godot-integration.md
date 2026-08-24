@@ -83,6 +83,18 @@ wrench from shell/rear support. Visible fill and payload aggregates come from
 the same bounded cellular occupancy. Direct cut/deposit queues remain test/debug
 seams only.
 
+The per-model soil contract also carries a hash-bound
+`bucket-soil-tool-v1` semantic description of the complete bucket: teeth/main
+edge, both side cutters, floor/wear plate, outer back/sides, inner shell, and
+opening. `SoilContractDescriptor` is the shared presentation/Jolt loader.
+`BucketSoilTool` composes bounded previous-to-current swept regions from the
+accepted `bucket_link` frame and can publish default-off, read-only shadow
+candidates for cut, scrape, push, grade, containment, entry, spill, and dump.
+Inner/opening regions have no stable-terrain role. This shadow path has no
+terrain, inventory, parcel, support-wrench, or articulation mutation API; the
+legacy analytic/parcel path remains authoritative until the later soil
+authority migration.
+
 The canonical authoritative truth keeps that bucket-query identity structured
 as `authority_epoch`, `physics_tick`, terrain generation/revision, and motion
 sequence alongside previous/candidate/accepted transforms. Support is limited

@@ -1,0 +1,282 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://excavator-sim.local/protocol/excavator-soil-contract-v1.schema.json",
+  "title": "Excavator soil and full-bucket semantic tool contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "model_id",
+    "material_density_kg_m3",
+    "nominal_capacity_m3",
+    "heaped_capacity_m3",
+    "cell_grid",
+    "interaction",
+    "proxies",
+    "bucket_tool"
+  ],
+  "properties": {
+    "schema_version": {"const": "excavator-soil-contract-v1"},
+    "model_id": {"enum": ["sy205", "sy135"]},
+    "material_density_kg_m3": {"type": "number", "exclusiveMinimum": 0},
+    "nominal_capacity_m3": {"type": "number", "exclusiveMinimum": 0},
+    "heaped_capacity_m3": {"type": "number", "exclusiveMinimum": 0},
+    "cell_grid": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "prefixItems": [
+        {"type": "integer", "minimum": 2, "maximum": 32},
+        {"type": "integer", "minimum": 2, "maximum": 32},
+        {"type": "integer", "minimum": 2, "maximum": 32}
+      ]
+    },
+    "interaction": {"$ref": "#/$defs/interaction"},
+    "proxies": {"$ref": "#/$defs/proxies"},
+    "bucket_tool": {"$ref": "#/$defs/bucket_tool"}
+  },
+  "$defs": {
+    "vec3": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "prefixItems": [{"type": "number"}, {"type": "number"}, {"type": "number"}]
+    },
+    "size2": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "prefixItems": [
+        {"type": "number", "exclusiveMinimum": 0},
+        {"type": "number", "exclusiveMinimum": 0}
+      ]
+    },
+    "size3": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "prefixItems": [
+        {"type": "number", "exclusiveMinimum": 0},
+        {"type": "number", "exclusiveMinimum": 0},
+        {"type": "number", "exclusiveMinimum": 0}
+      ]
+    },
+    "interaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contact_tolerance_m",
+        "maximum_cut_depth_m",
+        "minimum_sweep_m",
+        "cut_radius_m",
+        "deposit_radius_m",
+        "spill_opening_down_dot",
+        "dump_opening_down_dot"
+      ],
+      "properties": {
+        "contact_tolerance_m": {"type": "number", "exclusiveMinimum": 0},
+        "maximum_cut_depth_m": {"type": "number", "exclusiveMinimum": 0},
+        "minimum_sweep_m": {"type": "number", "exclusiveMinimum": 0},
+        "cut_radius_m": {"type": "number", "exclusiveMinimum": 0},
+        "deposit_radius_m": {"type": "number", "exclusiveMinimum": 0},
+        "spill_opening_down_dot": {"type": "number", "minimum": -1, "maximum": 1},
+        "dump_opening_down_dot": {"type": "number", "minimum": -1, "maximum": 1}
+      }
+    },
+    "edge_proxy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["frame", "center_godot", "half_width_m"],
+      "properties": {
+        "frame": {"const": "bucket_link"},
+        "center_godot": {"$ref": "#/$defs/vec3"},
+        "half_width_m": {"type": "number", "exclusiveMinimum": 0}
+      }
+    },
+    "cutting_proxy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["frame", "center_godot", "direction_godot", "half_width_m"],
+      "properties": {
+        "frame": {"const": "bucket_link"},
+        "center_godot": {"$ref": "#/$defs/vec3"},
+        "direction_godot": {"$ref": "#/$defs/vec3"},
+        "half_width_m": {"type": "number", "exclusiveMinimum": 0}
+      }
+    },
+    "opening_proxy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["frame", "center_godot", "normal_godot", "up_godot", "size_m"],
+      "properties": {
+        "frame": {"const": "bucket_link"},
+        "center_godot": {"$ref": "#/$defs/vec3"},
+        "normal_godot": {"$ref": "#/$defs/vec3"},
+        "up_godot": {"$ref": "#/$defs/vec3"},
+        "size_m": {"$ref": "#/$defs/size2"}
+      }
+    },
+    "box_proxy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["frame", "center_godot", "up_godot", "size_m"],
+      "properties": {
+        "frame": {"const": "bucket_link"},
+        "center_godot": {"$ref": "#/$defs/vec3"},
+        "up_godot": {"$ref": "#/$defs/vec3"},
+        "size_m": {"$ref": "#/$defs/size3"}
+      }
+    },
+    "shell_proxy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["frame", "center_godot", "up_godot", "size_m", "evidence"],
+      "properties": {
+        "frame": {"const": "bucket_link"},
+        "center_godot": {"$ref": "#/$defs/vec3"},
+        "up_godot": {"$ref": "#/$defs/vec3"},
+        "size_m": {"$ref": "#/$defs/size3"},
+        "evidence": {"type": "string", "minLength": 1}
+      }
+    },
+    "support_proxy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["frame", "center_godot", "radius_m"],
+      "properties": {
+        "frame": {"const": "bucket_link"},
+        "center_godot": {"$ref": "#/$defs/vec3"},
+        "radius_m": {"type": "number", "exclusiveMinimum": 0}
+      }
+    },
+    "proxies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cutting_edge", "top_edge", "opening", "cavity", "shell", "rear_support"],
+      "properties": {
+        "cutting_edge": {"$ref": "#/$defs/cutting_proxy"},
+        "top_edge": {"$ref": "#/$defs/edge_proxy"},
+        "opening": {"$ref": "#/$defs/opening_proxy"},
+        "cavity": {"$ref": "#/$defs/box_proxy"},
+        "shell": {"$ref": "#/$defs/shell_proxy"},
+        "rear_support": {"$ref": "#/$defs/support_proxy"}
+      }
+    },
+    "segment_shape": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "axis_godot", "half_length_m", "radius_m"],
+      "properties": {
+        "kind": {"const": "segment"},
+        "axis_godot": {"$ref": "#/$defs/vec3"},
+        "half_length_m": {"type": "number", "exclusiveMinimum": 0},
+        "radius_m": {"type": "number", "exclusiveMinimum": 0}
+      }
+    },
+    "box_shape": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "size_m"],
+      "properties": {
+        "kind": {"const": "box"},
+        "size_m": {"$ref": "#/$defs/size3"}
+      }
+    },
+    "plane_shape": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "size_m", "width_axis_godot", "height_axis_godot"],
+      "properties": {
+        "kind": {"const": "plane"},
+        "size_m": {"$ref": "#/$defs/size2"},
+        "width_axis_godot": {"$ref": "#/$defs/vec3"},
+        "height_axis_godot": {"$ref": "#/$defs/vec3"}
+      }
+    },
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "region_id",
+        "kind",
+        "center_godot",
+        "outward_normal_godot",
+        "shape",
+        "stable_soil_roles",
+        "active_soil_roles"
+      ],
+      "properties": {
+        "region_id": {
+          "enum": [
+            "teeth_main_edge",
+            "left_side_cutter",
+            "right_side_cutter",
+            "floor_wear_plate",
+            "outer_back",
+            "outer_left_side",
+            "outer_right_side",
+            "inner_shell",
+            "opening"
+          ]
+        },
+        "kind": {"enum": ["teeth", "side_cutter", "floor", "outer_shell", "inner_shell", "opening"]},
+        "center_godot": {"$ref": "#/$defs/vec3"},
+        "outward_normal_godot": {"$ref": "#/$defs/vec3"},
+        "shape": {
+          "oneOf": [
+            {"$ref": "#/$defs/segment_shape"},
+            {"$ref": "#/$defs/box_shape"},
+            {"$ref": "#/$defs/plane_shape"}
+          ]
+        },
+        "stable_soil_roles": {
+          "type": "array",
+          "maxItems": 7,
+          "uniqueItems": true,
+          "items": {"enum": ["cut", "side_cut", "scrape", "push", "back_drag", "grade", "compact"]}
+        },
+        "active_soil_roles": {
+          "type": "array",
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {"enum": ["contain", "entry", "spill", "dump"]}
+        }
+      }
+    },
+    "bucket_tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "frame", "capacity", "sweep", "regions"],
+      "properties": {
+        "schema_version": {"const": "bucket-soil-tool-v1"},
+        "frame": {"const": "bucket_link"},
+        "capacity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["nominal_m3", "heaped_m3", "cavity_region"],
+          "properties": {
+            "nominal_m3": {"type": "number", "exclusiveMinimum": 0},
+            "heaped_m3": {"type": "number", "exclusiveMinimum": 0},
+            "cavity_region": {"const": "inner_shell"}
+          }
+        },
+        "sweep": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maximum_translation_step_m", "maximum_rotation_step_degrees", "maximum_samples"],
+          "properties": {
+            "maximum_translation_step_m": {"type": "number", "exclusiveMinimum": 0, "maximum": 0.25},
+            "maximum_rotation_step_degrees": {"type": "number", "exclusiveMinimum": 0, "maximum": 15},
+            "maximum_samples": {"type": "integer", "minimum": 2, "maximum": 24}
+          }
+        },
+        "regions": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "items": {"$ref": "#/$defs/region"}
+        }
+      }
+    }
+  }
+}

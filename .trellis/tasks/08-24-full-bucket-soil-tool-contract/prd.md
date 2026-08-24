@@ -24,18 +24,18 @@ push, grade, contain, and release soil.
 
 ## Acceptance criteria
 
-- [ ] Both models validate all required regions, finite transforms, dimensions,
+- [x] Both models validate all required regions, finite transforms, dimensions,
       normals, opening orientation, and capacity/cavity consistency at load time.
-- [ ] Debug views remain aligned throughout the accepted boom/arm/bucket range;
+- [x] Debug views remain aligned throughout the accepted boom/arm/bucket range;
       no region visibly drifts or uses the wrong model after switching.
-- [ ] Deterministic swept tests distinguish forward cut, side cut, floor scrape,
+- [x] Deterministic swept tests distinguish forward cut, side cut, floor scrape,
       back push/grade, inner containment, and dump opening without single-point
       tunneling.
-- [ ] A resting or separating bucket produces no cut intent, and full-shell
+- [x] A resting or separating bucket produces no cut intent, and full-shell
       overlap cannot delete the whole enclosed terrain volume.
-- [ ] Enabling shadow classification leaves terrain snapshots/revisions, bucket
+- [x] Enabling shadow classification leaves terrain snapshots/revisions, bucket
       ledger, parcel snapshot, and accepted equipment motion unchanged.
-- [ ] Focused contract/classifier/model-switch tests and the standalone matrix
+- [x] Focused contract/classifier/model-switch tests and the standalone matrix
       pass for SY205 and SY135.
 
 ## In scope

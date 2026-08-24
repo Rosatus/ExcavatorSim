@@ -39,7 +39,12 @@ var _last_render_revision := -1
 var _contract_error := ""
 var _previous_bucket_proxies: Dictionary = {}
 var _previous_bucket_identity := ""
+var _previous_bucket_frame := Transform3D.IDENTITY
+var _has_previous_bucket_frame := false
+var _last_soil_tool_snapshot: Dictionary = {}
+var _soil_tool := BucketSoilTool.new()
 var _soil_debug_root: Node3D
+var _semantic_debug_root: Node3D
 
 # The imported GLB intentionally contains no Blender drivers or animation
 # tracks. These nodes are the Godot-only passive four-bar presentation seam
@@ -141,6 +146,11 @@ func sample_bucket_pose_fixed(world_generation: int, authority_generation: int) 
 	var identity := "%s|%s|%s|%d|%d" % [model_id, session_id, simulation_epoch, world_generation, authority_generation]
 	var reason := "ok"
 	var valid := not _previous_bucket_proxies.is_empty() and identity == _previous_bucket_identity
+	var bucket_frame := get_frame_node("bucket_link")
+	if bucket_frame == null:
+		clear_bucket_pose_history()
+		return {"valid": false, "reason": "bucket_frame_unavailable"}
+	var tool_has_previous := _has_previous_bucket_frame and identity == _previous_bucket_identity
 	if not valid:
 		reason = "history_unavailable"
 	else:
@@ -149,6 +159,15 @@ func sample_bucket_pose_fixed(world_generation: int, authority_generation: int) 
 		if previous_cutting.origin.distance_to(current_cutting.origin) > 2.0:
 			valid = false
 			reason = "discontinuous_pose"
+	var soil_tool_snapshot := _soil_tool.compose_snapshot(
+		_previous_bucket_frame,
+		bucket_frame.global_transform,
+		tool_has_previous,
+		identity,
+	)
+	if not valid:
+		soil_tool_snapshot["valid"] = false
+		soil_tool_snapshot["reason"] = reason
 	var proxies := _soil_contract.get("proxies", {}) as Dictionary
 	var cutting_contract := proxies.get("cutting_edge", {}) as Dictionary
 	var opening_contract := proxies.get("opening", {}) as Dictionary
@@ -172,23 +191,35 @@ func sample_bucket_pose_fixed(world_generation: int, authority_generation: int) 
 		"cutting_direction_world": cutting_direction_world.normalized(),
 		"opening_normal_world": opening_normal_world.normalized(),
 		"contract": _soil_contract.duplicate(true),
+		"soil_tool": soil_tool_snapshot.duplicate(true),
 	}
 	_previous_bucket_proxies = current.duplicate(true)
 	_previous_bucket_identity = identity
-	_update_soil_debug_proxies(current)
+	_previous_bucket_frame = bucket_frame.global_transform
+	_has_previous_bucket_frame = true
+	_last_soil_tool_snapshot = soil_tool_snapshot.duplicate(true)
+	_update_soil_debug_proxies(current, soil_tool_snapshot.get("regions", []) as Array)
 	return snapshot
 
 
 func clear_bucket_pose_history() -> void:
 	_previous_bucket_proxies.clear()
 	_previous_bucket_identity = ""
+	_previous_bucket_frame = Transform3D.IDENTITY
+	_has_previous_bucket_frame = false
+	_last_soil_tool_snapshot.clear()
+	if _soil_debug_root != null:
+		_soil_debug_root.visible = false
 
 
 func set_soil_debug_visible(value: bool) -> void:
 	_ensure_soil_debug_root()
 	_soil_debug_root.visible = value
 	if value and not _previous_bucket_proxies.is_empty():
-		_update_soil_debug_proxies(_previous_bucket_proxies)
+		_update_soil_debug_proxies(
+			_previous_bucket_proxies,
+			_last_soil_tool_snapshot.get("regions", []) as Array,
+		)
 
 
 func get_bucket_contact_world() -> Variant:
@@ -327,6 +358,7 @@ func _clear_contract_state() -> void:
 	_rest_globals.clear()
 	_rest_presentation_locals.clear()
 	_soil_contract.clear()
+	_soil_tool.reset()
 	clear_bucket_pose_history()
 	_pivot_reasons.clear()
 	_pivot_last_warning_reasons.clear()
@@ -455,69 +487,25 @@ func _on_pose_cleared(_generation: int, _reason: String) -> void:
 
 
 func _load_soil_contract(model_id: String) -> bool:
-	var contract := _read_json(_soil_contract_path)
-	if contract.get("schema_version", "") != "excavator-soil-contract-v1" or contract.get("model_id", "") != model_id:
-		_contract_error = "%s soil contract identity is invalid" % model_id
+	var descriptor := SoilContractDescriptor.load_for_model(model_id)
+	if descriptor == null or not descriptor.is_valid_for(model_id):
+		var reason := "descriptor_unavailable" if descriptor == null else descriptor.validation_error()
+		_contract_error = "%s soil contract is invalid: %s" % [model_id, reason]
 		push_error(_contract_error)
 		return false
-	for scalar_name in ["material_density_kg_m3", "nominal_capacity_m3", "heaped_capacity_m3"]:
-		var scalar := float(contract.get(scalar_name, 0.0))
-		if scalar <= 0.0 or is_nan(scalar) or is_inf(scalar):
-			_contract_error = "%s soil contract has invalid %s" % [model_id, scalar_name]
+	var contract := descriptor.to_dictionary()
+	for proxy_value in (contract.get("proxies", {}) as Dictionary).values():
+		var proxy := proxy_value as Dictionary
+		if not _frame_nodes.has(String(proxy.get("frame", ""))):
+			_contract_error = "%s soil proxy frame is unavailable" % model_id
 			push_error(_contract_error)
 			return false
-	if float(contract["heaped_capacity_m3"]) < float(contract["nominal_capacity_m3"]):
-		_contract_error = "%s heaped capacity is below nominal capacity" % model_id
+	if not _soil_tool.configure(contract):
+		_contract_error = "%s bucket tool is invalid: %s" % [model_id, _soil_tool.validation_error]
 		push_error(_contract_error)
 		return false
-	var grid: Variant = contract.get("cell_grid", [])
-	if not grid is Array or (grid as Array).size() != 3:
-		_contract_error = "%s soil cell grid is invalid" % model_id
-		push_error(_contract_error)
-		return false
-	var proxies: Dictionary = contract.get("proxies", {})
-	for proxy_name in ["cutting_edge", "top_edge", "opening", "cavity", "shell", "rear_support"]:
-		var proxy: Dictionary = proxies.get(proxy_name, {})
-		var frame_name := String(proxy.get("frame", ""))
-		if not _frame_nodes.has(frame_name) or not _valid_vector3_array(proxy.get("center_godot", [])):
-			_contract_error = "%s soil proxy is invalid: %s" % [model_id, proxy_name]
-			push_error(_contract_error)
-			return false
-	if not _valid_vector3_array((proxies["cutting_edge"] as Dictionary).get("direction_godot", [])):
-		_contract_error = "%s cutting direction is invalid" % model_id
-		return false
-	if not _valid_vector3_array((proxies["opening"] as Dictionary).get("normal_godot", [])):
-		_contract_error = "%s opening normal is invalid" % model_id
-		return false
-	for oriented_proxy_name in ["opening", "cavity", "shell"]:
-		var oriented_proxy := proxies[oriented_proxy_name] as Dictionary
-		if not _valid_direction_array(oriented_proxy.get("up_godot", [])):
-			_contract_error = "%s %s orientation is invalid" % [model_id, oriented_proxy_name]
-			return false
-	for edge_name in ["cutting_edge", "top_edge"]:
-		if float((proxies[edge_name] as Dictionary).get("half_width_m", 0.0)) <= 0.0:
-			_contract_error = "%s %s width is invalid" % [model_id, edge_name]
-			return false
-	var opening_size: Variant = (proxies["opening"] as Dictionary).get("size_m", [])
-	if not _valid_positive_array(opening_size, 2):
-		_contract_error = "%s opening size is invalid" % model_id
-		return false
-	if not _valid_positive_array((proxies["cavity"] as Dictionary).get("size_m", []), 3):
-		_contract_error = "%s cavity size is invalid" % model_id
-		return false
-	if not _valid_positive_array((proxies["shell"] as Dictionary).get("size_m", []), 3):
-		_contract_error = "%s shell size is invalid" % model_id
-		return false
-	if float((proxies["rear_support"] as Dictionary).get("radius_m", 0.0)) <= 0.0:
-		_contract_error = "%s rear support radius is invalid" % model_id
-		return false
-	var interaction := contract.get("interaction", {}) as Dictionary
-	var spill_threshold := float(interaction.get("spill_opening_down_dot", -2.0))
-	var dump_threshold := float(interaction.get("dump_opening_down_dot", -2.0))
-	if spill_threshold < -1.0 or dump_threshold > 1.0 or spill_threshold >= dump_threshold:
-		_contract_error = "%s spill/dump thresholds are invalid" % model_id
-		return false
-	_soil_contract = contract
+	_soil_contract = contract.duplicate(true)
+	_rebuild_semantic_debug()
 	return true
 
 
@@ -545,20 +533,6 @@ func _valid_vector3_array(value: Variant) -> bool:
 		if is_nan(number) or is_inf(number):
 			return false
 	return true
-
-
-func _valid_positive_array(value: Variant, expected_size: int) -> bool:
-	if not value is Array or (value as Array).size() != expected_size:
-		return false
-	for component in value:
-		var number := float(component)
-		if number <= 0.0 or is_nan(number) or is_inf(number):
-			return false
-	return true
-
-
-func _valid_direction_array(value: Variant) -> bool:
-	return _valid_vector3_array(value) and not _vector3_from_array(value).is_zero_approx()
 
 
 func _vector3_from_array(value: Variant) -> Vector3:
@@ -597,9 +571,45 @@ func _ensure_soil_debug_root() -> void:
 		proxy_mesh.material = material
 		mesh_instance.mesh = proxy_mesh
 		_soil_debug_root.add_child(mesh_instance)
+	_rebuild_semantic_debug()
 
 
-func _update_soil_debug_proxies(current: Dictionary) -> void:
+func _rebuild_semantic_debug() -> void:
+	if _soil_debug_root == null:
+		return
+	if _semantic_debug_root == null:
+		_semantic_debug_root = Node3D.new()
+		_semantic_debug_root.name = "BucketSemanticRegions"
+		_soil_debug_root.add_child(_semantic_debug_root)
+	for child in _semantic_debug_root.get_children():
+		child.free()
+	var tool := _soil_contract.get("bucket_tool", {}) as Dictionary
+	for region_value in tool.get("regions", []):
+		var region := region_value as Dictionary
+		var region_id := String(region.get("region_id", ""))
+		var shape := region.get("shape", {}) as Dictionary
+		var mesh_instance := MeshInstance3D.new()
+		mesh_instance.name = region_id
+		var mesh := BoxMesh.new()
+		match String(shape.get("kind", "")):
+			"segment":
+				var radius := float(shape.get("radius_m", 0.02))
+				mesh.size = Vector3(radius * 2.0, radius * 2.0, float(shape.get("half_length_m", 0.1)) * 2.0)
+			"plane":
+				var plane_size := shape.get("size_m", [0.1, 0.1]) as Array
+				mesh.size = Vector3(float(plane_size[0]), 0.02, float(plane_size[1]))
+			_:
+				mesh.size = _vector3_from_array(shape.get("size_m", [0.1, 0.1, 0.1]))
+		var material := StandardMaterial3D.new()
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.albedo_color = Color(0.2, 0.9, 0.95, 0.22) if (region.get("stable_soil_roles", []) as Array).is_empty() else Color(1.0, 0.35, 0.08, 0.3)
+		mesh.material = material
+		mesh_instance.mesh = mesh
+		_semantic_debug_root.add_child(mesh_instance)
+
+
+func _update_soil_debug_proxies(current: Dictionary, semantic_regions: Array = []) -> void:
 	if _soil_debug_root == null or not _soil_debug_root.visible:
 		return
 	var proxies: Dictionary = _soil_contract.get("proxies", {})
@@ -626,6 +636,14 @@ func _update_soil_debug_proxies(current: Dictionary) -> void:
 			var width := 2.0 * float(proxy.get("half_width_m", 0.25))
 			(mesh_instance.mesh as BoxMesh).size = Vector3(width, 0.035, 0.035)
 			mesh_instance.scale = Vector3.ONE
+	if _semantic_debug_root == null:
+		return
+	for region_value in semantic_regions:
+		var region := region_value as Dictionary
+		var mesh_instance := _semantic_debug_root.get_node_or_null(NodePath(String(region.get("region_id", "")))) as MeshInstance3D
+		var current_transform: Variant = region.get("current_transform")
+		if mesh_instance != null and current_transform is Transform3D:
+			mesh_instance.global_transform = current_transform as Transform3D
 
 
 func _apply_render_pose(pose: Dictionary) -> void:
