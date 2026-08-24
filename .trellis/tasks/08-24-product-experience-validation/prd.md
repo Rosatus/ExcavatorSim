@@ -12,8 +12,14 @@ and produce after evidence and release-candidate guidance for both models.
 - Execute cold-start and experienced-operator journeys on SY205 and SY135:
   onboarding/start, camera setup, travel, dig, carry, dump, pause/focus recovery,
   reset, model switch, and repeat.
+- Extend the soil journey with forward/side cut, floor scrape/grade, back push,
+  nonzero scoop, controlled spill, dump, pile settle, and legacy fallback.
 - Measure time-to-discover/time-to-complete, camera clipping, warning clarity,
   balanced 1080p frame pacing, fixed-step maxima, and effect/audio budgets.
+- Run the five-minute discoverability gate from a clean profile with an evaluator
+  who did not implement the controls: timing starts at product launch, only
+  in-product prompts/onboarding are allowed, and success requires start, straight
+  travel, productive dig, nonzero carry, dump, and reset without intervention.
 - Exercise offline default, optional gateway degradation, low/balanced/high
   profiles, 1280×720 and 1920×1080 UI, mute, focus loss, and reset generations.
 - Fix P0/P1 integration defects within parent scope and explicitly defer any
@@ -25,6 +31,9 @@ and produce after evidence and release-candidate guidance for both models.
 - [ ] Both models complete every operator journey without debug seams, external
       instructions, stale state, camera clipping, stuck effects/audio, or material
       simulation regressions.
+- [ ] Active soil mode has one material owner, conservative 20-cycle behavior,
+      nonzero real payload, continuous cut/carry/dump/settle visuals, bounded
+      speed response, and clean generation-level legacy fallback.
 - [ ] A first-time evaluator completes the core journey within five minutes and
       the scorecard improves in every P0/P1-owned dimension.
 - [ ] Before/after evidence is complete, comparable, and linked to closed/deferred
@@ -38,5 +47,6 @@ and produce after evidence and release-candidate guidance for both models.
 
 ## Out of scope
 
-New feature work not required by an evidenced P0/P1 integration defect, external
-user research programs, multiplayer/VR, and dynamic weather/time.
+New feature work outside the approved visual and gameplay-soil parents, external
+user research programs, professional hydraulic/soil calibration, multiplayer/VR,
+and dynamic weather/time.

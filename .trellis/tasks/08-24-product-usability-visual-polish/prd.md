@@ -7,7 +7,9 @@ learnable operator experience whose construction-site presentation, camera,
 machine feedback, soil interaction, and recovery flow feel intentional for both
 SY205 and SY135. A first-time user should be able to understand what to do,
 operate the machine, excavate, carry, dump, and recover without debug seams or
-outside instructions.
+outside instructions. The visual program consumes the separately planned
+`08-24-gameplay-soil-interaction-rebuild`; it does not disguise or duplicate
+soil authority inside presentation code.
 
 ## Confirmed product baseline
 
@@ -62,10 +64,12 @@ and deterministic fixed-time visual baseline unchanged.
 
 ### R5 — Credible action feedback
 
-Make drivetrain, hydraulics, digging, soil capture/carry/spill/settle, impacts,
-warnings, and lifecycle changes readable through bounded visual effects and an
-audio mix. Effects consume existing authoritative state and never become a new
-simulation authority.
+Make drivetrain, work-equipment motion, digging, soil entry/carry/spill/settle,
+impacts, warnings, and lifecycle changes readable through bounded visual effects
+and an audio mix. Soil presentation consumes versioned transfer, ledger, active-
+patch, and normalized game-feel snapshots from the separate soil rebuild. It
+never becomes a new simulation authority and does not invent professional
+hydraulic telemetry.
 
 ### R6 — Double-model product quality
 
@@ -100,9 +104,14 @@ must remain intact.
 - [ ] The construction site communicates scale and work zones, terrain types are
       visually distinguishable, and no required product presentation depends on
       an optional Terrain3D success path.
-- [ ] Digging, carrying, dumping, settling, hydraulics, drivetrain, impacts,
-      warnings, pause, and reset have coherent, rate-limited feedback; muting
-      audio does not remove required visual/state information.
+- [ ] Digging, carrying, dumping, settling, work-equipment motion, drivetrain,
+      impacts, warnings, pause, and reset have coherent, rate-limited feedback.
+      Work-equipment load means game-like motion/audio character, not a pressure
+      or flow simulation; muting audio does not remove required visual/state
+      information.
+- [ ] Real SY205 and SY135 journeys use the full-bucket soil contract to cut,
+      scoop nonzero payload, carry, spill/dump, form a settled pile, push, and
+      grade; visible material and payload share the same accepted transfers.
 - [ ] Balanced 1080p acceptance journeys sustain the 60 FPS target without
       violating existing fixed-step budgets; low/balanced/high profiles retain
       explicit effect, shadow, camera, and audio budgets.
@@ -112,23 +121,31 @@ must remain intact.
 ## In scope
 
 - Godot product UI/onboarding, camera, site dressing/materials/lighting,
-  presentation-only soil/VFX/audio, evidence capture, quality profiles, tests,
-  specs, and provenance records.
+  read-only soil/VFX/audio presentation, evidence capture, quality profiles,
+  tests, specs, and provenance records.
 - Small presentation telemetry additions derived from existing authoritative
   state when required for readable feedback.
+- Integration with the read-only outputs of
+  `08-24-gameplay-soil-interaction-rebuild`; that separate parent owns full-
+  bucket interaction, active soil, material conservation, and speed response.
 
 ## Out of scope
 
-- Replacing either excavator GLB, rewriting Jolt/terrain authority, changing
-  excavation physics to hide visual defects, multiplayer, VR, dynamic weather or
-  day/night simulation, backend protocol redesign, and a new mission/economy
-  system.
+- Replacing either excavator GLB, rewriting Jolt/terrain authority inside this
+  visual parent, changing soil/material results from presentation code,
+  multiplayer, VR, dynamic weather or day/night simulation, backend protocol
+  redesign, and a new mission/economy system.
 - Photorealism at the cost of deterministic operation or the balanced quality
   target.
 
 ## Key decisions and deferred items
 
 - Optimize the complete operator journey before decorative breadth.
+- Treat the legacy tooth/parcel journey as before/fallback evidence. The new
+  gameplay-soil task owns authority migration; this parent only consumes its
+  versioned read contracts.
+- Communicate work-equipment load through bounded speed change and audio/VFX;
+  professional hydraulic or calibrated soil-force simulation is not a goal.
 - Keep fixed daytime as the reproducible baseline; atmosphere polish may improve
   that baseline but dynamic time/weather is deferred.
 - Prefer code-native/procedural presentation and already-provenanced assets;

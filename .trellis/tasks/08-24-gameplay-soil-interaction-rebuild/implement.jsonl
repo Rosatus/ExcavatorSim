@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Preserve Godot/Jolt, terrain, bucket, lifecycle, quality, and presentation authority boundaries during the soil rebuild."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace the new material ledger and game-feel snapshots end to end without creating split authorities."}
+{"file":"docs/godot-integration.md","reason":"Keep the offline product, model activation, scene topology, and Jolt integration compatible."}

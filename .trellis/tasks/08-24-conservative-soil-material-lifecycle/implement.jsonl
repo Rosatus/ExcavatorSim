@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Implement one fixed-tick material owner compatible with terrain, bucket payload, Jolt, truth, and lifecycle contracts."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace transaction identity and values through field, patch, bucket, Jolt, telemetry, and presentation."}
+{"file":".trellis/spec/frontend/motion-transport.md","reason":"Keep optional backend observations subordinate to the offline Godot soil authority."}

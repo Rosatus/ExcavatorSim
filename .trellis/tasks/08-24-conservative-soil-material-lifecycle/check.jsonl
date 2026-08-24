@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Verify atomic transfers, one owner, generation cleanup, payload identity, quality invariance, and fallback boundaries."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Verify no mixed legacy/new mass or stale cross-layer snapshot occurs."}
+{"file":".trellis/spec/frontend/motion-transport.md","reason":"Verify any backend feedback remains optional telemetry rather than a competing authority."}

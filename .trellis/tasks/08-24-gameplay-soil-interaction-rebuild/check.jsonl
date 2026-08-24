@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Verify sole ownership, fixed-tick identities, lifecycle cleanup, fallback, and derived presentation boundaries."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Verify the complete cut-to-terrain-to-bucket-to-Jolt-to-presentation data flow."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Check that existing terrain, ledger, model-contract, and lifecycle seams are extended instead of duplicated."}

@@ -1,8 +1,8 @@
 {
   "id": "soil-effects-audio-feedback",
   "name": "soil-effects-audio-feedback",
-  "title": "Soil effects and audio feedback",
-  "description": "Add coherent digging, capture, carry, spill, settle, drivetrain, hydraulic, impact, and warning feedback with bounded effects and audio budgets.",
+  "title": "Soil action presentation and audio feedback",
+  "description": "Present the new soil transfer, active patch, bucket ledger, and game-feel response through coherent bounded visuals and audio without becoming a simulation authority.",
   "status": "planning",
   "dev_type": null,
   "scope": null,

@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Integrate bounded response at the safe equipment command boundary without breaking neutral, reset, or pose identity."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Publish stable game-feel inputs for UI/VFX/audio without feedback into material state."}

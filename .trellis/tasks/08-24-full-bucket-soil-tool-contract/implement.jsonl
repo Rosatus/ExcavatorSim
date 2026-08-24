@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Align model-specific bucket semantics with accepted pose, query identity, lifecycle, and model-switch contracts."}
+{"file":"docs/godot-integration.md","reason":"Reuse the existing model manifest and presentation frame topology for both excavators."}

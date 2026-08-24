@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Perform generation-safe mode selection, one-owner cutover, compatibility fallback, and double-model product validation."}
+{"file":".trellis/spec/frontend/godot-mcp.md","reason":"Combine deterministic standalone evidence with live visual/editor verification for final cutover."}
+{"file":"docs/godot-integration.md","reason":"Preserve offline startup, optional gateway degradation, model switching, and release topology."}

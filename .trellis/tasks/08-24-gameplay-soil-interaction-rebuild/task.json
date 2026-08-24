@@ -1,0 +1,32 @@
+{
+  "id": "gameplay-soil-interaction-rebuild",
+  "name": "gameplay-soil-interaction-rebuild",
+  "title": "Gameplay soil interaction rebuild",
+  "description": "Replace the tooth-point and parcel-capture excavation chain with a full-bucket, locally active, materially conservative soil interaction designed for strong game visuals and readable game feel.",
+  "status": "planning",
+  "dev_type": null,
+  "scope": "frontend/godot",
+  "package": null,
+  "priority": "P0",
+  "creator": "rosatus",
+  "assignee": "rosatus",
+  "createdAt": "2026-08-24",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "08-24-full-bucket-soil-tool-contract",
+    "08-24-local-active-soil-patch-prototype",
+    "08-24-conservative-soil-material-lifecycle",
+    "08-24-game-feel-digging-response",
+    "08-24-soil-authority-migration-validation"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

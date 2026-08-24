@@ -3,16 +3,25 @@
 1. [ ] `08-24-visual-baseline-evidence`: capture the full double-model,
        triple-quality core before matrix plus the balanced operator journey,
        error/performance evidence, rubric scores, defect backlog, and measurable
-       targets.
+       targets. Mark this as legacy soil before/fallback evidence.
 2. [ ] `08-24-operator-onboarding-hud`: establish product information hierarchy,
        control discovery, warnings, recovery, and diagnostics toggle.
 3. [ ] `08-24-camera-workflow-presets`: implement four double-model camera
        workflows with collision-safe framing and discoverable input.
-4. [ ] `08-24-construction-site-visual-polish`: improve terrain readability,
-       composition, scale cues, props, lighting, and fallback parity.
-5. [ ] `08-24-soil-effects-audio-feedback`: replace placeholder-looking feedback
-       and add a quality-bounded runtime audio mix.
-6. [ ] `08-24-product-experience-validation`: record after evidence, execute the
+4. [ ] Begin the soil-independent portion of
+       `08-24-construction-site-visual-polish`: composition, scale cues, props,
+       lighting, base materials, and fallback parity. Keep the child open.
+5. [ ] Complete the separate `08-24-gameplay-soil-interaction-rebuild` children:
+       full-bucket tool contract and active-patch prototype may proceed in
+       parallel, followed by conservative lifecycle, game-feel response, and
+       generation-safe migration validation.
+6. [ ] Finish `08-24-construction-site-visual-polish` by integrating the stable
+       persistent-field/active-patch dirty snapshots and close its seam/double-
+       pile acceptance gates.
+7. [ ] `08-24-soil-effects-audio-feedback`: consume stabilized soil transfer,
+       patch, ledger, and response snapshots; replace placeholder-looking
+       feedback and add a quality-bounded runtime audio mix.
+8. [ ] `08-24-product-experience-validation`: record after evidence, execute the
        two-model operator journeys, fix acceptance defects, and close the parent.
 
 ## Global validation

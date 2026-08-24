@@ -8,6 +8,9 @@ determinism and terrain authority.
 
 ## Requirements
 
+- Consume persistent-field/active-patch dirty snapshots from the separate soil
+  rebuild after that contract stabilizes; site presentation never owns material.
+
 - Establish a clear work area, dig face, spoil zone, travel space, boundaries, and
   distant composition using quality-bounded props and terrain dressing.
 - Improve logical/fallback terrain materials with readable loose soil, compacted
@@ -19,6 +22,8 @@ determinism and terrain authority.
   both yellow machines separate from terrain without dynamic weather/time.
 - Improve contact presentation around tracks, bucket, and disturbed soil without
   writing back to authoritative terrain or physics.
+- Blend active disturbed soil and newly settled loose terrain into Terrain3D and
+  fallback surfaces without seams, double piles, or a different product identity.
 - Preserve low/balanced/high budgets, deterministic placement, offline packaging,
   and asset provenance.
 
@@ -38,4 +43,5 @@ determinism and terrain authority.
 ## Out of scope
 
 Dynamic weather/day-night, large open world streaming, authoritative prop
-collision gameplay, replacement machine assets, and terrain physics changes.
+collision gameplay, replacement machine assets, and soil authority changes
+inside this presentation task.

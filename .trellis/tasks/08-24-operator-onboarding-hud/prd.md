@@ -8,6 +8,9 @@ engineering diagnostics as the default experience.
 
 ## Requirements
 
+- Consume the selected soil authority's versioned ledger/response snapshot; do
+  not infer fill or action state from visible particle counts or legacy parcels.
+
 - Present a concise first-run/recallable control guide for lifecycle, independent
   tracks, swing/boom/arm/bucket, camera, model selection, pause, and reset.
 - Replace the fixed diagnostic stack with an operator hierarchy: model/lifecycle,
@@ -30,6 +33,8 @@ engineering diagnostics as the default experience.
       values; all remain accessible through Advanced diagnostics.
 - [ ] Start/pause/reset, focus loss, model switch, bucket empty/partial/full,
       cutting/carrying/dumping, and warning states have distinct readable feedback.
+- [ ] Soil phase/fill UI clears at authority generation boundaries and shows no
+      stale legacy parcel state after active-mode cutover or fallback.
 - [ ] Reset/model switch consequences are clear and generation-safe.
 - [ ] Layout tests cover 1280×720 and 1920×1080, both models, local/gateway states,
       and keyboard/gamepad prompt variants.

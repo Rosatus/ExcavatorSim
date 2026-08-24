@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Verify shadow-only behavior, scheduler-only settlement, bounded quality budgets, and fallback continuity."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Check that the existing terrain snapshot/dirty-region/fallback machinery is reused."}

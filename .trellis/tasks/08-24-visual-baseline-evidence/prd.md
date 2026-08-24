@@ -4,7 +4,8 @@
 
 Create a reproducible, reviewable picture of the current SY205/SY135 experience
 and convert subjective dissatisfaction into an evidence-linked backlog and
-measurable targets for the remaining five children.
+measurable targets for the later visual children and the separate gameplay-soil
+task tree.
 
 ## Requirements
 
@@ -16,14 +17,15 @@ measurable targets for the remaining five children.
   travel, dig, and reset/recovery; together with carry and dump these form the
   complete seven-checkpoint operator journey for both models.
 - Record commit, Godot version, model, quality profile, resolution, authority,
-  lifecycle, capture command, checkpoint, support-case definition, Godot
+  lifecycle, soil-authority mode, capture command, checkpoint, support-case definition, Godot
   error-log outcome, and comparable FPS/frame-time sampling details next to
   every artifact. An explicit no-error result is evidence, not an omitted field.
 - Score each model from 1–5 for control discoverability, HUD hierarchy, camera
   usability/framing, site composition/scale, lighting/material readability,
   machine-ground contact, soil feedback, audio feedback, and recovery clarity.
 - Produce a P0/P1/P2 backlog. Every item includes screenshot/checkpoint evidence,
-  repository anchor, observable user impact, acceptance target, and owning child.
+  repository anchor, observable user impact, acceptance target, and exactly one
+  owning visual child or gameplay-soil task.
 - Reuse and minimally extend `visual_evidence_capture.gd`; do not alter simulation
   behavior merely to create a better baseline image.
 - Document capture nondeterminism and decide which checkpoints can support future
@@ -39,7 +41,8 @@ measurable targets for the remaining five children.
 - [ ] The scorecard contains all nine dimensions for both models with evidence,
       not unanchored aesthetic claims.
 - [ ] The backlog has no uncategorized P0/P1 issue and maps every P0/P1 to exactly
-      one later child plus an observable acceptance target.
+      one later visual child or gameplay-soil task plus an observable acceptance
+      target.
 - [ ] Current no-audio, diagnostic-first HUD, single non-collision camera,
       placeholder soil close-up, limited site scale cues, and fallback terrain
       parity are explicitly evaluated.
@@ -54,4 +57,4 @@ backlog, and small test-only capture hooks needed for deterministic checkpoints.
 ## Out of scope
 
 Product-facing HUD, camera, site, soil, VFX, or audio improvements. Those belong
-to the later implementation children so the before evidence stays honest.
+to later implementation tasks so the legacy before evidence stays honest.
