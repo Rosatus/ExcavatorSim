@@ -1,0 +1,33 @@
+{
+  "id": "product-usability-visual-polish",
+  "name": "product-usability-visual-polish",
+  "title": "Product usability and visual experience polish",
+  "description": "Long-running product pass that turns the technically functional excavator simulation into a visually coherent, learnable, operator-usable experience for SY205 and SY135.",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P1",
+  "creator": "rosatus",
+  "assignee": "rosatus",
+  "createdAt": "2026-08-24",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "08-24-visual-baseline-evidence",
+    "08-24-operator-onboarding-hud",
+    "08-24-camera-workflow-presets",
+    "08-24-construction-site-visual-polish",
+    "08-24-soil-effects-audio-feedback",
+    "08-24-product-experience-validation"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
