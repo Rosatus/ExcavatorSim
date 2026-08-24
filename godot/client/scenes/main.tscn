@@ -135,6 +135,48 @@ size = Vector3(3, 0.8, 2.4)
 [sub_resource type="BoxMesh" id="BoxMesh_tbgi4"]
 size = Vector3(20, 0.2, 20)
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_operator_panel"]
+bg_color = Color(0.025, 0.04, 0.055, 0.9)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.24, 0.55, 0.7, 0.72)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+shadow_color = Color(0, 0, 0, 0.5)
+shadow_size = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_guide_panel"]
+bg_color = Color(0.025, 0.04, 0.055, 0.97)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.31, 0.7, 0.86, 0.9)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+shadow_color = Color(0, 0, 0, 0.65)
+shadow_size = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_fill_background"]
+bg_color = Color(0.1, 0.14, 0.17, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_fill_foreground"]
+bg_color = Color(0.78, 0.52, 0.22, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
 [node name="Main" type="Node3D" unique_id=615713361]
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1005988133]
@@ -251,9 +293,11 @@ controller_enabled = true
 
 [node name="MotionClient" type="Node" parent="." unique_id=358783374]
 script = ExtResource("2_motion_client")
+lifecycle_input_enabled = false
 
 [node name="ProductSession" type="Node" parent="." unique_id=498572130]
 script = ExtResource("17_product_session")
+lifecycle_input_enabled = false
 
 [node name="MotionPresentation" type="Node3D" parent="." unique_id=2082115328]
 script = ExtResource("3_motion_presentation")
@@ -267,55 +311,209 @@ script = ExtResource("4_operator_ui")
 [node name="StatusPanel" type="PanelContainer" parent="OperatorUI" unique_id=1551506648]
 offset_left = 16.0
 offset_top = 16.0
-offset_right = 430.0
-offset_bottom = 250.0
+offset_right = 486.0
+offset_bottom = 452.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_operator_panel")
 
 [node name="Margin" type="MarginContainer" parent="OperatorUI/StatusPanel" unique_id=2021519112]
 layout_mode = 2
 theme_override_constants/margin_left = 12
-theme_override_constants/margin_top = 10
+theme_override_constants/margin_top = 12
 theme_override_constants/margin_right = 12
-theme_override_constants/margin_bottom = 10
+theme_override_constants/margin_bottom = 12
 
 [node name="VBox" type="VBoxContainer" parent="OperatorUI/StatusPanel/Margin" unique_id=107301372]
 layout_mode = 2
-theme_override_constants/separation = 5
+theme_override_constants/separation = 7
 
-[node name="Connection" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=1573557741]
+[node name="Title" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
 layout_mode = 2
-text = "Connection: disconnected"
+theme_override_font_sizes/font_size = 12
+text = "EXCAVATOR CONTROL"
 
-[node name="Authority" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=1315170415]
+[node name="Header" type="HBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox"]
 layout_mode = 2
-text = "Authority: Godot/Jolt local"
+theme_override_constants/separation = 8
 
-[node name="Lifecycle" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=1302050459]
+[node name="ModelSelector" type="OptionButton" parent="OperatorUI/StatusPanel/Margin/VBox/Header"]
 layout_mode = 2
-text = "Lifecycle: stopped"
+size_flags_horizontal = 3
 
-[node name="Diagnostics" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=119507650]
+[node name="LifecycleBadge" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox/Header"]
 layout_mode = 2
-text = "Input ACK: —"
+theme_override_font_sizes/font_size = 18
+text = "STOPPED"
+horizontal_alignment = 2
+vertical_alignment = 1
 
-[node name="BucketVolume" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=2114908316]
+[node name="Operation" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
 layout_mode = 2
-text = "Bucket soil: 0.000 / 0.35 m³"
+theme_override_font_sizes/font_size = 22
+text = "READY TO WORK"
 
-[node name="Buttons" type="HBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=764035980]
+[node name="BucketStatus" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
+layout_mode = 2
+text = "Bucket EMPTY   0%"
+
+[node name="BucketFill" type="ProgressBar" parent="OperatorUI/StatusPanel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 12)
+layout_mode = 2
+theme_override_styles/background = SubResource("StyleBoxFlat_fill_background")
+theme_override_styles/fill = SubResource("StyleBoxFlat_fill_foreground")
+show_percentage = false
+
+[node name="ControlHint" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
+layout_mode = 2
+text = "W/S + ↑/↓ tracks   Y/H swing   U/J boom   I/K arm   O/L bucket"
+autowrap_mode = 2
+
+[node name="AutomaticSoilHint" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.82, 0.88, 1)
+theme_override_font_sizes/font_size = 12
+text = "Use the bucket edge and shell directly—cut, carry and dump are automatic."
+autowrap_mode = 2
+
+[node name="Warning" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.8, 0.35, 1)
+text = "Machine stopped — review the controls, then press Start."
+autowrap_mode = 2
+
+[node name="Completion" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.45, 0.92, 0.6, 1)
+text = ""
+autowrap_mode = 2
+
+[node name="Actions" type="HBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox"]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="Start" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Buttons" unique_id=1851800208]
+[node name="Start" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Actions"]
 layout_mode = 2
-text = "Start (F6)"
+size_flags_horizontal = 3
+text = "Start  F6"
 
-[node name="Pause" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Buttons" unique_id=1445076987]
+[node name="Pause" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Actions"]
 layout_mode = 2
-text = "Pause (F7)"
+size_flags_horizontal = 3
+text = "Pause  F7"
 
-[node name="Reset" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Buttons" unique_id=87408431]
+[node name="Reset" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Actions"]
 layout_mode = 2
-text = "Reset (F8)"
+size_flags_horizontal = 3
+text = "Reset  F8"
+
+[node name="Tools" type="HBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Guide" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Tools"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Controls"
+
+[node name="Advanced" type="CheckButton" parent="OperatorUI/StatusPanel/Margin/VBox/Tools"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Advanced"
+
+[node name="AdvancedPanel" type="VBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 3
+
+[node name="Connection" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox/AdvancedPanel" unique_id=1573557741]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Connection: disconnected"
+
+[node name="Authority" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox/AdvancedPanel" unique_id=1315170415]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Authority: Godot/Jolt local"
+
+[node name="Lifecycle" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox/AdvancedPanel" unique_id=1302050459]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Lifecycle: stopped"
+
+[node name="Diagnostics" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox/AdvancedPanel" unique_id=119507650]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Input ACK: —"
+
+[node name="BucketVolume" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox/AdvancedPanel" unique_id=2114908316]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Bucket soil diagnostics"
+autowrap_mode = 2
+
+[node name="GuidePanel" type="PanelContainer" parent="OperatorUI"]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -370.0
+offset_top = -245.0
+offset_right = 370.0
+offset_bottom = 245.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_guide_panel")
+
+[node name="Margin" type="MarginContainer" parent="OperatorUI/GuidePanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 20
+
+[node name="VBox" type="VBoxContainer" parent="OperatorUI/GuidePanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="OperatorUI/GuidePanel/Margin/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+text = "Quick operator guide"
+
+[node name="Intro" type="Label" parent="OperatorUI/GuidePanel/Margin/VBox"]
+layout_mode = 2
+text = "Digging and dumping happen automatically from physical bucket contact."
+autowrap_mode = 2
+
+[node name="Device" type="Label" parent="OperatorUI/GuidePanel/Margin/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Current input: KEYBOARD + MOUSE"
+
+[node name="Controls" type="Label" parent="OperatorUI/GuidePanel/Margin/VBox"]
+layout_mode = 2
+text = "Controls"
+autowrap_mode = 2
+
+[node name="Recovery" type="Label" parent="OperatorUI/GuidePanel/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.8, 0.35, 1)
+text = "Reset and model changes clear the current work session."
+autowrap_mode = 2
+
+[node name="Close" type="Button" parent="OperatorUI/GuidePanel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+text = "Continue"
+
+[node name="DestructiveConfirmation" type="ConfirmationDialog" parent="OperatorUI"]
+title = "Confirm action"
+initial_position = 1
+size = Vector2i(560, 240)
+ok_button_text = "Confirm"
+cancel_button_text = "Cancel"
+dialog_text = "This action starts a fresh work session."
 
 [node name="SkyAttribution" type="Label" parent="OperatorUI" unique_id=25095541]
 anchors_preset = 3

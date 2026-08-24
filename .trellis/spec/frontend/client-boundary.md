@@ -1214,6 +1214,83 @@ Wrong: quality profile -> silently skip missing Sky3D -> report success
 Correct: quality profile -> VisualEnvironment -> Sky3D or explicit failure
 ```
 
+## Scenario: Operator-first onboarding and HUD
+
+### 1. Scope / Trigger
+
+Use this contract for product-visible lifecycle, model, control, selected soil,
+warning, recovery, and diagnostic presentation in the main Godot scene.
+
+### 2. Signatures
+
+```text
+MotionOperatorUI.show_control_guide() -> void
+MotionOperatorUI.set_prompt_mode_for_test(mode: String) -> void
+ExcavationWorld.get_selected_soil_payload_snapshot() -> Dictionary
+ProductSession.request_reset() -> bool
+ProductSession.request_model_switch(model_id: String) -> bool
+```
+
+### 3. Contracts
+
+- The default HUD shows model/lifecycle, current work phase, selected-authority
+  bucket fill, supported control prompts, warnings, and recovery. Session IDs,
+  authority epochs, generation/revision, ACK, penetration, engagement,
+  velocities, and focus diagnostics are visible only after Advanced is opened.
+- Bucket fill is read from `get_selected_soil_payload_snapshot()`. Visible
+  particles, hero clods, legacy parcel counts, and presentation meshes are never
+  payload truth. World/material/source generation changes clear transient UI
+  phase before the current selected snapshot is rendered.
+- The first-run guide is dismissible, recallable, preference-backed, and
+  explains lifecycle, independent tracks, work equipment, camera, model switch,
+  reset, and automatic physical excavation. It must not advertise bindings that
+  do not exist.
+- The most recently observed keyboard/mouse or gamepad input selects prompt
+  copy. Gamepad equipment mappings may be shown; track/camera prompts remain
+  keyboard/mouse until those controllers own real gamepad actions.
+- In `main.tscn`, `MotionOperatorUI` owns F6/F7/F8 routing. ProductSession and
+  MotionClient retain embeddable lifecycle-input defaults, but their scene
+  instances disable direct routing so F8 cannot bypass product confirmation.
+- Reset and model switch do not dispatch before explicit confirmation. Success
+  is reported only after an authoritative generation/model transition. Cancel,
+  rejection, focus loss, pause, gateway failure, and neutral re-arm never mutate
+  soil from UI code and resynchronize from authority snapshots.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Selected soil snapshot unavailable | Show unavailable/empty operator state; do not inspect visual representatives |
+| Reset/model choice pending | Preserve generation/model until confirmation |
+| Authority transition completes | Clear stale soil UI and show one completion/re-arm message |
+| Focus lost, stopped/paused, or neutral not armed | Show concise recovery guidance; motion stays safely gated |
+| Gateway disconnected | Show operator recovery by default and connection details only in Advanced |
+| Preference read/write fails | Guide remains usable for the current run; startup continues |
+
+### 5. Good / Base / Bad Cases
+
+- Good: selected ledger + lifecycle snapshots -> operator hierarchy -> optional
+  Advanced details.
+- Base: missing gateway/soil status -> readable recovery/unavailable state.
+- Bad: particle count -> fill gauge, or F8 -> immediate reset behind the dialog.
+
+### 6. Tests Required
+
+- `operator_ui_test.gd` covers 1280×720/1920×1080 bounds, default/Advanced
+  hierarchy, keyboard/gamepad prompts, guide recall, reset/model confirmation,
+  local/gateway recovery, both models, and soil generation clearing.
+- `offline_product_test.gd`, model-switch coverage, and the standalone matrix
+  retain local authority, optional gateway, lifecycle, and double-model behavior.
+- Subjective legibility and composition are reserved for the focused human
+  review in the final product-experience task.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: particle count -> bucket fill; F8 -> reset immediately; diagnostics always visible
+Correct: selected ledger -> operator state; confirm -> authority transition -> completion
+```
+
 ### Visual verification operating policy
 
 - Feature implementation prioritizes executable contracts, deterministic tests,

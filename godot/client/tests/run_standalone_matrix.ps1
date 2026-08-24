@@ -8,6 +8,7 @@ $ErrorActionPreference = "Stop"
 $projectDir = (Resolve-Path (Join-Path $PSScriptRoot ".." )).Path
 $tests = @(
     "foundation_scene_test.gd",
+    "operator_ui_test.gd",
     "jolt_capability_probe.gd",
     "jolt_bucket_query_spike.gd",
     "jolt_chassis_track_test.gd",

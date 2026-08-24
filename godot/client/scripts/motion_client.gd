@@ -44,6 +44,7 @@ const COMMAND_ACTIONS := {"motion_start": KEY_F6, "motion_pause": KEY_F7, "motio
 @export var auto_reconnect := false
 @export var interpolation_enabled := false
 @export var desired_model_id := "sy205"
+@export var lifecycle_input_enabled := true
 
 var connection_state := STATE_DISCONNECTED
 var session_id := ""
@@ -364,6 +365,7 @@ func get_status_snapshot() -> Dictionary:
 		"negotiated_optional_capabilities": negotiated_optional_capabilities.duplicate(),
 		"desired_model_id": desired_model_id,
 		"active_model_id": active_model_id,
+		"focused": _focused,
 		"last_input_ack": last_input_ack.duplicate(true),
 		"last_error": last_error.duplicate(true),
 		"pending_commands": _pending_commands.size(),
@@ -508,7 +510,8 @@ func _tick(delta: float) -> void:
 		if _input_elapsed >= 1.0 / INPUT_HZ:
 			_input_elapsed = 0.0
 			_send_current_input()
-			_handle_lifecycle_actions()
+			if lifecycle_input_enabled:
+				_handle_lifecycle_actions()
 	if connection_state == STATE_READY and not _pending_bucket_feedback.is_empty():
 		_feedback_elapsed += delta
 		if _feedback_elapsed >= 1.0 / BUCKET_FEEDBACK_HZ:

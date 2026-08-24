@@ -19,6 +19,7 @@ const MODEL_IDS := ["sy205", "sy135"]
 @export var chassis_path := NodePath("../ChassisMotionRoot")
 @export var excavation_world_path := NodePath("../TerrainRoot/ExcavationWorld")
 @export var gateway_enabled := false
+@export var lifecycle_input_enabled := true
 
 var lifecycle := LIFECYCLE_STOPPED
 var active_model_id := "sy205"
@@ -42,12 +43,13 @@ func _ready() -> void:
 
 
 func _physics_process(_delta: float) -> void:
-	if Input.is_action_just_pressed("motion_start"):
-		request_start()
-	if Input.is_action_just_pressed("motion_pause"):
-		request_pause()
-	if Input.is_action_just_pressed("motion_reset"):
-		request_reset()
+	if lifecycle_input_enabled:
+		if Input.is_action_just_pressed("motion_start"):
+			request_start()
+		if Input.is_action_just_pressed("motion_pause"):
+			request_pause()
+		if Input.is_action_just_pressed("motion_reset"):
+			request_reset()
 	if _chassis != null:
 		_chassis.set_product_session_state(lifecycle == LIFECYCLE_RUNNING, focused)
 	status_changed.emit(get_status_snapshot())

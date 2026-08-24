@@ -3,7 +3,7 @@
   "name": "operator-onboarding-hud",
   "title": "Operator onboarding and HUD",
   "description": "Make startup, controls, machine state, bucket payload, soil interaction, warnings, and reset/recovery legible without debug UI.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
