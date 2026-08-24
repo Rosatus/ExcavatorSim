@@ -750,6 +750,120 @@ Wrong: overflow particles are silently dropped to hold frame time
 Correct: reject before debit, or merge representatives while preserving volume
 ```
 
+## Scenario: Conservative soil material lifecycle shadow
+
+### 1. Scope / Trigger
+
+Use this contract when stable/loose terrain, active soil, bucket payload, and
+released/settling soil must participate in one generation-scoped transaction
+ledger. `shadow` observes and simulates the new chain while `legacy` remains the
+selected product writer; authority migration is a separate task.
+
+### 2. Signatures
+
+```text
+SoilInteractionAuthority.configure(contract: Dictionary,
+  generation: int, material: String = "loose") -> bool
+SoilInteractionAuthority.step_fixed(delta: float, tick: int,
+  tool_snapshot: Dictionary, tool_classification: Dictionary,
+  patch: ActiveSoilPatch, focus_world: Vector3) -> Dictionary
+SoilInteractionAuthority.get_status_snapshot() -> Dictionary
+SoilInteractionAuthority.get_journal_snapshot() -> Array[Dictionary]
+ActiveSoilPatch.extract_contained_volume(maximum_volume_m3: float) -> Dictionary
+ActiveSoilPatch.inject_released_volume(event: Dictionary,
+  aggregate_hint: String = "") -> Dictionary
+ActiveSoilPatch.consume_settlement_events() -> Array[Dictionary]
+ExcavationWorld.set_soil_material_lifecycle_mode(value: String) -> bool
+ExcavationWorld.get_selected_soil_payload_snapshot() -> Dictionary
+```
+
+Canonical journal rows conform to
+`protocol/soil-material-transaction-v1.schema.json`; optional compact truth
+telemetry conforms to `simulation-truth-v1.soil_lifecycle_shadow`.
+
+### 3. Contracts
+
+- One `SoilInteractionAuthority` owns ordering, residuals, bucket cells,
+  compartment deltas, transaction IDs, journal rows, and ledger snapshots for
+  one model/world generation. IDs are `<generation>:<sequence>` and rows carry
+  a SHA-256 over their core immutable fields and resulting compartments.
+- Compartments are `persistent_stable`, `persistent_loose`, `active`, `bucket`,
+  and `released`. Every accepted row writes equal/opposite source/destination
+  deltas. Stable excavation becomes active; all settlement becomes loose.
+- `TerrainState.surface_snapshot()` includes copied stable/loose layers. A
+  shadow clone preserves those layers, and each activation reports the actual
+  loose/stable split removed by its scheduler transaction.
+- Full-tool stable candidates are deterministic canonical-order input. Primary
+  displacement prefers cut, then side-cut, scrape, and grade; region shape,
+  penetration, and bounded swept motion determine volume. Push/back-drag and
+  shell contact move existing active representatives rather than mint volume.
+- Active representatives crossing into a valid inner shell are removed from
+  the patch and credited directly to the cell ledger in one fixed tick. Bucket
+  capacity is hard; excess remains active/contained and is exposed as overflow,
+  never deleted.
+- Opening orientation controls spill/dump. Destination capacity is checked
+  before bucket debit, released representatives inherit opening point motion,
+  and their settlement event writes `released -> persistent_loose`.
+- Representative merging is allowed only inside the same ledger compartment.
+  Quality count changes may not combine active and released provenance.
+- In `shadow`, `ExcavationWorld.get_selected_soil_payload_snapshot()` explicitly
+  returns `source=legacy`; Jolt, top-level truth payload, HUD, and existing VFX
+  therefore never mix new bucket mass with legacy mass. The new ledger is an
+  optional sibling observation and comparison record only.
+- Disable, reset, model switch, authority generation change, or material change
+  clears the patch and ledger together. Mid-scoop primary authority migration is
+  forbidden in this contract.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Invalid contract, model, generation, material, or cell grid | Reject configure; create no ledger |
+| Duplicate/stale fixed-tick identity | Reject without a transaction or compartment delta |
+| Patch generation mismatch or destination unavailable | Reject/retain exact source volume; no open transfer |
+| Sub-quantum candidate | Retain in a per-region/action residual accumulator |
+| Bucket reaches capacity | Credit only available space; retain contained overflow in active patch |
+| Opening points down | Disable inner-shell recapture; allow spill/dump release |
+| Settlement exceeds ledger source beyond tolerance | Increment invariant failure; never hide mismatch |
+| Shadow differs from legacy | Publish explicit identities and deltas; do not overwrite either result |
+
+### 5. Good / Base / Bad Cases
+
+- Good: full-tool cut -> stable/loose scheduler split -> active aggregate ->
+  oriented opening flux -> bucket cells -> spill/dump -> released -> loose pile.
+- Base: lifecycle mode `legacy` -> no new authority or patch allocation; Jolt
+  and product snapshots retain the existing analytic/parcel payload.
+- Bad: a parcel collision independently credits the new bucket, a presenter
+  decides volume, or shadow payload mass is added to selected legacy mass.
+
+### 6. Tests Required
+
+- Both model contracts complete fixed-tick cut -> scoop -> nonzero payload ->
+  dump -> settle without parcel coincidence or private test credit.
+- Assert unique IDs/hashes, equal/opposite deltas, bounded journal, stable/loose
+  source split, coherent cells/mass/center, and zero invariant failures.
+- Run partial/full capacity, retained overflow, spill/dump, duplicate/stale,
+  reset/model/generation/material change, and allocation rejection paths.
+- Compare low/balanced/high accepted displacement, opening flux, final logical
+  volume, and product terrain digest; representative counts may differ.
+- Run 20 accumulated cycles and enforce unexplained drift no greater than
+  `max(1e-5 m³, 0.5% of one bucket capacity)`.
+- Validate optional simulation truth against its strict schema while top-level
+  selected payload and Jolt applied payload remain legacy-identical in shadow.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: terrain cut callback -> parcel coincidence -> second bucket credit
+Correct: one ledger row persistent_* -> active -> bucket
+
+Wrong: merge an active rep with a released rep to meet a visual budget
+Correct: merge only same-compartment reps; preserve aggregate provenance
+
+Wrong: selected payload = legacy mass + shadow mass
+Correct: selected source=legacy; publish shadow under a separate ledger identity
+```
+
 ## Scenario: Construction-site Terrain3D presentation
 
 ### 1. Scope / Trigger

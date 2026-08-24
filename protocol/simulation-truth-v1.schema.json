@@ -24,6 +24,7 @@
     "quality_flags": {"type": "array", "maxItems": 32, "items": {"type": "string", "minLength": 1, "maxLength": 96}, "uniqueItems": true},
     "bucket_query": {"$ref": "#/$defs/bucket_query"},
     "soil_interaction_batch": {"$ref": "#/$defs/soil_interaction_batch"},
+    "soil_lifecycle_shadow": {"$ref": "#/$defs/soil_lifecycle_shadow"},
     "queued_chassis_wrench": {"$ref": "#/$defs/nullable_support_wrench"},
     "applied_chassis_wrench": {"$ref": "#/$defs/nullable_support_wrench"}
   },
@@ -265,6 +266,53 @@
         "fill_ratio": {"type": "number", "minimum": 0, "maximum": 1.5},
         "candidates": {"type": "array", "maxItems": 9, "items": {"$ref": "#/$defs/soil_tool_candidate"}},
         "quality_flags": {"type": "array", "maxItems": 8, "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+      }
+    },
+    "soil_lifecycle_shadow": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "mode", "model_id", "generation", "ledger_identity", "transaction_sequence", "material_preset", "compartments_m3", "conservation_drift_m3", "bucket_volume_m3", "payload_mass_kg", "fill_ratio", "center_of_mass_m", "invariant_failure_count", "snapshot_sha256"],
+      "properties": {
+        "schema_version": {"const": "soil-interaction-authority-v1"},
+        "mode": {"const": "shadow"},
+        "model_id": {"enum": ["sy205", "sy135"]},
+        "generation": {"type": "integer", "minimum": 0},
+        "ledger_identity": {"type": "string", "minLength": 1},
+        "transaction_sequence": {"type": "integer", "minimum": 0},
+        "material_preset": {"enum": ["loose", "compact", "sand", "damp"]},
+        "compartments_m3": {
+          "type": "object", "additionalProperties": false,
+          "required": ["persistent_stable", "persistent_loose", "active", "bucket", "released"],
+          "properties": {
+            "persistent_stable": {"type": "number"},
+            "persistent_loose": {"type": "number"},
+            "active": {"type": "number", "minimum": 0},
+            "bucket": {"type": "number", "minimum": 0},
+            "released": {"type": "number", "minimum": 0}
+          }
+        },
+        "conservation_drift_m3": {"type": "number"},
+        "bucket_volume_m3": {"type": "number", "minimum": 0},
+        "payload_mass_kg": {"type": "number", "minimum": 0},
+        "fill_ratio": {"type": "number", "minimum": 0, "maximum": 1.5},
+        "center_of_mass_m": {"$ref": "#/$defs/vec3"},
+        "invariant_failure_count": {"type": "integer", "minimum": 0},
+        "snapshot_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "last_transaction": {"$ref": "#/$defs/soil_lifecycle_transaction_summary"}
+      }
+    },
+    "soil_lifecycle_transaction_summary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["transaction_id", "tick", "kind", "source", "destination", "requested_volume_m3", "accepted_volume_m3", "rejected_volume_m3", "transaction_sha256"],
+      "properties": {
+        "transaction_id": {"type": "string", "minLength": 1},
+        "tick": {"type": "integer", "minimum": 0},
+        "kind": {"enum": ["cut", "side_cut", "scrape", "grade", "bucket_entry", "spill", "dump", "settle"]},
+        "source": {"enum": ["persistent_stable", "persistent_loose", "active", "bucket", "released"]},
+        "destination": {"enum": ["persistent_stable", "persistent_loose", "active", "bucket", "released"]},
+        "requested_volume_m3": {"type": "number", "minimum": 0},
+        "accepted_volume_m3": {"type": "number", "minimum": 0},
+        "rejected_volume_m3": {"type": "number", "minimum": 0},
+        "transaction_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
       }
     },
     "support_wrench": {

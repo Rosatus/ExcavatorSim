@@ -18,6 +18,9 @@ SIMULATION_AUTHORITY_MANIFEST_PATH = PROJECT_ROOT / "protocol" / "simulation-aut
 SIMULATION_TRUTH_SCHEMA_PATH = PROJECT_ROOT / "protocol" / "simulation-truth-v1.schema.json"
 PHYSICS_RIG_SCHEMA_PATH = PROJECT_ROOT / "protocol" / "physics-rig-v1.schema.json"
 SOIL_CONTRACT_SCHEMA_PATH = PROJECT_ROOT / "protocol" / "excavator-soil-contract-v1.schema.json"
+SOIL_TRANSACTION_SCHEMA_PATH = (
+    PROJECT_ROOT / "protocol" / "soil-material-transaction-v1.schema.json"
+)
 TERRAIN_SPEC_SCHEMA_PATH = PROJECT_ROOT / "protocol" / "terrain-spec-v1.schema.json"
 VERSION_MANIFEST_PATH = PROJECT_ROOT / "protocol" / "version-manifest.json"
 FRONTEND_DIST_PATH = PROJECT_ROOT / "godot" / "dist"

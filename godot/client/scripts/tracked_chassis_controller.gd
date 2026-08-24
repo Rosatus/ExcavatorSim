@@ -611,7 +611,7 @@ func _on_jolt_post_step_snapshot(snapshot: Dictionary) -> void:
 func _submit_authoritative_payload() -> void:
 	if _jolt_runtime == null or _excavation_world == null:
 		return
-	var soil := _excavation_world.get_status_snapshot()
+	var soil := _excavation_world.get_selected_soil_payload_snapshot()
 	var center: Variant = soil.get("center_of_mass_local", Vector3.ZERO)
 	if not center is Vector3:
 		center = Vector3.ZERO
@@ -619,6 +619,7 @@ func _submit_authoritative_payload() -> void:
 		"mass_kg": float(soil.get("payload_mass_kg", 0.0)),
 		"center_of_mass_local": center as Vector3,
 		"world_generation": int(soil.get("world_generation", 0)),
+		"ledger_identity": String(soil.get("ledger_identity", "legacy:unavailable")),
 	}
 	if sample == _last_payload_sample:
 		return

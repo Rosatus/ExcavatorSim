@@ -60,6 +60,14 @@ static func from_surface_snapshot(snapshot: Dictionary) -> TerrainState:
 	var surface: PackedFloat32Array = snapshot.get("surface", PackedFloat32Array())
 	if snapshot_rows < 2 or snapshot_columns < 2 or surface.size() != snapshot_rows * snapshot_columns:
 		return null
+	var snapshot_stable: PackedFloat32Array = snapshot.get("stable_heights", surface)
+	var snapshot_loose: PackedFloat32Array = snapshot.get("loose_depth", PackedFloat32Array())
+	if snapshot_stable.size() != surface.size():
+		return null
+	if snapshot_loose.is_empty():
+		snapshot_loose.resize(surface.size())
+	elif snapshot_loose.size() != surface.size():
+		return null
 	var clone := TerrainState.new(
 		int(snapshot.get("seed", DEFAULT_SEED)),
 		snapshot_rows,
@@ -70,10 +78,9 @@ static func from_surface_snapshot(snapshot: Dictionary) -> TerrainState:
 	clone.terrain_epoch = String(snapshot.get("terrain_epoch", clone.terrain_epoch))
 	clone.terrain_revision = maxi(0, int(snapshot.get("terrain_revision", 0)))
 	clone.world_generation = maxi(0, int(snapshot.get("world_generation", 0)))
-	clone.stable_heights = surface.duplicate()
-	clone._baseline_stable = surface.duplicate()
-	clone.loose_depth = PackedFloat32Array()
-	clone.loose_depth.resize(surface.size())
+	clone.stable_heights = snapshot_stable.duplicate()
+	clone._baseline_stable = snapshot_stable.duplicate()
+	clone.loose_depth = snapshot_loose.duplicate()
 	clone._pending_brushes.clear()
 	clone._last_enqueued_sequence = -1
 	clone._dirty_revision = -1
@@ -156,6 +163,8 @@ func surface_snapshot() -> Dictionary:
 		"dirty_rect_with_halo": _dirty_rect_with_halo,
 		"dirty_revision": _dirty_revision,
 		"surface": surface,
+		"stable_heights": stable_heights.duplicate(),
+		"loose_depth": loose_depth.duplicate(),
 		"surface_bytes": bytes,
 		"snapshot_sha256": _sha256(bytes),
 	}

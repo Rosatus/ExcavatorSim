@@ -145,6 +145,8 @@ func _commit_volume(kind: String, center_xz: Vector2, requested_volume_m3: float
 	if kind == "activate" and estimated_volume < requested_volume_m3 * 0.999:
 		delta_m *= requested_volume_m3 / estimated_volume
 		estimated_volume = terrain_state.estimate_brush_volume(center_xz, radius_m, delta_m)
+	var before_stable_volume := _layer_volume(terrain_state.stable_heights)
+	var before_loose_volume := _layer_volume(terrain_state.loose_depth)
 	var sequence := _transaction_sequence
 	_transaction_sequence += 1
 	var transfer_id := "active-patch:%d:%s:%s" % [sequence, kind, transfer_hint]
@@ -168,15 +170,35 @@ func _commit_volume(kind: String, center_xz: Vector2, requested_volume_m3: float
 		_activated_volume_m3 += estimated_volume
 	else:
 		_settled_volume_m3 += estimated_volume
+	var after_stable_volume := _layer_volume(terrain_state.stable_heights)
+	var after_loose_volume := _layer_volume(terrain_state.loose_depth)
+	var stable_volume := maxf(0.0, before_stable_volume - after_stable_volume) if kind == "activate" else 0.0
+	var loose_volume := (
+		maxf(0.0, before_loose_volume - after_loose_volume)
+		if kind == "activate"
+		else maxf(0.0, after_loose_volume - before_loose_volume)
+	)
 	_update_compaction(center_xz, radius_m, kind == "settle")
 	return {
 		"accepted": true,
 		"kind": kind,
 		"requested_volume_m3": requested_volume_m3,
 		"committed_volume_m3": estimated_volume,
+		"stable_volume_m3": stable_volume,
+		"loose_volume_m3": loose_volume,
 		"transfer_id": transfer_id,
 		"reason": "committed",
 	}
+
+
+func _layer_volume(layer: PackedFloat32Array) -> float:
+	if terrain_state == null:
+		return 0.0
+	var total := 0.0
+	var cell_area := terrain_state.spacing_m * terrain_state.spacing_m
+	for value in layer:
+		total += float(value) * cell_area
+	return total
 
 
 func _update_compaction(center_xz: Vector2, radius_m: float, settling: bool) -> void:

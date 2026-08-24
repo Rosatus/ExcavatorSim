@@ -3,7 +3,7 @@
   "name": "conservative-soil-material-lifecycle",
   "title": "Conservative soil material lifecycle",
   "description": "Make one fixed-tick authority conserve material through terrain, active soil, bucket carry, spill, dump, and settle for both excavator models.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": "frontend/godot",
   "package": null,

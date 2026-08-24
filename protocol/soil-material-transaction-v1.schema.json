@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://excavatorsim.local/protocol/soil-material-transaction-v1.schema.json",
+  "title": "Conservative Soil Material Transaction v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "transaction_id", "sequence", "tick", "generation",
+    "model_id", "material_preset", "kind", "source", "destination",
+    "requested_volume_m3", "accepted_volume_m3", "rejected_volume_m3",
+    "deltas_m3", "resulting_compartments_m3", "origin_world_m", "velocity_world_m_s", "transaction_sha256"
+  ],
+  "properties": {
+    "schema_version": {"const": "soil-material-transaction-v1"},
+    "transaction_id": {"type": "string", "pattern": "^[0-9]+:[0-9]+$"},
+    "sequence": {"type": "integer", "minimum": 0},
+    "tick": {"type": "integer", "minimum": 0},
+    "generation": {"type": "integer", "minimum": 0},
+    "model_id": {"enum": ["sy205", "sy135"]},
+    "material_preset": {"enum": ["loose", "compact", "sand", "damp"]},
+    "kind": {"enum": ["cut", "side_cut", "scrape", "grade", "bucket_entry", "spill", "dump", "settle"]},
+    "source": {"$ref": "#/$defs/compartment"},
+    "destination": {"$ref": "#/$defs/compartment"},
+    "requested_volume_m3": {"type": "number", "minimum": 0},
+    "accepted_volume_m3": {"type": "number", "minimum": 0},
+    "rejected_volume_m3": {"type": "number", "minimum": 0},
+    "deltas_m3": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "persistent_stable": {"type": "number"},
+        "persistent_loose": {"type": "number"},
+        "active": {"type": "number"},
+        "bucket": {"type": "number"},
+        "released": {"type": "number"}
+      },
+      "minProperties": 2,
+      "maxProperties": 2
+    },
+    "resulting_compartments_m3": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["persistent_stable", "persistent_loose", "active", "bucket", "released"],
+      "properties": {
+        "persistent_stable": {"type": "number"},
+        "persistent_loose": {"type": "number"},
+        "active": {"type": "number", "minimum": 0},
+        "bucket": {"type": "number", "minimum": 0},
+        "released": {"type": "number", "minimum": 0}
+      }
+    },
+    "origin_world_m": {"$ref": "#/$defs/vec3"},
+    "velocity_world_m_s": {"$ref": "#/$defs/vec3"},
+    "metadata": {"type": "object"},
+    "transaction_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  },
+  "$defs": {
+    "compartment": {"enum": ["persistent_stable", "persistent_loose", "active", "bucket", "released"]},
+    "vec3": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}}
+  }
+}

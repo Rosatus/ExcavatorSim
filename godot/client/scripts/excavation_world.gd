@@ -17,6 +17,7 @@ const SOIL_PROXY_ORDER := ["cutting_edge", "opening", "cavity", "shell", "rear_s
 @export var soil_tool_shadow_enabled := false
 @export var active_soil_patch_prototype_enabled := false
 @export_enum("loose", "compact", "sand", "damp") var active_soil_material_preset := "loose"
+@export_enum("legacy", "shadow") var soil_material_lifecycle_mode := "legacy"
 @export_enum("low", "balanced", "high") var feedback_quality := "balanced"
 @export var local_tooth_offset := Vector3(0.0, -0.55, 0.0)
 
@@ -46,6 +47,8 @@ var _soil_tool_classifier := BucketSoilTool.new()
 var _active_soil_patch: ActiveSoilPatch
 var _active_soil_presenter: ActiveSoilPatchPresenter
 var _active_soil_event_sequence := 0
+var _soil_interaction_authority: SoilInteractionAuthority
+var _soil_lifecycle_tick := -1
 
 
 func _ready() -> void:
@@ -84,8 +87,10 @@ func _initialize() -> void:
 	if not terrain_world.world_reset.is_connected(_on_world_reset):
 		terrain_world.world_reset.connect(_on_world_reset)
 	_initialized = true
-	if active_soil_patch_prototype_enabled:
+	if active_soil_patch_prototype_enabled or soil_material_lifecycle_mode == "shadow":
 		_ensure_active_soil_patch()
+	if soil_material_lifecycle_mode == "shadow":
+		_ensure_soil_interaction_authority()
 	excavation_changed.emit(get_status_snapshot())
 
 
@@ -229,13 +234,35 @@ func set_active_soil_patch_prototype_enabled(value: bool) -> void:
 	active_soil_patch_prototype_enabled = value
 	if value:
 		_ensure_active_soil_patch()
-	else:
+	elif soil_material_lifecycle_mode != "shadow":
 		_reset_active_soil_patch(false)
 	excavation_changed.emit(get_status_snapshot())
 
 
+func set_soil_material_lifecycle_mode(value: String) -> bool:
+	if value not in ["legacy", "shadow"]:
+		return false
+	if soil_material_lifecycle_mode == value:
+		return true
+	soil_material_lifecycle_mode = value
+	if value == "shadow":
+		if not _ensure_active_soil_patch() or not _ensure_soil_interaction_authority():
+			soil_material_lifecycle_mode = "legacy"
+			_reset_soil_interaction_authority()
+			if not active_soil_patch_prototype_enabled:
+				_reset_active_soil_patch(false)
+			return false
+	else:
+		_reset_soil_interaction_authority()
+		if not active_soil_patch_prototype_enabled:
+			_reset_active_soil_patch(false)
+	excavation_changed.emit(get_status_snapshot())
+	return true
+
+
 func get_status_snapshot() -> Dictionary:
 	var status := soil_state.get_status_snapshot() if soil_state != null else {"bucket_volume_m3": 0.0, "world_generation": -1}
+	var selected_payload := get_selected_soil_payload_snapshot()
 	status["authority_generation"] = authority_generation
 	status["automatic_soil_enabled"] = automatic_soil_enabled
 	status["debug_manual_controls"] = debug_manual_controls
@@ -243,8 +270,28 @@ func get_status_snapshot() -> Dictionary:
 	status["backend_feedback_enabled"] = backend_feedback_enabled
 	status["soil_tool_shadow_enabled"] = soil_tool_shadow_enabled
 	status["active_soil_patch_prototype_enabled"] = active_soil_patch_prototype_enabled
-	status["soil_authority_mode"] = "active_patch_shadow" if active_soil_patch_prototype_enabled else "legacy_analytic_parcel"
+	status["soil_material_lifecycle_mode"] = soil_material_lifecycle_mode
+	status["soil_authority_mode"] = "conservative_shadow" if soil_material_lifecycle_mode == "shadow" else "legacy_analytic_parcel"
 	status["active_soil_patch"] = _active_soil_patch.get_status_snapshot() if _active_soil_patch != null else {"configured": false}
+	status["soil_lifecycle_shadow"] = _soil_interaction_authority.get_status_snapshot() if _soil_interaction_authority != null else {"configured": false, "mode": "legacy"}
+	status["selected_soil_payload"] = selected_payload
+	status["selected_soil_ledger_identity"] = String(selected_payload.get("ledger_identity", "legacy:unavailable"))
+	var lifecycle_shadow := status["soil_lifecycle_shadow"] as Dictionary
+	if bool(lifecycle_shadow.get("configured", false)):
+		var legacy_volume := float(status.get("bucket_volume_m3", 0.0))
+		var shadow_volume := float(lifecycle_shadow.get("bucket_volume_m3", 0.0))
+		status["soil_lifecycle_comparison"] = {
+			"selected_source": "legacy",
+			"legacy_ledger_identity": String(selected_payload.get("ledger_identity", "legacy:unavailable")),
+			"shadow_ledger_identity": String(lifecycle_shadow.get("ledger_identity", "shadow:unavailable")),
+			"legacy_bucket_volume_m3": legacy_volume,
+			"shadow_bucket_volume_m3": shadow_volume,
+			"bucket_volume_delta_m3": shadow_volume - legacy_volume,
+			"legacy_payload_mass_kg": float(status.get("payload_mass_kg", 0.0)),
+			"shadow_payload_mass_kg": float(lifecycle_shadow.get("payload_mass_kg", 0.0)),
+			"shadow_conservation_drift_m3": float(lifecycle_shadow.get("conservation_drift_m3", 0.0)),
+			"shadow_invariant_failure_count": int(lifecycle_shadow.get("invariant_failure_count", 0)),
+		}
 	status["interaction_state"] = _last_interaction
 	status["material_generation"] = _material_generation
 	status["flow_volume_m3"] = _last_flow_volume_m3
@@ -257,6 +304,24 @@ func get_status_snapshot() -> Dictionary:
 	status["terrain3d"] = terrain_world.terrain3d_adapter.get_status_snapshot() if terrain_world != null and terrain_world.terrain3d_adapter != null else {"enabled": false, "available": false}
 	status["physics_fail_open"] = true
 	return status
+
+
+func get_selected_soil_payload_snapshot() -> Dictionary:
+	var legacy := soil_state.get_status_snapshot() if soil_state != null else {}
+	return {
+		"source": "legacy",
+		"ledger_identity": "legacy:%d:%d" % [
+			int(legacy.get("world_generation", -1)),
+			int(legacy.get("last_applied_sequence", -1)),
+		],
+		"world_generation": int(legacy.get("world_generation", -1)),
+		"bucket_volume_m3": float(legacy.get("bucket_volume_m3", 0.0)),
+		"payload_mass_kg": float(legacy.get("payload_mass_kg", 0.0)),
+		"fill_ratio": float(legacy.get("fill_ratio", 0.0)),
+		"center_of_mass_local": legacy.get("center_of_mass_local", Vector3.ZERO),
+		"fill_profile": legacy.get("fill_profile", PackedFloat32Array()),
+		"cell_grid": legacy.get("cell_grid", [1, 1, 1]),
+	}
 
 
 func get_bucket_pose_snapshot_for_test() -> Dictionary:
@@ -329,6 +394,7 @@ func _bucket_tooth_world() -> Variant:
 
 func get_soil_visual_snapshot() -> Dictionary:
 	var status := soil_state.get_status_snapshot() if soil_state != null else {}
+	var lifecycle_shadow := _soil_interaction_authority.get_status_snapshot() if _soil_interaction_authority != null else {}
 	return {
 		"world_generation": int(status.get("world_generation", -1)),
 		"authority_generation": authority_generation,
@@ -341,6 +407,8 @@ func get_soil_visual_snapshot() -> Dictionary:
 		"interaction_state": _last_interaction,
 		"hero_clods_enabled": hero_clods_enabled,
 		"bucket_pose": _last_pose_snapshot.duplicate(true),
+		"soil_material_lifecycle_mode": soil_material_lifecycle_mode,
+		"lifecycle_shadow": lifecycle_shadow,
 	}
 
 
@@ -434,8 +502,13 @@ func _build_interaction_batch(snapshot: Dictionary) -> Dictionary:
 	var classifications := _classify_interaction_records(snapshot, contacts, hybrid, identity_valid, physics_tick, motion_sequence, analytic)
 	var operation := _reduce_soil_operation(classifications)
 	var soil_tool_shadow := {}
-	if soil_tool_shadow_enabled:
-		var soil_status := soil_state.get_status_snapshot() if soil_state != null else {}
+	var lifecycle_shadow_enabled := soil_material_lifecycle_mode == "shadow"
+	if soil_tool_shadow_enabled or lifecycle_shadow_enabled:
+		var soil_status := (
+			_soil_interaction_authority.get_status_snapshot()
+			if lifecycle_shadow_enabled and _soil_interaction_authority != null
+			else soil_state.get_status_snapshot() if soil_state != null else {}
+		)
 		soil_tool_shadow = _soil_tool_classifier.classify(
 			snapshot.get("soil_tool", {}) as Dictionary,
 			terrain_world.terrain_state if terrain_world != null else null,
@@ -465,7 +538,7 @@ func _build_interaction_batch(snapshot: Dictionary) -> Dictionary:
 		"analytic_penetration_m": float(analytic.get("penetration_m", 0.0)),
 		"transaction_queued": false,
 	}
-	if soil_tool_shadow_enabled:
+	if soil_tool_shadow_enabled or lifecycle_shadow_enabled:
 		batch["soil_tool_shadow"] = soil_tool_shadow.duplicate(true)
 	if bool(batch["duplicate"]):
 		batch["eligible"] = false
@@ -738,7 +811,11 @@ func _spawn_cut_parcels(soil_result: Dictionary) -> void:
 
 
 func _ensure_active_soil_patch() -> bool:
-	if not active_soil_patch_prototype_enabled or terrain_world == null or terrain_world.terrain_state == null:
+	if (
+		not active_soil_patch_prototype_enabled and soil_material_lifecycle_mode != "shadow"
+		or terrain_world == null
+		or terrain_world.terrain_state == null
+	):
 		return false
 	if _active_soil_patch != null:
 		var status := _active_soil_patch.get_status_snapshot()
@@ -767,17 +844,21 @@ func _ensure_active_soil_patch() -> bool:
 
 
 func _step_active_soil_patch(soil_result: Dictionary, delta: float) -> void:
-	if not active_soil_patch_prototype_enabled or not _ensure_active_soil_patch():
+	if (
+		not active_soil_patch_prototype_enabled and soil_material_lifecycle_mode != "shadow"
+		or not _ensure_active_soil_patch()
+	):
 		return
 	var latest_event_position := Vector3.ZERO
 	var has_event_position := false
-	for event_value in soil_result.get("cut_events", []):
-		var event := event_value as Dictionary
-		var aggregate_id := "%d:%d" % [terrain_world.terrain_state.world_generation, _active_soil_event_sequence]
-		_active_soil_event_sequence += 1
-		_active_soil_patch.inject_cut_event(event, aggregate_id)
-		latest_event_position = event.get("tooth_world", Vector3.ZERO) as Vector3
-		has_event_position = true
+	if soil_material_lifecycle_mode != "shadow":
+		for event_value in soil_result.get("cut_events", []):
+			var event := event_value as Dictionary
+			var aggregate_id := "%d:%d" % [terrain_world.terrain_state.world_generation, _active_soil_event_sequence]
+			_active_soil_event_sequence += 1
+			_active_soil_patch.inject_cut_event(event, aggregate_id)
+			latest_event_position = event.get("tooth_world", Vector3.ZERO) as Vector3
+			has_event_position = true
 	var current := _last_pose_snapshot.get("current", {}) as Dictionary
 	var focus := latest_event_position if has_event_position else _active_soil_patch.get_status_snapshot().get("focus_world", Vector3.ZERO) as Vector3
 	if current.has("opening"):
@@ -785,7 +866,18 @@ func _step_active_soil_patch(soil_result: Dictionary, delta: float) -> void:
 	elif current.has("cutting_edge"):
 		focus = (current["cutting_edge"] as Transform3D).origin
 	var soil_tool_snapshot := _last_pose_snapshot.get("soil_tool", {}) as Dictionary
-	_active_soil_patch.step_fixed(delta, focus, soil_tool_snapshot)
+	if soil_material_lifecycle_mode == "shadow" and _ensure_soil_interaction_authority():
+		_soil_lifecycle_tick = maxi(Engine.get_physics_frames(), _soil_lifecycle_tick + 1)
+		_soil_interaction_authority.step_fixed(
+			delta,
+			_soil_lifecycle_tick,
+			soil_tool_snapshot,
+			_last_interaction_batch.get("soil_tool_shadow", {}) as Dictionary,
+			_active_soil_patch,
+			focus,
+		)
+	else:
+		_active_soil_patch.step_fixed(delta, focus, soil_tool_snapshot)
 	if _active_soil_presenter != null:
 		_active_soil_presenter.apply_snapshot(_active_soil_patch.get_visual_snapshot())
 
@@ -797,6 +889,44 @@ func _reset_active_soil_patch(settle_active: bool) -> void:
 	_active_soil_event_sequence = 0
 	if _active_soil_presenter != null:
 		_active_soil_presenter.clear()
+
+
+func _ensure_soil_interaction_authority() -> bool:
+	if (
+		soil_material_lifecycle_mode != "shadow"
+		or terrain_world == null
+		or terrain_world.terrain_state == null
+		or _presentation == null
+	):
+		return false
+	var contract := _presentation.get_soil_contract()
+	if contract.is_empty():
+		return false
+	if _soil_interaction_authority != null:
+		var status := _soil_interaction_authority.get_status_snapshot()
+		if (
+			int(status.get("generation", -1)) == terrain_world.terrain_state.world_generation
+			and String(status.get("model_id", "")) == String(contract.get("model_id", ""))
+			and String(status.get("material_preset", "")) == active_soil_material_preset
+		):
+			return true
+	_reset_soil_interaction_authority()
+	_soil_interaction_authority = SoilInteractionAuthority.new()
+	if not _soil_interaction_authority.configure(
+		contract,
+		terrain_world.terrain_state.world_generation,
+		active_soil_material_preset,
+	):
+		_soil_interaction_authority = null
+		return false
+	return true
+
+
+func _reset_soil_interaction_authority() -> void:
+	if _soil_interaction_authority != null:
+		_soil_interaction_authority.clear()
+	_soil_interaction_authority = null
+	_soil_lifecycle_tick = -1
 
 
 func _step_parcel_pool(delta: float) -> void:
@@ -966,9 +1096,12 @@ func _on_world_reset(generation: int) -> void:
 	_material_generation += 1
 	if _presentation != null:
 		_presentation.clear_bucket_pose_history()
+	_reset_soil_interaction_authority()
 	_reset_active_soil_patch(false)
-	if active_soil_patch_prototype_enabled:
+	if active_soil_patch_prototype_enabled or soil_material_lifecycle_mode == "shadow":
 		_ensure_active_soil_patch()
+	if soil_material_lifecycle_mode == "shadow":
+		_ensure_soil_interaction_authority()
 	excavation_changed.emit(get_status_snapshot())
 
 
@@ -996,7 +1129,10 @@ func _clear_local_material(reason: String) -> void:
 	_material_generation += 1
 	if _presentation != null:
 		_presentation.clear_bucket_pose_history()
+	_reset_soil_interaction_authority()
 	_reset_active_soil_patch(false)
-	if active_soil_patch_prototype_enabled:
+	if active_soil_patch_prototype_enabled or soil_material_lifecycle_mode == "shadow":
 		_ensure_active_soil_patch()
+	if soil_material_lifecycle_mode == "shadow":
+		_ensure_soil_interaction_authority()
 	excavation_changed.emit(get_status_snapshot())

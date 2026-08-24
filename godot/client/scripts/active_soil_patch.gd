@@ -96,9 +96,12 @@ var _focus_world := Vector3.ZERO
 var _last_tick_us := 0
 var _tick_samples_us := PackedInt64Array()
 var _injected_volume_m3 := 0.0
+var _received_released_volume_m3 := 0.0
+var _exported_bucket_volume_m3 := 0.0
 var _settled_volume_m3 := 0.0
 var _rejected_volume_m3 := 0.0
 var _evicted_representatives := 0
+var _settlement_events: Array[Dictionary] = []
 
 
 func configure(source_snapshot: Dictionary, requested_quality: String = "balanced", requested_material: String = "loose") -> bool:
@@ -126,9 +129,12 @@ func clear(settle_active: bool = true) -> void:
 	_last_tick_us = 0
 	_tick_samples_us = PackedInt64Array()
 	_injected_volume_m3 = 0.0
+	_received_released_volume_m3 = 0.0
+	_exported_bucket_volume_m3 = 0.0
 	_settled_volume_m3 = 0.0
 	_rejected_volume_m3 = 0.0
 	_evicted_representatives = 0
+	_settlement_events.clear()
 	generation = -1
 	persistent_field.clear()
 
@@ -140,11 +146,78 @@ func set_quality_profile(requested_quality: String) -> bool:
 	_profile = (QUALITY_PROFILES[quality_profile] as Dictionary).duplicate(true)
 	# Quality may reduce visual representatives, but never discards material.
 	while _representatives.size() > int(_profile["max_representatives"]):
-		_merge_last_representative()
+		if not _merge_last_representative():
+			break
 	return true
 
 
 func inject_cut_event(event: Dictionary, aggregate_hint: String = "") -> Dictionary:
+	return inject_tool_volume(event, aggregate_hint)
+
+
+func inject_tool_volume(event: Dictionary, aggregate_hint: String = "") -> Dictionary:
+	return _inject_volume(event, aggregate_hint, true, "active")
+
+
+func inject_released_volume(event: Dictionary, aggregate_hint: String = "") -> Dictionary:
+	return _inject_volume(event, aggregate_hint, false, "released")
+
+
+func can_accept_volume(requested_volume_m3: float) -> bool:
+	return (
+		generation >= 0
+		and requested_volume_m3 > MIN_VOLUME_M3
+		and (
+			_representatives.size() < int(_profile["max_representatives"])
+			or _representatives.size() >= 2
+		)
+	)
+
+
+func extract_contained_volume(maximum_volume_m3: float) -> Dictionary:
+	var remaining := maxf(maximum_volume_m3, 0.0)
+	var extracted := 0.0
+	var weighted_position := Vector3.ZERO
+	var weighted_velocity := Vector3.ZERO
+	for index in range(_representatives.size() - 1, -1, -1):
+		if remaining <= MIN_VOLUME_M3:
+			break
+		var rep := _representatives[index]
+		if not bool(rep["contained"]):
+			continue
+		var available := float(rep["volume_m3"])
+		var moved := minf(available, remaining)
+		weighted_position += (rep["position"] as Vector3) * moved
+		weighted_velocity += (rep["velocity"] as Vector3) * moved
+		extracted += moved
+		remaining -= moved
+		if moved >= available - MIN_VOLUME_M3:
+			_remove_representative(index)
+		else:
+			rep["volume_m3"] = available - moved
+			rep["radius_m"] = _radius_for_volume(float(rep["volume_m3"]))
+			_representatives[index] = rep
+			var aggregate_id := String(rep["aggregate_id"])
+			_aggregate_volume[aggregate_id] = maxf(0.0, float(_aggregate_volume.get(aggregate_id, available)) - moved)
+	_exported_bucket_volume_m3 += extracted
+	return {
+		"accepted": extracted > MIN_VOLUME_M3,
+		"volume_m3": extracted,
+		"origin_world": weighted_position / extracted if extracted > MIN_VOLUME_M3 else Vector3.ZERO,
+		"velocity_world": weighted_velocity / extracted if extracted > MIN_VOLUME_M3 else Vector3.ZERO,
+		"reason": "extracted" if extracted > MIN_VOLUME_M3 else "no_contained_volume",
+	}
+
+
+func consume_settlement_events() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for event in _settlement_events:
+		result.append(event.duplicate(true))
+	_settlement_events.clear()
+	return result
+
+
+func _inject_volume(event: Dictionary, aggregate_hint: String, debit_persistent: bool, compartment: String) -> Dictionary:
 	var requested_volume := float(event.get("volume_m3", 0.0))
 	var tooth_world := event.get("tooth_world", Vector3.ZERO) as Vector3
 	var center_xz_value: Variant = event.get("center", Vector2(tooth_world.x, tooth_world.z))
@@ -154,6 +227,9 @@ func inject_cut_event(event: Dictionary, aggregate_hint: String = "") -> Diction
 		_rejected_volume_m3 += maxf(requested_volume, 0.0)
 		return rejected
 	var available := int(_profile["max_representatives"]) - _representatives.size()
+	if available <= 0 and _representatives.size() >= 2:
+		_merge_last_representative()
+		available = int(_profile["max_representatives"]) - _representatives.size()
 	if available <= 0:
 		rejected["reason"] = "representative_budget"
 		_rejected_volume_m3 += requested_volume
@@ -167,12 +243,18 @@ func inject_cut_event(event: Dictionary, aggregate_hint: String = "") -> Diction
 		_rejected_volume_m3 += requested_volume
 		return rejected
 	var activation_radius := clampf(sqrt(requested_volume / PI) * 1.9, 0.22, 0.58)
-	var activation := persistent_field.activate_volume(center_xz, requested_volume, activation_radius, aggregate_id)
-	if not bool(activation.get("accepted", false)):
-		rejected["reason"] = String(activation.get("reason", "activation_rejected"))
-		_rejected_volume_m3 += requested_volume
-		return rejected
-	var committed_volume := float(activation.get("committed_volume_m3", 0.0))
+	var committed_volume := requested_volume
+	var stable_source_volume := 0.0
+	var loose_source_volume := 0.0
+	if debit_persistent:
+		var activation := persistent_field.activate_volume(center_xz, requested_volume, activation_radius, aggregate_id)
+		if not bool(activation.get("accepted", false)):
+			rejected["reason"] = String(activation.get("reason", "activation_rejected"))
+			_rejected_volume_m3 += requested_volume
+			return rejected
+		committed_volume = float(activation.get("committed_volume_m3", 0.0))
+		stable_source_volume = float(activation.get("stable_volume_m3", 0.0))
+		loose_source_volume = float(activation.get("loose_volume_m3", 0.0))
 	var desired_count := maxi(1, ceili(committed_volume / float(_profile["target_volume_m3"])))
 	var representative_count := mini(available, desired_count)
 	var volume_per_rep := committed_volume / float(representative_count)
@@ -198,15 +280,21 @@ func inject_cut_event(event: Dictionary, aggregate_hint: String = "") -> Diction
 			"sleep_s": 0.0,
 			"sleeping": false,
 			"contained": false,
+			"compartment": compartment,
 			"age_s": 0.0,
 		})
 		_representative_sequence += 1
 	_aggregate_volume[aggregate_id] = committed_volume
-	_injected_volume_m3 += committed_volume
+	if debit_persistent:
+		_injected_volume_m3 += committed_volume
+	else:
+		_received_released_volume_m3 += committed_volume
 	return {
 		"accepted": true,
 		"aggregate_id": aggregate_id,
 		"volume_m3": committed_volume,
+		"stable_source_volume_m3": stable_source_volume,
+		"loose_source_volume_m3": loose_source_volume,
 		"representative_count": representative_count,
 		"reason": "activated",
 	}
@@ -243,7 +331,15 @@ func flush_all() -> Dictionary:
 			"flush:%s" % str(rep["id"]),
 		)
 		if bool(result.get("accepted", false)):
-			settled += float(result.get("committed_volume_m3", 0.0))
+			var committed := float(result.get("committed_volume_m3", 0.0))
+			settled += committed
+			_settlement_events.append({
+				"compartment": String(rep.get("compartment", "active")),
+				"volume_m3": committed,
+				"origin_world": position,
+				"velocity_world": rep.get("velocity", Vector3.ZERO),
+				"aggregate_id": String(rep.get("aggregate_id", "")),
+			})
 			_remove_representative(index)
 	_settled_volume_m3 += settled
 	return {"settled_volume_m3": settled, "remaining_representatives": _representatives.size()}
@@ -274,12 +370,21 @@ func get_visual_snapshot() -> Dictionary:
 
 func get_status_snapshot() -> Dictionary:
 	var active_volume := 0.0
+	var displaced_active_volume := 0.0
+	var released_volume := 0.0
 	var sleeping_count := 0
 	var contained_count := 0
+	var contained_volume := 0.0
 	for rep in _representatives:
-		active_volume += float(rep["volume_m3"])
+		var rep_volume := float(rep["volume_m3"])
+		active_volume += rep_volume
+		if String(rep.get("compartment", "active")) == "released":
+			released_volume += rep_volume
+		else:
+			displaced_active_volume += rep_volume
 		sleeping_count += 1 if bool(rep["sleeping"]) else 0
 		contained_count += 1 if bool(rep["contained"]) else 0
+		contained_volume += rep_volume if bool(rep["contained"]) else 0.0
 	var sorted_ticks := Array(_tick_samples_us)
 	sorted_ticks.sort()
 	var p95_us := 0
@@ -300,12 +405,17 @@ func get_status_snapshot() -> Dictionary:
 		"max_representatives": int(_profile["max_representatives"]),
 		"sleeping_count": sleeping_count,
 		"contained_count": contained_count,
+		"contained_volume_m3": contained_volume,
 		"aggregate_count": _aggregate_volume.size(),
 		"injected_volume_m3": _injected_volume_m3,
+		"received_released_volume_m3": _received_released_volume_m3,
+		"exported_bucket_volume_m3": _exported_bucket_volume_m3,
 		"active_volume_m3": active_volume,
+		"displaced_active_volume_m3": displaced_active_volume,
+		"released_volume_m3": released_volume,
 		"settled_volume_m3": _settled_volume_m3,
 		"rejected_volume_m3": _rejected_volume_m3,
-		"conservation_error_m3": _injected_volume_m3 - active_volume - _settled_volume_m3,
+		"conservation_error_m3": _injected_volume_m3 + _received_released_volume_m3 - active_volume - _settled_volume_m3 - _exported_bucket_volume_m3,
 		"evicted_representatives": _evicted_representatives,
 		"last_tick_ms": float(_last_tick_us) / 1000.0,
 		"p95_tick_ms": float(p95_us) / 1000.0,
@@ -451,7 +561,15 @@ func _settle_ready_representatives() -> void:
 		)
 		if not bool(result.get("accepted", false)):
 			continue
-		_settled_volume_m3 += float(result.get("committed_volume_m3", 0.0))
+		var committed := float(result.get("committed_volume_m3", 0.0))
+		_settled_volume_m3 += committed
+		_settlement_events.append({
+			"compartment": String(rep.get("compartment", "active")),
+			"volume_m3": committed,
+			"origin_world": position,
+			"velocity_world": rep.get("velocity", Vector3.ZERO),
+			"aggregate_id": String(rep.get("aggregate_id", "")),
+		})
 		_remove_representative(index)
 		settled_this_tick += 1
 
@@ -478,7 +596,9 @@ func _resolve_containment(position: Vector3, velocity: Vector3, radius: float, r
 func _resolve_bucket_solids(position: Vector3, velocity: Vector3, radius: float, regions: Array) -> Dictionary:
 	var entered_cavity := false
 	var inner := _find_region(regions, "inner_shell")
-	if not inner.is_empty() and _point_inside_region(position, radius * 0.25, inner):
+	var opening := _find_region(regions, "opening")
+	var opening_down_dot := (opening.get("outward_normal_world", Vector3.UP) as Vector3).dot(Vector3.DOWN) if not opening.is_empty() else -1.0
+	if not inner.is_empty() and opening_down_dot <= 0.3 and _point_inside_region(position, radius * 0.25, inner):
 		entered_cavity = true
 		return {"position": position, "velocity": velocity * 0.75, "entered_cavity": true}
 	for region_value in regions:
@@ -547,11 +667,20 @@ func _remove_representative(index: int) -> void:
 	_representatives.remove_at(index)
 
 
-func _merge_last_representative() -> void:
+func _merge_last_representative() -> bool:
 	if _representatives.size() < 2:
-		return
-	var last := _representatives.pop_back() as Dictionary
-	var target_index := _representatives.size() - 1
+		return false
+	var last_index := _representatives.size() - 1
+	var last := _representatives[last_index] as Dictionary
+	var target_index := -1
+	for candidate_index in range(last_index - 1, -1, -1):
+		var candidate := _representatives[candidate_index] as Dictionary
+		if String(candidate.get("compartment", "active")) == String(last.get("compartment", "active")):
+			target_index = candidate_index
+			break
+	if target_index < 0:
+		return false
+	_representatives.remove_at(last_index)
 	var target := _representatives[target_index]
 	var last_aggregate := String(last["aggregate_id"])
 	var target_aggregate := String(target["aggregate_id"])
@@ -570,6 +699,7 @@ func _merge_last_representative() -> void:
 	target["volume_m3"] = combined
 	target["radius_m"] = _radius_for_volume(combined)
 	_representatives[target_index] = target
+	return true
 
 
 func _clamp_to_field(world_xz: Vector2) -> Vector2:
