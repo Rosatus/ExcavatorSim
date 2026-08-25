@@ -49,6 +49,14 @@ authority to Python. `TerrainCollider` is an optional generation-gated static
 derivative, disabled/fail-open by default. Missing or failed local physics
 cannot block terrain edits or motion presentation.
 
+Active-patch scoop transfer is spatially local: only displaced active material
+overlapping a bounded teeth/opening/inner-shell intake neighborhood may enter
+the bucket ledger. It may not pull arbitrary representatives from the patch.
+Scoop capture stops at the selected model's spill orientation, and release uses
+that same model contract's spill/dump opening thresholds. Visible bucket
+outward direction and the contract opening normal must be calibrated together;
+changing a joint endpoint alone is not sufficient evidence of a valid dump.
+
 ## Scenario: Legacy Godot-local tracked chassis locomotion
 
 ### 1. Scope / Trigger
@@ -65,11 +73,24 @@ TrackedChassisController.set_controller_enabled(value: bool) -> void
 TrackedChassisController.submit_bucket_support_contact(contact: Dictionary) -> void
 TrackedChassisController.raw_world_transform(world_transform: Transform3D) -> Transform3D
 TrackedChassisController.get_status_snapshot() -> Dictionary
+ProductSession.get_equipment_input_axes() -> Vector4
+MotionClient.get_authoritative_input_axes() -> Vector4
 ```
 
 The local actions are `track_left_forward`, `track_left_reverse`,
 `track_right_forward`, and `track_right_reverse`. They never enter the Python
 `Vector4` articulation snapshot.
+
+The production keyboard mapping is left forward/reverse `Q/A` and right
+forward/reverse `W/S`. XInput-compatible controllers map LT/LB to left
+forward/reverse and RT/RB to right forward/reverse. Work equipment uses the ISO
+excavator pattern: left stick X/Y is swing/arm and right stick Y/X is
+boom/bucket. Action/channel semantics and keyboard signs are global, but the
+canonical `InputEventJoypadMotion` signs are selected per active model: SY205
+reverses swing/boom/arm/bucket and SY135 reverses only swing. A rig's optional
+`tracks.local_forward_axis` is `-Z` or `+Z` and
+defaults to `-Z` for backward compatibility. Vehicle right is derived from
+forward × up; it is never hard-coded independently from forward.
 
 ### 3. Contracts
 
@@ -92,6 +113,16 @@ The local actions are `track_left_forward`, `track_left_reverse`,
   a global base transform that cancels the moving parent.
 - The controller is disabled by default. Disabling it restores
   `ChassisMotionRoot` to identity and clears track commands and velocities.
+- Keyboard and gamepad events feed the same four track actions and the same
+  `(swing, boom, arm, bucket)` equipment vector. Runtime registration replaces
+  stale joy events before installing the canonical mapping; it must not leave
+  the former trigger-driven bucket actions active or create a parallel gamepad
+  command path. Trigger pressure remains analog; shoulder reverse is digital.
+- Model-specific XInput direction is expressed only by
+  `MotionClient.MODEL_GAMEPAD_DIRECTION_MULTIPLIERS`. ProductSession refreshes
+  the owned joy events after successful initial/model activation; compatibility
+  transport refreshes them after hello acceptance. Do not invert keyboard
+  events, protocol channels, rig joint axes, or presentation pivots.
 - Each model descriptor must provide track/contact dimensions, independent
   front/rear/left/right support offsets, speed/acceleration/brake/coast values,
   pivot scale, slope limits, slip coefficients, minimum traction, and support
@@ -131,14 +162,18 @@ an unattended soak cannot accidentally weaken the product safety behavior.
 | Collider identity is stale | Ignore raycast and continue from heightfield |
 | Matching derived ray hit | Accept only a bounded height-compatible hint |
 | Focus/reconnect/model/world reset | Clear commands and velocities; reset pose where required |
+| Stale/duplicate runtime gamepad event | Replace it with exactly one canonical joy binding for that action |
+| Gamepad held during re-arm | Keep the corresponding track/equipment output zero until all owned controls return neutral |
+| One model's XInput direction is reversed | Correct its joy multiplier profile and reinstall only JoypadMotion events |
 
 ### 5. Good / Base / Bad Cases
 
-- Good: independent track actions -> fixed-step skid steer -> one chassis root ->
-  composed Python articulation.
+- Good: keyboard or XInput -> shared independent track/equipment actions ->
+  fixed-step skid steer plus four-axis articulation -> one chassis root.
 - Base: local physics disabled -> identical heightfield-driven locomotion.
-- Bad: track input is added to the Python articulation vector, or a raycast
-  mutates/invents terrain state.
+- Bad: gamepad creates a second command state, track input is added to the
+  Python articulation vector, joystick feedback is fixed by changing keyboard
+  or rig axes, or a raycast mutates/invents terrain state.
 
 ### 6. Tests Required
 
@@ -149,6 +184,12 @@ an unattended soak cannot accidentally weaken the product safety behavior.
   identity fallback.
 - Lifecycle tests assert reconnect, model activation, world reset, focus loss,
   and controller disable clearing behavior.
+- Input tests assert the exact ISO joy axis and sign for all eight equipment
+  actions, exact LT/LB/RT/RB track bindings, idempotent runtime registration,
+  and current-device prompt switching without weakening neutral re-arm.
+- Input tests select both model profiles, assert exact JoypadMotion axis/sign
+  pairs with unchanged keys, reject unknown profiles, and prove offline model
+  switching refreshes the active profile.
 - Godot MCP must drive the four actions and switch both production models in a
   live backend session.
 
@@ -157,6 +198,12 @@ an unattended soak cannot accidentally weaken the product safety behavior.
 ```text
 Wrong: MotionPresentation writes base_link.global_transform and cancels chassis travel
 Correct: ChassisMotionRoot owns travel; MotionPresentation composes below it
+
+Wrong: bucket remains on LT/RT while separate callbacks drive tracks
+Correct: canonical InputMap events put bucket on right-stick X and feed LT/LB/RT/RB into the existing track actions
+
+Wrong: SY135 joystick swing is reversed -> flip its physical joint axis and also reverse keyboard Y/H
+Correct: retain rig/keyboard semantics and flip only SY135 swing JoypadMotion events on model activation
 ```
 
 ## Scenario: Jolt-authoritative hybrid chassis and work equipment
@@ -224,13 +271,20 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
   bounded before forces are applied to the body. Effort shaping is updated once
   per side per fixed tick, independent of how many probes currently have
   support; partial contact changes the force budget, not the slew rate.
+- Track side/heading semantics derive from one descriptor field. `-Z` forward
+  places vehicle right on local `+X`; `+Z` forward places vehicle right on
+  local `-X`. The same derived forward drives probes, traction, signed speed,
+  residual stop cleanup, pitch telemetry, and left/right contact identity.
 - Spawn and reset posture are calibrated from the same descriptor compound
   shapes and the authoritative `TerrainState` surface. The initial transform
   must establish a level/upright chassis relative to the sampled terrain
   normal; changing only the vertical clearance is insufficient when provisional
   center-of-mass or hull/contact geometry creates a pitch moment. Model-specific
-  posture corrections must be explicit descriptor data or a bounded calibration
-  step, never an untracked per-frame pose writer.
+  heading/posture corrections must be explicit descriptor data or a bounded
+  calibration step, never an untracked per-frame pose writer. Optional
+  `chassis_dynamics.spawn_yaw_rad` is applied before terrain-normal alignment so
+  Jolt, local track sides, presentation, cameras, and soil proxies rotate as one
+  authority transform.
 - Longitudinal response is evaluated as a measured speed curve, not only by the
   final speed clamp. Drive, coast and braking forces remain bounded by actual
   support load, and brake effort must be slew-limited or otherwise bounded per
@@ -396,16 +450,20 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
 | Model activation changes cavity dimensions | Retarget floor/back/side barrier shapes before the new model can transport parcels |
 | Early/late/stale support request | Drop it without applying force or changing chassis transform |
 | Track command outside `[-1,1]` | Clamp before force calculation |
+| Missing `tracks.local_forward_axis` | Use backward-compatible `-Z` |
+| Axis outside `-Z` / `+Z` | Reject the descriptor before building a rig |
 | Speed/angular limit reached | Clamp body velocity and report a quality flag |
 | Disconnect/reset/model switch/profile exit | Zero commands and teardown or rebuild the body and contact state |
 | Authoritative truth offered to Python shadow decoder | Reject with `shadow_schema_validation_failed` |
 
 ### 5. Good / Base / Bad Cases
 
-- Good: product-default Jolt profile -> one dynamic chassis + accepted kinematic FK ->
+- Good: model-declared vehicle axis -> derived forward/right track space ->
+  product-default Jolt profile -> one dynamic chassis + accepted kinematic FK ->
   identity-bound bucket query -> one interaction batch -> local hybrid truth.
 - Base: explicit Python compatibility profile -> Python pose writer and no dynamic chassis rig.
-- Bad: apply Python base transform after the Jolt step, accept a stale terrain
+- Bad: swap keyboard commands or GLB nodes to compensate for an undeclared
+  model-forward mismatch; apply Python base transform after the Jolt step, accept a stale terrain
   collider, create dynamic work-equipment bodies, or relabel authoritative truth
   as a shadow message.
 
@@ -414,6 +472,9 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
 - Real Godot 4.7.1/Jolt tests cover both models settling, straight travel,
   braking, reversing, pivoting, bounded slope/mound traversal, speed/energy
   bounds, stale terrain rejection, model switch, and teardown.
+- Contact tests assert left/right probe points lie on the corresponding visual
+  vehicle side for both declared forward-axis conventions; straight travel is
+  measured along the declared vehicle forward rather than a fixed `-basis.z`.
 - Reset/model-switch tests assert the lowest chassis point remains within the
   configured clearance of `TerrainState`, the chassis up axis is within the
   posture tolerance of the sampled terrain normal, and the first movement
@@ -464,6 +525,9 @@ Correct: query evidence queues one identity-checked, capped next-tick chassis wr
 
 Wrong: poured parcel settles through queue_deposit_volume and debits the bucket twice
 Correct: parcel sequence -> queue_parcel_deposit_volume -> matching terrain transfer commit -> recycle only that parcel volume
+
+Wrong: SY205 looks reversed -> swap left/right commands or rotate only the GLB
+Correct: physics rig declares local_forward_axis=+Z -> Jolt derives forward and both sides
 ```
 
 ### Terrain3D derived-backend contract
@@ -475,6 +539,7 @@ authority. Its public seam is:
 queue_snapshot(snapshot: Dictionary) -> bool
 apply_pending() -> bool
 set_collision_mode(mode: int) -> bool
+set_test_mode(value: bool) -> bool
 get_status_snapshot() -> Dictionary
 ```
 
@@ -536,6 +601,13 @@ default (`terrain3d/collision_mode=0`); enabling it must not change logical
 excavation or motion behavior. A missing GDExtension, failed map update, or
 failed collision setup keeps `TerrainRenderer`/`TerrainCollider` usable.
 
+Test graphics mode deliberately deactivates native Terrain3D presentation,
+stops its grass emitter, and hides its rock dressing while retaining its last
+accepted copied snapshot. `TerrainWorld` exposes the existing fallback mesh,
+whose `TerrainRenderer.set_test_mode(true)` uses a procedural, texture-free
+black/white one-metre grid. TerrainState and TerrainCollider identities remain
+untouched.
+
 #### Validation & error matrix
 
 | Condition | Required behavior |
@@ -548,6 +620,7 @@ failed collision setup keeps `TerrainRenderer`/`TerrainCollider` usable.
 | Patch fails | previous surface stays visible; schedule full resync and retry fully |
 | Full materialization fails | restore custom mesh and foundation ground immediately |
 | Collision disabled or fails | `collision_available=false`; excavation/motion continue |
+| Test graphics enabled | Native textures/grass/rocks hidden; current fallback grid visible; authority unchanged |
 | Collider chunk install fails | retain old chunks; applied identity lags so queries fail closed |
 | Skipped/non-contiguous revision | derived consumers take the safe full path |
 
@@ -1095,7 +1168,10 @@ into Terrain3D.
   `Terrain3DMaterial`/texture assets and reuse RockA/B/C meshes plus its particle
   scene as an explicitly reviewed temporary visual baseline; demo height data is
   never logical input.
-- `godot-terrain-state-v2-flat` initializes the logical surface at zero height.
+- `godot-terrain-state-v3-construction-site` initializes one 64 m authoritative
+  surface: a level central 20 m work pad plus deterministic outer grades/spoil.
+  The visible construction map and `TerrainCollider` derive the same complete
+  footprint; presentation-only ground beyond the support grid is forbidden.
   Stable/loose edits and reset semantics remain unchanged after initialization.
 - Site dressing is bounded to 18 official rocks outside the logical rectangle;
   official grass particles use a 12 m central exclusion radius. Dressing adds
@@ -1179,9 +1255,10 @@ VisualQualityController.apply_profile(profile_name: String) -> bool
   not a reason to silently create a second environment implementation.
 - Terrain3D's infinite world background remains disabled while Sky3D owns the
   horizon; the bounded construction terrain and authority seam are unchanged.
-- The running client keeps a user-visible credit for the packaged ESO/S.
-  Brunier Milky Way textures. Full source/license links remain in `NOTICE.md`
-  and the adjacent third-party license file.
+- The simulation viewport carries no permanent third-party credit overlay.
+  Packaging and distribution retain the complete ESO/S. Brunier Milky Way
+  title, author, source, modification note, and CC BY 4.0 license in
+  `NOTICE.md` and the adjacent third-party provenance/license files.
 
 #### 4. Validation & Error Matrix
 
@@ -1203,7 +1280,7 @@ VisualQualityController.apply_profile(profile_name: String) -> bool
 
 - `visual_pass_test.gd` asserts SIMPLE 10:30 daylight, high/low profiles,
   disabled time authority, failure propagation, the single sun, horizon, and
-  user-visible attribution seam.
+  absence of a permanent attribution overlay.
 - A real Forward+ smoke must inspect the running frame and current-run logs;
   headless state tests do not prove shader, cloud, or horizon rendering.
 
@@ -1226,6 +1303,7 @@ warning, recovery, and diagnostic presentation in the main Godot scene.
 ```text
 MotionOperatorUI.show_control_guide() -> void
 MotionOperatorUI.set_prompt_mode_for_test(mode: String) -> void
+MotionOperatorUI.set_test_graphics_for_test(enabled: bool) -> void
 ExcavationWorld.get_selected_soil_payload_snapshot() -> Dictionary
 ProductSession.request_reset() -> bool
 ProductSession.request_model_switch(model_id: String) -> bool
@@ -1245,6 +1323,17 @@ ProductSession.request_model_switch(model_id: String) -> bool
   explains lifecycle, independent tracks, work equipment, camera, model switch,
   reset, and automatic physical excavation. It must not advertise bindings that
   do not exist.
+- The gamepad prompt names the ISO excavator pattern and projects the canonical
+  left-stick swing/arm, right-stick boom/bucket, LT/LB left-track and RT/RB
+  right-track bindings. Any joy button or axis event selects this prompt; the
+  next keyboard/mouse event restores the keyboard prompt without changing input
+  authority or arming state.
+- The top-left status panel has an always-available sibling toggle. Collapsing
+  the panel hides its body without hiding the restore control, changing motion,
+  or dismissing the separate first-run guide.
+- `Test Grid` selects the `test` visual-quality identity and restores the prior
+  product profile when disabled. It changes presentation only and remains
+  independent of session/reset confirmation.
 - The most recently observed keyboard/mouse or gamepad input selects prompt
   copy. Gamepad equipment mappings may be shown; track/camera prompts remain
   keyboard/mouse until those controllers own real gamepad actions.
@@ -1263,7 +1352,7 @@ ProductSession.request_model_switch(model_id: String) -> bool
 | Selected soil snapshot unavailable | Show unavailable/empty operator state; do not inspect visual representatives |
 | Reset/model choice pending | Preserve generation/model until confirmation |
 | Authority transition completes | Clear stale soil UI and show one completion/re-arm message |
-| Focus lost, stopped/paused, or neutral not armed | Show concise recovery guidance; motion stays safely gated |
+| Focus lost, stopped/paused, or neutral not armed | Show concise recovery guidance for the active device; motion stays safely gated |
 | Gateway disconnected | Show operator recovery by default and connection details only in Advanced |
 | Preference read/write fails | Guide remains usable for the current run; startup continues |
 
@@ -1279,6 +1368,9 @@ ProductSession.request_model_switch(model_id: String) -> bool
 - `operator_ui_test.gd` covers 1280×720/1920×1080 bounds, default/Advanced
   hierarchy, keyboard/gamepad prompts, guide recall, reset/model confirmation,
   local/gateway recovery, both models, and soil generation clearing.
+- Prompt tests dispatch real `InputEventJoypad*` and `InputEventKey` instances,
+  assert the mode changes, and reject the obsolete keyboard-only track or
+  trigger-bucket copy.
 - `offline_product_test.gd`, model-switch coverage, and the standalone matrix
   retain local authority, optional gateway, lifecycle, and double-model behavior.
 - Subjective legibility and composition are reserved for the focused human
@@ -1289,6 +1381,9 @@ ProductSession.request_model_switch(model_id: String) -> bool
 ```text
 Wrong: particle count -> bucket fill; F8 -> reset immediately; diagnostics always visible
 Correct: selected ledger -> operator state; confirm -> authority transition -> completion
+
+Wrong: gamepad prompt says triggers control bucket and tracks require keyboard
+Correct: gamepad prompt mirrors ISO sticks plus LT/LB/RT/RB track actions
 ```
 
 ## Scenario: Semantic camera workflow presets
@@ -1310,17 +1405,25 @@ CameraRig.get_view_snapshot_for_test() -> Dictionary
 
 ### 3. Contracts
 
-- One Camera3D owns `operator`, `chase`, `work_tool`, and `inspection`. Presets
+- One Camera3D owns `operator`, `chase`, `work_tool`, `inspection`, and `cab`.
+  Presets
   resolve only current `MotionPresentation` semantic frames and model-specific
   framing data; missing mode anchors fall back to the current `base_link`.
 - Chase uses base heading, operator uses upper-structure heading, work-tool
   follows the current bucket/contact while retaining machine context, and
   inspection preserves bounded free orbit/zoom.
+- Cab uses an explicit model-local eye pose rigidly attached to the current
+  `upper_structure_link`; it bypasses orbit, zoom, and occlusion shortening.
+  Only the manifest-declared upper-body visual subtree receives duplicated
+  per-instance alpha material overrides. Boom, arm, bucket, and tracks retain
+  their materials. Exit, model replacement, and teardown restore prior
+  overrides; generation reset safely reapplies the still-active cab mode.
 - Model activation invalidates cached anchors before resolving the new model.
   Model/authority generation reset restores the current mode preset and clears
   drag/occlusion transients. A queued-for-free visual node is never followed.
-- Camera actions are runtime-registered: 1/2/3/4 and gamepad D-pad select modes;
-  C and right-stick-click reset. Middle-drag and wheel retain orbit/zoom. Input
+- Camera actions are runtime-registered: 1/2/3/4 select external modes, 5 selects
+  cab, and gamepad D-pad selects the four external modes; C and
+  right-stick-click reset. Middle-drag and wheel retain orbit/zoom outside cab. Input
   remains `_unhandled_input`, so events consumed by product UI do not move it.
 - Occlusion performs one read-only terrain/machine-mask ray from outside the
   mode minimum radius. A hit shortens to a clearance; inward correction is
@@ -1397,6 +1500,8 @@ TerrainRenderer.get_status_snapshot() -> Dictionary
   shadows; balanced adds route/stored-material context and bounded shadows;
   high enables deterministic track/aggregate detail. Quality changes alter
   visibility/shadows only, never placement identity.
+- Test exposes zero worksite cues and selects the texture-free fallback terrain;
+  it is an operator/debug presentation identity, not a fourth simulation quality.
 - Fallback `TerrainRenderer` uses accepted vertices/normals with a procedural
   `procedural_worksite_soil` material for compacted, disturbed/loose, damp, and
   macro-distance variation. Shader classifications are visual and cannot enter
@@ -1415,6 +1520,7 @@ TerrainRenderer.get_status_snapshot() -> Dictionary
 | Model switch or terrain reset | Re-sample height, retain deterministic layout, create no collision |
 | Unknown quality | Reject and preserve prior profile/visibility |
 | Low/balanced/high | Apply exact cue and shadow budgets |
+| Test | Hide all shared/native dressing and expose zero cue budget |
 | Fallback renderer active | Use procedural worksite soil material on accepted mesh topology |
 
 ### 5. Good / Base / Bad Cases
@@ -1429,7 +1535,9 @@ TerrainRenderer.get_status_snapshot() -> Dictionary
 - `construction_site_terrain_test.gd` asserts logical parity, material zones,
   deterministic cue layout/counts, finite heights, and excavation exclusion.
 - `visual_pass_test.gd` asserts procedural fallback identity, 14/28/45 quality
-  budgets, zero cue collision, shadow policy, fixed Sky3D, and one sun.
+  budgets, zero cue collision, shadow policy, fixed Sky3D, and one sun. It also
+  asserts test mode has zero cues/particles, inactive native terrain, and the
+  visible black/white grid fallback identity.
 - Offline/model tests assert site placement does not depend on SY205/SY135 and
   remains deterministic across clean generation resets.
 - Subjective work-zone legibility, palette, depth, and silhouette separation
@@ -1440,6 +1548,9 @@ TerrainRenderer.get_status_snapshot() -> Dictionary
 ```text
 Wrong: Terrain3D-only props/materials -> different fallback product
 Correct: shared code-native dressing + accepted snapshot derivatives -> both backends
+
+Wrong: test mode -> create a second flat debug ground/collider
+Correct: test mode -> same accepted fallback mesh -> texture-free grid material
 ```
 
 ## Scenario: Bounded machine/soil feedback presentation
@@ -1454,6 +1565,7 @@ audio, mix/mute state, event deduplication, and lifecycle cleanup.
 ```text
 ExcavationWorld.get_soil_visual_snapshot() -> Dictionary
 SoilEffects.set_budget(count: int) -> void
+SoilEffects.set_emission_enabled(value: bool) -> void
 SoilEffects.clear_for_generation(generation: int) -> void
 MachineFeedback.set_quality_profile(profile: String) -> bool
 MachineFeedback.set_muted(value: bool) -> void

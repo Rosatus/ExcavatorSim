@@ -25,6 +25,14 @@ verify` for the backend/provenance/standalone gates.
 The standalone matrix includes `offline_product_test.gd`; this is the required
 offline-default smoke and must pass with no service listening on port 8765.
 
+Final product-experience evidence uses
+`godot/client/tests/capture_visual_baseline.ps1 -EvidencePhase after`. The
+automated driver proves real tooth contact, curl, nonzero carry, outward dump,
+terrain change, support, reset, artifact integrity, and error logs for both
+models and all quality profiles. Composition, endpoint naturalness, camera
+clipping, material appeal, audio balance, and five-minute discoverability remain
+one explicit human gate; automated screenshots do not approve those judgments.
+
 ## Reproducible release evidence
 
 Run the following from the repository root. The standalone runner accepts an

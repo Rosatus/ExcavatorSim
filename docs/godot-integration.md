@@ -72,6 +72,22 @@ profile teardown stops forces and clears or rebuilds the complete dynamic rig.
 SY205 and SY135 use separate hash-bound rig and track descriptors with no
 cross-model fallback.
 
+The product keyboard maps left-track forward/reverse to `Q/A` and right-track
+forward/reverse to `W/S`. XInput-compatible controllers feed the same actions:
+LT/LB control the left track forward/reverse and RT/RB control the right track
+forward/reverse. Work equipment follows the ISO excavator pattern without
+changing the four-axis command order: left stick X/Y controls swing/arm and
+right stick Y/X controls boom/bucket. MotionClient replaces only the joy-axis
+events with the active model's direction profile: SY205 reverses all four stick
+channels and SY135 reverses only swing. ProductSession refreshes that profile on
+offline model activation; keyboard actions, protocol order, physical joint axes,
+and joint limits remain unchanged. Jolt does not assume every visual asset faces local
+`-Z`: the optional rig field `tracks.local_forward_axis` defaults to `-Z`, while
+SY205 explicitly declares `+Z`. Forward, vehicle right, probe placement,
+traction, signed speed, stop cleanup, and pitch telemetry derive from that same
+field, so the 180-degree SY205 spawn heading does not turn physical right-front
+into visual left-rear.
+
 The excavation path selects one generation-scoped local material owner. The
 product default is `active_patch`: `SoilInteractionAuthority` owns the complete
 stable/loose -> active -> bucket -> released -> settled ledger and borrows the
@@ -194,13 +210,26 @@ atmosphere, and high raises the same visual features without altering the 60 Hz
 simulation/transport contracts. These are disposable presentation resources;
 changing their profile cannot alter motion cadence, terrain snapshots, bucket
 volume, replay state, or any Python message. Profile-application failure is
-propagated through `VisualQualityController`, and the running UI retains the
-required ESO/S. Brunier Milky Way attribution.
+propagated through `VisualQualityController`. The simulation viewport has no
+permanent attribution overlay; the complete ESO/S. Brunier Milky Way credit and
+license links remain in the packaged NOTICE and adjacent third-party files.
+
+The operator HUD also exposes `Test Grid`. This presentation-only profile reuses
+low sky/audio/material-simulation budgets, disables soil particles and all
+shared/native site dressing, deactivates Terrain3D textured presentation, and
+renders the current authoritative fallback surface with an untextured
+black/white one-metre grid. TerrainState, TerrainCollider, Jolt, and soil ledgers
+remain unchanged, and disabling the toggle restores the prior product profile.
 
 Terrain3D's optional infinite world background is disabled in this composition;
 its generated cliff shell would otherwise cover the Sky3D horizon. The bounded
 64 m site terrain, official surface assets, rocks, grass, and logical excavation
 contracts remain unchanged.
+
+The camera workflow also provides a model-specific cab first-person preset on
+key 5. It follows `upper_structure_link` directly and applies reversible,
+per-instance transparency only to the manifest-declared upper-body shell; work
+equipment and undercarriage visuals are not modified.
 
 ### SY205 passive four-bar linkage
 
@@ -251,8 +280,11 @@ IDs select the demo cliff/bare-ground and grass slots. The adapter loads the
 extracted demo `Terrain3DMaterial`, including projection, dual scaling, macro
 variation, auto-shader, and world-background parameters.
 
-`TerrainState` algorithm `godot-terrain-state-v2-flat` initializes the logical
-patch as a true zero-height plane, so the excavator starts on flat ground.
+`TerrainState` algorithm `godot-terrain-state-v3-construction-site` covers the
+complete 64 m visible site at 0.5 m spacing. Its central 20 m work pad is a true
+zero-height plane while the deterministic outer grades and spoil contours are
+part of the same authoritative heightfield, so rendered ground, Jolt support,
+and excavation sampling cannot diverge when the machine leaves the spawn area.
 Official RockA/B/C meshes are placed outside that patch through bounded
 `MultiMeshInstance3D` layers. The official grass particle scene is retained
 outside a 12 m central exclusion radius. Demo height maps are never imported as

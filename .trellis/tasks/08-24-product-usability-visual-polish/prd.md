@@ -152,3 +152,11 @@ must remain intact.
   every new external asset requires provenance before integration.
 - Pixel-perfect screenshot thresholds are deferred until the baseline task has
   measured nondeterminism; human visual review remains a required gate.
+
+## Closure decision
+
+On 2026-08-25 the user explicitly requested commit, push, and archival. The
+parent therefore closes on the completed implementation children and focused
+automated evidence. The final fresh visual matrix and subjective review remain
+documented, intentionally unclaimed checks in the validation child rather than
+being silently marked as passed.

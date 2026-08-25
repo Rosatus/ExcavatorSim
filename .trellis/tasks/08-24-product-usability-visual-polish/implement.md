@@ -21,8 +21,10 @@
 7. [x] `08-24-soil-effects-audio-feedback`: consume stabilized soil transfer,
        patch, ledger, and response snapshots; replace placeholder-looking
        feedback and add a quality-bounded runtime audio mix.
-8. [ ] `08-24-product-experience-validation`: record after evidence, execute the
-       two-model operator journeys, fix acceptance defects, and close the parent.
+8. [x] `08-24-product-experience-validation`: record focused after evidence,
+       execute the automated two-model journeys, fix the reported acceptance
+       defects, and close the parent under the 2026-08-25 user-directed visual
+       gate waiver recorded by that child.
 
 ## Global validation
 

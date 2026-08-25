@@ -3,7 +3,7 @@
   "name": "product-experience-validation",
   "title": "Product experience validation",
   "description": "Run double-model operator journeys, capture after evidence, verify performance/accessibility/recovery, and close release-candidate experience defects.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
