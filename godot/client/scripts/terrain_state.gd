@@ -3,12 +3,13 @@ extends RefCounted
 
 ## Godot-owned, deterministic terrain authority.  Meshes are always derived
 ## from snapshots of these two Float32 layers.
-const ALGORITHM_VERSION := "godot-terrain-state-v2-flat"
+const ALGORITHM_VERSION := "godot-terrain-state-v3-construction-site"
 const DEFAULT_SEED := 24681357
-const DEFAULT_ROWS := 41
-const DEFAULT_COLUMNS := 41
+const DEFAULT_ROWS := 129
+const DEFAULT_COLUMNS := 129
 const DEFAULT_SPACING_M := 0.5
 const MAX_CELLS := 50000
+const WORK_PAD_HALF_EXTENT_M := 10.0
 ## One-cell normal/seam halo published with every dirty rectangle so derived
 ## mesh/collider consumers can rebuild normals and shared chunk edges.
 const DIRTY_HALO_CELLS := 1
@@ -274,9 +275,37 @@ func get_last_enqueued_sequence() -> int:
 func _generate_baseline() -> void:
 	_baseline_stable = PackedFloat32Array()
 	_baseline_stable.resize(rows * columns)
+	for row in rows:
+		var z := origin_xz.y + float(row) * spacing_m
+		for column in columns:
+			var x := origin_xz.x + float(column) * spacing_m
+			_baseline_stable[row * columns + column] = construction_site_baseline_height(Vector2(x, z))
 	stable_heights = _baseline_stable.duplicate()
 	loose_depth = PackedFloat32Array()
 	loose_depth.resize(_baseline_stable.size())
+
+
+static func construction_site_baseline_height(position: Vector2) -> float:
+	var dx := maxf(absf(position.x) - WORK_PAD_HALF_EXTENT_M, 0.0)
+	var dz := maxf(absf(position.y) - WORK_PAD_HALF_EXTENT_M, 0.0)
+	var outside_distance := Vector2(dx, dz).length()
+	var context_weight := smoothstep(0.0, 3.0, outside_distance)
+	return _construction_site_context_offset(position) * context_weight
+
+
+static func _construction_site_context_offset(position: Vector2) -> float:
+	var gentle_grade := 0.07 * sin(position.x * 0.12) * cos(position.y * 0.09)
+	var north_spoil := 1.55 * _gaussian(position, Vector2(-16.5, -13.0), Vector2(4.6, 3.8))
+	var east_spoil := 1.15 * _gaussian(position, Vector2(16.0, -11.0), Vector2(4.0, 3.4))
+	var west_berm := 0.85 * _gaussian(position, Vector2(-18.0, 10.5), Vector2(2.4, 8.5))
+	var damp_low := -0.32 * _gaussian(position, Vector2(15.0, 16.0), Vector2(7.0, 6.0))
+	return gentle_grade + north_spoil + east_spoil + west_berm + damp_low
+
+
+static func _gaussian(position: Vector2, center: Vector2, sigma: Vector2) -> float:
+	var dx := (position.x - center.x) / sigma.x
+	var dz := (position.y - center.y) / sigma.y
+	return exp(-0.5 * (dx * dx + dz * dz))
 
 
 ## Applies one brush bounded to its clamped grid rectangle. Returns the touched

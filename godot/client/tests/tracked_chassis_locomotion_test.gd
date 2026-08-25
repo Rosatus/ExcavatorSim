@@ -163,6 +163,34 @@ func _test_input_actions_and_parent_composition() -> int:
 		if _check(InputMap.has_action(action), "missing track input action: %s" % action) != 0:
 			host.free()
 			return 1
+		var definition: Dictionary = TrackedChassisController.INPUT_ACTIONS[action]
+		var key_events: Array[InputEvent] = []
+		var joy_events: Array[InputEvent] = []
+		for event in InputMap.action_get_events(action):
+			if event is InputEventKey:
+				key_events.append(event)
+			elif event is InputEventJoypadMotion or event is InputEventJoypadButton:
+				joy_events.append(event)
+		if _check(
+			key_events.size() == 1
+			and (key_events[0] as InputEventKey).physical_keycode == int(definition["key"]),
+			"track input action has the wrong keyboard binding: %s" % action,
+		) != 0:
+			host.free()
+			return 1
+		var gamepad_matches := joy_events.size() == 1
+		if definition.has("joy_axis"):
+			gamepad_matches = gamepad_matches and joy_events[0] is InputEventJoypadMotion
+			if gamepad_matches:
+				var motion := joy_events[0] as InputEventJoypadMotion
+				gamepad_matches = motion.axis == int(definition["joy_axis"]) and is_equal_approx(motion.axis_value, float(definition["joy_sign"]))
+		else:
+			gamepad_matches = gamepad_matches and joy_events[0] is InputEventJoypadButton
+			if gamepad_matches:
+				gamepad_matches = (joy_events[0] as InputEventJoypadButton).button_index == int(definition["joy_button"])
+		if _check(gamepad_matches, "track input action has the wrong XInput binding: %s" % action) != 0:
+			host.free()
+			return 1
 	if _check(chassis.configure_model_for_test("sy205"), chassis.contract_error) != 0:
 		host.free()
 		return 1

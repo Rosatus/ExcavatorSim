@@ -47,8 +47,12 @@ the logical height/control maps; demo terrain heights are not authoritative.
 The Godot client also vendors Sky3D 2.1 under
 `godot/client/addons/sky_3d/`. Sky3D is Copyright © 2023-2026 Cory Petkovsek
 and Contributors and © 2021 J. Cuéllar, and is provided under the MIT License
-retained at `godot/client/addons/sky_3d/LICENSE.txt`. Its Milky Way and star
-field textures use “The Milky Way panorama” by ESO/S. Brunier under CC BY 4.0;
+retained at `godot/client/addons/sky_3d/LICENSE.txt`. Its Milky Way and modified
+star-field textures use
+[“The Milky Way panorama”](https://www.eso.org/public/images/eso0932a/) by
+ESO/S. Brunier under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), in original and
+modified forms;
 the moon map is Copyright © 2019 GPoSM under MIT. Detailed source and license
 links are retained beside those assets and summarized in
 `godot/client/addons/sky_3d/EXCAVATORSIM-PROVENANCE.md`. Sky3D is a fixed-time,

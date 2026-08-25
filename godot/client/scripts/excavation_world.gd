@@ -989,7 +989,7 @@ func _ensure_soil_interaction_authority() -> bool:
 	_soil_interaction_authority = SoilInteractionAuthority.new()
 	if not _soil_interaction_authority.configure(
 		contract,
-		_material_generation,
+		terrain_world.terrain_state.world_generation,
 		active_soil_material_preset,
 		_selected_soil_mode(),
 	):

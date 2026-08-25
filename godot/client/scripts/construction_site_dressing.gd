@@ -6,6 +6,7 @@ extends Node3D
 ## CollisionObject3D or writes the accepted terrain snapshot.
 
 const PROFILE_VISIBILITY := {
+	"test": [],
 	"low": ["Primary"],
 	"balanced": ["Primary", "Context"],
 	"high": ["Primary", "Context", "Detail"],
@@ -176,7 +177,7 @@ func _apply_quality_visibility() -> void:
 		for geometry in root.find_children("*", "GeometryInstance3D", true, false):
 			var instance := geometry as GeometryInstance3D
 			var is_track_mark := instance.name == "Mark"
-			instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if profile == "low" or is_track_mark else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+			instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if profile in ["test", "low"] or is_track_mark else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
 
 func _on_world_reset(_world_generation: int) -> void:

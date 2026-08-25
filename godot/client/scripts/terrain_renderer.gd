@@ -13,6 +13,8 @@ var _latest_queued_revision := -1
 var _applied_generation := -1
 var _applied_revision := -1
 var _soil_material: ShaderMaterial
+var _test_grid_material: ShaderMaterial
+var _test_mode := false
 var _cached_vertices := PackedVector3Array()
 var _cached_normals := PackedVector3Array()
 var _cached_uvs := PackedVector2Array()
@@ -81,8 +83,19 @@ func get_status_snapshot() -> Dictionary:
 		"applied_revision": _applied_revision,
 		"cached_rows": _cached_rows,
 		"cached_columns": _cached_columns,
-		"material_kind": "procedural_worksite_soil" if _soil_material != null else "unavailable",
+		"material_kind": "test_black_white_grid" if _test_mode else ("procedural_worksite_soil" if _soil_material != null else "unavailable"),
+		"test_mode": _test_mode,
 	}
+
+
+func set_test_mode(value: bool) -> bool:
+	_test_mode = value
+	_ensure_soil_material()
+	_ensure_test_grid_material()
+	var array_mesh := mesh as ArrayMesh
+	if array_mesh != null and array_mesh.get_surface_count() > 0:
+		array_mesh.surface_set_material(0, _test_grid_material if _test_mode else _soil_material)
+	return true
 
 
 ## Full rebuild: recompute every vertex/normal and repopulate the cache.
@@ -205,7 +218,8 @@ func _publish_surface(
 	var result := ArrayMesh.new()
 	result.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	_ensure_soil_material()
-	result.surface_set_material(0, _soil_material)
+	_ensure_test_grid_material()
+	result.surface_set_material(0, _test_grid_material if _test_mode else _soil_material)
 	mesh = result
 	return true
 
@@ -264,6 +278,35 @@ void fragment() {
 """
 	_soil_material = ShaderMaterial.new()
 	_soil_material.shader = shader
+
+
+func _ensure_test_grid_material() -> void:
+	if _test_grid_material != null:
+		return
+	var shader := Shader.new()
+	shader.code = """
+shader_type spatial;
+render_mode unshaded;
+
+varying vec3 grid_world_position;
+
+void vertex() {
+	grid_world_position = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+}
+
+void fragment() {
+	vec2 cell = floor(grid_world_position.xz);
+	float checker = mod(cell.x + cell.y, 2.0);
+	vec2 within = abs(fract(grid_world_position.xz) - vec2(0.5));
+	float line = smoothstep(0.46, 0.495, max(within.x, within.y));
+	vec3 tile = mix(vec3(0.055), vec3(0.86), checker);
+	ALBEDO = mix(tile, vec3(0.015), line);
+	ROUGHNESS = 1.0;
+	METALLIC = 0.0;
+}
+"""
+	_test_grid_material = ShaderMaterial.new()
+	_test_grid_material.shader = shader
 
 
 func _normal_at(surface: PackedFloat32Array, rows: int, columns: int, row: int, column: int, spacing: float) -> Vector3:

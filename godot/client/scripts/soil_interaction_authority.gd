@@ -21,6 +21,8 @@ var material_preset := "loose"
 var bucket_capacity_m3 := 0.0
 var nominal_capacity_m3 := 0.0
 var material_density_kg_m3 := 1600.0
+var spill_opening_down_dot := 0.05
+var dump_opening_down_dot := 0.3
 
 var _grid_dimensions := Vector3i.ONE
 var _cell_capacity_m3 := 0.0
@@ -66,7 +68,18 @@ func configure(
 	bucket_capacity_m3 = float(contract.get("heaped_capacity_m3", 0.0))
 	nominal_capacity_m3 = float(contract.get("nominal_capacity_m3", 0.0))
 	material_density_kg_m3 = float(contract.get("material_density_kg_m3", 0.0))
+	var interaction := contract.get("interaction", {}) as Dictionary
+	spill_opening_down_dot = float(interaction.get("spill_opening_down_dot", 0.05))
+	dump_opening_down_dot = float(interaction.get("dump_opening_down_dot", 0.3))
 	if bucket_capacity_m3 <= EPSILON_M3 or nominal_capacity_m3 <= EPSILON_M3 or material_density_kg_m3 <= 0.0:
+		return false
+	if (
+		spill_opening_down_dot < -1.0
+		or spill_opening_down_dot > 1.0
+		or dump_opening_down_dot < -1.0
+		or dump_opening_down_dot > 1.0
+		or spill_opening_down_dot >= dump_opening_down_dot
+	):
 		return false
 	var cell_count := _grid_dimensions.x * _grid_dimensions.y * _grid_dimensions.z
 	_cell_fill.resize(cell_count)
@@ -88,6 +101,8 @@ func clear() -> void:
 	bucket_capacity_m3 = 0.0
 	nominal_capacity_m3 = 0.0
 	material_density_kg_m3 = 1600.0
+	spill_opening_down_dot = 0.05
+	dump_opening_down_dot = 0.3
 	_grid_dimensions = Vector3i.ONE
 	_cell_capacity_m3 = 0.0
 	_cell_fill = PackedFloat32Array()
@@ -128,6 +143,7 @@ func step_fixed(
 	_overflow_volume_m3 = maxf(0.0, float(patch.get_status_snapshot().get("contained_volume_m3", 0.0)))
 	_release_bucket_soil(delta, tick, tool_snapshot, patch)
 	_activate_full_tool_displacement(delta, tick, tool_snapshot, tool_classification, patch)
+	_capture_scoop_flux(tick, tool_snapshot, tool_classification, patch)
 	_settle_bucket_cells(tool_snapshot, delta)
 	patch.step_fixed(delta, focus_world, tool_snapshot)
 	_consume_patch_settlements(patch, tick)
@@ -292,6 +308,66 @@ func _capture_contained_soil(patch: ActiveSoilPatch, tick: int) -> void:
 	)
 
 
+func _capture_scoop_flux(
+	tick: int,
+	tool_snapshot: Dictionary,
+	classification: Dictionary,
+	patch: ActiveSoilPatch,
+) -> void:
+	if not bool(tool_snapshot.get("valid", false)) or not bool(classification.get("valid", false)):
+		return
+	var available := maxf(0.0, bucket_capacity_m3 - float(_compartment_volume["bucket"]))
+	var active_volume := maxf(0.0, float(_compartment_volume["active"]))
+	if available <= EPSILON_M3 or active_volume <= EPSILON_M3:
+		return
+	var opening := _find_region(tool_snapshot.get("regions", []) as Array, "opening")
+	if opening.is_empty():
+		return
+	var opening_down_dot := (
+		(opening.get("outward_normal_world", Vector3.UP) as Vector3).dot(Vector3.DOWN)
+	)
+	if opening_down_dot > spill_opening_down_dot:
+		return
+	var best_motion := 0.0
+	var best_action := "none"
+	var best_region := ""
+	for value in classification.get("candidates", []):
+		var candidate := value as Dictionary
+		var action := String(candidate.get("classification", "none"))
+		if action not in DISPLACEMENT_ACTIONS or String(candidate.get("role_scope", "none")) != "stable":
+			continue
+		var motion := maxf(0.0, float(candidate.get("motion_m", 0.0)))
+		if motion > best_motion:
+			best_motion = motion
+			best_action = action
+			best_region = String(candidate.get("region_id", ""))
+	if best_motion < 0.002:
+		return
+	var requested := minf(
+		minf(available, active_volume * 0.6),
+		bucket_capacity_m3 * clampf(best_motion, 0.0, 0.08) * 0.35,
+	)
+	var extraction := patch.extract_scoop_volume(
+		requested,
+		tool_snapshot.get("regions", []) as Array,
+	)
+	if not bool(extraction.get("accepted", false)):
+		return
+	var moved := float(extraction.get("volume_m3", 0.0))
+	var accepted := _add_bucket_volume(moved)
+	_record_transaction(
+		tick,
+		"bucket_entry",
+		"active",
+		"bucket",
+		moved,
+		accepted,
+		extraction.get("origin_world", Vector3.ZERO) as Vector3,
+		extraction.get("velocity_world", Vector3.ZERO) as Vector3,
+		{"reason": "scoop_flux", "action": best_action, "region_id": best_region},
+	)
+
+
 func _release_bucket_soil(delta: float, tick: int, tool_snapshot: Dictionary, patch: ActiveSoilPatch) -> void:
 	var bucket_volume := float(_compartment_volume["bucket"])
 	if bucket_volume <= EPSILON_M3 or not bool(tool_snapshot.get("valid", false)):
@@ -300,9 +376,14 @@ func _release_bucket_soil(delta: float, tick: int, tool_snapshot: Dictionary, pa
 	if opening.is_empty():
 		return
 	var opening_down_dot := (opening.get("outward_normal_world", Vector3.UP) as Vector3).dot(Vector3.DOWN)
-	if opening_down_dot <= 0.05:
+	if opening_down_dot <= spill_opening_down_dot:
 		return
-	var exposure := clampf((opening_down_dot - 0.05) / 0.95, 0.0, 1.0)
+	var exposure := clampf(
+		(opening_down_dot - spill_opening_down_dot)
+		/ maxf(0.01, 1.0 - spill_opening_down_dot),
+		0.0,
+		1.0,
+	)
 	var requested := minf(bucket_volume, bucket_capacity_m3 * lerpf(0.06, 1.35, exposure) * maxf(delta, 0.0))
 	if requested <= EPSILON_M3 or not patch.can_accept_volume(requested):
 		return
@@ -325,7 +406,7 @@ func _release_bucket_soil(delta: float, tick: int, tool_snapshot: Dictionary, pa
 	var debited := _remove_bucket_volume(accepted)
 	if absf(debited - accepted) > _transaction_tolerance(accepted):
 		_invariant_failure_count += 1
-	_record_transaction(tick, "dump" if opening_down_dot >= 0.3 else "spill", "bucket", "released", requested, debited, origin, velocity, {
+	_record_transaction(tick, "dump" if opening_down_dot > dump_opening_down_dot else "spill", "bucket", "released", requested, debited, origin, velocity, {
 		"opening_down_dot": opening_down_dot,
 		"aggregate_id": String(injection.get("aggregate_id", "")),
 	})

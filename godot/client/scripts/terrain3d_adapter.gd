@@ -63,6 +63,7 @@ var _assets_source := "none"
 var _dressing_root: Node3D
 var _rock_count := 0
 var _tree_count := 0
+var _test_mode := false
 
 
 func _ready() -> void:
@@ -113,7 +114,7 @@ func queue_snapshot(snapshot: Dictionary) -> bool:
 func apply_pending() -> bool:
 	if _pending_snapshot.is_empty():
 		return false
-	if not _ready_complete or not enabled:
+	if not _ready_complete or not enabled or _test_mode:
 		_set_native_active(false)
 		return false
 	var snapshot := _pending_snapshot
@@ -171,7 +172,20 @@ func get_applied_epoch() -> String:
 
 
 func is_native_mesh_active() -> bool:
-	return available
+	return available and not _test_mode
+
+
+func set_test_mode(value: bool) -> bool:
+	if _test_mode == value:
+		return true
+	_test_mode = value
+	if _test_mode:
+		_set_native_active(false)
+	elif not _pending_snapshot.is_empty():
+		apply_pending()
+	elif _terrain_node != null and is_instance_valid(_terrain_node) and _applied_generation >= 0:
+		_set_native_active(true)
+	return true
 
 
 func set_collision_mode(mode: int) -> bool:
@@ -205,7 +219,8 @@ func get_status_snapshot() -> Dictionary:
 		"assets_source": _assets_source,
 		"rock_count": _rock_count,
 		"tree_count": _tree_count,
-		"grass_enabled": _dressing_root != null and _dressing_root.has_node("Terrain3DParticles"),
+		"grass_enabled": not _test_mode and _dressing_root != null and _dressing_root.has_node("Terrain3DParticles"),
+		"test_mode": _test_mode,
 	}
 
 
@@ -633,7 +648,9 @@ func _set_native_active(active: bool) -> void:
 	if _terrain_node != null and is_instance_valid(_terrain_node):
 		_terrain_node.visible = active
 	if _dressing_root != null and is_instance_valid(_dressing_root):
-		_dressing_root.visible = active
+		_dressing_root.visible = active and not _test_mode
+		for particle_value in _dressing_root.find_children("*", "GPUParticles3D", true, false):
+			(particle_value as GPUParticles3D).emitting = active and not _test_mode
 	if changed:
 		backend_changed.emit(active)
 

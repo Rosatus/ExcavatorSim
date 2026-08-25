@@ -1,12 +1,12 @@
 {
   "schema_version": "machine-calibration-v2",
-  "calibration_version": "m1-provisional-2",
+  "calibration_version": "m1-provisional-3",
   "quality": "provisional",
   "joint_limits": {
     "swing_joint": {"min_position_rad": -3.141592653589793, "max_position_rad": 3.141592653589793, "max_velocity_rad_s": 0.6, "max_acceleration_rad_s2": 0.8},
     "boom_joint": {"min_position_rad": -0.2617993877991494, "max_position_rad": 0.7853981633974483, "max_velocity_rad_s": 0.35, "max_acceleration_rad_s2": 0.5},
     "arm_joint": {"min_position_rad": -0.7853981633974483, "max_position_rad": 0.5235987755982988, "max_velocity_rad_s": 0.45, "max_acceleration_rad_s2": 0.65},
-    "bucket_joint": {"min_position_rad": -0.7853981633974483, "max_position_rad": 0.7853981633974483, "max_velocity_rad_s": 0.55, "max_acceleration_rad_s2": 0.8}
+    "bucket_joint": {"min_position_rad": -1.6580627893946132, "max_position_rad": 0.5235987755982988, "max_velocity_rad_s": 0.55, "max_acceleration_rad_s2": 0.8}
   },
   "cylinders": [
     {"name": "boom_cylinder", "joint": "boom_joint", "anchor_a_m": 1.8, "anchor_b_m": 1.5, "angle_offset_rad": 1.6283185307179586},

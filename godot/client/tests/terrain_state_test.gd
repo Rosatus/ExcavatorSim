@@ -25,11 +25,18 @@ func _run() -> void:
 func _test_repeatability_and_layers() -> int:
 	var first := TerrainState.new(77)
 	var second := TerrainState.new(77)
-	if String(first.surface_snapshot()["algorithm_version"]) != "godot-terrain-state-v2-flat":
-		return _fail("flat construction-pad baseline advances the terrain algorithm identity")
-	for height in first.stable_heights:
-		if height != 0.0:
-			return _fail("initial logical terrain is a level construction pad")
+	if String(first.surface_snapshot()["algorithm_version"]) != "godot-terrain-state-v3-construction-site":
+		return _fail("site-wide authoritative baseline advances the terrain algorithm identity")
+	if first.rows != 129 or first.columns != 129 or first.origin_xz != Vector2(-32.0, -32.0):
+		return _fail("default logical terrain covers the visible 64 m construction site")
+	for point in [Vector2.ZERO, Vector2(-10.0, -10.0), Vector2(10.0, 10.0)]:
+		if not is_zero_approx(first.sample_surface_bilinear_at(point)):
+			return _fail("central construction pad remains level")
+	for point in [Vector2(-30.0, 0.0), Vector2(30.0, 0.0), Vector2(0.0, -30.0), Vector2(0.0, 30.0)]:
+		if not is_finite(first.sample_surface_bilinear_at(point)):
+			return _fail("authoritative support reaches every side of the visible site")
+	if is_zero_approx(first.sample_surface_bilinear_at(Vector2(-18.0, -13.0))):
+		return _fail("outer construction context is part of authoritative terrain height")
 	for state in [first, second]:
 		if not state.enqueue_brush(1, Vector2(0.0, 0.0), 1.5, 0.25):
 			return _fail("valid fill command queues")

@@ -31,6 +31,8 @@ func _run() -> void:
 			_fail("offline startup did not begin stopped")
 		if presentation.get_active_model_id() != "sy205":
 			_fail("offline startup did not activate SY205")
+		if client.get_equipment_gamepad_model_id() != "sy205":
+			_fail("offline startup did not install the SY205 gamepad direction profile")
 		var site_identity := String(dressing.get_status_snapshot().get("layout_identity", ""))
 		if site_identity.is_empty() or int(dressing.get_status_snapshot().get("collision_objects", -1)) != 0:
 			_fail("offline worksite dressing was not deterministic and collision-free")
@@ -42,6 +44,13 @@ func _run() -> void:
 		var initial_selection := excavation.get_status_snapshot().get("soil_authority_selection", {}) as Dictionary
 		if String(initial_selection.get("selected_mode", "")) != "active_patch" or not bool(initial_selection.get("single_owner_valid", false)):
 			_fail("offline product did not start with one active-patch material owner")
+		var initial_soil_status := excavation.get_status_snapshot()
+		var initial_lifecycle := initial_soil_status.get("soil_lifecycle_active", {}) as Dictionary
+		if (
+			int(initial_lifecycle.get("generation", -1))
+			!= int(initial_soil_status.get("world_generation", -2))
+		):
+			_fail("active soil authority did not retain the selected world generation")
 		if not excavation.set_soil_material_lifecycle_mode("legacy"):
 			_fail("offline legacy fallback request was rejected")
 		if String(excavation.get_status_snapshot().get("soil_material_lifecycle_mode", "")) != "active_patch":
@@ -71,6 +80,8 @@ func _run() -> void:
 			_fail("offline pause failed")
 		if not session.request_model_switch("sy135") or presentation.get_active_model_id() != "sy135":
 			_fail("offline SY135 switch failed")
+		if client.get_equipment_gamepad_model_id() != "sy135":
+			_fail("offline SY135 switch did not refresh gamepad directions")
 		if String(dressing.get_status_snapshot().get("layout_identity", "")) != site_identity:
 			_fail("model switch changed model-independent worksite placement")
 		if _visible_model_count(scene.get_node("ChassisMotionRoot/PresentationRoot")) != 1:

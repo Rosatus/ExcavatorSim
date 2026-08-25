@@ -63,6 +63,7 @@ func configure_product_for_capture(
 	chassis.set_test_input_focus_bypass_for_test(true)
 	if not session.request_reset():
 		return {"ok": false, "reason": "offline_reset_failed"}
+	session.set_focused(true)
 	for _frame in SETTLE_FRAMES:
 		await scene.get_tree().physics_frame
 	chassis.set_commands_for_test(0.0, 0.0)
@@ -121,7 +122,9 @@ func capture(
 	var chassis := scene.get_node("ChassisMotionRoot") as TrackedChassisController
 	var excavation := scene.get_node("TerrainRoot/ExcavationWorld") as ExcavationWorld
 	var quality := scene.get_node("VisualQualityController") as VisualQualityController
+	var evidence_phase := String(run_context.get("evidence_phase", "before"))
 	var checkpoints: Array[Dictionary] = []
+	var journey_trace: Array[Dictionary] = []
 
 	if quality_profile == "balanced":
 		var startup_window := _begin_performance_window()
@@ -137,6 +140,7 @@ func capture(
 			== ProductSession.LIFECYCLE_STOPPED
 		)
 		checkpoints.append(startup_checkpoint)
+		var controls_status := await controls_visible_status(scene)
 		var controls_window := _begin_performance_window()
 		await _wait_process(scene, 5)
 		var controls_checkpoint := (
@@ -145,13 +149,18 @@ func capture(
 				excavation.get_status_snapshot()
 			)
 		)
-		controls_checkpoint["state_achieved"] = false
-		controls_checkpoint["finding"] = "essential operator controls are absent from the baseline HUD"
+		controls_checkpoint["controls"] = controls_status
+		controls_checkpoint["state_achieved"] = bool(controls_status.get("achieved", false))
+		if not bool(controls_checkpoint["state_achieved"]):
+			controls_checkpoint["finding"] = String(
+				controls_status.get("finding", "essential operator controls are not discoverable")
+			)
 		checkpoints.append(controls_checkpoint)
 
 	if not session.request_start():
 		release_product_after_capture(scene)
 		return {"ok": false, "reason": "offline_start_failed"}
+	session.set_focused(true)
 	await _wait_physics(scene, 30)
 
 	if quality_profile == "balanced":
@@ -181,9 +190,15 @@ func capture(
 		)
 	)
 	await _move_to(scene, chassis, _pose(model_id, "approach_arm"), 100)
+	journey_trace.append(_journey_sample(chassis, excavation, "approach_arm"))
 	await _move_to(scene, chassis, _pose(model_id, "approach_bucket"), 100)
+	journey_trace.append(_journey_sample(chassis, excavation, "approach_bucket"))
 	await _move_to(scene, chassis, _pose(model_id, "approach"), 120)
-	await _move_to(scene, chassis, _pose(model_id, "cut"), 180)
+	journey_trace.append(_journey_sample(chassis, excavation, "approach"))
+	var contact_outcome := await _move_to_ground_contact(
+		scene, chassis, excavation, model_id, -0.04, 180
+	)
+	journey_trace.append(_journey_sample(chassis, excavation, "ground_contact"))
 	if quality_profile == "balanced":
 		var dig_checkpoint := (
 			await _capture_checkpoint(
@@ -193,17 +208,23 @@ func capture(
 		)
 		var dig_status := dig_checkpoint.get("simulation", {}) as Dictionary
 		dig_checkpoint["state_achieved"] = (
-			String(dig_status.get("interaction_state", "")) == "cut"
+			bool(contact_outcome.get("achieved", false))
+			and (
+			String(dig_status.get("interaction_state", "")) in ["cut", "side_cut", "scrape", "grade"]
 			or int(dig_status.get("terrain_revision", -1)) > terrain_revision_before_dig
+			)
 		)
+		dig_checkpoint["ground_contact"] = contact_outcome
 		checkpoints.append(dig_checkpoint)
 
 	var capture_outcome := await _wait_for_payload_capture(
-		scene, chassis, excavation, _pose(model_id, "cut"), 120
+		scene, chassis, excavation, _pose(model_id, "scoop"), 180
 	)
+	journey_trace.append(_journey_sample(chassis, excavation, "capture_wait"))
 
 	var carry_window := _begin_performance_window()
 	await _move_to(scene, chassis, _pose(model_id, "carry"), 240)
+	journey_trace.append(_journey_sample(chassis, excavation, "carry"))
 	var carry_checkpoint := (
 		await _capture_checkpoint(
 			scene, output_dir, model_id, quality_profile, "carry", carry_window,
@@ -224,8 +245,9 @@ func capture(
 		(carry_checkpoint.get("simulation", {}) as Dictionary).get("payload_mass_kg", 0.0)
 	)
 	var dump_status := await _move_until_dump(
-		scene, chassis, excavation, _pose(model_id, "dump"), 240
+		scene, chassis, excavation, _pose(model_id, "dump"), 300, payload_before_dump
 	)
+	journey_trace.append(_journey_sample(chassis, excavation, "dump"))
 	var dump_checkpoint := (
 		await _capture_checkpoint(
 			scene, output_dir, model_id, quality_profile, "dump", dump_window, dump_status
@@ -237,11 +259,7 @@ func capture(
 	dump_checkpoint["payload_before_dump_kg"] = payload_before_dump
 	dump_checkpoint["state_achieved"] = (
 		payload_before_dump > 0.1
-		and (
-			String((dump_checkpoint.get("simulation", {}) as Dictionary).get("interaction_state", ""))
-			in ["dump", "spill"]
-			or payload_after_dump < payload_before_dump - 0.1
-		)
+		and payload_after_dump < payload_before_dump - 0.1
 	)
 	if not bool(dump_checkpoint["state_achieved"]):
 		dump_checkpoint["finding"] = "dump stage lacked a nonzero payload-to-release transition"
@@ -334,10 +352,13 @@ func capture(
 		and String(session.get_status_snapshot().get("session_id", ""))
 		== ProductSession.LOCAL_SESSION_ID
 	)
+	if evidence_phase == "after" and not scenario_findings.is_empty():
+		evidence_ok = false
 	var result := {
 		"schema_version": SCHEMA_VERSION,
 		"ok": evidence_ok,
 		"reason": "" if evidence_ok else "capture_contract_failed",
+		"evidence_phase": evidence_phase,
 		"capture_errors": capture_errors,
 		"all_scenarios_achieved": scenario_findings.is_empty(),
 		"scenario_findings": scenario_findings,
@@ -352,6 +373,7 @@ func capture(
 		"session": _compact_session(session.get_status_snapshot()),
 		"quality": quality_snapshot,
 		"run": _run_metadata(scene, run_context),
+		"journey_trace": journey_trace,
 		"checkpoints": checkpoints,
 	}
 	var metadata_path := "%s/%s-%s.json" % [output_dir, model_id, quality_profile]
@@ -392,6 +414,49 @@ func validate_artifact_metadata(
 	return errors
 
 
+func controls_visible_status(scene: Node3D) -> Dictionary:
+	var ui := scene.get_node_or_null("OperatorUI") as MotionOperatorUI
+	if ui == null:
+		return {"achieved": false, "finding": "production operator UI is unavailable"}
+	var guide := ui.get_node_or_null("GuidePanel") as Control
+	var hint := ui.get_node_or_null("StatusPanel/Margin/VBox/ControlHint") as Label
+	ui.show_control_guide()
+	await scene.get_tree().process_frame
+	var copy := _visible_label_copy(ui)
+	var required := ["Q/A", "W/S", "Tracks", "boom", "bucket", "Camera", "F8"]
+	var missing: Array[String] = []
+	for token in required:
+		if token not in copy:
+			missing.append(token)
+	var achieved := (
+		guide != null
+		and guide.is_visible_in_tree()
+		and hint != null
+		and not hint.text.is_empty()
+		and missing.is_empty()
+	)
+	return {
+		"achieved": achieved,
+		"guide_visible": guide != null and guide.is_visible_in_tree(),
+		"prompt": hint.text if hint != null else "",
+		"missing_tokens": missing,
+		"finding": "" if achieved else "operator onboarding is missing: %s" % ", ".join(missing),
+	}
+
+
+func _visible_label_copy(node: Node) -> String:
+	var values := PackedStringArray()
+	_collect_visible_labels(node, values)
+	return "\n".join(values)
+
+
+func _collect_visible_labels(node: Node, values: PackedStringArray) -> void:
+	if node is Label and (node as Label).is_visible_in_tree():
+		values.append((node as Label).text)
+	for child in node.get_children():
+		_collect_visible_labels(child, values)
+
+
 func _required_nodes(scene: Node3D) -> Dictionary:
 	var session := scene.get_node_or_null("ProductSession") as ProductSession
 	var client := scene.get_node_or_null("MotionClient") as MotionClient
@@ -430,6 +495,16 @@ func _capture_checkpoint(
 ) -> Dictionary:
 	var performance := _finish_performance_window(performance_window)
 	var artifact := await _save_frame(scene, output_dir, model_id, quality_profile, label)
+	var simulation := _compact_status(status)
+	var teeth := (simulation.get("tool_regions", {}) as Dictionary).get(
+		"teeth_main_edge", {}
+	) as Dictionary
+	var teeth_center := teeth.get("center_world", Vector3.ZERO) as Vector3
+	var chassis := scene.get_node_or_null("ChassisMotionRoot") as TrackedChassisController
+	if chassis != null and not teeth.is_empty():
+		var surface_y := chassis.sample_terrain_height_for_test(Vector2(teeth_center.x, teeth_center.z))
+		simulation["teeth_surface_y"] = surface_y
+		simulation["teeth_clearance_m"] = teeth_center.y - surface_y if is_finite(surface_y) else NAN
 	return {
 		"ok": bool(artifact.get("ok", false)),
 		"validation_errors": artifact.get("validation_errors", []),
@@ -439,7 +514,7 @@ func _capture_checkpoint(
 		"session": _compact_session(
 			(scene.get_node("ProductSession") as ProductSession).get_status_snapshot()
 		),
-		"simulation": _compact_status(status),
+		"simulation": simulation,
 	}
 
 
@@ -486,6 +561,7 @@ func _run_metadata(scene: Node3D, run_context: Dictionary) -> Dictionary:
 		"commit": String(run_context.get("commit", "unrecorded")),
 		"capture_command": String(run_context.get("capture_command", "unrecorded")),
 		"run_id": String(run_context.get("run_id", "unrecorded")),
+		"evidence_phase": String(run_context.get("evidence_phase", "before")),
 		"error_log_path": String(run_context.get("error_log_path", "unrecorded")),
 		"godot": Engine.get_version_info(),
 		"os": {"name": OS.get_name(), "version": OS.get_version()},
@@ -501,29 +577,35 @@ func _move_to(
 	scene: Node3D, chassis: TrackedChassisController, target: Vector4, frames: int
 ) -> void:
 	for _frame in frames:
-		var positions := Vector4.ZERO
-		var velocities := Vector4.ZERO
-		for joint_value in chassis.get_status_snapshot().get("joints", []):
-			var joint := joint_value as Dictionary
-			var index := JOINT_NAMES.find(String(joint.get("name", "")))
-			if index >= 0:
-				positions[index] = float(joint.get("position_rad", 0.0))
-				velocities[index] = float(joint.get("velocity_rad_s", 0.0))
-		var error := target - positions
-		var commands := Vector4.ZERO
-		for index in 4:
-			commands[index] = (
-				0.0
-				if absf(error[index]) < 0.004 and absf(velocities[index]) < 0.01
-				else clampf(
-					error[index] * 12.0
-					- velocities[index] * 3.0 / MAXIMUM_VELOCITIES[index],
-					-1.0,
-					1.0,
-				)
-			)
-		chassis.set_equipment_commands_for_test(commands)
+		chassis.set_equipment_commands_for_test(_equipment_commands_toward(chassis, target))
 		await scene.get_tree().physics_frame
+
+
+func _equipment_commands_toward(
+	chassis: TrackedChassisController, target: Vector4
+) -> Vector4:
+	var positions := Vector4.ZERO
+	var velocities := Vector4.ZERO
+	for joint_value in chassis.get_status_snapshot().get("joints", []):
+		var joint := joint_value as Dictionary
+		var index := JOINT_NAMES.find(String(joint.get("name", "")))
+		if index >= 0:
+			positions[index] = float(joint.get("position_rad", 0.0))
+			velocities[index] = float(joint.get("velocity_rad_s", 0.0))
+	var error := target - positions
+	var commands := Vector4.ZERO
+	for index in 4:
+		commands[index] = (
+			0.0
+			if absf(error[index]) < 0.004 and absf(velocities[index]) < 0.01
+			else clampf(
+				error[index] * 12.0
+				- velocities[index] * 3.0 / MAXIMUM_VELOCITIES[index],
+				-1.0,
+				1.0,
+			)
+		)
+	return commands
 
 
 func _move_until_dump(
@@ -532,13 +614,27 @@ func _move_until_dump(
 	excavation: ExcavationWorld,
 	target: Vector4,
 	frames: int,
+	payload_before_dump_kg: float,
 ) -> Dictionary:
 	for _frame in frames:
 		await _move_to(scene, chassis, target, 1)
 		var status := excavation.get_status_snapshot()
-		if String(status.get("interaction_state", "")) in ["dump", "spill"]:
+		var payload_mass_kg := float(status.get("payload_mass_kg", payload_before_dump_kg))
+		var bucket_position := _joint_position(chassis, "bucket_joint")
+		if (
+			payload_mass_kg <= maxf(0.1, payload_before_dump_kg * 0.1)
+			and absf(bucket_position - target.w) <= 0.08
+		):
 			return status
 	return excavation.get_status_snapshot()
+
+
+func _joint_position(chassis: TrackedChassisController, joint_name: String) -> float:
+	for value in chassis.get_status_snapshot().get("joints", []):
+		var joint := value as Dictionary
+		if String(joint.get("name", "")) == joint_name:
+			return float(joint.get("position_rad", 0.0))
+	return NAN
 
 
 func _wait_for_payload_capture(
@@ -552,7 +648,8 @@ func _wait_for_payload_capture(
 		await _move_to(scene, chassis, target, 1)
 		var status := excavation.get_status_snapshot()
 		var payload_mass_kg := float(status.get("payload_mass_kg", 0.0))
-		if payload_mass_kg > 0.1:
+		var bucket_position := _joint_position(chassis, "bucket_joint")
+		if payload_mass_kg >= 1.0 and absf(bucket_position - target.w) <= 0.05:
 			return {
 				"achieved": true,
 				"frames": frame + 1,
@@ -565,8 +662,56 @@ func _wait_for_payload_capture(
 		"frames": frames,
 		"payload_mass_kg": final_status.get("payload_mass_kg", 0.0),
 		"interaction_state": final_status.get("interaction_state", ""),
-		"diagnostic": "parcel capture timeout while holding the cut pose",
+		"diagnostic": "active-soil capture timeout during the real scoop stroke",
 	}
+
+
+func _move_to_ground_contact(
+	scene: Node3D,
+	chassis: TrackedChassisController,
+	excavation: ExcavationWorld,
+	model_id: String,
+	target_clearance_m: float,
+	frames: int,
+) -> Dictionary:
+	var descent_sign := -1.0 if model_id == "sy135" else 1.0
+	var target := _pose(model_id, "contact")
+	for frame in frames:
+		var clearance := _tooth_clearance(chassis, excavation)
+		if is_finite(clearance) and absf(clearance - target_clearance_m) <= 0.02:
+			chassis.set_equipment_commands_for_test(Vector4.ZERO)
+			await scene.get_tree().physics_frame
+			return {"achieved": true, "frames": frame + 1, "clearance_m": clearance}
+		var commands := _equipment_commands_toward(chassis, target)
+		var clearance_error := clearance - target_clearance_m
+		commands.y = (
+			descent_sign
+			* signf(clearance_error)
+			* clampf(absf(clearance_error) * 0.8, 0.18, 0.72)
+		)
+		chassis.set_equipment_commands_for_test(commands)
+		await scene.get_tree().physics_frame
+	var final_clearance := _tooth_clearance(chassis, excavation)
+	return {
+		"achieved": is_finite(final_clearance) and absf(final_clearance - target_clearance_m) <= 0.03,
+		"frames": frames,
+		"clearance_m": final_clearance,
+	}
+
+
+func _tooth_clearance(
+	chassis: TrackedChassisController, excavation: ExcavationWorld
+) -> float:
+	var status := excavation.get_status_snapshot()
+	var tool := ((status.get("bucket_pose", {}) as Dictionary).get("soil_tool", {}) as Dictionary)
+	for value in tool.get("regions", []):
+		var region := value as Dictionary
+		if String(region.get("region_id", "")) != "teeth_main_edge":
+			continue
+		var center := region.get("current_center_world", Vector3.ZERO) as Vector3
+		var surface := chassis.sample_terrain_height_for_test(Vector2(center.x, center.z))
+		return center.y - surface if is_finite(surface) else NAN
+	return NAN
 
 
 func _move_until_support(
@@ -649,6 +794,12 @@ func _compact_session(status: Dictionary) -> Dictionary:
 
 func _compact_status(status: Dictionary) -> Dictionary:
 	var terrain_commit := status.get("terrain_commit", {}) as Dictionary
+	var active_patch := status.get("active_soil_patch", {}) as Dictionary
+	var lifecycle := status.get("soil_lifecycle_active", {}) as Dictionary
+	var tool_snapshot := (status.get("bucket_pose", {}) as Dictionary).get("soil_tool", {}) as Dictionary
+	var tool_classification := (
+		status.get("soil_interaction_batch", {}) as Dictionary
+	).get("soil_tool_classification", {}) as Dictionary
 	var soil_authority_mode := String(status.get("soil_authority_mode", ""))
 	if soil_authority_mode.is_empty():
 		soil_authority_mode = (
@@ -660,8 +811,87 @@ func _compact_status(status: Dictionary) -> Dictionary:
 		"soil_authority_mode": soil_authority_mode,
 		"interaction_state": status.get("interaction_state", ""),
 		"payload_mass_kg": status.get("payload_mass_kg", 0.0),
+		"bucket_volume_m3": status.get("bucket_volume_m3", 0.0),
+		"active_patch": {
+			"representative_count": active_patch.get("representative_count", 0),
+			"contained_count": active_patch.get("contained_count", 0),
+			"contained_volume_m3": active_patch.get("contained_volume_m3", 0.0),
+			"active_volume_m3": active_patch.get("active_volume_m3", 0.0),
+		},
+		"soil_lifecycle": {
+			"compartments_m3": lifecycle.get("compartments_m3", {}),
+			"last_transaction": lifecycle.get("last_transaction", {}),
+			"journal_size": lifecycle.get("journal_size", 0),
+			"invariant_failure_count": lifecycle.get("invariant_failure_count", 0),
+		},
+		"tool_regions": _compact_tool_regions(tool_snapshot),
+		"tool_classification": _compact_tool_classification(tool_classification),
 		"terrain_revision": terrain_commit.get("last_flush_revision", -1),
 		"support_contact": status.get("support_contact", {}),
+	}
+
+
+func _compact_tool_regions(tool_snapshot: Dictionary) -> Dictionary:
+	var result := {}
+	for value in tool_snapshot.get("regions", []):
+		var region := value as Dictionary
+		var region_id := String(region.get("region_id", ""))
+		if region_id not in ["teeth_main_edge", "inner_shell", "opening"]:
+			continue
+		result[region_id] = {
+			"center_world": region.get("current_center_world", Vector3.ZERO),
+			"outward_normal_world": region.get("outward_normal_world", Vector3.UP),
+		}
+	return result
+
+
+func _compact_tool_classification(classification: Dictionary) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for value in classification.get("candidates", []):
+		var candidate := value as Dictionary
+		if String(candidate.get("classification", "none")) == "none":
+			continue
+		result.append({
+			"region_id": candidate.get("region_id", ""),
+			"classification": candidate.get("classification", "none"),
+			"role_scope": candidate.get("role_scope", "none"),
+			"penetration_m": candidate.get("penetration_m", 0.0),
+			"motion_m": candidate.get("motion_m", 0.0),
+		})
+	return result
+
+
+func _journey_sample(
+	chassis: TrackedChassisController, excavation: ExcavationWorld, stage: String
+) -> Dictionary:
+	var simulation := _compact_status(excavation.get_status_snapshot())
+	var teeth := (simulation.get("tool_regions", {}) as Dictionary).get(
+		"teeth_main_edge", {}
+	) as Dictionary
+	var teeth_center := teeth.get("center_world", Vector3.ZERO) as Vector3
+	var surface_y := chassis.sample_terrain_height_for_test(Vector2(teeth_center.x, teeth_center.z))
+	return {
+		"stage": stage,
+		"teeth_surface_y": surface_y,
+		"teeth_clearance_m": teeth_center.y - surface_y if is_finite(surface_y) else NAN,
+		"chassis": _compact_chassis(chassis.get_status_snapshot()),
+		"simulation": simulation,
+	}
+
+
+func _compact_chassis(status: Dictionary) -> Dictionary:
+	var joints := {}
+	for value in status.get("joints", []):
+		var joint := value as Dictionary
+		joints[String(joint.get("name", ""))] = {
+			"position_rad": joint.get("position_rad", 0.0),
+			"velocity_rad_s": joint.get("velocity_rad_s", 0.0),
+			"target_velocity_rad_s": joint.get("target_velocity_rad_s", 0.0),
+		}
+	return {
+		"enabled": status.get("enabled", false),
+		"neutral_rearm_required": status.get("neutral_rearm_required", false),
+		"joints": joints,
 	}
 
 
@@ -671,7 +901,9 @@ func _pose(model_id: String, name: String) -> Vector4:
 			"approach_arm": return Vector4(0.0, 0.0, -0.5127, 0.0)
 			"approach_bucket": return Vector4(0.0, 0.0, -0.5127, 0.589)
 			"approach": return Vector4(0.0, -0.1666, -0.5127, 0.589)
+			"contact": return Vector4(0.0, -0.1666, -0.5127, 0.589)
 			"cut": return Vector4(0.0, -0.2166, -0.5877, 0.739)
+			"scoop": return Vector4(0.0, 0.0, -0.2, 0.739)
 			"carry": return Vector4(0.0, 0.2, 0.4, 0.5)
 			"dump": return Vector4(0.0, -0.1309, -0.1309, -0.1745)
 			"support_clear": return Vector4.ZERO
@@ -680,8 +912,11 @@ func _pose(model_id: String, name: String) -> Vector4:
 		"approach_arm": return Vector4(0.0, 0.0, -0.6763, 0.0)
 		"approach_bucket": return Vector4(0.0, 0.0, -0.6763, -0.1964)
 		"approach": return Vector4(0.0, 0.3094, -0.6763, -0.1964)
+		"contact": return Vector4(0.0, 0.3094, -0.6763, -0.1964)
 		"cut": return Vector4(0.0, 0.3344, -0.5513, -0.4964)
-		"carry", "support_clear": return Vector4.ZERO
-		"dump": return Vector4(0.0, 0.1, 0.2, 0.785)
+		"scoop": return Vector4(0.0, 0.28, -0.45, 0.45)
+		"carry": return Vector4(0.0, 0.0, 0.0, 0.35)
+		"support_clear": return Vector4.ZERO
+		"dump": return Vector4(0.0, 0.1, 0.2, -1.57)
 		"support": return Vector4(0.0, 0.611, -0.1305, 0.628)
 	return Vector4.ZERO

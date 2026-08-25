@@ -28,14 +28,19 @@ const HELLO_TIMEOUT_SECONDS := 3.0
 const RECONNECT_INITIAL_SECONDS := 0.25
 const RECONNECT_MAX_SECONDS := 5.0
 const INPUT_ACTIONS := {
-	"motion_swing_positive": {"keys": [KEY_Y], "joy_axis": JOY_AXIS_LEFT_X, "joy_sign": 1.0},
-	"motion_swing_negative": {"keys": [KEY_H], "joy_axis": JOY_AXIS_LEFT_X, "joy_sign": -1.0},
-	"motion_boom_positive": {"keys": [KEY_U], "joy_axis": JOY_AXIS_LEFT_Y, "joy_sign": -1.0},
-	"motion_boom_negative": {"keys": [KEY_J], "joy_axis": JOY_AXIS_LEFT_Y, "joy_sign": 1.0},
-	"motion_arm_positive": {"keys": [KEY_I], "joy_axis": JOY_AXIS_RIGHT_Y, "joy_sign": -1.0},
-	"motion_arm_negative": {"keys": [KEY_K], "joy_axis": JOY_AXIS_RIGHT_Y, "joy_sign": 1.0},
-	"motion_bucket_positive": {"keys": [KEY_O], "joy_axis": JOY_AXIS_TRIGGER_RIGHT, "joy_sign": 1.0},
-	"motion_bucket_negative": {"keys": [KEY_L], "joy_axis": JOY_AXIS_TRIGGER_LEFT, "joy_sign": 1.0},
+	"motion_swing_positive": {"keys": [KEY_Y], "channel": "swing", "joy_axis": JOY_AXIS_LEFT_X, "joy_sign": 1.0},
+	"motion_swing_negative": {"keys": [KEY_H], "channel": "swing", "joy_axis": JOY_AXIS_LEFT_X, "joy_sign": -1.0},
+	# ISO excavator pattern: left stick owns swing/arm; right stick owns boom/bucket.
+	"motion_boom_positive": {"keys": [KEY_U], "channel": "boom", "joy_axis": JOY_AXIS_RIGHT_Y, "joy_sign": 1.0},
+	"motion_boom_negative": {"keys": [KEY_J], "channel": "boom", "joy_axis": JOY_AXIS_RIGHT_Y, "joy_sign": -1.0},
+	"motion_arm_positive": {"keys": [KEY_I], "channel": "arm", "joy_axis": JOY_AXIS_LEFT_Y, "joy_sign": -1.0},
+	"motion_arm_negative": {"keys": [KEY_K], "channel": "arm", "joy_axis": JOY_AXIS_LEFT_Y, "joy_sign": 1.0},
+	"motion_bucket_positive": {"keys": [KEY_O], "channel": "bucket", "joy_axis": JOY_AXIS_RIGHT_X, "joy_sign": 1.0},
+	"motion_bucket_negative": {"keys": [KEY_L], "channel": "bucket", "joy_axis": JOY_AXIS_RIGHT_X, "joy_sign": -1.0},
+}
+const MODEL_GAMEPAD_DIRECTION_MULTIPLIERS := {
+	"sy205": {"swing": -1.0, "boom": -1.0, "arm": -1.0, "bucket": -1.0},
+	"sy135": {"swing": -1.0, "boom": 1.0, "arm": 1.0, "bucket": 1.0},
 }
 const COMMAND_ACTIONS := {"motion_start": KEY_F6, "motion_pause": KEY_F7, "motion_reset": KEY_F8}
 
@@ -93,10 +98,11 @@ var _shadow_elapsed := 0.0
 var _pending_shadow_truth: Dictionary = {}
 var _sensor_elapsed := 0.0
 var _pending_sensor_telemetry: Dictionary = {}
+var _equipment_gamepad_model_id := ""
 
 
 func _ready() -> void:
-	_ensure_input_actions()
+	configure_equipment_gamepad_model(desired_model_id)
 	_ensure_preflight_request()
 	endpoint = String(ProjectSettings.get_setting("motion/endpoint", endpoint))
 	auto_connect = bool(ProjectSettings.get_setting("gateway/enabled", auto_connect))
@@ -138,6 +144,18 @@ func set_transport_factory_for_test(factory: Callable) -> void:
 func set_preflight_optional_capabilities_for_test(optional_capabilities: Array[String]) -> void:
 	_preflight_override = optional_capabilities.duplicate()
 	auto_connect = false
+
+
+func configure_equipment_gamepad_model(model_id: String) -> bool:
+	if not MODEL_GAMEPAD_DIRECTION_MULTIPLIERS.has(model_id):
+		return false
+	_equipment_gamepad_model_id = model_id
+	_ensure_input_actions()
+	return true
+
+
+func get_equipment_gamepad_model_id() -> String:
+	return _equipment_gamepad_model_id
 
 
 func connect_to_service() -> void:
@@ -628,6 +646,7 @@ func _accept_hello_ack(payload: Dictionary) -> void:
 	_retry_delay = RECONNECT_INITIAL_SECONDS
 	_retry_elapsed = 0.0
 	_set_connection_state(STATE_READY)
+	configure_equipment_gamepad_model(active_model_id)
 	model_changed.emit(active_model_id)
 	authority_changed.emit(session_id, simulation_epoch, _generation)
 	pose_cleared.emit(_generation, "hello_ack")
@@ -948,13 +967,26 @@ func _set_error(code: String, message: String, recoverable: bool, request_id: St
 
 
 func _ensure_input_actions() -> void:
+	var direction_profile := MODEL_GAMEPAD_DIRECTION_MULTIPLIERS.get(
+		_equipment_gamepad_model_id, MODEL_GAMEPAD_DIRECTION_MULTIPLIERS["sy205"]
+	) as Dictionary
 	for action in INPUT_ACTIONS:
 		if not InputMap.has_action(action):
 			InputMap.add_action(action, 0.08)
 		var definition: Dictionary = INPUT_ACTIONS[action]
 		for keycode in definition["keys"]:
 			_add_key_event(action, int(keycode))
-		_add_joy_axis_event(action, int(definition["joy_axis"]), float(definition["joy_sign"]))
+		# Product work-equipment actions own one canonical gamepad axis. Remove a
+		# stale runtime mapping (including the former bucket triggers) before add.
+		for existing in InputMap.action_get_events(action):
+			if existing is InputEventJoypadMotion:
+				InputMap.action_erase_event(action, existing)
+		var direction_multiplier := float(direction_profile.get(String(definition["channel"]), 1.0))
+		_add_joy_axis_event(
+			action,
+			int(definition["joy_axis"]),
+			float(definition["joy_sign"]) * direction_multiplier,
+		)
 	for action in COMMAND_ACTIONS:
 		if not InputMap.has_action(action):
 			InputMap.add_action(action)

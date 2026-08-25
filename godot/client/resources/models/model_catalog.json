@@ -14,9 +14,9 @@
       "parity_fixture_path": "res://tests/fixtures/sy205_frame_parity_cases.json",
       "parity_fixture_sha256": "873c06951ca317b6e4205b867e7c475eb924374a59b2d21dda87e65bb340d738",
       "soil_contract_path": "res://resources/models/sy205_soil_contract.json",
-      "soil_contract_sha256": "e6718da8cb8d581c2fafc2e83c45a04642538fbf5bf78d2a03b4a04c33169161",
+      "soil_contract_sha256": "bdb63fd300397ce8cef18f7715882e0299f46ed9f415a55cf1d0a58dd6be59b0",
       "physics_rig_path": "res://resources/physics/sy205_physics_rig.json",
-      "physics_rig_sha256": "df89aed0b0363864529712446900b35454aea0a884154f76ccdfdd64a702595f",
+      "physics_rig_sha256": "cb0528597b0e688f04f607883a034ab1041f87becd07faae1298544c15334255",
       "tracked_locomotion": {
         "track_gauge_m": 2.2,
         "contact_length_m": 3.4,

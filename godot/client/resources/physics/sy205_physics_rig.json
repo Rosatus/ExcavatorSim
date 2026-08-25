@@ -23,9 +23,10 @@
     {"name": "swing_joint", "type": "continuous_hinge", "parent_body": "chassis", "child_body": "upper", "frame": "upper_structure_link", "parent_anchor_godot": [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.46000003814697], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]], "child_anchor_godot": [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]], "axis": [0.0, 1.0, 0.0], "axis_frame": "child_anchor_local", "limit_rad": [-3.141592653589793, 3.141592653589793], "collide_connected": false, "actuator": {"mode": "velocity_motor", "max_torque_nm": 1200000.0, "max_velocity_rad_s": 0.6, "max_acceleration_rad_s2": 0.9, "max_jerk_rad_s3": 3.6, "damping": 80000.0}},
     {"name": "boom_joint", "type": "hinge", "parent_body": "upper", "child_body": "boom", "frame": "boom_link", "parent_anchor_godot": [[1.0, 0.0, 0.0, -0.11900000274181], [0.0, 1.0, 0.0, 0.71299999952317], [0.0, 0.0, 1.0, -0.07500000298023], [0.0, 0.0, 0.0, 1.0]], "child_anchor_godot": [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]], "axis": [1.0, 0.0, 0.0], "axis_frame": "child_anchor_local", "limit_rad": [-0.2617993877991494, 0.7853981633974483], "collide_connected": false, "actuator": {"mode": "velocity_motor", "max_torque_nm": 1500000.0, "max_velocity_rad_s": 0.35, "max_acceleration_rad_s2": 0.65, "max_jerk_rad_s3": 2.6, "damping": 90000.0}},
     {"name": "arm_joint", "type": "hinge", "parent_body": "boom", "child_body": "arm", "frame": "arm_link", "parent_anchor_godot": [[1.0, 0.0, 0.0, 0.06599999964237], [0.0, 1.0, 0.0, 4.29500019550323], [0.0, 0.0, 1.0, 3.91499991714954], [0.0, 0.0, 0.0, 1.0]], "child_anchor_godot": [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]], "axis": [1.0, 0.0, 0.0], "axis_frame": "child_anchor_local", "limit_rad": [-0.7853981633974483, 0.5235987755982988], "collide_connected": false, "actuator": {"mode": "velocity_motor", "max_torque_nm": 1200000.0, "max_velocity_rad_s": 0.45, "max_acceleration_rad_s2": 0.8, "max_jerk_rad_s3": 3.2, "damping": 70000.0}},
-    {"name": "bucket_joint", "type": "hinge", "parent_body": "arm", "child_body": "bucket", "frame": "bucket_link", "parent_anchor_godot": [[1.0, 0.0, 0.0, -0.0080000013113], [0.0, 1.0, 0.0, -3.02600026130676], [0.0, 0.0, 1.0, -0.62999987602234], [0.0, 0.0, 0.0, 1.0]], "child_anchor_godot": [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]], "axis": [1.0, 0.0, 0.0], "axis_frame": "child_anchor_local", "limit_rad": [-0.7853981633974483, 0.7853981633974483], "collide_connected": false, "actuator": {"mode": "velocity_motor", "max_torque_nm": 900000.0, "max_velocity_rad_s": 0.55, "max_acceleration_rad_s2": 1.0, "max_jerk_rad_s3": 4.0, "damping": 50000.0}}
+    {"name": "bucket_joint", "type": "hinge", "parent_body": "arm", "child_body": "bucket", "frame": "bucket_link", "parent_anchor_godot": [[1.0, 0.0, 0.0, -0.0080000013113], [0.0, 1.0, 0.0, -3.02600026130676], [0.0, 0.0, 1.0, -0.62999987602234], [0.0, 0.0, 0.0, 1.0]], "child_anchor_godot": [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]], "axis": [1.0, 0.0, 0.0], "axis_frame": "child_anchor_local", "limit_rad": [-1.6580627893946132, 0.5235987755982988], "collide_connected": false, "actuator": {"mode": "velocity_motor", "max_torque_nm": 900000.0, "max_velocity_rad_s": 0.55, "max_acceleration_rad_s2": 1.0, "max_jerk_rad_s3": 4.0, "damping": 50000.0}}
   ],
   "chassis_dynamics": {
+    "spawn_yaw_rad": 3.141592653589793,
     "mass_kg": 21500.0,
     "center_of_mass_m": [0.0, 1.1, 0.0],
     "inertia_diagonal_kg_m2": [52000.0, 48000.0, 28000.0],
@@ -45,6 +46,7 @@
     ]
   },
   "tracks": {
+    "local_forward_axis": "+Z",
     "gauge_m": 2.2,
     "contact_length_m": 3.4,
     "contact_width_m": 2.8,

@@ -24,11 +24,12 @@
       "source_path": "config/m1_provisional_calibration.json",
       "source_blob": "4cefe83cb4e1779ff82869396e2f934570746e74",
       "destination_path": "assets/calibration/m1_provisional_calibration.json",
-      "destination_sha256": "2e1714c46c262ff78acf1c8ebbf8a98f51b13f25722efef8d4143d137ece800c",
+      "destination_sha256": "6216ce75f63c3ae0f70823bf63f7594b636626757dd8ef8b9c1ca1af6b55a890",
       "license": "AGPL-3.0-only",
       "imported_at": "2026-07-29",
-      "relationship": "verbatim-configuration",
-      "locally_modified": false
+      "relationship": "adapted-configuration",
+      "locally_modified": true,
+      "modified_at": "2026-08-25"
     },
     {
       "source_repository": "https://github.com/Rosatus/KinematicSim.git",
@@ -78,7 +79,7 @@
         },
         {
           "path": "assets/model/sy205_glb_derived_v4.json",
-          "sha256": "671673279089c2e8171fda8f66d0ac4c027f24da5a9998d2f9145d3e09d4dd6c"
+          "sha256": "5635f61d7bb6a6c0b2749c26d58d3f3b1677c9126fa96a5f330ab16b3995f1f6"
         },
         {
           "path": "assets/model/sy205_glb_derived_v4.urdf",
@@ -296,7 +297,7 @@
         "symbols": [{ "name": "CalibrationTests", "lines": "15-64" }]
       }],
       "destination_path": "tests/backend/test_calibration.py",
-      "destination_sha256": "4b5e2ccc3aa2a4d6a5f3ab7db5e912ebd443cb7bbf3317b2053acbc2af5441f9",
+      "destination_sha256": "315534b7f66850d8739195ec89bf7005a188798bd83da351930bdc67ca041ca7",
       "destination_symbols": [{ "name": "motion calibration tests", "lines": "1-27" }],
       "license": "AGPL-3.0-only", "modified_at": "2026-07-29", "relationship": "adapted-test", "locally_modified": true,
       "tests": ["tests/backend/test_calibration.py"]

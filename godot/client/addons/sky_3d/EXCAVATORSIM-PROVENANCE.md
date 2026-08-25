@@ -17,6 +17,7 @@ Third-party texture obligations retained in the package:
 - `assets/thirdparty/textures/moon/MoonMap.png`: GPoSM 2019, MIT.
 
 The production scene fixes Sky3D at 10:30 and routes all quality changes through
-the project-owned `VisualEnvironment`/`VisualQualityController` seam. The main
-client UI reproduces the ESO/S. Brunier CC BY 4.0 credit for all users; full
-source and license links remain in the adjacent `LICENSE.md` and root NOTICE.
+the project-owned `VisualEnvironment`/`VisualQualityController` seam. The
+simulation viewport does not carry a permanent credit overlay; the complete
+ESO/S. Brunier title, source, modification note, and CC BY 4.0 license remain in
+the adjacent `LICENSE.md`, `ThirdParty.md`, and root `NOTICE.md` for packaging.

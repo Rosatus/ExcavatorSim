@@ -134,15 +134,20 @@ func _test_motion_client() -> int:
 	if _check(client.request_model_switch("sy205") and client.get_connection_state() == MotionClient.STATE_READY, "selecting the active model is a no-op") != 0:
 		client.queue_free()
 		return 1
-	for action in [
-		"motion_swing_positive", "motion_swing_negative",
-		"motion_boom_positive", "motion_boom_negative",
-		"motion_arm_positive", "motion_arm_negative",
-		"motion_bucket_positive", "motion_bucket_negative",
-	]:
-		if _check(InputMap.has_action(action) and InputMap.action_get_events(action).size() >= 2, "keyboard and gamepad bindings exist for %s" % action) != 0:
-			client.queue_free()
-			return 1
+	if _assert_equipment_bindings(client, "sy205") != 0:
+		client.queue_free()
+		return 1
+	if _assert_equipment_bindings(client, "sy135") != 0:
+		client.queue_free()
+		return 1
+	if _check(
+		not client.configure_equipment_gamepad_model("unknown")
+		and client.get_equipment_gamepad_model_id() == "sy135",
+		"unknown model cannot replace the active gamepad direction profile",
+	) != 0:
+		client.queue_free()
+		return 1
+	client.configure_equipment_gamepad_model("sy205")
 	if _check(transport.sent.size() == 2, "hello_ack is followed by a zero-input arming snapshot") != 0:
 		client.queue_free()
 		return 1
@@ -292,6 +297,35 @@ func _test_motion_client() -> int:
 	draining_client.queue_free()
 	await process_frame
 	print("Motion client transport contract passed.")
+	return 0
+
+
+func _assert_equipment_bindings(client: MotionClient, model_id: String) -> int:
+	if _check(client.configure_equipment_gamepad_model(model_id), "%s gamepad profile is supported" % model_id) != 0:
+		return 1
+	var direction_profile := MotionClient.MODEL_GAMEPAD_DIRECTION_MULTIPLIERS[model_id] as Dictionary
+	for action in MotionClient.INPUT_ACTIONS:
+		var definition: Dictionary = MotionClient.INPUT_ACTIONS[action]
+		var expected_sign := (
+			float(definition["joy_sign"])
+			* float(direction_profile[String(definition["channel"])])
+		)
+		var key_matches := 0
+		var joy_count := 0
+		var joy_matches := 0
+		for event in InputMap.action_get_events(action):
+			if event is InputEventKey and (event as InputEventKey).physical_keycode in definition["keys"]:
+				key_matches += 1
+			elif event is InputEventJoypadMotion:
+				joy_count += 1
+				var motion := event as InputEventJoypadMotion
+				if motion.axis == int(definition["joy_axis"]) and is_equal_approx(motion.axis_value, expected_sign):
+					joy_matches += 1
+		if _check(
+			key_matches >= 1 and joy_count == 1 and joy_matches == 1,
+			"%s keeps keyboard and its calibrated ISO gamepad binding for %s" % [model_id, action],
+		) != 0:
+			return 1
 	return 0
 
 

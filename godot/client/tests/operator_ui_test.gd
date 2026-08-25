@@ -25,10 +25,12 @@ func _run() -> void:
 		_fail("main scene did not provide the operator UI integration nodes")
 	else:
 		_check_default_hierarchy(ui)
-		_check_layout(ui, Vector2i(1280, 720))
-		_check_layout(ui, Vector2i(1920, 1080))
+		await _check_layout(ui, Vector2i(1280, 720))
+		await _check_layout(ui, Vector2i(1920, 1080))
 		_check_prompts(ui)
 		_check_guide(ui)
+		_check_panel_collapse(ui)
+		_check_test_graphics(ui)
 		_check_reset_confirmation(ui, session)
 		_check_model_confirmation(ui, session)
 		_check_generation_clear(ui, session)
@@ -70,22 +72,40 @@ func _check_default_hierarchy(ui: MotionOperatorUI) -> void:
 func _check_layout(ui: MotionOperatorUI, resolution: Vector2i) -> void:
 	root.size = resolution
 	root.content_scale_size = resolution
-	var status := ui.get_node("StatusPanel") as Control
 	var guide := ui.get_node("GuidePanel") as Control
+	var guide_was_visible := guide.visible
+	guide.visible = true
+	await process_frame
+	await process_frame
+	var status := ui.get_node("StatusPanel") as Control
 	for control_value in [status, guide]:
 		var control := control_value as Control
 		var rect: Rect2 = control.get_global_rect()
 		if rect.position.x < 0.0 or rect.position.y < 0.0 or rect.end.x > resolution.x or rect.end.y > resolution.y:
 			_fail("%s escaped %dx%d safe bounds: %s" % [control.name, resolution.x, resolution.y, rect])
+	guide.visible = guide_was_visible
 
 
 func _check_prompts(ui: MotionOperatorUI) -> void:
 	var hint := ui.get_node("StatusPanel/Margin/VBox/ControlHint") as Label
-	ui.set_prompt_mode_for_test("gamepad")
-	if ui.get_prompt_mode_for_test() != "gamepad" or "Triggers" not in hint.text:
+	var guide_controls := ui.get_node("GuidePanel/Margin/VBox/Controls") as Label
+	var joy_event := InputEventJoypadButton.new()
+	joy_event.button_index = JOY_BUTTON_LEFT_SHOULDER
+	joy_event.pressed = true
+	ui._unhandled_input(joy_event)
+	if (
+		ui.get_prompt_mode_for_test() != "gamepad"
+		or "LT/RT" not in hint.text
+		or "ISO excavator pattern" not in guide_controls.text
+		or "bucket curl" not in guide_controls.text
+		or "Keyboard: tracks" in guide_controls.text
+	):
 		_fail("gamepad prompt variant was not readable")
-	ui.set_prompt_mode_for_test("keyboard")
-	if ui.get_prompt_mode_for_test() != "keyboard" or "W/S" not in hint.text:
+	var key_event := InputEventKey.new()
+	key_event.physical_keycode = KEY_Q
+	key_event.pressed = true
+	ui._unhandled_input(key_event)
+	if ui.get_prompt_mode_for_test() != "keyboard" or "Q/A" not in hint.text or "W/S" not in hint.text:
 		_fail("keyboard prompt variant was not readable")
 
 
@@ -98,6 +118,35 @@ func _check_guide(ui: MotionOperatorUI) -> void:
 		if token not in copy:
 			_fail("control guide omitted essential copy: %s" % token)
 	guide.visible = false
+
+
+func _check_panel_collapse(ui: MotionOperatorUI) -> void:
+	var panel := ui.get_node_or_null("StatusPanel") as PanelContainer
+	var toggle := ui.get_node_or_null("PanelToggle") as Button
+	if panel == null or toggle == null or not panel.visible or ui.is_panel_collapsed_for_test():
+		_fail("operator panel starts expanded with a persistent collapse control")
+		return
+	ui.set_panel_collapsed_for_test(true)
+	if panel.visible or not toggle.visible or not ui.is_panel_collapsed_for_test():
+		_fail("collapsed operator panel keeps its restore control visible")
+	ui.set_panel_collapsed_for_test(false)
+	if not panel.visible or ui.is_panel_collapsed_for_test():
+		_fail("operator panel reopens after collapse")
+
+
+func _check_test_graphics(ui: MotionOperatorUI) -> void:
+	var quality := ui.get_node_or_null("../VisualQualityController") as VisualQualityController
+	if quality == null:
+		_fail("operator test-graphics control has no quality owner")
+		return
+	quality.apply_profile("high")
+	ui.set_test_graphics_for_test(true)
+	if not ui.is_test_graphics_enabled_for_test() or String(quality.get_quality_snapshot().get("profile", "")) != "test":
+		_fail("operator test-graphics control did not select the test profile")
+	ui.set_test_graphics_for_test(false)
+	if ui.is_test_graphics_enabled_for_test() or String(quality.get_quality_snapshot().get("profile", "")) != "high":
+		_fail("operator test-graphics control did not restore the prior profile")
+	quality.apply_profile("balanced")
 
 
 func _check_reset_confirmation(ui: MotionOperatorUI, session: ProductSession) -> void:

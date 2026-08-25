@@ -60,9 +60,12 @@ func _test_model(model_id: String) -> void:
 		return
 	var legacy_data := descriptor.to_dictionary()
 	var legacy_tracks := (legacy_data["tracks"] as Dictionary).duplicate(true)
-	for field in ["drive_effort_slew_n_per_tick", "brake_effort_slew_n_per_tick", "acceleration_window_s", "brake_stop_window_s"]:
+	for field in ["drive_effort_slew_n_per_tick", "brake_effort_slew_n_per_tick", "acceleration_window_s", "brake_stop_window_s", "local_forward_axis"]:
 		legacy_tracks.erase(field)
 	legacy_data["tracks"] = legacy_tracks
+	var legacy_dynamics := (legacy_data["chassis_dynamics"] as Dictionary).duplicate(true)
+	legacy_dynamics.erase("spawn_yaw_rad")
+	legacy_data["chassis_dynamics"] = legacy_dynamics
 	var legacy_descriptor := PhysicsRigDescriptor.from_dictionary_for_test(legacy_data)
 	if not legacy_descriptor.is_valid_for(model_id, model_version):
 		failures.append("%s physics-rig-v1 compatibility rejected a descriptor without optional response fields: %s" % [model_id, legacy_descriptor.validation_error()])
@@ -128,6 +131,23 @@ func _test_model(model_id: String) -> void:
 		failures.append("%s did not accept current terrain identity" % model_id)
 	if int(settled["left_contact_count"]) == 0 or int(settled["right_contact_count"]) == 0:
 		failures.append("%s did not settle on both tracks: %s" % [model_id, settled])
+	var expected_forward_axis := "+Z" if model_id == "sy205" else "-Z"
+	if String(settled.get("local_forward_axis", "")) != expected_forward_axis:
+		failures.append("%s did not expose its declared vehicle-forward axis" % model_id)
+	var settled_body := settled["body_transform"] as Transform3D
+	var vehicle_right := _vehicle_forward(descriptor, settled_body).cross(settled_body.basis.y.normalized()).normalized()
+	var observed_sides := {"left": false, "right": false}
+	for contact_value in settled.get("contacts", []):
+		var contact := contact_value as Dictionary
+		var side := String(contact.get("track_side", ""))
+		if side not in ["left", "right"]:
+			continue
+		observed_sides[side] = true
+		var side_distance := ((contact.get("point", settled_body.origin) as Vector3) - settled_body.origin).dot(vehicle_right)
+		if (side == "left" and side_distance >= -0.2) or (side == "right" and side_distance <= 0.2):
+			failures.append("%s %s track probes crossed the visual vehicle side: %.3f" % [model_id, side, side_distance])
+	if not bool(observed_sides["left"]) or not bool(observed_sides["right"]):
+		failures.append("%s did not publish both semantic track-side probe sets" % model_id)
 	var expected_weight := float(descriptor.chassis_dynamics()["mass_kg"]) * 9.80665
 	var support_load := float(settled.get("left_support_load_n", 0.0)) + float(settled.get("right_support_load_n", 0.0))
 	if support_load < expected_weight * 0.65 or support_load > expected_weight * 1.35:
@@ -196,7 +216,7 @@ func _test_model(model_id: String) -> void:
 	if int(driven.get("hull_collision_switch_count", 0)) > 1:
 		failures.append("%s hull/probe support ownership oscillated during straight drive" % model_id)
 	var moved := runtime.get_body_global_transform().origin - start.origin
-	if moved.dot(-start.basis.z) < 0.15:
+	if moved.dot(_vehicle_forward(descriptor, start)) < 0.15:
 		failures.append("%s straight drive did not move forward: %s" % [model_id, moved])
 	var max_speed := float(descriptor.chassis_dynamics()["max_linear_speed_m_s"])
 	if (driven["linear_velocity"] as Vector3).length() > max_speed + 0.01:
@@ -233,7 +253,8 @@ func _test_model(model_id: String) -> void:
 			brake_speed_violation = true
 		previous_signed_speed = signed_forward_speed
 		var brake_body := runtime.get_body_global_transform()
-		var pitch := atan2((-brake_body.basis.z).y, maxf(Vector2((-brake_body.basis.z).x, (-brake_body.basis.z).z).length(), 0.001))
+		var brake_forward := _vehicle_forward(descriptor, brake_body)
+		var pitch := atan2(brake_forward.y, maxf(Vector2(brake_forward.x, brake_forward.z).length(), 0.001))
 		var pitch_rate := float((brake_sample.get("angular_velocity", Vector3.ZERO) as Vector3).dot(brake_body.basis.x))
 		brake_pitch_sq_sum += pitch * pitch
 		brake_pitch_samples += 1
@@ -304,7 +325,7 @@ func _test_model(model_id: String) -> void:
 	for _frame in DRIVE_FRAMES:
 		await physics_frame
 	var pivot_end := runtime.get_body_global_transform()
-	var heading_change := (-pivot_start.basis.z).angle_to(-pivot_end.basis.z)
+	var heading_change := _vehicle_forward(descriptor, pivot_start).angle_to(_vehicle_forward(descriptor, pivot_end))
 	if heading_change < 0.08:
 		failures.append(
 			"%s differential track force did not pivot (heading=%.4f angular=%s status=%s)"
@@ -393,7 +414,7 @@ func _test_slope_and_obstacle() -> void:
 		print("jolt_chassis_track_test: slope did not expose a partial contact tick; bilateral support remained available")
 	var finish := runtime.get_body_global_transform()
 	var status := runtime.get_status_snapshot()
-	var forward_distance := (finish.origin - start.origin).dot(-start.basis.z)
+	var forward_distance := (finish.origin - start.origin).dot(_vehicle_forward(descriptor, start))
 	print(
 		"jolt_chassis_track_test: slope start=%s finish=%s forward=%.3f linear=%s angular=%s contacts=(%d,%d) support=(%.1f,%.1f) switches=%d flags=%s"
 		% [
@@ -468,10 +489,13 @@ func _test_controller_authority_lifecycle() -> void:
 		host.queue_free()
 		return
 	var start := chassis.global_transform
+	if (-start.basis.z).dot(Vector3.BACK) < 0.99:
+		failures.append("SY205 authoritative spawn did not apply its 180-degree heading: %s" % start.basis)
 	chassis.set_commands_for_test(1.0, 1.0)
 	for _frame in 120:
 		await physics_frame
-	if (chassis.global_position - start.origin).dot(-start.basis.z) < 0.08:
+	var controller_forward := initial.get("vehicle_forward_world", Vector3.FORWARD) as Vector3
+	if (chassis.global_position - start.origin).dot(controller_forward) < 0.08:
 		failures.append("authoritative controller did not follow the Jolt body")
 	chassis.notification(Node.NOTIFICATION_APPLICATION_FOCUS_OUT)
 	await physics_frame
@@ -524,7 +548,7 @@ func _test_controller_authority_lifecycle() -> void:
 		if runtime_count != 1:
 			failures.append("model switch left %d Jolt runtimes" % runtime_count)
 		var switch_start := chassis.global_position
-		var switch_forward := -chassis.global_basis.z
+		var switch_forward := switched.get("vehicle_forward_world", Vector3.FORWARD) as Vector3
 		chassis.set_commands_for_test(1.0, 1.0)
 		for _frame in 10:
 			await physics_frame
@@ -671,6 +695,8 @@ func _spawn_transform(descriptor: PhysicsRigDescriptor, terrain_world: TerrainWo
 	var terrain_normal := Vector3((left_height - right_height) / (2.0 * spacing), 1.0, (rear_height - front_height) / (2.0 * spacing)).normalized()
 	var forward := Vector3.FORWARD.slide(terrain_normal).normalized()
 	var basis := Basis(forward.cross(terrain_normal).normalized(), terrain_normal, -forward).orthonormalized()
+	var spawn_yaw := float(dynamics.get("spawn_yaw_rad", 0.0))
+	basis = (basis * Basis(Vector3.UP, spawn_yaw)).orthonormalized()
 	var clearance := float(dynamics["ground_clearance_m"])
 	var surface_y := terrain_world.terrain_state.sample_surface_bilinear_at(Vector2.ZERO)
 	var tracks := data["tracks"] as Dictionary
@@ -691,6 +717,11 @@ func _spawn_transform(descriptor: PhysicsRigDescriptor, terrain_world: TerrainWo
 					if is_finite(corner_ground):
 						required_origin_y = maxf(required_origin_y, corner_ground + clearance + support_sag - offset.y)
 	return Transform3D(basis, Vector3(0.0, required_origin_y if not is_inf(required_origin_y) else surface_y - minimum_bottom + clearance + support_sag, 0.0))
+
+
+func _vehicle_forward(descriptor: PhysicsRigDescriptor, body_transform: Transform3D) -> Vector3:
+	var local_axis := String(descriptor.tracks().get("local_forward_axis", "-Z"))
+	return (body_transform.basis.z if local_axis == "+Z" else -body_transform.basis.z).normalized()
 
 
 func _vector3(value: Array) -> Vector3:

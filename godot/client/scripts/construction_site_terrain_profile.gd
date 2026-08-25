@@ -3,9 +3,9 @@ extends RefCounted
 
 ## Deterministic, disposable Terrain3D presentation for a medium earthwork site.
 ##
-## The central logical patch is copied from TerrainState without modification.
-## Everything outside it is visual context and must never be written back to
-## TerrainState or used for BucketSoilState volume accounting.
+## The complete 64 m site is copied from TerrainState without modification so
+## visible ground and authoritative machine support share one footprint. The
+## central work pad remains the primary excavation/dressing exclusion zone.
 
 const SITE_EXTENT_M := 64.0
 const DEMO_ASSETS_PATH := "res://assets/terrain/terrain3d_demo_assets.tres"
@@ -20,18 +20,20 @@ func build_maps(snapshot: Dictionary) -> Dictionary:
 	var logical_rows := int(snapshot["rows"])
 	var logical_columns := int(snapshot["columns"])
 	var spacing := float(snapshot["spacing_m"])
-	var logical_origin: Vector2 = snapshot["origin_xz"]
-	var logical_surface: PackedFloat32Array = snapshot["surface"]
+	var authority_origin: Vector2 = snapshot["origin_xz"]
+	var authority_surface: PackedFloat32Array = snapshot["surface"]
 	var site_rows := _site_samples(spacing, logical_rows)
 	var site_columns := _site_samples(spacing, logical_columns)
 	var site_origin := Vector2(
 		-0.5 * float(site_columns - 1) * spacing,
 		-0.5 * float(site_rows - 1) * spacing
 	)
-	var logical_max := Vector2(
-		logical_origin.x + float(logical_columns - 1) * spacing,
-		logical_origin.y + float(logical_rows - 1) * spacing
+	var authority_max := Vector2(
+		authority_origin.x + float(logical_columns - 1) * spacing,
+		authority_origin.y + float(logical_rows - 1) * spacing
 	)
+	var work_pad_origin := Vector2(-TerrainState.WORK_PAD_HALF_EXTENT_M, -TerrainState.WORK_PAD_HALF_EXTENT_M)
+	var work_pad_max := Vector2(TerrainState.WORK_PAD_HALF_EXTENT_M, TerrainState.WORK_PAD_HALF_EXTENT_M)
 	var surface := PackedFloat32Array()
 	var height_bytes := PackedByteArray()
 	var control_bytes := PackedByteArray()
@@ -47,18 +49,18 @@ func build_maps(snapshot: Dictionary) -> Dictionary:
 			var index := row * site_columns + column
 			var height := _presentation_height(
 				position,
-				logical_surface,
+				authority_surface,
 				logical_rows,
 				logical_columns,
 				spacing,
-				logical_origin,
-				logical_max
+				authority_origin,
+				authority_max
 			)
 			surface[index] = height
 			height_bytes.encode_float(index * 4, height)
 			control_bytes.encode_u32(
 				index * 4,
-				_control_code(position, logical_origin, logical_max)
+				_control_code(position, work_pad_origin, work_pad_max)
 			)
 	return {
 		"rows": site_rows,
@@ -68,8 +70,10 @@ func build_maps(snapshot: Dictionary) -> Dictionary:
 		"surface": surface,
 		"height_bytes": height_bytes,
 		"control_bytes": control_bytes,
-		"logical_origin_xz": logical_origin,
-		"logical_max_xz": logical_max,
+		"authority_origin_xz": authority_origin,
+		"authority_max_xz": authority_max,
+		"logical_origin_xz": work_pad_origin,
+		"logical_max_xz": work_pad_max,
 		"material_roles": get_material_roles(),
 	}
 
@@ -177,16 +181,7 @@ func _presentation_height(
 		return logical_height
 	var outside_distance := _distance_outside_rect(position, logical_origin, logical_max)
 	var context_weight := _smoothstep(0.0, 3.0, outside_distance)
-	return logical_height + _context_height_offset(position) * context_weight
-
-
-func _context_height_offset(position: Vector2) -> float:
-	var gentle_grade := 0.07 * sin(position.x * 0.12) * cos(position.y * 0.09)
-	var north_spoil := 1.55 * _gaussian(position, Vector2(-16.5, -13.0), Vector2(4.6, 3.8))
-	var east_spoil := 1.15 * _gaussian(position, Vector2(16.0, -11.0), Vector2(4.0, 3.4))
-	var west_berm := 0.85 * _gaussian(position, Vector2(-18.0, 10.5), Vector2(2.4, 8.5))
-	var damp_low := -0.32 * _gaussian(position, Vector2(15.0, 16.0), Vector2(7.0, 6.0))
-	return gentle_grade + north_spoil + east_spoil + west_berm + damp_low
+	return logical_height + TerrainState.construction_site_baseline_height(position) * context_weight
 
 
 func _control_code(position: Vector2, logical_origin: Vector2, logical_max: Vector2) -> int:

@@ -14,6 +14,8 @@ func _run() -> int:
 		return _fail("construction-site maps build from a TerrainState snapshot")
 	if int(maps["rows"]) != 129 or int(maps["columns"]) != 129:
 		return _fail("default construction site is 64 m square at 0.5 m spacing")
+	if snapshot["origin_xz"] != Vector2(-32.0, -32.0) or maps["authority_origin_xz"] != snapshot["origin_xz"]:
+		return _fail("visible site and authoritative terrain share the same footprint")
 	if (maps["height_bytes"] as PackedByteArray).size() != 129 * 129 * 4:
 		return _fail("presentation height bytes match the site grid")
 	if (maps["control_bytes"] as PackedByteArray).size() != 129 * 129 * 4:

@@ -16,6 +16,7 @@ const LIFECYCLE_PAUSED := "paused"
 const MODEL_IDS := ["sy205", "sy135"]
 
 @export var motion_presentation_path := NodePath("../MotionPresentation")
+@export var motion_client_path := NodePath("../MotionClient")
 @export var chassis_path := NodePath("../ChassisMotionRoot")
 @export var excavation_world_path := NodePath("../TerrainRoot/ExcavationWorld")
 @export var gateway_enabled := false
@@ -29,6 +30,7 @@ var focused := true
 var last_error: Dictionary = {}
 
 var _presentation: MotionPresentation
+var _motion_client: MotionClient
 var _chassis: TrackedChassisController
 var _excavation: ExcavationWorld
 
@@ -37,6 +39,7 @@ func _ready() -> void:
 	process_physics_priority = -30
 	authority_epoch = _new_epoch()
 	_presentation = get_node_or_null(motion_presentation_path) as MotionPresentation
+	_motion_client = get_node_or_null(motion_client_path) as MotionClient
 	_chassis = get_node_or_null(chassis_path) as TrackedChassisController
 	_excavation = get_node_or_null(excavation_world_path) as ExcavationWorld
 	call_deferred("_activate_initial_model")
@@ -114,6 +117,8 @@ func request_model_switch(model_id: String) -> bool:
 			_chassis.configure_model_for_test(previous)
 		return false
 	active_model_id = model_id
+	if _motion_client != null:
+		_motion_client.configure_equipment_gamepad_model(active_model_id)
 	authority_epoch = _new_epoch()
 	generation += 1
 	if _excavation != null:
@@ -165,6 +170,8 @@ func _activate_initial_model() -> void:
 		active_model_id = _presentation.get_active_model_id()
 	if _chassis != null and not _chassis.active_model_id.is_empty():
 		active_model_id = _chassis.active_model_id
+	if _motion_client != null:
+		_motion_client.configure_equipment_gamepad_model(active_model_id)
 	_apply_lifecycle()
 	_emit_transition()
 

@@ -2,13 +2,14 @@ extends SceneTree
 
 const MAIN_SCENE := "res://scenes/main.tscn"
 const HELPER_SCRIPT := "res://tests/visual_evidence_capture.gd"
-const SCHEMA_VERSION := "excavator-sim-visual-evidence-manifest-v1"
+const SCHEMA_VERSION := "excavator-sim-visual-evidence-manifest-v2"
 
 var _output_dir := "user://visual-evidence"
 var _commit := "unrecorded"
 var _capture_command := "unrecorded"
 var _run_id := "unrecorded"
 var _error_log_path := "unrecorded"
+var _evidence_phase := "before"
 var _models: Array[String] = ["sy205", "sy135"]
 var _quality_profiles: Array[String] = ["low", "balanced", "high"]
 var _failures: Array[String] = []
@@ -31,7 +32,7 @@ func _run() -> void:
 		_finish([], "main_scene_instantiation_failed")
 		return
 	root.add_child(scene)
-	DisplayServer.window_set_title("ExcavatorSim visual evidence baseline")
+	DisplayServer.window_set_title("ExcavatorSim visual evidence %s" % _evidence_phase)
 	DisplayServer.window_set_size(Vector2i(1920, 1080))
 	for _frame in 5:
 		await process_frame
@@ -42,6 +43,7 @@ func _run() -> void:
 		"capture_command": _capture_command,
 		"run_id": _run_id,
 		"error_log_path": _error_log_path,
+		"evidence_phase": _evidence_phase,
 	}
 	for model_id in _models:
 		for quality_profile in _quality_profiles:
@@ -98,6 +100,7 @@ func _write_manifest(helper, entries: Array[Dictionary]) -> bool:
 	var manifest := {
 		"schema_version": SCHEMA_VERSION,
 		"run_id": _run_id,
+		"evidence_phase": _evidence_phase,
 		"commit": _commit,
 		"capture_command": _capture_command,
 		"models": _models,
@@ -156,6 +159,11 @@ func _parse_arguments() -> bool:
 			"--evidence-models": _models = _parse_list(value, ["sy205", "sy135"])
 			"--evidence-quality-profiles":
 				_quality_profiles = _parse_list(value, ["low", "balanced", "high"])
+			"--evidence-phase":
+				if value not in ["before", "after"]:
+					push_error("unsupported visual evidence phase: %s" % value)
+					return false
+				_evidence_phase = value
 			_:
 				push_error("unknown visual evidence argument: %s" % argument)
 				return false

@@ -63,6 +63,7 @@
         "attitude_stiffness_nm_per_rad": {"type": "number", "exclusiveMinimum": 0},
         "attitude_damping_nm_s_per_rad": {"type": "number", "exclusiveMinimum": 0},
         "max_attitude_torque_nm": {"type": "number", "exclusiveMinimum": 0},
+        "spawn_yaw_rad": {"type": "number", "minimum": -3.141592653589793, "maximum": 3.141592653589793},
         "compound_shapes": {"type": "array", "minItems": 2, "maxItems": 8, "items": {"$ref": "#/$defs/phase1_shape"}}
       }
     },
@@ -89,6 +90,7 @@
         "max_support_force_n": {"type": "number", "exclusiveMinimum": 0},
         "pivot_lateral_resistance_scale": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
         "yaw_assist_scale": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+        "local_forward_axis": {"type": "string", "enum": ["-Z", "+Z"]},
         "drive_effort_slew_n_per_tick": {"type": "number", "exclusiveMinimum": 0},
         "brake_effort_slew_n_per_tick": {"type": "number", "exclusiveMinimum": 0},
         "acceleration_window_s": {"type": "number", "exclusiveMinimum": 0},

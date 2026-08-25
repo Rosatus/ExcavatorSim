@@ -6,6 +6,7 @@ const MODE_ANCHORS := {
 	CameraRig.MODE_CHASE: "base_link",
 	CameraRig.MODE_WORK_TOOL: "bucket_link",
 	CameraRig.MODE_INSPECTION: "base_link",
+	CameraRig.MODE_CAB: "upper_structure_link",
 }
 
 var failures: Array[String] = []
@@ -39,6 +40,7 @@ func _run() -> void:
 		_check_quality_clamp(camera)
 		_check_hud_integration(camera, ui)
 		_check_generation_reset(camera, session)
+		await _check_cab_lifecycle(camera, session, presentation)
 	scene.queue_free()
 	await process_frame
 	if failures.is_empty():
@@ -57,8 +59,9 @@ func _check_input_contract(camera: CameraRig) -> void:
 		for event in InputMap.action_get_events(action):
 			has_key = has_key or event is InputEventKey
 			has_joy = has_joy or event is InputEventJoypadButton
-		if not has_key or not has_joy:
-			_fail("camera action lacks keyboard/gamepad bindings: %s" % action)
+		var expects_joy := int((CameraRig.CAMERA_ACTIONS[action] as Dictionary)["joy"]) >= 0
+		if not has_key or (expects_joy and not has_joy):
+			_fail("camera action lacks its declared bindings: %s" % action)
 	var reset_events := InputMap.action_get_events(CameraRig.RESET_ACTION)
 	if not reset_events.any(func(event: InputEvent) -> bool: return event is InputEventKey) or not reset_events.any(func(event: InputEvent) -> bool: return event is InputEventJoypadButton):
 		_fail("camera reset lacks keyboard/gamepad bindings")
@@ -74,6 +77,12 @@ func _check_input_contract(camera: CameraRig) -> void:
 	camera._unhandled_input(chase_pad)
 	if camera.get_mode() != CameraRig.MODE_CHASE:
 		_fail("gamepad mode event did not select chase view")
+	var cab_key := InputEventKey.new()
+	cab_key.keycode = KEY_5
+	cab_key.pressed = true
+	camera._unhandled_input(cab_key)
+	if camera.get_mode() != CameraRig.MODE_CAB:
+		_fail("keyboard mode event did not select cab view")
 
 
 func _check_model_modes(camera: CameraRig, session: ProductSession, presentation: MotionPresentation, model_id: String) -> void:
@@ -104,6 +113,11 @@ func _check_model_modes(camera: CameraRig, session: ProductSession, presentation
 		var near_clip := float(snapshot.get("near", 0.0))
 		if near_clip < 0.079 or near_clip > 0.221:
 			_fail("%s %s escaped near-clip safety" % [model_id, mode])
+		var transparent_surfaces := int(snapshot.get("cab_transparent_surfaces", 0))
+		if mode == CameraRig.MODE_CAB and transparent_surfaces <= 0:
+			_fail("%s cab mode did not make its upper shell transparent" % model_id)
+		elif mode != CameraRig.MODE_CAB and transparent_surfaces != 0:
+			_fail("%s %s retained cab transparency" % [model_id, mode])
 
 
 func _check_orbit_and_reset(camera: CameraRig) -> void:
@@ -177,6 +191,24 @@ func _check_generation_reset(camera: CameraRig, session: ProductSession) -> void
 	var reset_yaw := float(camera.get_view_snapshot_for_test()["yaw"])
 	if is_equal_approx(changed_yaw, reset_yaw):
 		_fail("authority generation reset retained transient camera orbit")
+
+
+func _check_cab_lifecycle(camera: CameraRig, session: ProductSession, presentation: MotionPresentation) -> void:
+	camera.set_mode(CameraRig.MODE_CAB)
+	camera.force_camera_update_for_test()
+	var before := camera.get_view_snapshot_for_test()
+	if int(before.get("cab_transparent_surfaces", 0)) <= 0:
+		_fail("cab transparency was unavailable before lifecycle checks")
+	var anchor := presentation.get_frame_node("upper_structure_link")
+	if anchor == null or (before["camera_position"] as Vector3).distance_to(anchor.global_position) > 3.0:
+		_fail("cab camera was not placed inside the current upper structure")
+	session.request_reset()
+	camera.force_camera_update_for_test()
+	if camera.get_mode() != CameraRig.MODE_CAB or int(camera.get_view_snapshot_for_test().get("cab_transparent_surfaces", 0)) <= 0:
+		_fail("authority reset did not preserve the active cab view safely")
+	camera.set_mode(CameraRig.MODE_CHASE)
+	if int(camera.get_view_snapshot_for_test().get("cab_transparent_surfaces", -1)) != 0:
+		_fail("leaving cab mode did not restore upper-shell materials")
 
 
 func _midpoint_hit(from: Vector3, to: Vector3, _mask: int) -> Dictionary:

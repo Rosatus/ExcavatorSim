@@ -115,6 +115,19 @@ func get_frame_node(frame_name: String) -> Node3D:
 	return _frame_nodes.get(frame_name) as Node3D
 
 
+func get_frame_visual_nodes(frame_name: String) -> Array[Node3D]:
+	var result: Array[Node3D] = []
+	if _asset_root == null or not is_instance_valid(_asset_root):
+		return result
+	var frame_map := _manifest.get("frame_map", {}) as Dictionary
+	var mapping := frame_map.get(frame_name, {}) as Dictionary
+	for path_value in mapping.get("visual_nodes", []):
+		var visual := _asset_root.get_node_or_null(NodePath(String(path_value))) as Node3D
+		if visual != null:
+			result.append(visual)
+	return result
+
+
 func get_active_model_id() -> String:
 	return _active_model_id
 

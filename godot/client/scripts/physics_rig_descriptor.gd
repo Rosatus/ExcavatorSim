@@ -28,6 +28,7 @@ const CHASSIS_DYNAMICS_FIELDS := [
 	"ground_clearance_m", "can_sleep", "continuous_collision_detection",
 	"compound_shapes",
 ]
+const OPTIONAL_CHASSIS_DYNAMICS_FIELDS := ["spawn_yaw_rad"]
 const TRACK_FIELDS := [
 	"gauge_m", "contact_length_m", "contact_width_m", "traction_points_per_side",
 	"friction", "max_drive_force_n", "max_belt_speed_m_s", "brake_force_n",
@@ -40,6 +41,7 @@ const OPTIONAL_TRACK_RESPONSE_FIELDS := [
 	"drive_effort_slew_n_per_tick", "brake_effort_slew_n_per_tick",
 	"acceleration_window_s", "brake_stop_window_s",
 ]
+const OPTIONAL_TRACK_ORIENTATION_FIELDS := ["local_forward_axis"]
 const BODY_FRAMES := {
 	"chassis": "base_link",
 	"upper": "upper_structure_link",
@@ -312,8 +314,10 @@ func _validate_tracks(value: Variant) -> bool:
 	if not value is Dictionary:
 		return _reject("tracks", "must be an object")
 	var tracks := value as Dictionary
-	if not _fields_with_optional(tracks, TRACK_FIELDS, OPTIONAL_TRACK_RESPONSE_FIELDS, "tracks"):
+	if not _fields_with_optional(tracks, TRACK_FIELDS, OPTIONAL_TRACK_RESPONSE_FIELDS + OPTIONAL_TRACK_ORIENTATION_FIELDS, "tracks"):
 		return false
+	if tracks.has("local_forward_axis") and String(tracks.get("local_forward_axis", "")) not in ["-Z", "+Z"]:
+		return _reject("tracks.local_forward_axis", "must equal -Z or +Z")
 	for field in TRACK_FIELDS:
 		if field == "traction_points_per_side" or field == "friction":
 			continue
@@ -339,8 +343,12 @@ func _validate_chassis_dynamics(value: Variant) -> bool:
 	if not value is Dictionary:
 		return _reject("chassis_dynamics", "must be an object")
 	var dynamics := value as Dictionary
-	if not _exact_fields(dynamics, CHASSIS_DYNAMICS_FIELDS, "chassis_dynamics"):
+	if not _fields_with_optional(dynamics, CHASSIS_DYNAMICS_FIELDS, OPTIONAL_CHASSIS_DYNAMICS_FIELDS, "chassis_dynamics"):
 		return false
+	if dynamics.has("spawn_yaw_rad"):
+		var spawn_yaw := float(dynamics.get("spawn_yaw_rad", 0.0))
+		if not _finite_number(dynamics.get("spawn_yaw_rad")) or absf(spawn_yaw) > PI:
+			return _reject("chassis_dynamics.spawn_yaw_rad", "must be finite and within [-PI, PI]")
 	for field in [
 		"mass_kg", "max_linear_speed_m_s", "max_angular_speed_rad_s",
 		"attitude_stiffness_nm_per_rad", "attitude_damping_nm_s_per_rad",

@@ -24,10 +24,10 @@
 [ext_resource type="Script" uid="uid://b4kidhr20qmau" path="res://scripts/terrain3d_adapter.gd" id="13_terrain3d_adapter"]
 [ext_resource type="Script" uid="uid://deo0gxkmk2ahd" path="res://addons/sky_3d/src/Sky3D.gd" id="14_sky3d"]
 [ext_resource type="Script" uid="uid://y3tj71yjij51" path="res://scripts/tracked_chassis_controller.gd" id="15_track_controller"]
-[ext_resource type="Script" path="res://scripts/simulation_truth_publisher.gd" id="16_truth_publisher"]
-[ext_resource type="Script" path="res://scripts/product_session.gd" id="17_product_session"]
-[ext_resource type="Script" path="res://scripts/construction_site_dressing.gd" id="18_site_dressing"]
-[ext_resource type="Script" path="res://scripts/machine_feedback.gd" id="19_machine_feedback"]
+[ext_resource type="Script" uid="uid://b3lngubh08h3y" path="res://scripts/simulation_truth_publisher.gd" id="16_truth_publisher"]
+[ext_resource type="Script" uid="uid://rs84iev83we6" path="res://scripts/product_session.gd" id="17_product_session"]
+[ext_resource type="Script" uid="uid://ctx4iojwvg4k6" path="res://scripts/construction_site_dressing.gd" id="18_site_dressing"]
+[ext_resource type="Script" uid="uid://cce4qy15353ac" path="res://scripts/machine_feedback.gd" id="19_machine_feedback"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_qkpxi"]
 shader = ExtResource("1_pm3ni")
@@ -39,12 +39,12 @@ shader_parameter/atm_darkness = 0.5
 shader_parameter/atm_sun_intensity = 18.0
 shader_parameter/atm_day_tint = Color(0.807843, 0.909804, 1, 1)
 shader_parameter/atm_horizon_light_tint = Color(0.980392, 0.635294, 0.462745, 1)
-shader_parameter/atm_night_tint = Color(0, 0, 0, 0)
+shader_parameter/atm_night_tint = Color(0.062421326, 0.0740348, 0.09290627, 0.370174)
 shader_parameter/atm_level_params = Vector3(1, 0, 0)
 shader_parameter/atm_thickness = 0.7
 shader_parameter/atm_beta_ray = Vector3(5.804544e-06, 1.3562913e-05, 3.311258e-05)
 shader_parameter/atm_beta_mie = Vector3(3.038e-08, 3.038e-08, 3.038e-08)
-shader_parameter/sun_light_color = Color(1, 1, 1, 1)
+shader_parameter/sun_light_color = Color(0.98, 0.523, 0.294, 1)
 shader_parameter/sun_disk_color = Color(0.996094, 0.541334, 0.140076, 1)
 shader_parameter/sun_disk_intensity = 30.0
 shader_parameter/sun_disk_size = 0.02
@@ -66,7 +66,7 @@ shader_parameter/starmap_flip_u = false
 shader_parameter/starmap_flip_v = false
 shader_parameter/starmap_alignment = Vector3(2.68288, -0.25891, 0.40101)
 shader_parameter/star_rotation_offset = 9.38899
-shader_parameter/star_rotation = -10.670794789469639
+shader_parameter/star_rotation = -13.157766963075968
 shader_parameter/star_tilt = -1.2915436464758039
 shader_parameter/star_field_color = Color(1, 1, 1, 1)
 shader_parameter/star_field_texture = ExtResource("6_2f3dj")
@@ -82,8 +82,8 @@ shader_parameter/cirrus_absorption = 2.0
 shader_parameter/cirrus_sky_tint_fade = 0.5
 shader_parameter/cirrus_size = 1.0
 shader_parameter/cirrus_uv = Vector2(0.16, 0.11)
-shader_parameter/cirrus_position1 = Vector2(0.96935695, 0.96935695)
-shader_parameter/cirrus_position2 = Vector2(0.96935695, 0.96935695)
+shader_parameter/cirrus_position1 = Vector2(0.58561426, 0.58561426)
+shader_parameter/cirrus_position2 = Vector2(0.58561426, 0.58561426)
 shader_parameter/cirrus_texture = ExtResource("2_y6deb")
 shader_parameter/cumulus_visible = true
 shader_parameter/cumulus_intensity = 0.6
@@ -93,7 +93,7 @@ shader_parameter/cumulus_absorption = 2.0
 shader_parameter/cumulus_noise_freq = 2.7
 shader_parameter/cumulus_sky_tint_fade = 0.0
 shader_parameter/cumulus_size = 0.5
-shader_parameter/cumulus_position = Vector2(4.847673, 4.847673)
+shader_parameter/cumulus_position = Vector2(97.17513, 97.17513)
 shader_parameter/cumulus_texture = ExtResource("3_og1vs")
 shader_parameter/cumulus_partial_mie_phase = Vector3(0.957564, 1.042436, 0.412)
 shader_parameter/cumulus_mie_intensity = 1.0
@@ -103,7 +103,7 @@ shader_parameter/azimuthal_grid_rotation_offset = 0.03
 shader_parameter/show_equatorial_grid = false
 shader_parameter/equatorial_grid_color = Color(0, 0.75, 1, 1)
 shader_parameter/equatorial_grid_rotation_offset = 0.03
-shader_parameter/moon_matrix = Basis(-0.63028383, -0.7462897, -0.21399513, -0.14382552, 0.38310623, -0.9124383, 0.7629262, -0.5443172, -0.34880123)
+shader_parameter/moon_matrix = Basis(-0.99566925, 0.08936427, 0.025624791, -0.030240074, -0.05068005, -0.9982569, -0.08790984, -0.9947088, 0.05316293)
 
 [sub_resource type="Sky" id="Sky_5q0nq"]
 sky_material = SubResource("ShaderMaterial_qkpxi")
@@ -112,7 +112,8 @@ sky_material = SubResource("ShaderMaterial_qkpxi")
 background_mode = 2
 sky = SubResource("Sky_5q0nq")
 ambient_light_source = 3
-ambient_light_color = Color(1, 1, 1, 1)
+ambient_light_color = Color(0.36506265, 0.22211519, 0.15923223, 1)
+ambient_light_sky_contribution = 0.7
 reflected_light_source = 2
 tonemap_mode = 3
 tonemap_white = 6.0
@@ -151,20 +152,6 @@ corner_radius_bottom_left = 8
 shadow_color = Color(0, 0, 0, 0.5)
 shadow_size = 8
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_guide_panel"]
-bg_color = Color(0.025, 0.04, 0.055, 0.97)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.31, 0.7, 0.86, 0.9)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
-shadow_color = Color(0, 0, 0, 0.65)
-shadow_size = 12
-
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_fill_background"]
 bg_color = Color(0.1, 0.14, 0.17, 1)
 corner_radius_top_left = 4
@@ -179,37 +166,52 @@ corner_radius_top_right = 4
 corner_radius_bottom_right = 4
 corner_radius_bottom_left = 4
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_guide_panel"]
+bg_color = Color(0.025, 0.04, 0.055, 0.97)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.31, 0.7, 0.86, 0.9)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+shadow_color = Color(0, 0, 0, 0.65)
+shadow_size = 12
+
 [node name="Main" type="Node3D" unique_id=615713361]
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1005988133]
 environment = SubResource("Environment_dgi5k")
 camera_attributes = SubResource("CameraAttributesPractical_j8jky")
 script = ExtResource("14_sky3d")
-current_time = 9.412426666642629
+current_time = 17.903066666604083
 wind_direction = 2.35619451204804
 
 [node name="SunLight" type="DirectionalLight3D" parent="WorldEnvironment" unique_id=1271245286]
-transform = Transform3D(0.7106436, -0.4234245, 0.56186944, 0, 0.798618, 0.6018382, -0.7035521, -0.42769244, 0.56753284, 0.56186944, 0.6018382, 0.56753284)
-shadow_enabled = true
+transform = Transform3D(0.32779542, -0.06629679, -0.9424197, 0, 0.99753475, -0.070174, 0.9447487, 0.023002716, 0.32698733, -0.9424197, -0.070174, 0.32698733)
+light_color = Color(0.98, 0.523, 0.294, 1)
+light_energy = 0.0
 
 [node name="MoonLight" type="DirectionalLight3D" parent="WorldEnvironment" unique_id=526965036]
-transform = Transform3D(0, -0.6464855, 0.7629262, -0.53953445, -0.642356, -0.54431725, 0.84196347, -0.41162497, -0.34880123, 0.7629262, -0.54431725, -0.34880123)
+transform = Transform3D(0, -0.99612844, -0.08790985, 0.05336958, 0.08778456, -0.9947088, 0.9985748, -0.0046917116, 0.05316296, -0.08790985, -0.9947088, 0.05316296)
 light_color = Color(0.572549, 0.776471, 0.956863, 1)
 light_energy = 0.0
 
 [node name="SkyDome" type="Node" parent="WorldEnvironment" unique_id=1193753276]
 script = ExtResource("9_fv21b")
-sun_azimuth = -2.361209
-sun_altitude = -0.9249955
-moon_azimuth = -1.1419804
-moon_altitude = -2.1463714
+sun_azimuth = -4.37842
+sun_altitude = -1.641028
+moon_azimuth = -4.1684885
+moon_altitude = -3.0386763
 wind_direction = 2.35619451204804
 
 [node name="TimeOfDay" type="Node" parent="WorldEnvironment" unique_id=1869329603]
 script = ExtResource("10_tel4y")
 dome_path = NodePath("../SkyDome")
-current_time = 9.412426666642629
-day = 7
+current_time = 17.903066666604083
+day = 22
 
 [node name="KeyLight" type="DirectionalLight3D" parent="." unique_id=1459257187]
 transform = Transform3D(0.7960838, 0.4546647, -0.3994128, 0, 0.6599831, 0.7512804, 0.6051864, -0.5980822, 0.52540183, 0, 0, 0)
@@ -217,7 +219,7 @@ visible = false
 light_energy = 0.0
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=759888586]
-transform = Transform3D(-0.9402287, -0.1167717, 0.31989756, 3.711504e-09, 0.9393728, 0.34289774, -0.3405438, 0.3224023, -0.8832252, 0.971653, 3.315454, 1.1439075)
+transform = Transform3D(0.17393297, -0.3078823, 0.9353907, 0.00028040074, 0.94988453, 0.3126008, -0.9847574, -0.05410929, 0.16530259, 9.000984, 2.901647, 1.1439075)
 current = true
 fov = 55.0
 script = ExtResource("10_camera_rig")
@@ -279,7 +281,7 @@ script = ExtResource("6_terrain_renderer")
 [node name="Terrain3DAdapter" type="Node3D" parent="TerrainRoot" unique_id=255875373]
 script = ExtResource("13_terrain3d_adapter")
 
-[node name="ConstructionSiteDressing" type="Node3D" parent="TerrainRoot"]
+[node name="ConstructionSiteDressing" type="Node3D" parent="TerrainRoot" unique_id=1141307064]
 script = ExtResource("18_site_dressing")
 
 [node name="TerrainCollider" type="Node3D" parent="TerrainRoot" unique_id=1878975737]
@@ -308,10 +310,10 @@ lifecycle_input_enabled = false
 script = ExtResource("3_motion_presentation")
 presentation_root_path = NodePath("../ChassisMotionRoot/PresentationRoot")
 
-[node name="SimulationTruthPublisher" type="Node" parent="."]
+[node name="SimulationTruthPublisher" type="Node" parent="." unique_id=874374906]
 script = ExtResource("16_truth_publisher")
 
-[node name="MachineFeedback" type="Node" parent="."]
+[node name="MachineFeedback" type="Node" parent="." unique_id=1997508795]
 script = ExtResource("19_machine_feedback")
 
 [node name="OperatorUI" type="CanvasLayer" parent="." unique_id=232332145]
@@ -335,123 +337,127 @@ theme_override_constants/margin_bottom = 12
 layout_mode = 2
 theme_override_constants/separation = 7
 
-[node name="Title" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
+[node name="Title" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=1505076524]
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
 text = "EXCAVATOR CONTROL"
 
-[node name="Header" type="HBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox"]
+[node name="Header" type="HBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=1020691274]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="ModelSelector" type="OptionButton" parent="OperatorUI/StatusPanel/Margin/VBox/Header"]
+[node name="ModelSelector" type="OptionButton" parent="OperatorUI/StatusPanel/Margin/VBox/Header" unique_id=880138627]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="LifecycleBadge" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox/Header"]
+[node name="LifecycleBadge" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox/Header" unique_id=455621928]
 layout_mode = 2
 theme_override_font_sizes/font_size = 18
 text = "STOPPED"
 horizontal_alignment = 2
 vertical_alignment = 1
 
-[node name="Operation" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
+[node name="Operation" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=1945445983]
 layout_mode = 2
 theme_override_font_sizes/font_size = 22
 text = "READY TO WORK"
 
-[node name="BucketStatus" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
+[node name="BucketStatus" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=39009725]
 layout_mode = 2
 text = "Bucket EMPTY   0%"
 
-[node name="BucketFill" type="ProgressBar" parent="OperatorUI/StatusPanel/Margin/VBox"]
+[node name="BucketFill" type="ProgressBar" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=752042152]
 custom_minimum_size = Vector2(0, 12)
 layout_mode = 2
 theme_override_styles/background = SubResource("StyleBoxFlat_fill_background")
 theme_override_styles/fill = SubResource("StyleBoxFlat_fill_foreground")
 show_percentage = false
 
-[node name="ControlHint" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
+[node name="ControlHint" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=1676260264]
 layout_mode = 2
-text = "W/S + ↑/↓ tracks   Y/H swing   U/J boom   I/K arm   O/L bucket"
+text = "Q/A left + W/S right tracks   Y/H swing   U/J boom   I/K arm   O/L bucket"
 autowrap_mode = 2
 
-[node name="AutomaticSoilHint" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
+[node name="AutomaticSoilHint" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=1657688566]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.75, 0.82, 0.88, 1)
 theme_override_font_sizes/font_size = 12
 text = "Use the bucket edge and shell directly—cut, carry and dump are automatic."
 autowrap_mode = 2
 
-[node name="CameraRow" type="HBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox"]
+[node name="CameraRow" type="HBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=58704173]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="Mode" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox/CameraRow"]
+[node name="Mode" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox/CameraRow" unique_id=1009255860]
 layout_mode = 2
 text = "VIEW"
 vertical_alignment = 1
 
-[node name="Selector" type="OptionButton" parent="OperatorUI/StatusPanel/Margin/VBox/CameraRow"]
+[node name="Selector" type="OptionButton" parent="OperatorUI/StatusPanel/Margin/VBox/CameraRow" unique_id=2014120382]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="ResetView" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/CameraRow"]
+[node name="ResetView" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/CameraRow" unique_id=450435478]
 layout_mode = 2
 text = "Reset View  C"
 
-[node name="Warning" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
+[node name="Warning" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=1990971092]
 custom_minimum_size = Vector2(0, 36)
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.8, 0.35, 1)
 text = "Machine stopped — review the controls, then press Start."
 autowrap_mode = 2
 
-[node name="Completion" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox"]
+[node name="Completion" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=1109058595]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.45, 0.92, 0.6, 1)
-text = ""
 autowrap_mode = 2
 
-[node name="Actions" type="HBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox"]
+[node name="Actions" type="HBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=985692533]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="Start" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Actions"]
+[node name="Start" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Actions" unique_id=412998898]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Start  F6"
 
-[node name="Pause" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Actions"]
+[node name="Pause" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Actions" unique_id=170636265]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Pause  F7"
 
-[node name="Reset" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Actions"]
+[node name="Reset" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Actions" unique_id=48827271]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Reset  F8"
 
-[node name="Tools" type="HBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox"]
+[node name="Tools" type="HBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=616826466]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="Guide" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Tools"]
+[node name="Guide" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Tools" unique_id=922858547]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Controls"
 
-[node name="Advanced" type="CheckButton" parent="OperatorUI/StatusPanel/Margin/VBox/Tools"]
+[node name="Advanced" type="CheckButton" parent="OperatorUI/StatusPanel/Margin/VBox/Tools" unique_id=1199970035]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Advanced"
 
-[node name="MuteAudio" type="CheckButton" parent="OperatorUI/StatusPanel/Margin/VBox/Tools"]
+[node name="MuteAudio" type="CheckButton" parent="OperatorUI/StatusPanel/Margin/VBox/Tools" unique_id=1921746845]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Mute Audio"
 
-[node name="AdvancedPanel" type="VBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox"]
+[node name="TestGraphics" type="CheckButton" parent="OperatorUI/StatusPanel/Margin/VBox/Tools" unique_id=1809170051]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Test Grid"
+
+[node name="AdvancedPanel" type="VBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=780181745]
 visible = false
 layout_mode = 2
 theme_override_constants/separation = 3
@@ -482,7 +488,14 @@ theme_override_font_sizes/font_size = 12
 text = "Bucket soil diagnostics"
 autowrap_mode = 2
 
-[node name="GuidePanel" type="PanelContainer" parent="OperatorUI"]
+[node name="PanelToggle" type="Button" parent="OperatorUI" unique_id=447274004]
+offset_left = 382.0
+offset_top = 22.0
+offset_right = 476.0
+offset_bottom = 50.0
+text = "Hide panel"
+
+[node name="GuidePanel" type="PanelContainer" parent="OperatorUI" unique_id=1770164644]
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
@@ -496,73 +509,51 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_guide_panel")
 
-[node name="Margin" type="MarginContainer" parent="OperatorUI/GuidePanel"]
+[node name="Margin" type="MarginContainer" parent="OperatorUI/GuidePanel" unique_id=1528492702]
 layout_mode = 2
 theme_override_constants/margin_left = 24
 theme_override_constants/margin_top = 20
 theme_override_constants/margin_right = 24
 theme_override_constants/margin_bottom = 20
 
-[node name="VBox" type="VBoxContainer" parent="OperatorUI/GuidePanel/Margin"]
+[node name="VBox" type="VBoxContainer" parent="OperatorUI/GuidePanel/Margin" unique_id=275425250]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="Title" type="Label" parent="OperatorUI/GuidePanel/Margin/VBox"]
+[node name="Title" type="Label" parent="OperatorUI/GuidePanel/Margin/VBox" unique_id=86566389]
 layout_mode = 2
 theme_override_font_sizes/font_size = 26
 text = "Quick operator guide"
 
-[node name="Intro" type="Label" parent="OperatorUI/GuidePanel/Margin/VBox"]
+[node name="Intro" type="Label" parent="OperatorUI/GuidePanel/Margin/VBox" unique_id=1097564688]
 layout_mode = 2
 text = "Digging and dumping happen automatically from physical bucket contact."
 autowrap_mode = 2
 
-[node name="Device" type="Label" parent="OperatorUI/GuidePanel/Margin/VBox"]
+[node name="Device" type="Label" parent="OperatorUI/GuidePanel/Margin/VBox" unique_id=1026925881]
 layout_mode = 2
 theme_override_font_sizes/font_size = 16
 text = "Current input: KEYBOARD + MOUSE"
 
-[node name="Controls" type="Label" parent="OperatorUI/GuidePanel/Margin/VBox"]
+[node name="Controls" type="Label" parent="OperatorUI/GuidePanel/Margin/VBox" unique_id=1249625243]
 layout_mode = 2
 text = "Controls"
 autowrap_mode = 2
 
-[node name="Recovery" type="Label" parent="OperatorUI/GuidePanel/Margin/VBox"]
+[node name="Recovery" type="Label" parent="OperatorUI/GuidePanel/Margin/VBox" unique_id=718089701]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.8, 0.35, 1)
 text = "Reset and model changes clear the current work session."
 autowrap_mode = 2
 
-[node name="Close" type="Button" parent="OperatorUI/GuidePanel/Margin/VBox"]
+[node name="Close" type="Button" parent="OperatorUI/GuidePanel/Margin/VBox" unique_id=1021691228]
 custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 text = "Continue"
 
-[node name="DestructiveConfirmation" type="ConfirmationDialog" parent="OperatorUI"]
+[node name="DestructiveConfirmation" type="ConfirmationDialog" parent="OperatorUI" unique_id=744847489]
 title = "Confirm action"
 initial_position = 1
 size = Vector2i(560, 240)
 ok_button_text = "Confirm"
-cancel_button_text = "Cancel"
 dialog_text = "This action starts a fresh work session."
-
-[node name="SkyAttribution" type="Label" parent="OperatorUI" unique_id=25095541]
-anchors_preset = 3
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -430.0
-offset_top = -48.0
-offset_right = -12.0
-offset_bottom = -10.0
-grow_horizontal = 0
-grow_vertical = 0
-theme_override_colors/font_color = Color(1, 1, 1, 0.82)
-theme_override_colors/font_outline_color = Color(0, 0, 0, 0.8)
-theme_override_constants/outline_size = 4
-theme_override_font_sizes/font_size = 12
-text = "The Milky Way panorama by ESO/S. Brunier
-CC BY 4.0, original and modified forms"
-horizontal_alignment = 2
-vertical_alignment = 2

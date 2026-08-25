@@ -109,7 +109,7 @@ func _run() -> void:
 			}
 		var phase_diag := phase_diagnostics[phase_name] as Dictionary
 		phase_diag["frames"] = int(phase_diag["frames"]) + 1
-		_apply_scenario(chassis, elapsed)
+		_apply_scenario(chassis, excavation, elapsed)
 		if not reset_started and elapsed >= _duration_seconds * 0.45:
 			reset_started = true
 			client.request_reset()
@@ -373,7 +373,9 @@ func _wait_for_lifecycle(client: MotionClient, expected: String) -> bool:
 	return false
 
 
-func _apply_scenario(chassis: TrackedChassisController, elapsed: float) -> void:
+func _apply_scenario(
+	chassis: TrackedChassisController, excavation: ExcavationWorld, elapsed: float
+) -> void:
 	var phase := fmod(elapsed, 34.0)
 	var tracks := Vector2.ZERO
 	var target_pose := Vector4.ZERO
@@ -385,10 +387,12 @@ func _apply_scenario(chassis: TrackedChassisController, elapsed: float) -> void:
 		target_pose = _scenario_pose("approach_bucket")
 	elif phase < 8.0:
 		target_pose = _scenario_pose("approach")
-	elif phase < 11.0:
-		target_pose = _scenario_pose("cut")
+	elif phase < 10.5:
+		chassis.set_commands_for_test(0.0, 0.0)
+		chassis.set_equipment_commands_for_test(_ground_contact_commands(chassis, excavation))
+		return
 	elif phase < 14.0:
-		target_pose = _scenario_pose("recovery_clear")
+		target_pose = _scenario_pose("scoop")
 	elif phase < 19.0:
 		target_pose = _scenario_pose("carry")
 	elif phase < 23.0:
@@ -409,7 +413,8 @@ func _scenario_phase_name(elapsed: float) -> String:
 	var phase := fmod(elapsed, 34.0)
 	if phase < 2.0: return "neutral"
 	if phase < 8.0: return "approach"
-	if phase < 11.0: return "cut"
+	if phase < 10.5: return "ground_contact"
+	if phase < 14.0: return "scoop"
 	if phase < 19.0: return "carry"
 	if phase < 23.0: return "dump"
 	if phase < 26.0: return "support_clear"
@@ -424,7 +429,7 @@ func _scenario_pose(name: String) -> Vector4:
 			"approach_arm": return Vector4(0.0, 0.0, -0.5127, 0.0)
 			"approach_bucket": return Vector4(0.0, 0.0, -0.5127, 0.589)
 			"approach": return Vector4(0.0, -0.1666, -0.5127, 0.589)
-			"cut": return Vector4(0.0, -0.2166, -0.5877, 0.739)
+			"scoop": return Vector4(0.0, 0.0, -0.2, 0.739)
 			"recovery_clear": return Vector4(0.0, -0.1745, -0.5984, 0.7293)
 			"carry": return Vector4(0.0, 0.2, 0.4, 0.5)
 			"dump": return Vector4(0.0, -0.1309, -0.1309, -0.1745)
@@ -434,12 +439,45 @@ func _scenario_pose(name: String) -> Vector4:
 		"approach_arm": return Vector4(0.0, 0.0, -0.6763, 0.0)
 		"approach_bucket": return Vector4(0.0, 0.0, -0.6763, -0.1964)
 		"approach": return Vector4(0.0, 0.3094, -0.6763, -0.1964)
-		"cut": return Vector4(0.0, 0.3344, -0.5513, -0.4964)
-		"carry": return Vector4.ZERO
-		"dump": return Vector4(0.0, 0.1, 0.2, 0.785)
+		"scoop": return Vector4(0.0, 0.28, -0.45, 0.45)
+		"carry": return Vector4(0.0, 0.0, 0.0, 0.35)
+		"dump": return Vector4(0.0, 0.1, 0.2, -1.57)
 		"support_clear": return Vector4.ZERO
 		"support": return Vector4(0.0, 0.611, -0.1305, 0.628)
 	return Vector4.ZERO
+
+
+func _ground_contact_commands(
+	chassis: TrackedChassisController, excavation: ExcavationWorld
+) -> Vector4:
+	var target := _scenario_pose("approach")
+	var clearance := _tooth_clearance(chassis, excavation)
+	if not is_finite(clearance) or absf(clearance + 0.04) <= 0.02:
+		return Vector4.ZERO
+	var descent_sign := -1.0 if _model_id == "sy135" else 1.0
+	var commands := _commands_toward(chassis, target)
+	var clearance_error := clearance + 0.04
+	commands.y = (
+		descent_sign
+		* signf(clearance_error)
+		* clampf(absf(clearance_error) * 0.8, 0.18, 0.72)
+	)
+	return commands
+
+
+func _tooth_clearance(
+	chassis: TrackedChassisController, excavation: ExcavationWorld
+) -> float:
+	var pose := excavation.get_status_snapshot().get("bucket_pose", {}) as Dictionary
+	var tool := pose.get("soil_tool", {}) as Dictionary
+	for value in tool.get("regions", []):
+		var region := value as Dictionary
+		if String(region.get("region_id", "")) != "teeth_main_edge":
+			continue
+		var center := region.get("current_center_world", Vector3.ZERO) as Vector3
+		var surface := chassis.sample_terrain_height_for_test(Vector2(center.x, center.z))
+		return center.y - surface if is_finite(surface) else NAN
+	return NAN
 
 
 func _commands_toward(chassis: TrackedChassisController, target: Vector4) -> Vector4:

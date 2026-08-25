@@ -49,6 +49,23 @@ func set_budget(count: int) -> void:
 	_active_clod_cap = 0 if _budget < 1000 else (32 if _budget < 3000 else max_clods)
 
 
+func set_emission_enabled(value: bool) -> void:
+	emission_enabled = value
+	if emission_enabled:
+		return
+	if _flow_particles != null:
+		_flow_particles.emitting = false
+		_flow_particles.restart()
+		_flow_particles.emitting = false
+	if _dust_particles != null:
+		_dust_particles.emitting = false
+		_dust_particles.restart()
+		_dust_particles.emitting = false
+	_clod_spawn_accumulator = 0.0
+	for clod in _clods:
+		_deactivate_clod(clod)
+
+
 func clear_for_generation(generation: int) -> void:
 	if generation < _generation:
 		return

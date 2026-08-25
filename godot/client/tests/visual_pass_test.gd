@@ -22,6 +22,8 @@ func _run() -> void:
 
 func _test_quality_profiles() -> int:
 	var quality := VisualQualityController.new()
+	if not quality.apply_profile("test") or quality.get_quality_snapshot()["particles"] != 0 or not bool(quality.get_quality_snapshot()["test_ground"]):
+		return _fail("test profile selects the grid-ground presentation budget")
 	if not quality.apply_profile("low") or quality.get_quality_snapshot()["particles"] != 500:
 		return _fail("low profile applies bounded particle budget")
 	if not quality.apply_profile("high") or quality.get_quality_snapshot()["camera_far"] != 220.0:
@@ -77,11 +79,11 @@ func _test_scene_visual_nodes() -> int:
 	if not bool(scene_effects.get_effect_snapshot()["dust_node"]):
 		return _fail("soil effects include a bounded contact-dust pool")
 	var terrain_renderer := scene.get_node_or_null("TerrainRoot/TerrainWorld/TerrainMesh") as TerrainRenderer
-	if terrain_renderer == null or terrain_renderer.get_status_snapshot().get("material_kind", "") != "procedural_worksite_soil":
+	var terrain_adapter := scene.get_node_or_null("TerrainRoot/Terrain3DAdapter") as Terrain3DAdapter
+	if terrain_renderer == null or terrain_adapter == null or terrain_renderer.get_status_snapshot().get("material_kind", "") != "procedural_worksite_soil":
 		return _fail("fallback terrain retains the procedural worksite material identity")
-	var attribution := scene.get_node_or_null("OperatorUI/SkyAttribution") as Label
-	if attribution == null or "ESO/S. Brunier" not in attribution.text or "CC BY 4.0" not in attribution.text:
-		return _fail("running client exposes the required Milky Way attribution")
+	if scene.get_node_or_null("OperatorUI/SkyAttribution") != null:
+		return _fail("running client keeps third-party attribution out of the simulation viewport")
 	var sky := scene.get_node_or_null("WorldEnvironment") as Sky3D
 	if sky == null or sky.sun == null or sky.tod == null:
 		return _fail("root WorldEnvironment uses the initialized Sky3D backend")
@@ -104,11 +106,28 @@ func _test_scene_visual_nodes() -> int:
 	var low_site := dressing.get_status_snapshot()
 	if int(low_site["visible_cues"]) != 14 or int(low_site["shadow_instances"]) != 0:
 		return _fail("low quality keeps primary non-shadowing worksite cues")
+	if not quality.apply_profile("test"):
+		return _fail("test quality applies from the production quality owner")
+	var test_site := dressing.get_status_snapshot()
+	var terrain3d_status := terrain_adapter.get_status_snapshot()
+	if int(test_site["visible_cues"]) != 0 or bool(terrain3d_status["available"]) or not bool(terrain3d_status["test_mode"]):
+		return _fail("test quality disables native terrain and all site dressing")
+	if not terrain_renderer.visible or String(terrain_renderer.get_status_snapshot()["material_kind"]) != "test_black_white_grid":
+		return _fail("test quality exposes the untextured black/white fallback grid")
+	var test_effects := scene_effects.get_effect_snapshot()
+	if int(test_effects["budget"]) != 0 or bool(test_effects["enabled"]) or bool(test_effects["particles_emitting"]) or bool(test_effects["dust_emitting"]) or int(test_effects["active_clods"]) != 0:
+		return _fail("test quality disables disposable soil particles: %s" % test_effects)
 	if not quality.apply_profile("balanced"):
 		return _fail("balanced quality restores worksite context")
 	var balanced_site := dressing.get_status_snapshot()
 	if int(balanced_site["visible_cues"]) != 28 or int(balanced_site["shadow_instances"]) <= 0:
 		return _fail("balanced quality applies its context and shadow budget")
+	var restored_adapter := terrain_adapter.get_status_snapshot()
+	var restored_effects := scene_effects.get_effect_snapshot()
+	if not bool(restored_adapter["available"]) or bool(restored_adapter["test_mode"]) or terrain_renderer.visible:
+		return _fail("leaving test quality restores native Terrain3D presentation")
+	if String(terrain_renderer.get_status_snapshot()["material_kind"]) != "procedural_worksite_soil" or int(restored_effects["budget"]) != 1800 or not bool(restored_effects["enabled"]):
+		return _fail("leaving test quality restores normal terrain material and effects budget")
 	if not quality.apply_profile("high") or not sky.clouds_enabled or not sky.fog_enabled or not sky.sun.shadow_enabled:
 		return _fail("high quality restores bounded Sky3D atmosphere and shadows")
 	var high_site := dressing.get_status_snapshot()

@@ -2,6 +2,7 @@ class_name VisualQualityController
 extends Node
 
 const PROFILES := {
+	"test": {"particles": 0, "camera_far": 80.0, "shadows": false, "site_cues": 0, "site_shadows": false, "audio_loops": 1, "audio_voices": 2},
 	"low": {"particles": 500, "camera_far": 80.0, "shadows": false, "site_cues": 14, "site_shadows": false, "audio_loops": 1, "audio_voices": 2},
 	"balanced": {"particles": 1800, "camera_far": 140.0, "shadows": true, "site_cues": 28, "site_shadows": true, "audio_loops": 3, "audio_voices": 4},
 	"high": {"particles": 4200, "camera_far": 220.0, "shadows": true, "site_cues": 45, "site_shadows": true, "audio_loops": 3, "audio_voices": 6},
@@ -24,12 +25,14 @@ func apply_profile(profile_name: String) -> bool:
 		last_error = "unknown_quality_profile"
 		return false
 	var settings: Dictionary = PROFILES[profile_name]
+	var test_ground := profile_name == "test"
 	var environment := get_node_or_null("../VisualEnvironment") as VisualEnvironment
 	if is_inside_tree() and environment == null:
 		_applied = false
 		last_error = "visual_environment_unavailable"
 		return false
-	if environment != null and not environment.apply_profile(profile_name):
+	var bounded_profile := "low" if profile_name == "test" else profile_name
+	if environment != null and not environment.apply_profile(bounded_profile):
 		_applied = false
 		last_error = "visual_environment_profile_failed"
 		return false
@@ -40,6 +43,7 @@ func apply_profile(profile_name: String) -> bool:
 		camera.set_quality_distance_for_test(float(settings["camera_far"]) * 0.1)
 	var effects := get_node_or_null("../SoilEffects") as SoilEffects
 	if effects != null:
+		effects.set_emission_enabled(not test_ground)
 		effects.set_budget(int(settings["particles"]))
 	var site_dressing := get_node_or_null("../TerrainRoot/ConstructionSiteDressing")
 	if site_dressing != null and site_dressing.has_method("set_quality_profile") and not bool(site_dressing.call("set_quality_profile", profile_name)):
@@ -47,9 +51,19 @@ func apply_profile(profile_name: String) -> bool:
 		last_error = "site_dressing_profile_failed"
 		return false
 	var feedback := get_node_or_null("../MachineFeedback")
-	if feedback != null and feedback.has_method("set_quality_profile") and not bool(feedback.call("set_quality_profile", profile_name)):
+	if feedback != null and feedback.has_method("set_quality_profile") and not bool(feedback.call("set_quality_profile", bounded_profile)):
 		_applied = false
 		last_error = "feedback_profile_failed"
+		return false
+	var terrain_renderer := get_node_or_null("../TerrainRoot/TerrainWorld/TerrainMesh")
+	if terrain_renderer != null and terrain_renderer.has_method("set_test_mode") and not bool(terrain_renderer.call("set_test_mode", test_ground)):
+		_applied = false
+		last_error = "terrain_renderer_profile_failed"
+		return false
+	var terrain3d_adapter := get_node_or_null("../TerrainRoot/Terrain3DAdapter")
+	if terrain3d_adapter != null and terrain3d_adapter.has_method("set_test_mode") and not bool(terrain3d_adapter.call("set_test_mode", test_ground)):
+		_applied = false
+		last_error = "terrain3d_profile_failed"
 		return false
 	Engine.max_fps = target_fps
 	_applied = true
@@ -69,6 +83,7 @@ func get_quality_snapshot() -> Dictionary:
 		"site_shadows": bool(settings.get("site_shadows", false)),
 		"audio_loops": int(settings.get("audio_loops", 0)),
 		"audio_voices": int(settings.get("audio_voices", 0)),
+		"test_ground": profile == "test",
 		"applied": _applied,
 		"last_error": last_error,
 	}

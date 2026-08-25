@@ -8,7 +8,7 @@ from babylon_sim.constants import ACTIVE_JOINT_NAMES
 
 def test_loads_motion_calibration(calibration: MachineCalibration) -> None:
     assert tuple(limit.name for limit in calibration.joint_limits) == ACTIVE_JOINT_NAMES
-    assert calibration.calibration_version == "m1-provisional-2"
+    assert calibration.calibration_version == "m1-provisional-3"
     assert calibration.quality == "provisional"
     assert all(limit.max_acceleration > 0.0 for limit in calibration.joint_limits)
 

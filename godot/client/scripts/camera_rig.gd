@@ -7,18 +7,21 @@ const MODE_OPERATOR := "operator"
 const MODE_CHASE := "chase"
 const MODE_WORK_TOOL := "work_tool"
 const MODE_INSPECTION := "inspection"
-const MODES := [MODE_OPERATOR, MODE_CHASE, MODE_WORK_TOOL, MODE_INSPECTION]
+const MODE_CAB := "cab"
+const MODES := [MODE_OPERATOR, MODE_CHASE, MODE_WORK_TOOL, MODE_INSPECTION, MODE_CAB]
 const MODE_NAMES := {
 	MODE_OPERATOR: "Operator",
 	MODE_CHASE: "Chase",
 	MODE_WORK_TOOL: "Work Tool",
 	MODE_INSPECTION: "Inspection",
+	MODE_CAB: "Cab / First Person",
 }
 const CAMERA_ACTIONS := {
 	"camera_view_operator": {"key": KEY_1, "joy": JOY_BUTTON_DPAD_UP, "mode": MODE_OPERATOR},
 	"camera_view_chase": {"key": KEY_2, "joy": JOY_BUTTON_DPAD_RIGHT, "mode": MODE_CHASE},
 	"camera_view_work_tool": {"key": KEY_3, "joy": JOY_BUTTON_DPAD_DOWN, "mode": MODE_WORK_TOOL},
 	"camera_view_inspection": {"key": KEY_4, "joy": JOY_BUTTON_DPAD_LEFT, "mode": MODE_INSPECTION},
+	"camera_view_cab": {"key": KEY_5, "joy": -1, "mode": MODE_CAB},
 }
 const RESET_ACTION := "camera_reset_view"
 const PRESETS := {
@@ -27,12 +30,14 @@ const PRESETS := {
 		MODE_CHASE: {"anchor": "base_link", "reference": "base_link", "yaw": 0.0, "pitch": 0.30, "distance": 12.0, "focus_height": 1.85, "minimum": 5.5},
 		MODE_WORK_TOOL: {"anchor": "bucket_link", "reference": "base_link", "yaw": 0.82, "pitch": 0.34, "distance": 7.4, "focus_height": 0.15, "minimum": 3.8},
 		MODE_INSPECTION: {"anchor": "base_link", "reference": "base_link", "yaw": 0.72, "pitch": 0.34, "distance": 12.0, "focus_height": 2.15, "minimum": 4.0},
+		MODE_CAB: {"anchor": "upper_structure_link", "reference": "upper_structure_link", "cab_position": Vector3(0.78, 1.72, -0.35), "cab_rotation": Vector3(-0.04, PI, 0.0)},
 	},
 	"sy135": {
 		MODE_OPERATOR: {"anchor": "upper_structure_link", "reference": "upper_structure_link", "yaw": 2.18, "pitch": 0.30, "distance": 5.2, "focus_height": 0.95, "minimum": 3.0},
 		MODE_CHASE: {"anchor": "base_link", "reference": "base_link", "yaw": 0.0, "pitch": 0.31, "distance": 11.2, "focus_height": 1.55, "minimum": 5.0},
 		MODE_WORK_TOOL: {"anchor": "bucket_link", "reference": "base_link", "yaw": 0.76, "pitch": 0.36, "distance": 6.8, "focus_height": 0.12, "minimum": 3.5},
 		MODE_INSPECTION: {"anchor": "base_link", "reference": "base_link", "yaw": 0.68, "pitch": 0.35, "distance": 11.5, "focus_height": 1.85, "minimum": 3.8},
+		MODE_CAB: {"anchor": "upper_structure_link", "reference": "upper_structure_link", "cab_position": Vector3(-0.64, 1.58, -0.28), "cab_rotation": Vector3(-0.04, 0.0, 0.0)},
 	},
 }
 
@@ -48,6 +53,7 @@ const PRESETS := {
 @export var transition_speed := 7.0
 @export var recovery_speed := 3.5
 @export var occlusion_clearance_m := 0.35
+@export_range(0.05, 0.5, 0.01) var cab_shell_alpha := 0.16
 @export_flags_3d_physics var occlusion_mask := 3
 
 var _presentation: MotionPresentation
@@ -67,6 +73,7 @@ var _resolved_position := Vector3.ZERO
 var _occluded := false
 var _last_query_usec := 0
 var _occlusion_probe_override := Callable()
+var _cab_material_overrides: Array[Dictionary] = []
 
 
 func _ready() -> void:
@@ -86,6 +93,7 @@ func _ready() -> void:
 	_reset_mode_state()
 	_resolve_anchors()
 	_step_camera(1.0, true)
+	_sync_cab_transparency()
 	mode_changed.emit(_mode, get_mode_display_name())
 
 
@@ -103,6 +111,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 	if event.is_action_pressed(RESET_ACTION):
 		reset_view()
+		return
+	if _mode == MODE_CAB:
 		return
 	var button := event as InputEventMouseButton
 	if button != null:
@@ -127,6 +137,7 @@ func set_mode(value: String) -> bool:
 	_mode = value
 	_reset_mode_state()
 	_resolve_anchors()
+	_sync_cab_transparency()
 	mode_changed.emit(_mode, get_mode_display_name())
 	return true
 
@@ -179,11 +190,15 @@ func get_view_snapshot_for_test() -> Dictionary:
 		"occluded": _occluded,
 		"query_usec": _last_query_usec,
 		"finite": _finite_vector3(global_position) and _finite_vector3(_current_focus),
+		"cab_transparent_surfaces": _cab_material_overrides.size(),
 	}
 
 
 func _step_camera(delta: float, snap: bool) -> void:
 	if _target == null or not is_instance_valid(_target):
+		return
+	if _mode == MODE_CAB:
+		_step_cab_camera()
 		return
 	var focus := _resolve_focus()
 	var reference := _reference if is_instance_valid(_reference) else _target
@@ -217,6 +232,21 @@ func _step_camera(delta: float, snap: bool) -> void:
 			global_position = global_position.lerp(_resolved_position, position_alpha)
 	if global_position.distance_squared_to(_current_focus) > 0.0001:
 		look_at(_current_focus, Vector3.UP)
+
+
+func _step_cab_camera() -> void:
+	var preset := _current_preset()
+	var local_position := preset.get("cab_position", Vector3.ZERO) as Vector3
+	var local_rotation := preset.get("cab_rotation", Vector3.ZERO) as Vector3
+	var anchor := Transform3D(_target.global_basis.orthonormalized(), _target.global_position)
+	global_transform = anchor * Transform3D(Basis.from_euler(local_rotation), local_position)
+	_desired_position = global_position
+	_resolved_position = global_position
+	_current_focus = global_position - global_basis.z * 10.0
+	_occluded = false
+	_last_query_usec = 0
+	near = 0.08
+	_initialized = true
 
 
 func _resolve_focus() -> Vector3:
@@ -298,6 +328,7 @@ func _current_preset() -> Dictionary:
 
 
 func _on_model_activated(model_id: String, _asset_root: Node3D) -> void:
+	_restore_cab_transparency()
 	_target = null
 	_reference = null
 	_active_model_id = model_id if PRESETS.has(model_id) else "sy205"
@@ -305,11 +336,60 @@ func _on_model_activated(model_id: String, _asset_root: Node3D) -> void:
 	_resolve_anchors()
 	_initialized = false
 	_step_camera(1.0, true)
+	_sync_cab_transparency()
 	mode_changed.emit(_mode, get_mode_display_name())
 
 
 func _on_authority_changed(_session_id: String, _epoch: String, _generation: int) -> void:
 	reset_view()
+	_sync_cab_transparency()
+
+
+func _exit_tree() -> void:
+	_restore_cab_transparency()
+
+
+func _sync_cab_transparency() -> void:
+	if _mode != MODE_CAB or _presentation == null:
+		_restore_cab_transparency()
+		return
+	if not _cab_material_overrides.is_empty():
+		return
+	var seen_meshes := {}
+	for visual_root in _presentation.get_frame_visual_nodes("upper_structure_link"):
+		var meshes: Array[MeshInstance3D] = []
+		if visual_root is MeshInstance3D:
+			meshes.append(visual_root as MeshInstance3D)
+		for child in visual_root.find_children("*", "MeshInstance3D", true, false):
+			meshes.append(child as MeshInstance3D)
+		for mesh_instance in meshes:
+			if mesh_instance == null or mesh_instance.mesh == null or seen_meshes.has(mesh_instance.get_instance_id()):
+				continue
+			seen_meshes[mesh_instance.get_instance_id()] = true
+			for surface in mesh_instance.mesh.get_surface_count():
+				var source := mesh_instance.get_active_material(surface)
+				if not source is BaseMaterial3D:
+					continue
+				var transparent := source.duplicate() as BaseMaterial3D
+				transparent.resource_local_to_scene = true
+				transparent.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+				var color := transparent.albedo_color
+				color.a = minf(color.a, cab_shell_alpha)
+				transparent.albedo_color = color
+				_cab_material_overrides.append({
+					"mesh": mesh_instance,
+					"surface": surface,
+					"previous": mesh_instance.get_surface_override_material(surface),
+				})
+				mesh_instance.set_surface_override_material(surface, transparent)
+
+
+func _restore_cab_transparency() -> void:
+	for entry in _cab_material_overrides:
+		var mesh_instance := entry.get("mesh") as MeshInstance3D
+		if mesh_instance != null and is_instance_valid(mesh_instance):
+			mesh_instance.set_surface_override_material(int(entry.get("surface", -1)), entry.get("previous") as Material)
+	_cab_material_overrides.clear()
 
 
 func _ensure_input_actions() -> void:
@@ -317,7 +397,8 @@ func _ensure_input_actions() -> void:
 		var binding := CAMERA_ACTIONS[action] as Dictionary
 		_ensure_action(action)
 		_add_event_once(action, _key_event(int(binding["key"])))
-		_add_event_once(action, _joy_button_event(int(binding["joy"])))
+		if int(binding["joy"]) >= 0:
+			_add_event_once(action, _joy_button_event(int(binding["joy"])))
 	_ensure_action(RESET_ACTION)
 	_add_event_once(RESET_ACTION, _key_event(KEY_C))
 	_add_event_once(RESET_ACTION, _joy_button_event(JOY_BUTTON_RIGHT_STICK))

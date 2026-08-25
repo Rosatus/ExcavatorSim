@@ -24,6 +24,7 @@ func _run() -> void:
 		],
 	)
 	_assert_artifact_validation(helper)
+	await _assert_controls_status(helper)
 	var scene := load(MAIN_SCENE).instantiate() as Node3D
 	if scene == null:
 		_fail("main scene did not instantiate")
@@ -87,6 +88,17 @@ func _assert_artifact_validation(helper) -> void:
 	for expected_error in ["width_mismatch", "sha256_missing", "blank_or_uniform_render"]:
 		if not errors.has(expected_error):
 			_fail("artifact validation missed %s" % expected_error)
+
+
+func _assert_controls_status(helper) -> void:
+	var scene := load(MAIN_SCENE).instantiate() as Node3D
+	root.add_child(scene)
+	await process_frame
+	var status: Dictionary = await helper.controls_visible_status(scene)
+	if not bool(status.get("achieved", false)):
+		_fail("production controls are not discoverable: %s" % status)
+	scene.queue_free()
+	await process_frame
 
 
 func _finish() -> void:

@@ -112,7 +112,7 @@ func _run() -> void:
 	if _classification(tool.classify(carry, terrain, 0.5, interaction), "inner_shell") != "contain":
 		return _fail("inner shell did not classify active-soil containment")
 
-	var opening_normal := Vector3(0.0, 0.707107, 0.707107).normalized()
+	var opening_normal := Vector3(0.0, 0.707107, -0.707107).normalized()
 	var dump_basis := Basis(Quaternion(opening_normal, Vector3.DOWN))
 	var dump := tool.compose_snapshot(
 		Transform3D(dump_basis, Vector3(0.0, 2.0, 0.0)),

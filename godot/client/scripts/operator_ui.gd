@@ -12,6 +12,7 @@ const CONFIG_GUIDE_DISMISSED := "guide_dismissed"
 @export var chassis_path := NodePath("../ChassisMotionRoot")
 @export var camera_path := NodePath("../Camera3D")
 @export var feedback_path := NodePath("../MachineFeedback")
+@export var visual_quality_path := NodePath("../VisualQualityController")
 
 var _motion_client: MotionClient
 var _product_session: ProductSession
@@ -19,6 +20,7 @@ var _excavation_world: ExcavationWorld
 var _chassis: TrackedChassisController
 var _camera: CameraRig
 var _feedback: MachineFeedback
+var _visual_quality: VisualQualityController
 var _prompt_mode := "keyboard"
 var _ignore_model_selection := false
 var _pending_action := ""
@@ -28,7 +30,12 @@ var _awaiting_model_id := ""
 var _awaiting_generation := -1
 var _soil_generation_key := ""
 var _current_fill_ratio := 0.0
+var _panel_collapsed := false
+var _quality_before_test := "balanced"
+var _ignore_quality_toggle := false
 
+@onready var _status_panel: PanelContainer = $StatusPanel
+@onready var _panel_toggle_button: Button = $PanelToggle
 @onready var _title_label: Label = $StatusPanel/Margin/VBox/Title
 @onready var _model_selector: OptionButton = $StatusPanel/Margin/VBox/Header/ModelSelector
 @onready var _lifecycle_badge: Label = $StatusPanel/Margin/VBox/Header/LifecycleBadge
@@ -54,6 +61,7 @@ var _current_fill_ratio := 0.0
 @onready var _guide_button: Button = $StatusPanel/Margin/VBox/Tools/Guide
 @onready var _advanced_button: CheckButton = $StatusPanel/Margin/VBox/Tools/Advanced
 @onready var _mute_audio_button: CheckButton = $StatusPanel/Margin/VBox/Tools/MuteAudio
+@onready var _test_graphics_button: CheckButton = $StatusPanel/Margin/VBox/Tools/TestGraphics
 @onready var _guide_panel: PanelContainer = $GuidePanel
 @onready var _guide_title_label: Label = $GuidePanel/Margin/VBox/Title
 @onready var _guide_intro_label: Label = $GuidePanel/Margin/VBox/Intro
@@ -71,15 +79,18 @@ func _ready() -> void:
 	_chassis = get_node_or_null(chassis_path) as TrackedChassisController
 	_camera = get_node_or_null(camera_path) as CameraRig
 	_feedback = get_node_or_null(feedback_path) as MachineFeedback
+	_visual_quality = get_node_or_null(visual_quality_path) as VisualQualityController
 	_apply_static_copy()
 	_configure_model_selector()
 	_configure_camera_selector()
+	_panel_toggle_button.pressed.connect(_on_panel_toggle_pressed)
 	_start_button.pressed.connect(_on_start_pressed)
 	_pause_button.pressed.connect(_on_pause_pressed)
 	_reset_button.pressed.connect(_on_reset_pressed)
 	_guide_button.pressed.connect(show_control_guide)
 	_advanced_button.toggled.connect(_on_advanced_toggled)
 	_mute_audio_button.toggled.connect(_on_audio_muted)
+	_test_graphics_button.toggled.connect(_on_test_graphics_toggled)
 	_guide_close_button.pressed.connect(_on_guide_closed)
 	_reset_view_button.pressed.connect(_on_reset_view_pressed)
 	_confirmation.confirmed.connect(_on_destructive_confirmed)
@@ -99,6 +110,8 @@ func _ready() -> void:
 	if _camera != null:
 		_camera.mode_changed.connect(_on_camera_mode_changed)
 	_advanced_panel.visible = false
+	_set_panel_collapsed(false)
+	_sync_test_graphics_toggle()
 	_guide_panel.visible = not _guide_was_dismissed()
 	_refresh_prompt_copy()
 	_refresh()
@@ -114,11 +127,14 @@ func _apply_static_copy() -> void:
 	_guide_button.text = UIStrings.BUTTON_GUIDE
 	_advanced_button.text = UIStrings.BUTTON_ADVANCED
 	_mute_audio_button.text = UIStrings.BUTTON_MUTE_AUDIO
+	_test_graphics_button.text = UIStrings.BUTTON_TEST_GRAPHICS
+	_test_graphics_button.tooltip_text = "Use an untextured black/white terrain grid and hide site dressing."
 	_guide_title_label.text = UIStrings.GUIDE_TITLE
 	_guide_intro_label.text = UIStrings.GUIDE_INTRO
 	_guide_recovery_label.text = UIStrings.GUIDE_RECOVERY
 	_guide_close_button.text = UIStrings.BUTTON_CLOSE
 	_reset_view_button.text = UIStrings.BUTTON_RESET_VIEW
+	_panel_toggle_button.tooltip_text = "Hide or restore the operator control panel"
 
 
 func _process(_delta: float) -> void:
@@ -128,6 +144,41 @@ func _process(_delta: float) -> void:
 		_on_pause_pressed()
 	if Input.is_action_just_pressed("motion_reset"):
 		_on_reset_pressed()
+
+
+func _on_test_graphics_toggled(enabled: bool) -> void:
+	if _ignore_quality_toggle:
+		return
+	if _visual_quality == null:
+		_sync_test_graphics_toggle()
+		return
+	if enabled:
+		var current := String(_visual_quality.get_quality_snapshot().get("profile", "balanced"))
+		if current != "test":
+			_quality_before_test = current
+	var requested := "test" if enabled else _quality_before_test
+	if not VisualQualityController.PROFILES.has(requested) or (not enabled and requested == "test"):
+		requested = "balanced"
+	if not _visual_quality.apply_profile(requested):
+		_sync_test_graphics_toggle()
+
+
+func _sync_test_graphics_toggle() -> void:
+	_ignore_quality_toggle = true
+	_test_graphics_button.button_pressed = (
+		_visual_quality != null
+		and String(_visual_quality.get_quality_snapshot().get("profile", "")) == "test"
+	)
+	_ignore_quality_toggle = false
+
+
+func set_test_graphics_for_test(enabled: bool) -> void:
+	_on_test_graphics_toggled(enabled)
+	_sync_test_graphics_toggle()
+
+
+func is_test_graphics_enabled_for_test() -> bool:
+	return _test_graphics_button.button_pressed
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -256,6 +307,27 @@ func _on_destructive_canceled() -> void:
 
 func _on_advanced_toggled(pressed: bool) -> void:
 	_advanced_panel.visible = pressed
+
+
+func _on_panel_toggle_pressed() -> void:
+	_set_panel_collapsed(not _panel_collapsed)
+
+
+func _set_panel_collapsed(collapsed: bool) -> void:
+	_panel_collapsed = collapsed
+	_status_panel.visible = not collapsed
+	_panel_toggle_button.text = UIStrings.BUTTON_EXPAND_PANEL if collapsed else UIStrings.BUTTON_COLLAPSE_PANEL
+	_panel_toggle_button.tooltip_text = "Restore the operator control panel" if collapsed else "Hide the operator control panel"
+	_panel_toggle_button.position = Vector2(16.0, 16.0) if collapsed else Vector2(382.0, 22.0)
+	_panel_toggle_button.size = Vector2(110.0, 32.0) if collapsed else Vector2(94.0, 28.0)
+
+
+func set_panel_collapsed_for_test(collapsed: bool) -> void:
+	_set_panel_collapsed(collapsed)
+
+
+func is_panel_collapsed_for_test() -> bool:
+	return _panel_collapsed
 
 
 func _on_audio_muted(pressed: bool) -> void:

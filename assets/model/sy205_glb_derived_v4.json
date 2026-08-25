@@ -134,7 +134,7 @@
       "byte_size": 1676,
       "evidence_level": "retained_provisional",
       "path": "assets/calibration/m1_provisional_calibration.json",
-      "sha256": "2e1714c46c262ff78acf1c8ebbf8a98f51b13f25722efef8d4143d137ece800c"
+      "sha256": "6216ce75f63c3ae0f70823bf63f7594b636626757dd8ef8b9c1ca1af6b55a890"
     },
     "glb": {
       "byte_size": 4904884,
@@ -881,7 +881,7 @@
       "byte_size": 23728,
       "hash_basis": "canonical JSON with this sha256 field replaced by 64 zeroes",
       "path": "assets/model/sy205_glb_derived_v4.json",
-      "sha256": "80fb4a2be4b6e85550d3713ebed952e3d518e5460ac169af6f73ec70a3b16c23"
+      "sha256": "66c341b314a28baf23d39fdcceeb7350170e4f43fc88282e21a38712557008c7"
     },
     "reference_urdf": {
       "byte_size": 5281,
@@ -891,7 +891,7 @@
     }
   },
   "retained_calibration": {
-    "calibration_version": "m1-provisional-2",
+    "calibration_version": "m1-provisional-3",
     "cylinders": {
       "activation_policy": "unchanged_in_m1",
       "evidence_level": "retained_provisional",
@@ -937,9 +937,9 @@
       "bucket_joint": {
         "evidence_level": "retained_provisional",
         "max_acceleration_rad_s2": 0.8,
-        "max_position_rad": 0.7853981633974483,
+        "max_position_rad": 0.5235987755982988,
         "max_velocity_rad_s": 0.55,
-        "min_position_rad": -0.7853981633974483
+        "min_position_rad": -1.6580627893946132
       },
       "swing_joint": {
         "evidence_level": "retained_provisional",

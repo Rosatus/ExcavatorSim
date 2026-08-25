@@ -3,10 +3,10 @@ extends Node3D
 
 const MODEL_CATALOG_PATH := "res://resources/models/model_catalog.json"
 const INPUT_ACTIONS := {
-	"track_left_forward": KEY_W,
-	"track_left_reverse": KEY_S,
-	"track_right_forward": KEY_UP,
-	"track_right_reverse": KEY_DOWN,
+	"track_left_forward": {"key": KEY_Q, "joy_axis": JOY_AXIS_TRIGGER_LEFT, "joy_sign": 1.0},
+	"track_left_reverse": {"key": KEY_A, "joy_button": JOY_BUTTON_LEFT_SHOULDER},
+	"track_right_forward": {"key": KEY_W, "joy_axis": JOY_AXIS_TRIGGER_RIGHT, "joy_sign": 1.0},
+	"track_right_reverse": {"key": KEY_S, "joy_button": JOY_BUTTON_RIGHT_SHOULDER},
 }
 
 @export var controller_enabled := false
@@ -542,6 +542,9 @@ func _authoritative_spawn_transform(descriptor: PhysicsRigDescriptor) -> Transfo
 	var parent := get_parent_node_3d()
 	var spawn := parent.global_transform if parent != null else Transform3D.IDENTITY
 	spawn.basis = spawn.basis.orthonormalized()
+	var dynamics := descriptor.chassis_dynamics()
+	var spawn_yaw := float(dynamics.get("spawn_yaw_rad", 0.0))
+	spawn.basis = (spawn.basis * Basis(Vector3.UP, spawn_yaw)).orthonormalized()
 	var terrain_normal := _sample_authoritative_terrain_normal(spawn.origin)
 	if terrain_normal.length_squared() > 0.5:
 		var forward := (-spawn.basis.z).slide(terrain_normal)
@@ -559,7 +562,6 @@ func _authoritative_spawn_transform(descriptor: PhysicsRigDescriptor) -> Transfo
 		if is_finite(sampled):
 			surface_y = sampled
 	var data := descriptor.to_dictionary()
-	var dynamics := data.get("chassis_dynamics", {}) as Dictionary
 	var ground_clearance := float(dynamics.get("ground_clearance_m", 0.05))
 	var tracks := data.get("tracks", {}) as Dictionary
 	var stiffness := float(tracks.get("support_stiffness_n_per_m", 0.0))
@@ -660,7 +662,17 @@ func _ensure_input_actions() -> void:
 	for action in INPUT_ACTIONS:
 		if not InputMap.has_action(action):
 			InputMap.add_action(action, 0.08)
-		_add_key_event(action, int(INPUT_ACTIONS[action]))
+		# These four product actions own one keyboard and one XInput-style binding.
+		# Replace stale runtime events so old layouts cannot remain active.
+		for existing in InputMap.action_get_events(action):
+			if existing is InputEventKey or existing is InputEventJoypadMotion or existing is InputEventJoypadButton:
+				InputMap.action_erase_event(action, existing)
+		var definition: Dictionary = INPUT_ACTIONS[action]
+		_add_key_event(action, int(definition["key"]))
+		if definition.has("joy_axis"):
+			_add_joy_axis_event(action, int(definition["joy_axis"]), float(definition["joy_sign"]))
+		else:
+			_add_joy_button_event(action, int(definition["joy_button"]))
 
 
 func _add_key_event(action: String, keycode: int) -> void:
@@ -669,6 +681,19 @@ func _add_key_event(action: String, keycode: int) -> void:
 			return
 	var event := InputEventKey.new()
 	event.physical_keycode = keycode as Key
+	InputMap.action_add_event(action, event)
+
+
+func _add_joy_axis_event(action: String, axis: int, axis_value: float) -> void:
+	var event := InputEventJoypadMotion.new()
+	event.axis = axis as JoyAxis
+	event.axis_value = axis_value
+	InputMap.action_add_event(action, event)
+
+
+func _add_joy_button_event(action: String, button_index: int) -> void:
+	var event := InputEventJoypadButton.new()
+	event.button_index = button_index as JoyButton
 	InputMap.action_add_event(action, event)
 
 

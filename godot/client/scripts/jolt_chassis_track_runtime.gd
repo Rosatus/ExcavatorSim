@@ -607,6 +607,8 @@ func _capture_post_step_snapshot() -> void:
 		"terrain_normal_alignment_deg": _terrain_normal_alignment_deg,
 		"lowest_clearance_m": _lowest_clearance_m,
 		"forward_speed_m_s": _forward_speed_m_s(),
+		"local_forward_axis": String(_tracks.get("local_forward_axis", "-Z")),
+		"vehicle_forward_world": _vehicle_forward_world(),
 		"acceleration_time_s": _acceleration_time_s,
 		"brake_stop_time_s": _brake_stop_time_s,
 		"brake_stop_distance_m": _brake_stop_distance_m,
@@ -837,8 +839,11 @@ func _apply_track_forces() -> void:
 	var count := int(_tracks["traction_points_per_side"])
 	var length := float(_tracks["contact_length_m"])
 	var half_gauge := 0.5 * float(_tracks["gauge_m"])
-	var result_left := _apply_track_side(-half_gauge, _left_command, count, length, "left")
-	var result_right := _apply_track_side(half_gauge, _right_command, count, length, "right")
+	var forward_sign := _local_forward_sign()
+	# Vehicle right changes with the declared local forward axis: -Z forward
+	# uses +X right, while +Z forward uses -X right.
+	var result_left := _apply_track_side(forward_sign * half_gauge, _left_command, count, length, "left")
+	var result_right := _apply_track_side(-forward_sign * half_gauge, _right_command, count, length, "right")
 	_left_contact_count = int(result_left["contact_count"])
 	_right_contact_count = int(result_right["contact_count"])
 	_left_speed_m_s = float(result_left["speed_m_s"])
@@ -925,7 +930,8 @@ func _apply_track_side(local_x: float, command: float, point_count: int, contact
 	var samples: Array[Dictionary] = []
 	for index in point_count:
 		var alpha := (float(index) + 0.5) / float(point_count)
-		var hit := _track_raycast(Vector3(local_x, 0.0, lerpf(-0.5 * contact_length, 0.5 * contact_length, alpha)))
+		var longitudinal := lerpf(-0.5 * contact_length, 0.5 * contact_length, alpha)
+		var hit := _track_raycast(Vector3(local_x, 0.0, -_local_forward_sign() * longitudinal))
 		ray_hits.append(hit)
 	for probe_index in ray_hits.size():
 		var hit := ray_hits[probe_index]
@@ -957,8 +963,8 @@ func _apply_track_side(local_x: float, command: float, point_count: int, contact
 		var support_force := lerpf(previous_support_force, raw_support_force, SUPPORT_FORCE_SMOOTHING_ALPHA)
 		_previous_probe_support_loads[probe_key] = support_force
 		var friction_cap := float(_tracks["friction"]) * support_force
-		var forward := (-_body.global_basis.z).slide(normal).normalized()
-		var lateral := _body.global_basis.x.slide(normal).normalized()
+		var forward := _vehicle_forward_world().slide(normal).normalized()
+		var lateral := _vehicle_right_world().slide(normal).normalized()
 		if forward.length_squared() < 0.5 or lateral.length_squared() < 0.5:
 			continue
 		var longitudinal_speed := point_velocity.dot(forward)
@@ -1202,7 +1208,23 @@ func _reset_response_telemetry() -> void:
 func _forward_speed_m_s() -> float:
 	if _body == null or not is_instance_valid(_body) or not _body.is_inside_tree():
 		return 0.0
-	return _body.linear_velocity.dot(-_body.global_basis.z)
+	return _body.linear_velocity.dot(_vehicle_forward_world())
+
+
+func _local_forward_sign() -> float:
+	return 1.0 if String(_tracks.get("local_forward_axis", "-Z")) == "+Z" else -1.0
+
+
+func _vehicle_forward_world() -> Vector3:
+	if _body == null or not is_instance_valid(_body) or not _body.is_inside_tree():
+		return Vector3.FORWARD
+	return (_body.global_basis.z * _local_forward_sign()).normalized()
+
+
+func _vehicle_right_world() -> Vector3:
+	if _body == null or not is_instance_valid(_body) or not _body.is_inside_tree():
+		return Vector3.RIGHT
+	return _vehicle_forward_world().cross(_body.global_basis.y.normalized()).normalized()
 
 
 func _update_response_telemetry(delta: float) -> void:
@@ -1212,7 +1234,7 @@ func _update_response_telemetry(delta: float) -> void:
 	if is_zero_approx(_left_command) and is_zero_approx(_right_command) and absf(forward_speed) <= 0.05:
 		# The bounded stop window may leave a tiny residual after the last force
 		# tick. Remove only that longitudinal residue so neutral cannot roll back.
-		_body.linear_velocity -= (-_body.global_basis.z).normalized() * forward_speed
+		_body.linear_velocity -= _vehicle_forward_world() * forward_speed
 		forward_speed = 0.0
 	var command_axis := 0.5 * (_left_command + _right_command)
 	var straight_command := _left_command * _right_command > 0.0 and absf(_left_command - _right_command) <= 0.1
@@ -1251,7 +1273,7 @@ func _update_response_telemetry(delta: float) -> void:
 		_posture_error_rad = _body.global_basis.y.normalized().angle_to(terrain_normal)
 		_terrain_normal_alignment_deg = rad_to_deg(_posture_error_rad)
 		_lowest_clearance_m = _lowest_shape_clearance()
-	var forward := -_body.global_basis.z
+	var forward := _vehicle_forward_world()
 	var pitch_angle := atan2(forward.y, maxf(Vector2(forward.x, forward.z).length(), 0.001))
 	var pitch_rate := absf(_body.angular_velocity.dot(_body.global_basis.x))
 	_peak_pitch_angle_rad = maxf(_peak_pitch_angle_rad, absf(pitch_angle))
@@ -1317,6 +1339,8 @@ func _empty_snapshot() -> Dictionary:
 		"terrain_normal_alignment_deg": 0.0,
 		"lowest_clearance_m": 0.0,
 		"forward_speed_m_s": 0.0,
+		"local_forward_axis": "-Z",
+		"vehicle_forward_world": Vector3.FORWARD,
 		"acceleration_time_s": -1.0,
 		"brake_stop_time_s": -1.0,
 		"brake_stop_distance_m": 0.0,

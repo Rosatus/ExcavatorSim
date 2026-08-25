@@ -12,7 +12,11 @@ param(
 
     [Parameter()]
     [ValidateSet("low", "balanced", "high", "all")]
-    [string]$QualityProfile = "all"
+    [string]$QualityProfile = "all",
+
+    [Parameter()]
+    [ValidateSet("before", "after")]
+    [string]$EvidencePhase = "before"
 )
 
 $ErrorActionPreference = "Stop"
@@ -22,7 +26,7 @@ $commit = (& git -C $repoRoot rev-parse HEAD).Trim()
 $timestamp = [DateTime]::UtcNow.ToString("yyyyMMddTHHmmssZ")
 $runId = "$timestamp-$($commit.Substring(0, 8))"
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
-    $OutputDir = Join-Path $repoRoot "artifacts/benchmark/visual-baseline-before-raw/$runId"
+    $OutputDir = Join-Path $repoRoot "artifacts/benchmark/visual-baseline-$EvidencePhase-raw/$runId"
 }
 $resolvedOutput = [System.IO.Path]::GetFullPath($OutputDir)
 New-Item -ItemType Directory -Force -Path $resolvedOutput | Out-Null
@@ -32,9 +36,10 @@ $summaryPath = Join-Path $resolvedOutput "run-summary.json"
 $modelList = if ($Model -eq "all") { "sy205,sy135" } else { $Model }
 $qualityList = if ($QualityProfile -eq "all") { "low,balanced,high" } else { $QualityProfile }
 $partialSelection = $Model -ne "all" -or $QualityProfile -ne "all"
-$captureCommand = "capture_visual_baseline.ps1 -Model $Model -QualityProfile $QualityProfile -OutputDir `"$resolvedOutput`""
+$captureCommand = "capture_visual_baseline.ps1 -EvidencePhase $EvidencePhase -Model $Model -QualityProfile $QualityProfile -OutputDir `"$resolvedOutput`""
 $godotArguments = @(
     "--path", $projectDir,
+    "--audio-driver", "Dummy",
     "--resolution", "1920x1080",
     "--script", "res://tests/visual_evidence_matrix.gd",
     "--",
@@ -45,6 +50,7 @@ $godotArguments = @(
     "--evidence-error-log", $summaryPath,
     "--evidence-models", $modelList,
     "--evidence-quality-profiles", $qualityList
+    "--evidence-phase", $EvidencePhase
 )
 
 Write-Host "[visual-evidence] run $runId"
@@ -62,8 +68,9 @@ $errorResult = [ordered]@{
     process_exit_code = $exitCode
 }
 $summary = [ordered]@{
-    schema_version = "excavator-sim-visual-evidence-run-v1"
+    schema_version = "excavator-sim-visual-evidence-run-v2"
     run_id = $runId
+    evidence_phase = $EvidencePhase
     captured_at_utc = [DateTime]::UtcNow.ToString("o")
     commit = $commit
     command = $captureCommand
@@ -79,6 +86,7 @@ $manifestPath = Join-Path $resolvedOutput "manifest.json"
 $manifestComplete = $false
 if (Test-Path -LiteralPath $manifestPath) {
     $manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
+    $manifest | Add-Member -NotePropertyName evidence_phase -NotePropertyValue $EvidencePhase -Force
     $manifest | Add-Member -NotePropertyName error_log_result -NotePropertyValue $errorResult -Force
     foreach ($entry in $manifest.entries) {
         $entry | Add-Member -NotePropertyName error_log_result -NotePropertyValue $errorResult -Force
@@ -124,6 +132,9 @@ if ($errorMatches.Count -gt 0) {
 }
 if (-not $partialSelection -and -not $manifestComplete) {
     throw "Visual evidence full matrix is incomplete. See $manifestPath"
+}
+if ($EvidencePhase -eq "after" -and -not [bool]$manifest.all_scenarios_achieved) {
+    throw "After evidence contains unachieved product scenarios. See $manifestPath"
 }
 if ($partialSelection) {
     Write-Host "Visual evidence partial selection passed (not a complete baseline). Summary: $summaryPath"

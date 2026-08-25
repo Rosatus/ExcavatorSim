@@ -228,6 +228,64 @@ func extract_contained_volume(maximum_volume_m3: float) -> Dictionary:
 	}
 
 
+func extract_scoop_volume(
+	maximum_volume_m3: float,
+	intake_regions: Array,
+	intake_margin_m: float = 0.18,
+) -> Dictionary:
+	var requested := maxf(maximum_volume_m3, 0.0)
+	var extracted := 0.0
+	var weighted_position := Vector3.ZERO
+	var weighted_velocity := Vector3.ZERO
+	for index in range(_representatives.size() - 1, -1, -1):
+		if extracted >= requested - MIN_VOLUME_M3:
+			break
+		var rep := _representatives[index]
+		if String(rep.get("compartment", "active")) != "active":
+			continue
+		var near_intake := false
+		for region_value in intake_regions:
+			var region := region_value as Dictionary
+			if String(region.get("region_id", "")) not in [
+				"teeth_main_edge", "inner_shell", "opening",
+			]:
+				continue
+			if _point_inside_region(
+				rep["position"] as Vector3,
+				float(rep["radius_m"]) + maxf(intake_margin_m, 0.0),
+				region,
+			):
+				near_intake = true
+				break
+		if not near_intake:
+			continue
+		var available := float(rep["volume_m3"])
+		var moved := minf(available, requested - extracted)
+		if moved <= MIN_VOLUME_M3:
+			continue
+		extracted += moved
+		weighted_position += (rep["position"] as Vector3) * moved
+		weighted_velocity += (rep["velocity"] as Vector3) * moved
+		if moved >= available - MIN_VOLUME_M3:
+			_remove_representative(index)
+		else:
+			rep["volume_m3"] = available - moved
+			rep["radius_m"] = _radius_for_volume(float(rep["volume_m3"]))
+			_aggregate_volume[String(rep["aggregate_id"])] = maxf(
+				0.0,
+				float(_aggregate_volume.get(String(rep["aggregate_id"]), 0.0)) - moved,
+			)
+			_representatives[index] = rep
+	_exported_bucket_volume_m3 += extracted
+	return {
+		"accepted": extracted > MIN_VOLUME_M3,
+		"volume_m3": extracted,
+		"origin_world": weighted_position / extracted if extracted > MIN_VOLUME_M3 else Vector3.ZERO,
+		"velocity_world": weighted_velocity / extracted if extracted > MIN_VOLUME_M3 else Vector3.ZERO,
+		"reason": "scoop_flux" if extracted > MIN_VOLUME_M3 else "no_local_active_volume",
+	}
+
+
 func consume_settlement_events() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for event in _settlement_events:
@@ -462,11 +520,12 @@ func _integrate_representatives(delta: float, soil_tool_snapshot: Dictionary) ->
 			velocity.y -= GRAVITY_M_S2 * delta
 			velocity *= damping
 			position += velocity * delta
-			var bucket_result := _resolve_bucket_solids(position, velocity, radius, regions)
-			position = bucket_result["position"] as Vector3
-			velocity = bucket_result["velocity"] as Vector3
-			if bool(bucket_result["entered_cavity"]):
-				rep["contained"] = true
+			if String(rep.get("compartment", "active")) == "active":
+				var bucket_result := _resolve_bucket_solids(position, velocity, radius, regions)
+				position = bucket_result["position"] as Vector3
+				velocity = bucket_result["velocity"] as Vector3
+				if bool(bucket_result["entered_cavity"]):
+					rep["contained"] = true
 		var on_floor := false
 		if not bool(rep["contained"]):
 			var surface := persistent_field.sample_surface_at(Vector2(position.x, position.z))
@@ -617,7 +676,11 @@ func _resolve_bucket_solids(position: Vector3, velocity: Vector3, radius: float,
 	var inner := _find_region(regions, "inner_shell")
 	var opening := _find_region(regions, "opening")
 	var opening_down_dot := (opening.get("outward_normal_world", Vector3.UP) as Vector3).dot(Vector3.DOWN) if not opening.is_empty() else -1.0
-	if not inner.is_empty() and opening_down_dot <= 0.3 and _point_inside_region(position, radius * 0.25, inner):
+	if (
+		not inner.is_empty()
+		and opening_down_dot <= 0.3
+		and _point_inside_region(position, radius * 0.25, inner)
+	):
 		entered_cavity = true
 		return {"position": position, "velocity": velocity * 0.75, "entered_cavity": true}
 	for region_value in regions:
