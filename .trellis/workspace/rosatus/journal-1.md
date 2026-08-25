@@ -1476,3 +1476,37 @@ Added strict hash-bound full-bucket semantic regions for SY205/SY135, accepted-p
 ### Next Steps
 
 - None - task complete
+
+
+## Session 39: Close product experience validation
+
+**Date**: 2026-08-25
+**Task**: Close product experience validation
+**Branch**: `main`
+
+### Summary
+
+Closed the accumulated SY205/SY135 product experience defects, model-specific XInput calibration, terrain/camera/HUD/test-grid/soil integration, synchronized calibration provenance, documented the user-directed visual-gate waiver, and archived the validation child plus its completed parent.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e6c4250` | (see git log) |
+| `79f8c9e` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
