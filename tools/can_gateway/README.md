@@ -65,7 +65,8 @@ cd tools/can_gateway && ./dist_linux.sh        # 优先 uv，缺 uv 时回退 ve
 - 瑞芬 IMU：slot=count×0.01−180°；count 三连零 = 无效标记 → 编码器钳位 ≥1。
   parser 安装重映射 roll=s1/pitch=−s0/yaw=s2，在 `conventions.MachineState.
   sensor_slots` 反演。
-- 行走压力 0x256：≥8 判移动 → 行进发 ±9，静止发 0。
+- 行走压力 0x256：无符号 u16 先导压力（kg，合法域 0~50），≥8 判移动 →
+  行走发 +9（幅值恒正，**本帧不表达方向**），静止发 0。
 - 轴系/安装标定集中在 `conventions.py`（ORIGIN_*、MOUNTING 相关纯数据），
   实机校准改表不动码。
 

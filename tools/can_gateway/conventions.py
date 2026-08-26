@@ -102,10 +102,13 @@ class MachineState:
         return deg
 
     def travel_pressures(self) -> tuple[int, int]:
+        # Pilot pressure frame (0x256) carries magnitude only: unsigned kg,
+        # valid domain 0..50. Direction is not representable on this protocol,
+        # so any track speed above epsilon emits +TRAVEL_PRESSURE_MOVING.
         def pressure(speed: float) -> int:
             if abs(speed) < SPEED_EPSILON_MPS:
                 return 0
-            return TRAVEL_PRESSURE_MOVING if speed > 0 else -TRAVEL_PRESSURE_MOVING
+            return TRAVEL_PRESSURE_MOVING
         return pressure(self.sample.track_left_mps), pressure(self.sample.track_right_mps)
 
     def geodetic(self) -> tuple[float, float, float]:

@@ -180,7 +180,21 @@ class TravelSemanticsTest(unittest.TestCase):
         self.assertIs(travel_body_moving(left, right), True)
 
     def test_reverse_command_yields_moving(self) -> None:
-        left, right = decode_travel(encode_travel_frame(-9, -9))
+        # Direction is not representable on this frame: reverse still emits
+        # positive pressure magnitude (unsigned u16, 0..50 kg domain).
+        left, right = decode_travel(encode_travel_frame(9, 9))
+        self.assertIs(travel_body_moving(left, right), True)
+
+    def test_negative_pressure_rejected(self) -> None:
+        with self.assertRaises(AssertionError):
+            encode_travel_frame(-9, 0)
+
+    def test_invalid_above_50(self) -> None:
+        # Raw decode of an out-of-domain frame mirrors the parser's invalid path.
+        self.assertIsNone(travel_body_moving(51, 9))
+        payload = encode_travel_frame(50, 9)
+        left, right = decode_travel(payload)
+        self.assertEqual((left, right), (50, 9))
         self.assertIs(travel_body_moving(left, right), True)
 
     def test_idle_yields_zero_pressure_not_moving(self) -> None:
@@ -294,9 +308,13 @@ class MachineStateSemanticTest(unittest.TestCase):
         self.assertAlmostEqual(pitch, -20.0, places=2)
         self.assertAlmostEqual(yaw, 30.0, places=2)
 
-    def test_travel_pressures_follow_speed_sign(self) -> None:
+    def test_travel_pressures_magnitude_only(self) -> None:
+        # Any |speed| >= epsilon yields positive pressure regardless of
+        # direction; the 0x256 frame does not encode direction.
         state = MachineState(parse_packet(make_packet(1, left=0.5, right=-0.4)))
-        self.assertEqual(state.travel_pressures(), (9, -9))
+        self.assertEqual(state.travel_pressures(), (9, 9))
+        idle = MachineState(parse_packet(make_packet(2, left=0.01, right=-0.02)))
+        self.assertEqual(idle.travel_pressures(), (0, 0))
 
     def test_geodetic_offset_direction(self) -> None:
         state = MachineState(parse_packet(make_packet(1)))
