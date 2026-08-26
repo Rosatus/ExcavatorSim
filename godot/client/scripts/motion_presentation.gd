@@ -337,6 +337,11 @@ func _activate_model(model_id: String) -> bool:
 		candidate_is_new = true
 	_asset_root = candidate_root
 	_asset_root.visible = true
+	# Direct replacement: hide any other visible model under the presentation
+	# root (pre-placed scene defaults as well as previously activated ones).
+	for sibling in _presentation_root.get_children():
+		if sibling is Node3D and sibling != _asset_root:
+			sibling.visible = false
 	_clear_contract_state()
 	if not _load_mapping_contract(model_id):
 		_asset_root.visible = false

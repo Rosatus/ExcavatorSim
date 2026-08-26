@@ -9,6 +9,9 @@ signal world_reset(world_generation: int)
 @export var terrain_spacing_m := TerrainState.DEFAULT_SPACING_M
 @export var terrain3d_adapter_path := NodePath("../Terrain3DAdapter")
 @export var foundation_ground_path := NodePath("../FoundationGround")
+## "terrain3d" uses the native GDExtension surface; "soil_shader" forces the
+## built-in procedural soil mesh (deterministic across machines/GPU drivers).
+@export var terrain_backend := "soil_shader"
 
 var terrain_state: TerrainState
 @onready var terrain_renderer := get_node_or_null("TerrainMesh") as TerrainRenderer
@@ -78,7 +81,15 @@ func rebuild_mesh_from_snapshot(snapshot: Dictionary) -> bool:
 	_latest_snapshot = snapshot
 	var native_applied := false
 	var native_active := false
-	if terrain3d_adapter != null:
+	if terrain_backend == "soil_shader":
+		# Deterministic soil-shader presentation: keep the native backend off
+		# and hide the white foundation slab so the soil mesh is what shows.
+		if terrain3d_adapter != null:
+			terrain3d_adapter.set_test_mode(false)
+			terrain3d_adapter.deactivate_native_for_test()
+		if foundation_ground != null:
+			foundation_ground.visible = false
+	elif terrain3d_adapter != null:
 		terrain3d_adapter.queue_snapshot(snapshot)
 		native_applied = terrain3d_adapter.apply_pending()
 		native_active = terrain3d_adapter.is_native_mesh_active()

@@ -300,6 +300,7 @@ controller_enabled = true
 
 [node name="MotionClient" type="Node" parent="." unique_id=358783374]
 script = ExtResource("2_motion_client")
+desired_model_id = "sy135"
 lifecycle_input_enabled = false
 
 [node name="ProductSession" type="Node" parent="." unique_id=498572130]
@@ -457,6 +458,12 @@ layout_mode = 2
 size_flags_horizontal = 3
 text = "Test Grid"
 
+[node name="CANOutputToggle" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Tools"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "CAN 输出"
+toggle_mode = true
+
 [node name="AdvancedPanel" type="VBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=780181745]
 visible = false
 layout_mode = 2
@@ -481,6 +488,11 @@ text = "Lifecycle: stopped"
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
 text = "Input ACK: —"
+
+[node name="CANStatus" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox/AdvancedPanel"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "CAN Gateway: offline"
 
 [node name="BucketVolume" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox/AdvancedPanel" unique_id=2114908316]
 layout_mode = 2

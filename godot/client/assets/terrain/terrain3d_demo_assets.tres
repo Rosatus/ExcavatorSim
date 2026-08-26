@@ -1,9 +1,9 @@
 [gd_resource type="Terrain3DAssets" load_steps=7 format=3]
 
-[ext_resource type="Texture2D" path="res://demo/assets/textures/rock023_alb_ht.png" id="1_rock_albedo"]
-[ext_resource type="Texture2D" path="res://demo/assets/textures/rock023_nrm_rgh.png" id="2_rock_normal"]
-[ext_resource type="Texture2D" path="res://demo/assets/textures/ground037_alb_ht.png" id="3_ground_albedo"]
-[ext_resource type="Texture2D" path="res://demo/assets/textures/ground037_nrm_rgh.png" id="4_ground_normal"]
+[ext_resource type="Texture2D" path="res://assets/terrain/textures/rock023_alb_ht.png" id="1_rock_albedo"]
+[ext_resource type="Texture2D" path="res://assets/terrain/textures/rock023_nrm_rgh.png" id="2_rock_normal"]
+[ext_resource type="Texture2D" path="res://assets/terrain/textures/ground037_alb_ht.png" id="3_ground_albedo"]
+[ext_resource type="Texture2D" path="res://assets/terrain/textures/ground037_nrm_rgh.png" id="4_ground_normal"]
 
 [sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_cliff"]
 name = "Cliff"

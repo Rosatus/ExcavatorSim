@@ -20,8 +20,8 @@ const ROCK_SCENES := [
 	"res://demo/assets/models/RockB.glb",
 	"res://demo/assets/models/RockC.glb",
 ]
-const ROCK_ALBEDO := "res://demo/assets/textures/rock023_alb_ht.png"
-const ROCK_NORMAL := "res://demo/assets/textures/rock023_nrm_rgh.png"
+const ROCK_ALBEDO := "res://assets/terrain/textures/rock023_alb_ht.png"
+const ROCK_NORMAL := "res://assets/terrain/textures/rock023_nrm_rgh.png"
 
 @export var enabled := true
 @export var region_size := 128
@@ -175,15 +175,27 @@ func is_native_mesh_active() -> bool:
 	return available and not _test_mode
 
 
+## Force the native Terrain3D surface off (soil-shader backend). Idempotent.
+func deactivate_native_for_test() -> void:
+	_test_mode = false
+	_set_native_active(false)
+
+
 func set_test_mode(value: bool) -> bool:
 	if _test_mode == value:
 		return true
 	_test_mode = value
 	if _test_mode:
+		# Product decision: test-grid look = Terrain3D's own black/white
+		# checkerboard, achieved by dropping its material entirely.
+		if _terrain_node != null and is_instance_valid(_terrain_node):
+			_set_property_if_present(_terrain_node, "material", null)
 		_set_native_active(false)
 	elif not _pending_snapshot.is_empty():
+		_configure_material()
 		apply_pending()
 	elif _terrain_node != null and is_instance_valid(_terrain_node) and _applied_generation >= 0:
+		_configure_material()
 		_set_native_active(true)
 	return true
 
@@ -255,6 +267,9 @@ func _ensure_terrain_node() -> bool:
 	add_child(_terrain_node, true)
 	_set_property_if_present(_terrain_node, "region_size", region_size)
 	_set_property_if_present(_terrain_node, "collision_mask", 1)
+	# Native initialization can reset the material during the first pass;
+	# re-apply after entering the tree so the shipped build keeps its surface.
+	_configure_material()
 	_ensure_dressing_root()
 	return true
 

@@ -53,6 +53,8 @@ var _ignore_quality_toggle := false
 @onready var _authority_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/Authority
 @onready var _lifecycle_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/Lifecycle
 @onready var _diagnostics_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/Diagnostics
+@onready var _can_status_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/CANStatus
+@onready var _can_output_button: Button = $StatusPanel/Margin/VBox/Tools/CANOutputToggle
 @onready var _bucket_volume_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/BucketVolume
 @onready var _advanced_panel: VBoxContainer = $StatusPanel/Margin/VBox/AdvancedPanel
 @onready var _start_button: Button = $StatusPanel/Margin/VBox/Actions/Start
@@ -91,6 +93,7 @@ func _ready() -> void:
 	_advanced_button.toggled.connect(_on_advanced_toggled)
 	_mute_audio_button.toggled.connect(_on_audio_muted)
 	_test_graphics_button.toggled.connect(_on_test_graphics_toggled)
+	_can_output_button.pressed.connect(_on_can_output_pressed)
 	_guide_close_button.pressed.connect(_on_guide_closed)
 	_reset_view_button.pressed.connect(_on_reset_view_pressed)
 	_confirmation.confirmed.connect(_on_destructive_confirmed)
@@ -309,6 +312,79 @@ func _on_advanced_toggled(pressed: bool) -> void:
 	_advanced_panel.visible = pressed
 
 
+func _on_can_output_pressed() -> void:
+	var bridge := _can_bridge()
+	if bridge == null:
+		return
+	var enable := _can_output_button.button_pressed
+	if enable:
+		if not bridge.is_gateway_online():
+			push_warning("CAN gateway offline; retrying spawn")
+			bridge.respawn_gateway()
+		bridge.set_recording(true)
+	else:
+		bridge.set_recording(false)
+		_offer_segment_save(bridge)
+	_refresh_can_status()
+
+
+## Stop-flow: ask the user where to keep the captured segment (rename/move),
+## falling back to Explorer selection if the dialog is unavailable.
+func _offer_segment_save(bridge: Node) -> void:
+	var source := String(bridge.get_last_segment_path())
+	if source.is_empty() or not FileAccess.file_exists(source):
+		return
+	var dialog := FileDialog.new()
+	dialog.file_mode = FileDialog.FILE_MODE_SAVE_FILE
+	dialog.access = FileDialog.ACCESS_FILESYSTEM
+	dialog.current_file = source.get_file()
+	dialog.root_subfolder = source.get_base_dir()
+	dialog.add_filter("*.csv", "CAN CSV")
+	dialog.ok_button_text = "保存"
+	dialog.title = "保存 CAN 记录"
+	dialog.file_selected.connect(func(target: String) -> void:
+		var err := DirAccess.rename_absolute(source, target) \
+			if source.to_lower() != target.to_lower() else OK
+		if err != OK and source.to_lower() != target.to_lower():
+			err = FileAccess.open(source, FileAccess.READ).get_buffer(-1) != null if false else err
+		if err == OK and source.to_lower() != target.to_lower():
+			DirAccess.remove_absolute(source)
+		if err == OK:
+			bridge.set_last_segment_path(target)
+		dialog.queue_free())
+	dialog.canceled.connect(dialog.queue_free)
+	get_tree().root.add_child.call_deferred(dialog)
+	dialog.popup_centered(Vector2i(900, 600))
+
+
+func _refresh_can_status() -> void:
+	var bridge := _can_bridge()
+	if bridge == null:
+		_can_status_label.text = "CAN Gateway: unavailable"
+		_can_output_button.text = "开始记录 CAN"
+		_can_output_button.button_pressed = false
+		return
+	match int(bridge.get_status()):
+		0:
+			_can_status_label.text = "CAN Gateway: offline"
+			_can_output_button.text = "开始记录 CAN（离线，点击重试）"
+			_can_output_button.button_pressed = false
+		1:
+			_can_status_label.text = "CAN Gateway: online (idle)"
+			_can_output_button.text = "开始记录 CAN"
+			_can_output_button.button_pressed = false
+		2:
+			_can_status_label.text = "CAN Gateway: recording"
+			_can_output_button.text = "停止并保存"
+			_can_output_button.button_pressed = true
+
+
+func _can_bridge() -> Node:
+	var scene := get_tree().root.get_node_or_null("CanTelemetryBridge")
+	return scene
+
+
+
 func _on_panel_toggle_pressed() -> void:
 	_set_panel_collapsed(not _panel_collapsed)
 
@@ -412,6 +488,7 @@ func _refresh() -> void:
 	if not last_error.is_empty():
 		diagnostics += "   Error: %s" % String(last_error.get("code", "unknown"))
 	_diagnostics_label.text = diagnostics
+	_refresh_can_status()
 	_model_selector.tooltip_text = "%s — switching starts a fresh work session" % UIStrings.model_name(model_id)
 	_refresh_soil()
 	_refresh_warning(status, lifecycle, connection)

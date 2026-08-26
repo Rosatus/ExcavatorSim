@@ -1,0 +1,295 @@
+﻿"""Golden + roundtrip tests. Run: python -m unittest discover -s tools/can_gateway/tests"""
+
+from __future__ import annotations
+
+import json
+import math
+import struct
+import sys
+import unittest
+from pathlib import Path
+
+TOOLS_DIR = Path(__file__).resolve().parents[1]
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+from conventions import (  # noqa: E402
+    PACKET_MAGIC,
+    PACKET_STRUCT,
+    MachineState,
+    parse_packet,
+)
+from control_protocol import (  # noqa: E402
+    CMD_RECORD_START,
+    CMD_RECORD_STOP,
+    CMD_SHUTDOWN,
+    build_control,
+    build_heartbeat,
+    build_session_done,
+    parse_control,
+    parse_heartbeat,
+    parse_session_done,
+)
+from csv_writer import CanapeCsvWriter  # noqa: E402
+from encoders.dxg_slew import decode_slew, encode_slew_frame  # noqa: E402
+from encoders.ruifen_imu import decode_ruifen_slots, encode_ruifen_frame, reported_rpy  # noqa: E402
+from encoders.sinan_rtk import (  # noqa: E402
+    decode_alt,
+    decode_geo_int64,
+    decode_heading,
+    decode_status,
+    decode_time,
+    decode_velocity,
+    encode_alt_frame,
+    encode_heading_frame,
+    encode_lat_frame,
+    encode_lon_frame,
+    encode_status_frame,
+    encode_time_frame,
+    encode_velocity_frame,
+)
+from encoders.travel_pilot import decode_travel, encode_travel_frame, travel_body_moving  # noqa: E402
+
+FIXTURES = Path(__file__).parent / "fixtures" / "golden_capture.json"
+
+
+def golden_rows(can_id: str) -> list[bytes]:
+    rows = json.loads(FIXTURES.read_text(encoding="utf-8"))[can_id]
+    return [bytes.fromhex(row) for row in rows]
+
+
+def make_packet(tick_ms: int, swing_rad: float = 0.0, left: float = 0.0, right: float = 0.0) -> bytes:
+    raw = struct.pack("<IBBHQ", PACKET_MAGIC, 1, 0, 0, tick_ms)
+    for index in range(5):
+        raw += struct.pack("<4f3f", 0.0, 0.0, 0.0, 1.0, float(index), 0.0, 0.0)
+    raw += struct.pack("<5f", swing_rad, left, right, 0.0, 0.0)
+    return raw
+
+
+class RuifenGoldenTest(unittest.TestCase):
+    def test_golden_decode_reencode_first_six_bytes(self) -> None:
+        for can_id in ("18ff3a00", "18ff3b00", "18ff3c00", "18ff3d00"):
+            for payload in golden_rows(can_id):
+                slots = decode_ruifen_slots(payload)
+                counts = tuple(int(round((s + 180.0) * 100.0)) for s in slots)
+                reencoded = encode_ruifen_frame(counts)
+                self.assertEqual(reencoded[0:6], payload[0:6], f"{can_id}: {payload.hex()}")
+
+    def test_full_range_roundtrip_within_quantum(self) -> None:
+        for step in range(974):
+            slot = max(-179.99, min(179.99, step * 0.37 - 179.99))
+            encoded = encode_ruifen_frame((max(1, int(round((slot + 180.0) / 0.01))), 32768, 65535))
+            s0 = decode_ruifen_slots(encoded)[0]
+            self.assertLessEqual(abs(s0 - slot), 0.010001)
+
+    def test_reported_rpy_matches_parser_remap(self) -> None:
+        # slots(1000,20000,30000) -> s=(-170,+20,+120); remap roll=s1 pitch=-s0 yaw=s2
+        roll, pitch, yaw = reported_rpy(encode_ruifen_frame((1000, 20000, 30000)))
+        self.assertAlmostEqual(roll, 20.0, places=2)
+        self.assertAlmostEqual(pitch, 170.0, places=2)
+        self.assertAlmostEqual(yaw, 120.0, places=2)
+
+    def test_encoder_never_emits_invalid_zero_triple(self) -> None:
+        payload = encode_ruifen_frame(MachineState.sensor_slots(0.0, 179.995, 0.0))
+        self.assertNotEqual(payload[0:6], b"\x00\x00\x00\x00\x00\x00")
+        payload = encode_ruifen_frame(MachineState.sensor_slots(0.0, -179.995, 0.0))
+        self.assertNotEqual(payload[0:6], b"\x00\x00\x00\x00\x00\x00")
+
+
+class SlewGoldenTest(unittest.TestCase):
+    def test_golden_decode_reencode_counts_and_sta(self) -> None:
+        for payload in golden_rows("18fff000"):
+            angle, sta = decode_slew(payload)
+            reencoded = encode_slew_frame(angle, status=sta)
+            self.assertEqual(reencoded[0:3], payload[0:3], payload.hex())
+
+    def test_full_revolution_roundtrip_one_lsb(self) -> None:
+        lsb_deg = 360.0 / 65536.0
+        for step in range(50):
+            deg = step * 7.31
+            angle, _ = decode_slew(encode_slew_frame(deg))
+            self.assertLessEqual(abs(angle - deg % 360.0) / lsb_deg, 1.0)
+
+
+class RtkGoldenTest(unittest.TestCase):
+    """Protocol is mixed-endian per parser code; capture CSV and the dev_arch
+    ground-truth e2e fixture agree. Golden asserts that DEFAULT encoders
+    (parser parity) reproduce captured frames byte-for-byte."""
+
+    CASES = {
+        "0cfda000": "time",
+        "0cfda800": "velocity",
+        "0cfda900": "heading",
+        "0cfda200": "lon",
+        "0cfda300": "lat",
+        "0cfda500": "lon",
+        "0cfda600": "lat",
+        "0cfda400": "alt",
+        "0cfda700": "alt",
+    }
+
+    @staticmethod
+    def _codec(kind: str):
+        if kind == "lon":
+            return decode_geo_int64, encode_lon_frame
+        if kind == "lat":
+            return decode_geo_int64, encode_lat_frame
+        if kind == "alt":
+            return decode_alt, encode_alt_frame
+        if kind == "velocity":
+            return decode_velocity, lambda v: encode_velocity_frame(*v)
+        if kind == "heading":
+            return decode_heading, encode_heading_frame
+        return decode_time, lambda v: encode_time_frame(v[0], v[1])
+
+    def test_golden_default_encoders_reproduce_capture(self) -> None:
+        for can_id, kind in self.CASES.items():
+            decoder, encoder = self._codec(kind)
+            for payload in golden_rows(can_id):
+                decoded = decoder(payload)
+                reencoded = encoder(decoded)
+                self.assertEqual(reencoded.ljust(8, b"\x00"), payload.ljust(8, b"\x00"), can_id)
+
+    def test_synthetic_values(self) -> None:
+        week, seconds = decode_time(encode_time_frame(2300, 452967.891))
+        self.assertEqual((week, round(seconds, 3)), (2300, 452967.891))
+        status = decode_status(encode_status_frame(gps_age_cs=42))
+        self.assertEqual(status["gpsAgeCs"], 42)
+        self.assertEqual(status["gpsNumStatsUsed"], status["viceGpsNumStatsUsed"])
+        lon = decode_geo_int64(encode_lon_frame(120.09331234))
+        self.assertAlmostEqual(lon, 120.09331234, places=7)
+        alt = decode_alt(encode_alt_frame(-12.345))
+        self.assertAlmostEqual(alt, -12.345, places=3)
+        vel = decode_velocity(encode_velocity_frame(1.234, -0.567, 0.001, 1.35))
+        self.assertAlmostEqual(vel[0], 1.234, places=2)
+        self.assertAlmostEqual(vel[1], -0.567, places=2)
+        self.assertAlmostEqual(vel[3], 1.35, places=2)
+        heading = decode_heading(encode_heading_frame(359.99))
+        self.assertAlmostEqual(heading, 359.99, places=2)
+
+
+class TravelSemanticsTest(unittest.TestCase):
+    def test_forward_command_yields_moving(self) -> None:
+        left, right = decode_travel(encode_travel_frame(9, 9))
+        self.assertEqual((left, right), (9, 9))
+        self.assertIs(travel_body_moving(left, right), True)
+
+    def test_reverse_command_yields_moving(self) -> None:
+        left, right = decode_travel(encode_travel_frame(-9, -9))
+        self.assertIs(travel_body_moving(left, right), True)
+
+    def test_idle_yields_zero_pressure_not_moving(self) -> None:
+        left, right = decode_travel(encode_travel_frame(0, 0))
+        self.assertEqual((left, right), (0, 0))
+        self.assertIs(travel_body_moving(left, right), False)
+
+
+class PacketAndCsvTest(unittest.TestCase):
+    def test_bridge_packet_roundtrip(self) -> None:
+        sample = parse_packet(make_packet(12345, swing_rad=0.77, left=0.4))
+        self.assertIsNotNone(sample)
+        assert sample is not None
+        self.assertEqual(sample.tick_ms, 12345)
+        self.assertAlmostEqual(sample.bodies["boom"].origin_m[0], 2.0, places=5)
+        self.assertAlmostEqual(sample.swing_rad, 0.77, places=5)
+        self.assertEqual(PACKET_STRUCT.size, len(make_packet(0)))
+        state = MachineState(sample)
+        self.assertAlmostEqual(state.slew_degrees(), math.degrees(0.77) % 360.0, places=3)
+
+    def test_bad_packets_rejected(self) -> None:
+        self.assertIsNone(parse_packet(b"short"))
+        self.assertIsNone(parse_packet(bytes(PACKET_STRUCT.size)))
+
+    def test_csv_writer_dialect(self) -> None:
+        path = Path(__file__).parent / "_tmp_dialect.csv"
+        writer = CanapeCsvWriter(path)
+        writer.append(0x18FF3A00, bytes.fromhex("9C278A46F24769 00".replace(" ", "")))
+        writer.append(0x256, bytes(8))
+        writer.close()
+        lines = path.read_text(encoding="utf-8-sig").strip().splitlines()
+        self.assertEqual(lines[0].split(",")[0], "\u5e8f\u53f7")
+        fields = lines[1].split(",")
+        self.assertEqual(fields[0], "00000")
+        self.assertTrue(fields[1].startswith('="') and fields[1].endswith('"'))
+        self.assertEqual(fields[5], "0x18FF3A00")
+        self.assertEqual(fields[7], "\u6269\u5c55\u5e27")
+        self.assertEqual(fields[9].strip(), "x| 9C 27 8A 46 F2 47 69 00")
+        fields2 = lines[2].split(",")
+        self.assertEqual(fields2[5], "0x256")
+        self.assertEqual(fields2[7], "\u6807\u51c6\u5e27")
+        path.unlink()
+
+    def test_csv_loadable_by_dev_arch_reader(self) -> None:
+        reader_path = Path("E:/projects/dev_arch2.0_36b5586c/tools/can_replay/csv_parser.py")
+        if not reader_path.exists():
+            self.skipTest("dev_arch2.0 repo not available")
+        sys.path.insert(0, str(reader_path.parent))
+        try:
+            from csv_parser import read_can_csv  # type: ignore
+        finally:
+            sys.path.remove(str(reader_path.parent))
+        path = Path(__file__).parent / "_tmp_reader.csv"
+        writer = CanapeCsvWriter(path)
+        for can_id in (0x18FF3A00, 0x256, 0x18FFF000):
+            writer.append(can_id, bytes(range(1, 9)))
+        writer.close()
+        frames = read_can_csv(str(path))
+        eff_mask = 0x1FFFFFFF
+        self.assertEqual([f.can_id & eff_mask for f in frames], [0x18FF3A00, 0x256, 0x18FFF000])
+        self.assertTrue(frames[0].is_extended and not frames[1].is_extended)
+        self.assertEqual(frames[0].data, bytes(range(1, 9)))
+        path.unlink()
+
+
+class ControlProtocolTest(unittest.TestCase):
+    def test_control_roundtrip(self) -> None:
+        for cmd in (CMD_RECORD_START, CMD_RECORD_STOP, CMD_SHUTDOWN):
+            self.assertEqual(parse_control(build_control(cmd, seq=7)), cmd)
+
+    def test_control_rejects_garbage(self) -> None:
+        self.assertIsNone(parse_control(b"short"))
+        self.assertIsNone(parse_control(bytes(12)))
+        self.assertIsNone(parse_control(build_control(99)))
+
+    def test_heartbeat_roundtrip_and_flags(self) -> None:
+        idle = parse_heartbeat(build_heartbeat(1234, recording=False))
+        rec = parse_heartbeat(build_heartbeat(5678, recording=True))
+        self.assertEqual(idle, (False, 1234))
+        self.assertEqual(rec, (True, 5678))
+        self.assertIsNone(parse_heartbeat(b"x" * 15))
+        self.assertIsNone(parse_heartbeat(bytes(16)))
+
+    def test_session_done_roundtrip(self) -> None:
+        path = "E:/dir/can_telemetry_20260825_120000.csv"
+        payload = build_session_done(path)
+        self.assertEqual(parse_session_done(payload), path)
+        self.assertIsNone(parse_session_done(b"tiny"))
+        self.assertIsNone(parse_session_done(bytes(16)))
+
+
+class MachineStateSemanticTest(unittest.TestCase):
+    def test_sensor_slots_invert_parser_remap(self) -> None:
+        from encoders.ruifen_imu import encode_ruifen_frame as encode
+
+        slots = MachineState.sensor_slots(10.0, -20.0, 30.0)
+        roll, pitch, yaw = reported_rpy(encode(slots))
+        self.assertAlmostEqual(roll, 10.0, places=2)
+        self.assertAlmostEqual(pitch, -20.0, places=2)
+        self.assertAlmostEqual(yaw, 30.0, places=2)
+
+    def test_travel_pressures_follow_speed_sign(self) -> None:
+        state = MachineState(parse_packet(make_packet(1, left=0.5, right=-0.4)))
+        self.assertEqual(state.travel_pressures(), (9, -9))
+
+    def test_geodetic_offset_direction(self) -> None:
+        state = MachineState(parse_packet(make_packet(1)))
+        lat, lon, alt = state.geodetic()
+        self.assertAlmostEqual(lat, 30.8675, places=6)
+        self.assertAlmostEqual(lon, 120.0933, places=6)
+        self.assertAlmostEqual(alt, 3.0, places=4)
+        heading = state.heading_degrees()
+        self.assertTrue(0.0 <= heading < 360.0)
+
+
+if __name__ == "__main__":
+    unittest.main()
