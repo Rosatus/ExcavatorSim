@@ -213,17 +213,25 @@ def quat_to_yup_euler_deg(q: tuple[float, float, float, float]) -> tuple[float, 
     # clockwise viewed from +Y, so heading = -atan2(fwd_x, -fwd_z)
     yaw = math.degrees(math.atan2(-fwd_x, -fwd_z))
     horiz = math.hypot(fwd_x, fwd_z)
-    if horiz < 1e-9:
-        # gimbal lock on elevation: read pitch from the up axis
-        pitch = math.degrees(math.atan2(m[1][0] if fwd_y < 0 else -m[1][0], abs(fwd_y)))
-    else:
-        pitch = math.degrees(math.atan2(fwd_y, horiz))
+    pitch = math.degrees(math.atan2(fwd_y, horiz))
     # roll tilts the up axis within the plane containing forward and up:
     # project up onto the vertical plane spanned by forward-horizontal and Y
     up_x, up_y, up_z = m[0][1], m[1][1], m[2][1]
     fwd_horiz_x, fwd_horiz_z = (fwd_x / horiz, fwd_z / horiz) if horiz > 1e-9 else (0.0, -1.0)
     lateral = up_x * (-fwd_horiz_z) + up_z * fwd_horiz_x
     roll = math.degrees(math.atan2(lateral, max(up_y, 1e-12)) if abs(up_y) > 1e-12 else math.copysign(90.0, lateral))
+    # Continuous-pitch unwrap: a real IMU reports pitch through +/-90 without
+    # flipping yaw (e.g. an arm curling past vertical keeps pitch growing to
+    # +/-180). The elevation-only decomposition instead folds at +/-90 with a
+    # 180 deg yaw jump; undo that fold so joint-angle reconstruction
+    # (downstream uses bkt-arm differences) stays monotonic across travel.
+    # Fold signature: the link up axis points downward (up_y < 0) - true
+    # attitude has |pitch| > 90. Genuine heading rotations keep up_y >= 0.
+    if up_y < 0.0:
+        sign = 1.0 if pitch >= 0.0 else -1.0
+        pitch = sign * (180.0 - abs(pitch))
+        yaw -= math.copysign(180.0, yaw)
+        roll = -roll
     return roll, pitch, yaw
 
 

@@ -96,6 +96,32 @@ class YupEulerDecompositionTest(unittest.TestCase):
         self.assertAlmostEqual(yaw, 90.0, delta=0.05)
 
 
+class ContinuousPitchUnwrapTest(unittest.TestCase):
+    """Real IMUs report pitch through +/-90 continuously; the elevation
+    decomposition folds there with a yaw jump. Downstream joint reconstruction
+    uses bkt-arm differences, so a fold mid-dig breaks the model."""
+
+    def test_arm_curling_past_vertical_stays_monotonic(self) -> None:
+        # sy135 arm: rest frame Rx(-55); digging curls further down.
+        pitches = []
+        for deg in range(-55, -176, -10):
+            st = state_for({"arm": q_rest("arm") if deg == -55 else q_axis_angle(X, float(deg))})
+            pitches.append(st.link_rpy("arm")[1])
+        diffs = [b - a for a, b in zip(pitches, pitches[1:])]
+        self.assertTrue(all(d > 1.0 for d in diffs),
+                        f"pitch not monotonically increasing through vertical: {pitches}")
+        self.assertLess(pitches[-1], 120.5)
+        self.assertGreater(pitches[-1], 119.0)
+
+    def test_heading_rotation_does_not_trigger_unwrap(self) -> None:
+        # slewing backward puts world yaw beyond +/-90 with up_y >= 0:
+        # pitch must stay ~0, yaw must read the true heading.
+        st = state_for({"chassis": q_axis_angle(Y, 135), "upper": q_axis_angle(Y, 135)})
+        roll, pitch, yaw = st.link_rpy("body")
+        self.assertAlmostEqual(yaw, 135.0, delta=0.01)
+        self.assertLess(abs(pitch), 0.01)
+
+
 class MountCompensationTest(unittest.TestCase):
     def test_sy135_rest_reports_zero_segment_elevation(self) -> None:
         # sy135 segments are horizontal at rest; comp cancels the baked frame
