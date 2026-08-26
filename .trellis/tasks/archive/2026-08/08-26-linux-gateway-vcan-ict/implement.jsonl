@@ -1,0 +1,5 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": "E:\\projects\\dev_arch2.0_36b5586c\\tools\\can_replay\\vcan_setup.py", "reason": "参考实现：ensure_vcan_interface/sudo 探测/runner 注入测试模式，原样移植"}
+{"file": "E:\\projects\\dev_arch2.0_36b5586c\\tools\\can_replay\\vcan_client.py", "reason": "参考实现：AF_CAN CAN_RAW socket + can_frame 16B 打包（SocketCanSink 蓝本）"}
+{"file": "E:\\projects\\dev_arch2.0_36b5586c\\tools\\can_replay\\setup_vcan.sh", "reason": "参考实现：shell 入口包装形态"}
+{"file": "E:\\projects\\ExcavatorSim\\tools\\can_gateway\\gateway.py", "reason": "改造对象：主循环 sink 泛化、ICT 门控、CLI 扩展"}
