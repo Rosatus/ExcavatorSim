@@ -34,6 +34,7 @@ from encoders.sinan_rtk import (
     build_rtk_frames,
 )
 from encoders.travel_pilot import encode_travel_frame
+from pc001_sink import TcpPc001Sink
 from sinks import CsvFrameSink, FrameSink, SocketCanSink
 from vcan_setup import VcanSetupError, ensure_vcan_interface
 
@@ -68,10 +69,16 @@ def run(args: argparse.Namespace) -> int:
     out_path = Path(args.out)
     out_path.mkdir(parents=True, exist_ok=True)
 
-    vcan_sink: SocketCanSink | None = None
+    ict_sink: FrameSink | None = None
     if args.sink == "vcan":
-        vcan_sink = _open_vcan(args.interface)
-        if vcan_sink is None:
+        ict_sink = _open_vcan(args.interface)
+        if ict_sink is None:
+            return 1
+    elif args.sink == "tcp":
+        try:
+            ict_sink = TcpPc001Sink(args.tcp_host, args.tcp_port)
+        except RuntimeError as exc:
+            print(str(exc), file=sys.stderr)
             return 1
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -96,8 +103,8 @@ def run(args: argparse.Namespace) -> int:
         sinks: list[FrameSink] = []
         if recording and writer is not None:
             sinks.append(CsvFrameSink(writer))
-        if vcan_sink is not None:
-            sinks.append(vcan_sink)
+        if ict_sink is not None:
+            sinks.append(ict_sink)
         return sinks
 
     try:
@@ -137,16 +144,19 @@ def run(args: argparse.Namespace) -> int:
                         writer = None
                     print("recording stopped")
                 elif cmd == CMD_ICT_START:
-                    if vcan_sink is None:
-                        vcan_sink = _open_vcan(args.interface)
-                    if vcan_sink is not None:
-                        print(f"ICT connected: {vcan_sink.peer_name()}")
-                    else:
-                        print("ICT connect failed", file=sys.stderr)
+                    if ict_sink is None:
+                        if args.sink == "vcan":
+                            ict_sink = _open_vcan(args.interface)
+                        elif args.sink == "csv":
+                            # csv-only mode: ICT was never configured
+                            print("ICT unavailable: gateway started without --sink tcp/vcan", file=sys.stderr)
+                    if ict_sink is not None:
+                        print(f"ICT connected: {ict_sink.peer_name()}")
                 elif cmd == CMD_ICT_STOP:
-                    if vcan_sink is not None:
-                        vcan_sink.close()
-                        vcan_sink = None
+                    if ict_sink is not None and args.sink == "vcan":
+                        # tcp sink stays listening across ICT stop; only vcan closes
+                        ict_sink.close()
+                        ict_sink = None
                     print("ICT disconnected")
                 elif cmd == CMD_SHUTDOWN:
                     print("shutdown requested")
@@ -170,8 +180,8 @@ def run(args: argparse.Namespace) -> int:
         path = writer._path if writer is not None else "(no session)"
         if writer is not None:
             writer.close()
-        if vcan_sink is not None:
-            vcan_sink.close()
+        if ict_sink is not None:
+            ict_sink.close()
         print(f"closed {path} ({rows} frames)")
         sock.close()
     return 0
@@ -246,11 +256,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ack-port", type=int, default=29765, help="heartbeat destination port")
     parser.add_argument(
         "--sink",
-        choices=("csv", "vcan"),
+        choices=("csv", "vcan", "tcp"),
         default="csv",
-        help="frame output: csv segments (default) or SocketCAN vcan direct send",
+        help="frame output: csv segments (default), SocketCAN vcan, or PC001 TCP server",
     )
     parser.add_argument("--interface", default="vcan0", help="SocketCAN interface for --sink vcan / --setup-vcan")
+    parser.add_argument("--tcp-host", default="0.0.0.0", help="listen address for --sink tcp (PC001)")
+    parser.add_argument("--tcp-port", type=int, default=5678, help="listen port for --sink tcp (PC001)")
     parser.add_argument(
         "--setup-vcan",
         action="store_true",
@@ -287,17 +299,23 @@ def run_with_injection(args: argparse.Namespace, sender: socket.socket) -> int:
     out_path = Path(args.out)
     out_path.mkdir(parents=True, exist_ok=True)
 
-    vcan_sink: SocketCanSink | None = None
+    ict_sink: FrameSink | None = None
     if args.sink == "vcan":
-        vcan_sink = _open_vcan(args.interface)
-        if vcan_sink is None:
+        ict_sink = _open_vcan(args.interface)
+        if ict_sink is None:
+            return 1
+    elif args.sink == "tcp":
+        try:
+            ict_sink = TcpPc001Sink(args.tcp_host, args.tcp_port)
+        except RuntimeError as exc:
+            print(str(exc), file=sys.stderr)
             return 1
 
     csv_path = out_path / "can_telemetry_smoke.csv"
     writer = CanapeCsvWriter(csv_path)
     sinks: list[FrameSink] = [CsvFrameSink(writer)]
-    if vcan_sink is not None:
-        sinks.append(vcan_sink)
+    if ict_sink is not None:
+        sinks.append(ict_sink)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((args.host, args.port))
     sock.settimeout(0.5)
@@ -318,8 +336,8 @@ def run_with_injection(args: argparse.Namespace, sender: socket.socket) -> int:
             time.sleep(0.006)
     finally:
         writer.close()
-        if vcan_sink is not None:
-            vcan_sink.close()
+        if ict_sink is not None:
+            ict_sink.close()
         sock.close()
         print(f"smoke wrote {writer.row_count} frames -> {csv_path}")
     return 0 if writer.row_count >= args.max_rows else 1

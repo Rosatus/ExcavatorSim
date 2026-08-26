@@ -42,6 +42,9 @@ var _last_heartbeat_ms := -1
 var _heartbeat_recording := false
 var _gateway_is_linux := false
 var _ict_active := false
+## PC001 TCP endpoint for Windows ICT (injected into gateway spawn argv).
+var tcp_host := "0.0.0.0"
+var tcp_port := 5678
 var _control_seq := 0
 var _last_segment_path := ""
 
@@ -129,6 +132,16 @@ func is_linux_gateway() -> bool:
 	return _gateway_is_linux
 
 
+## Panel-configured PC001 TCP endpoint; applied on the next gateway spawn.
+func set_tcp_endpoint(host: String, port_text: String) -> void:
+	var trimmed_host := host.strip_edges()
+	if not trimmed_host.is_empty():
+		tcp_host = trimmed_host
+	var trimmed_port := port_text.strip_edges()
+	if not trimmed_port.is_empty() and trimmed_port.is_valid_int():
+		tcp_port = clampi(trimmed_port.to_int(), 1, 65535)
+
+
 func is_ict_active() -> bool:
 	return _ict_active
 
@@ -162,6 +175,17 @@ func _resolve_gateway_command() -> PackedStringArray:
 			exe_dir.path_join(candidate_name),
 		]:
 			if FileAccess.file_exists(candidate):
+				if OS.get_name() == "Windows":
+					return PackedStringArray([
+						candidate,
+						"--host", remote_host,
+						"--port", str(remote_port),
+						"--ack-port", str(ack_port),
+						"--out", _resolve_output_dir(),
+						"--sink", "tcp",
+						"--tcp-host", tcp_host,
+						"--tcp-port", str(tcp_port),
+					])
 				return PackedStringArray([
 					candidate,
 					"--host", remote_host,

@@ -501,6 +501,16 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 12
 text = "CAN Gateway: offline"
 
+[node name="ICTHost" type="LineEdit" parent="OperatorUI/StatusPanel/Margin/VBox/AdvancedPanel"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+placeholder_text = "ICT IP，默认 0.0.0.0"
+
+[node name="ICTPort" type="LineEdit" parent="OperatorUI/StatusPanel/Margin/VBox/AdvancedPanel"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+placeholder_text = "ICT 端口，默认 5678"
+
 [node name="BucketVolume" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox/AdvancedPanel" unique_id=2114908316]
 layout_mode = 2
 theme_override_font_sizes/font_size = 12

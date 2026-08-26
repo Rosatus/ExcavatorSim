@@ -36,8 +36,7 @@ Godot: tests/can_gateway_e2e_test.gd                     # 进程监督+录制�
 ## Linux / SocketCAN（vcan 直发）
 
 `--sink vcan` 将编码帧经 `AF_CAN CAN_RAW` 实时写入 vcan 网卡
-（供 CANape/ICT 测试台消费），与 CSV 录制相互独立；游戏内
-[连接 ICT] 按钮仅在网关为 Linux 版时可用（心跳 flags.bit1 上报平台）。
+（供 CANape/ICT 测试台消费），与 CSV 录制相互独立。
 
 ```bash
 # WSL 出包（产物 ELF → dist/can_gateway_linux/gateway）
@@ -50,6 +49,27 @@ cd tools/can_gateway && ./dist_linux.sh        # 优先 uv，缺 uv 时回退 ve
 
 注意：WSL2 默认内核可能无 CONFIG_CAN/VCAN（报 "AF_CAN unavailable"），
 需自编译内核或用真实 Linux。构建机 glibc 需不高于目标机。
+
+## Windows / PC001 TCP（ICT 直连）
+
+Windows 无 SocketCAN，改用 can_replay 的 PC001 TCP transport：
+gateway 作 **TCP 服务端**（默认 `0.0.0.0:5678`），ICT 侧运行现成的
+`socket_client_to_vcan.sh` 桥接到 vcan——**对端零改动**。
+
+```
+ExcavatorSim gateway.exe (--sink tcp)          ICT 侧 (LinuxPC)
+  TCP :5678 服务端                               socket_bridge.py 客户端
+  ── "who" ────────────────────────────────►     回 "PC001"
+  ◄─ [u16 count] + count×[can_frame16B+i32 channel] ──► 写入 vcan0
+```
+
+- 游戏 AdvancedPanel 的 **ICT IP / ICT 端口** 输入框配置监听地址
+  （持久化 user://ict_config.cfg，spawn 时经 argv 注入）；
+  [连接 ICT] 在 Windows/Linux 网关下均可用。
+- 手动运行：`gateway.exe --sink tcp --tcp-host 0.0.0.0 --tcp-port 5678`
+- 对端：`python3 -m tools.can_replay bridge --host <本机IP> --port 5678 --interface vcan0`
+- 无客户端接入时帧静默丢弃；断线自动重等连接，未发出的帧重新排队。
+- 批帧 ≤100 帧（MAX_BATCH_FRAMES），握手超时 10s，语义与参考实现一致。
 
 ## 关键约定
 
@@ -76,6 +96,7 @@ cd tools/can_gateway && ./dist_linux.sh        # 优先 uv，缺 uv 时回退 ve
 - `conventions.py` — 包解析 / 四元数→ZYX 欧拉 / ENU→大地坐标 / 行走语义
 - `csv_writer.py` — CANape CSV 方言（UTF-8-sig，被对方 read_can_csv 消费）
 - `sinks.py` — FrameSink 抽象：CsvFrameSink / SocketCanSink（AF_CAN 直发）
+- `pc001_sink.py` — PC001 TCP 服务端 sink（Windows ICT，字节兼容 dev_arch 桥）
 - `vcan_setup.py` — vcan 接口检测/自动创建（移植自 dev_arch can_replay）
 - `dist_linux.sh` — WSL/Linux 打包脚本（uv 优先）→ dist/can_gateway_linux/gateway
 - `encoders/` — ruifen_imu / dxg_slew / sinan_rtk / travel_pilot

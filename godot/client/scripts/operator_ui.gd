@@ -56,6 +56,10 @@ var _ignore_quality_toggle := false
 @onready var _can_status_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/CANStatus
 @onready var _can_output_button: Button = $StatusPanel/Margin/VBox/Tools/CANOutputToggle
 @onready var _ict_button: Button = $StatusPanel/Margin/VBox/Tools/ICTConnectToggle
+@onready var _ict_host_edit: LineEdit = $StatusPanel/Margin/VBox/AdvancedPanel/ICTHost
+@onready var _ict_port_edit: LineEdit = $StatusPanel/Margin/VBox/AdvancedPanel/ICTPort
+
+const ICT_CONFIG_PATH := "user://ict_config.cfg"
 @onready var _bucket_volume_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/BucketVolume
 @onready var _advanced_panel: VBoxContainer = $StatusPanel/Margin/VBox/AdvancedPanel
 @onready var _start_button: Button = $StatusPanel/Margin/VBox/Actions/Start
@@ -96,6 +100,9 @@ func _ready() -> void:
 	_test_graphics_button.toggled.connect(_on_test_graphics_toggled)
 	_can_output_button.pressed.connect(_on_can_output_pressed)
 	_ict_button.pressed.connect(_on_ict_pressed)
+	_load_ict_config()
+	_ict_host_edit.text_changed.connect(func(_t: String) -> void: _save_ict_config())
+	_ict_port_edit.text_changed.connect(func(_t: String) -> void: _save_ict_config())
 	_guide_close_button.pressed.connect(_on_guide_closed)
 	_reset_view_button.pressed.connect(_on_reset_view_pressed)
 	_confirmation.confirmed.connect(_on_destructive_confirmed)
@@ -365,12 +372,28 @@ func _on_ict_pressed() -> void:
 		_ict_button.button_pressed = false
 		return
 	var enable := _ict_button.button_pressed
-	if enable and not (bridge.is_gateway_online() and bridge.is_linux_gateway()):
-		push_warning("ICT requires an online Linux gateway")
+	if enable and not bridge.is_gateway_online():
+		push_warning("ICT requires an online gateway")
 		_ict_button.button_pressed = false
 		return
+	if enable:
+		bridge.set_tcp_endpoint(_ict_host_edit.text.strip_edges(), _ict_port_edit.text.strip_edges())
 	bridge.set_ict_connected(enable)
 	_refresh_can_status()
+
+
+func _load_ict_config() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load(ICT_CONFIG_PATH) == OK:
+		_ict_host_edit.text = String(cfg.get_value("ict", "host", ""))
+		_ict_port_edit.text = String(cfg.get_value("ict", "port", ""))
+
+
+func _save_ict_config() -> void:
+	var cfg := ConfigFile.new()
+	cfg.set_value("ict", "host", _ict_host_edit.text.strip_edges())
+	cfg.set_value("ict", "port", _ict_port_edit.text.strip_edges())
+	cfg.save(ICT_CONFIG_PATH)
 
 
 func _refresh_can_status() -> void:
@@ -379,40 +402,38 @@ func _refresh_can_status() -> void:
 		_can_status_label.text = "CAN Gateway: unavailable"
 		_can_output_button.text = "开始记录 CAN"
 		_can_output_button.button_pressed = false
-		_set_ict_button(false, false, "CAN 网关不可用")
+		_set_ict_button(false, false, false, "CAN 网关不可用")
 		return
+	var linux_gw: bool = bridge.is_linux_gateway()
 	match int(bridge.get_status()):
 		0:
 			_can_status_label.text = "CAN Gateway: offline"
 			_can_output_button.text = "开始记录 CAN（离线，点击重试）"
 			_can_output_button.button_pressed = false
-			_set_ict_button(bridge.is_linux_gateway(), false, "网关离线，连接后重试")
+			_set_ict_button(false, linux_gw, false, "网关离线，连接后重试")
 		1:
 			_can_status_label.text = "CAN Gateway: online (idle)"
 			_can_output_button.text = "开始记录 CAN"
 			_can_output_button.button_pressed = false
-			_set_ict_button(
-				bridge.is_linux_gateway(),
-				bridge.is_ict_active(),
-				"" if bridge.is_linux_gateway() else "当前为 Windows 网关（仅 CSV 输出）；Linux 网关支持 vcan 直发"
-			)
+			_set_ict_button(true, linux_gw, bridge.is_ict_active(), "")
 		2:
 			_can_status_label.text = "CAN Gateway: recording"
 			_can_output_button.text = "停止并保存"
 			_can_output_button.button_pressed = true
-			_set_ict_button(
-				bridge.is_linux_gateway(),
-				bridge.is_ict_active(),
-				"" if bridge.is_linux_gateway() else "当前为 Windows 网关（仅 CSV 输出）；Linux 网关支持 vcan 直发"
-			)
+			_set_ict_button(true, linux_gw, bridge.is_ict_active(), "")
 
 
-func _set_ict_button(linux_gateway: bool, active: bool, disabled_reason: String) -> void:
-	var usable := linux_gateway
+func _set_ict_button(online: bool, linux_gateway: bool, active: bool, disabled_reason: String) -> void:
+	var usable := online
 	_ict_button.disabled = not usable
-	_ict_button.tooltip_text = disabled_reason if not usable else ""
+	_ict_button.tooltip_text = disabled_reason if not usable else (
+		"Linux 网关：vcan 直发" if linux_gateway
+		else "Windows 网关：PC001 TCP %s:%s（对端用 socket_client_to_vcan 桥接）"
+			% [_ict_host_edit.text.strip_edges() if not _ict_host_edit.text.strip_edges().is_empty() else "0.0.0.0",
+				_ict_port_edit.text.strip_edges() if not _ict_port_edit.text.strip_edges().is_empty() else "5678"]
+	)
 	if not usable:
-		_ict_button.text = "连接 ICT（需 Linux 网关）"
+		_ict_button.text = "连接 ICT（网关离线）"
 		_ict_button.button_pressed = false
 	elif active:
 		_ict_button.text = "断开 ICT"
