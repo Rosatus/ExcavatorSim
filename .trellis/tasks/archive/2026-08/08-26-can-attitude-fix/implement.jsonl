@@ -1,0 +1,3 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": "E:\\projects\\ExcavatorSim\\godot\\client\\resources\\visual\\sy135_visual_manifest.json", "reason": "sy135 rest_transforms 非单位旋转(35/-55/-75)与水平段几何 → 安装角表来源"}
+{"file": "E:\\projects\\ExcavatorSim\\godot\\client\\resources\\visual\\sy205_visual_manifest.json", "reason": "sy205 单位 rest 帧 + 烘焙段几何（boom 47.65）→ 安装角表对照"}
