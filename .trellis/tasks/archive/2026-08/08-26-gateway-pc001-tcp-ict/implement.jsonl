@@ -1,0 +1,3 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": "E:\\projects\\dev_arch2.0_36b5586c\\tools\\can_replay\\pc001_server.py", "reason": "参考：PC001 服务端握手/批帧格式/单客户端顶替语义"}
+{"file": "E:\\projects\\dev_arch2.0_36b5586c\\tools\\can_replay\\socket_bridge.py", "reason": "参考：ICT 侧客户端行为（who/PC001、[u16 count]+n*[can_frame+channel]）——本任务 gateway 必须与其字节兼容"}
