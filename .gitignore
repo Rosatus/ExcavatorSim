@@ -8,3 +8,7 @@ artifacts/
 godot/.godot/
 godot/.cache/
 
+
+build/
+dist/
+output/
