@@ -13,7 +13,13 @@ import sys
 import time
 from pathlib import Path
 
-from conventions import MachineState, TelemetrySample, parse_packet
+from conventions import (
+    IMU_MOUNT_COMPENSATION_DEG,
+    DEFAULT_MODEL,
+    MachineState,
+    TelemetrySample,
+    parse_packet,
+)
 from control_protocol import (
     CMD_ICT_START,
     CMD_ICT_STOP,
@@ -210,7 +216,7 @@ def emit_frames(
     sample: TelemetrySample,
     rtk_byteorder: str = "little",
 ) -> None:
-    state = MachineState(sample)
+    state = MachineState(sample, model=args.model)
     tick = float(sample.tick_ms)
 
     if scheduler.due("imu", tick):
@@ -253,6 +259,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--travel-hz", type=float, default=10.0)
     parser.add_argument("--max-rows", type=int, default=0, help="stop after N rows (smoke)")
     parser.add_argument("--rtk-byteorder", choices=("big", "little"), default="little")
+    parser.add_argument("--model", choices=tuple(IMU_MOUNT_COMPENSATION_DEG), default=DEFAULT_MODEL,
+                        help="machine model selecting the IMU zero-mount compensation table")
     parser.add_argument("--ack-port", type=int, default=29765, help="heartbeat destination port")
     parser.add_argument(
         "--sink",

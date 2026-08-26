@@ -85,6 +85,20 @@ ExcavatorSim gateway.exe (--sink tcp)          ICT 侧 (LinuxPC)
 - 瑞芬 IMU：slot=count×0.01−180°；count 三连零 = 无效标记 → 编码器钳位 ≥1。
   parser 安装重映射 roll=s1/pitch=−s0/yaw=s2，在 `conventions.MachineState.
   sensor_slots` 反演。
+- **姿态轴系（Y-up）**：Godot 世界 Y-up，姿态按 Ry(yaw)·Rx(pitch)·Rz(roll) 分解
+  （先航向、后段仰角、后横滚）。符号契约：解析 pitch = −(臂杆段方向绝对仰角)，
+  抬高为负（真机金样本语义，下游按 pitch 差分重建关节角）。
+  旧 Z-up ZYX 分解已废弃（曾把抬臂错送 roll 通道、回转 ±90° 万向节奇异）。
+- **IMU 零位安装角补偿**：仿真 link frame ≠ 臂杆钢面 IMU。`conventions.
+  IMU_MOUNT_COMPENSATION_DEG` 按模型补偿：
+  - sy205：rest 帧单位阵，段几何烘焙——boom −47.65 / arm +101.79（下游极角
+    约定，肘部偏离伸直 30.58°）/ bucket 待实测定
+    （出处：pivot_contract 铰点 C/F/Q）
+  - sy135：段几何全水平，rest_transforms 含 X 轴旋转（+35/−55/−75）→
+    boom +35 / arm −55 / bucket −75
+  该表与下游 calibration.toml 现值（pitch_error_IMU_Boom=0.4713 等）**成套**；
+  下游零改动即可渲染正确 rest 形状（Sensor2Ang 复刻测试锁定）。模型经
+  `--model`/bridge spawn argv 选择，默认 sy135。
 - 行走压力 0x256：无符号 u16 先导压力（kg，合法域 0~50），≥8 判移动 →
   行走发 +9（幅值恒正，**本帧不表达方向**），静止发 0。
 - 轴系/安装标定集中在 `conventions.py`（ORIGIN_*、MOUNTING 相关纯数据），

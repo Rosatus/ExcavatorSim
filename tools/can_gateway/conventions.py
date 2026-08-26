@@ -23,6 +23,29 @@ PACKET_STRUCT = struct.Struct("<IBBHQ" + "4f3f" * BODY_COUNT + "5f")
 TRAVEL_PRESSURE_MOVING = 9
 SPEED_EPSILON_MPS = 0.05
 
+# IMU zero-mount compensation per model (degrees, added to the link-frame
+# pitch before slot encoding). Contract: the parser-reported pitch must equal
+# -(absolute segment elevation), i.e. a steel-mounted real-machine IMU whose
+# "raised" reads negative. Since sensor_slots() passes the caller's pitch
+# through verbatim, mount_comp is defined so that
+#
+#   pitch_arg = -(frame_forward_elevation) + comp
+#   comp[link] = frame_fwd_rest_elevation - segment_rest_elevation
+#
+# sy205: rest_transforms are identity (frame rest elevation 0); segment
+#   geometry is baked into the meshes. Values use the downstream polar-angle
+#   convention (authoritative calibration reference): boom +47.65, arm
+#   -101.79 (elbow bent 30.58 deg off straight), from pivot_contract hinges
+#   C=(-0.119, 1.623, -0.075), F=(-0.053, 5.918, 3.840), Q=(-0.061, 2.892, 3.210).
+# sy135: segment geometry is horizontal (all pivots along -Z, seg elev 0),
+#   but rest_transforms_godot carry X-axis rotations giving frame rest
+#   elevations boom +35 / arm -55 / bucket -75 -> comp = frame - 0.
+IMU_MOUNT_COMPENSATION_DEG: dict[str, dict[str, float]] = {
+    "sy205": {"boom": -47.65, "arm": 101.79, "bucket": 0.0},
+    "sy135": {"boom": 35.00, "arm": -55.00, "bucket": -75.00},
+}
+DEFAULT_MODEL = "sy135"
+
 # Synthetic geodetic origin (equirectangular ENU approximation).
 ORIGIN_LAT_DEG = 30.8675
 ORIGIN_LON_DEG = 120.0933
@@ -74,12 +97,16 @@ def parse_packet(data: bytes) -> TelemetrySample | None:
 class MachineState:
     sample: TelemetrySample
     heading_baseline_deg: float = field(default=0.0)
+    model: str = DEFAULT_MODEL
 
     def link_rpy(self, link: str) -> tuple[float, float, float]:
-        """World-frame ZYX Euler (deg) for a logical sensor link."""
+        """Y-up attitude (deg) for a logical sensor link, with IMU zero-mount
+        compensation so the parser-reported pitch equals -(absolute segment
+        elevation): raised reads negative, matching real-machine goldens."""
         body = self._body_for_link(link)
-        roll, pitch, yaw = quat_to_zyx_euler_deg(body.quat_xyzw)
-        return roll, pitch, yaw
+        roll, pitch, yaw = quat_to_yup_euler_deg(body.quat_xyzw)
+        comp = IMU_MOUNT_COMPENSATION_DEG.get(self.model, {}).get(link, 0.0)
+        return roll, -pitch + comp, yaw
 
     def _body_for_link(self, link: str):
         if link == "body":
@@ -144,7 +171,8 @@ class MachineState:
 
 
 def quat_to_zyx_euler_deg(q: tuple[float, float, float, float]) -> tuple[float, float, float]:
-    """ZYX (aerospace yaw-pitch-roll) Euler in degrees from Godot quaternion."""
+    """Deprecated Z-up aerospace ZYX decomposition. Kept only for reference;
+    CAN encoding must use quat_to_yup_euler_deg (Godot world is Y-up)."""
     x, y, z, w = q
     sinr_cosp = 2.0 * (w * x + y * z)
     cosr_cosp = 1.0 - 2.0 * (x * x + y * y)
@@ -157,6 +185,46 @@ def quat_to_zyx_euler_deg(q: tuple[float, float, float, float]) -> tuple[float, 
     cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
     yaw = math.atan2(siny_cosp, cosy_cosp)
     return math.degrees(roll), math.degrees(pitch), math.degrees(yaw)
+
+
+def _quat_to_matrix_rows(q: tuple[float, float, float, float]) -> list[list[float]]:
+    """Rotation matrix (row-major) for a Godot quaternion (x,y,z,w)."""
+    x, y, z, w = q
+    return [
+        [1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)],
+        [2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)],
+        [2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)],
+    ]
+
+
+def quat_to_yup_euler_deg(q: tuple[float, float, float, float]) -> tuple[float, float, float]:
+    """Y-up (Godot) attitude decomposition: R = Ry(yaw) * Rx(pitch) * Rz(roll).
+
+    Extracts in order: heading about the vertical Y axis, then elevation of the
+    link forward axis (-Z) above the horizontal plane, then roll about the
+    forward longitudinal axis. Sign contract with the downstream parser:
+    lifting a link raises its forward-axis elevation, and the parser reports
+    pitch = -(elevation) so that "raised" reads as negative pitch.
+    """
+    m = _quat_to_matrix_rows(q)
+    # Godot forward is the third column negated.
+    fwd_x, fwd_y, fwd_z = -m[0][2], -m[1][2], -m[2][2]
+    # azimuth measured from the -Z reference axis; Godot Y-rotation is
+    # clockwise viewed from +Y, so heading = -atan2(fwd_x, -fwd_z)
+    yaw = math.degrees(math.atan2(-fwd_x, -fwd_z))
+    horiz = math.hypot(fwd_x, fwd_z)
+    if horiz < 1e-9:
+        # gimbal lock on elevation: read pitch from the up axis
+        pitch = math.degrees(math.atan2(m[1][0] if fwd_y < 0 else -m[1][0], abs(fwd_y)))
+    else:
+        pitch = math.degrees(math.atan2(fwd_y, horiz))
+    # roll tilts the up axis within the plane containing forward and up:
+    # project up onto the vertical plane spanned by forward-horizontal and Y
+    up_x, up_y, up_z = m[0][1], m[1][1], m[2][1]
+    fwd_horiz_x, fwd_horiz_z = (fwd_x / horiz, fwd_z / horiz) if horiz > 1e-9 else (0.0, -1.0)
+    lateral = up_x * (-fwd_horiz_z) + up_z * fwd_horiz_x
+    roll = math.degrees(math.atan2(lateral, max(up_y, 1e-12)) if abs(up_y) > 1e-12 else math.copysign(90.0, lateral))
+    return roll, pitch, yaw
 
 
 def basis_forward_from_quat(q: tuple[float, float, float, float]) -> tuple[float, float, float]:

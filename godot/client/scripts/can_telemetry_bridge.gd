@@ -27,6 +27,8 @@ enum GatewayStatus { OFFLINE, ONLINE, RECORDING }
 @export var ack_port := DEFAULT_ACK_PORT
 @export var auto_spawn := true
 @export var python_command := "python"
+## Machine model selecting the gateway IMU mount-compensation table.
+@export var model_id := "sy135"
 
 var _udp: PacketPeerUDP = null
 var _ack: PacketPeerUDP = null
@@ -185,6 +187,7 @@ func _resolve_gateway_command() -> PackedStringArray:
 						"--sink", "tcp",
 						"--tcp-host", tcp_host,
 						"--tcp-port", str(tcp_port),
+						"--model", model_id,
 					])
 				return PackedStringArray([
 					candidate,
@@ -192,6 +195,7 @@ func _resolve_gateway_command() -> PackedStringArray:
 					"--port", str(remote_port),
 					"--ack-port", str(ack_port),
 					"--out", _resolve_output_dir(),
+					"--model", model_id,
 				])
 	var script := _resolve_gateway_script()
 	if script.is_empty():
@@ -202,6 +206,7 @@ func _resolve_gateway_command() -> PackedStringArray:
 		"--port", str(remote_port),
 		"--ack-port", str(ack_port),
 		"--out", _resolve_output_dir(),
+		"--model", model_id,
 	])
 
 
