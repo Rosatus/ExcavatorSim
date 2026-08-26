@@ -25,24 +25,29 @@ SPEED_EPSILON_MPS = 0.05
 
 # IMU zero-mount compensation per model (degrees, added to the link-frame
 # pitch before slot encoding). Contract: the parser-reported pitch must equal
-# -(absolute segment elevation), i.e. a steel-mounted real-machine IMU whose
-# "raised" reads negative. Since sensor_slots() passes the caller's pitch
-# through verbatim, mount_comp is defined so that
+# -(absolute SEGMENT elevation in world), i.e. a steel-mounted real-machine
+# IMU whose "raised" reads negative. Since sensor_slots() passes the caller's
+# pitch through verbatim,
 #
-#   pitch_arg = -(frame_forward_elevation) + comp
-#   comp[link] = frame_fwd_rest_elevation - segment_rest_elevation
+#   pitch_arg = -(frame_world_elevation) + comp
 #
-# sy205: rest_transforms are identity (frame rest elevation 0); segment
-#   geometry is baked into the meshes. Values use the downstream polar-angle
-#   convention (authoritative calibration reference): boom +47.65, arm
-#   -101.79 (elbow bent 30.58 deg off straight), from pivot_contract hinges
-#   C=(-0.119, 1.623, -0.075), F=(-0.053, 5.918, 3.840), Q=(-0.061, 2.892, 3.210).
-# sy135: segment geometry is horizontal (all pivots along -Z, seg elev 0),
-#   but rest_transforms_godot carry X-axis rotations giving frame rest
-#   elevations boom +35 / arm -55 / bucket -75 -> comp = frame - 0.
+# comp MUST be derived from WORLD-accumulated rest elevations (parent chain
+# cascades!), not per-link local differences:
+#
+#   comp[link] = frame_world_rest_elevation - segment_world_rest_elevation
+#
+# sy205: rest_transforms are identity (frame world rest elevation 0);
+#   segment geometry baked into meshes. Values use the downstream polar-angle
+#   convention verified against Sensor2Ang + calibration.toml: boom -47.65
+#   (segment +47.65 up), arm +101.79 (elbow 30.58 off straight; locks
+#   armPhi~30.6). Hinges C=(-0.119,1.623,-0.075) F=(-0.053,5.918,3.840)
+#   Q=(-0.061,2.892,3.210).
+# sy135: segments horizontal at rest (world seg elevation 0); frame world
+#   rest elevations accumulate down the chain (+35-55-75):
+#   boom +35 / arm -20 / bucket -95.
 IMU_MOUNT_COMPENSATION_DEG: dict[str, dict[str, float]] = {
     "sy205": {"boom": -47.65, "arm": 101.79, "bucket": 0.0},
-    "sy135": {"boom": 35.00, "arm": -55.00, "bucket": -75.00},
+    "sy135": {"boom": 35.00, "arm": -20.00, "bucket": -95.00},
 }
 DEFAULT_MODEL = "sy135"
 

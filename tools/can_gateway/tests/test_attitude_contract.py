@@ -48,9 +48,9 @@ def q_mul(a, b):
 X = (1.0, 0.0, 0.0)
 Y = (0.0, 1.0, 0.0)
 
-# sy135 baked rest rotations about X (from rest_transforms_godot): runtime
-# world quats include these, so "rest pose" quat for boom is Rx(+35), etc.
-SY135_REST_X_DEG = {"boom": 35.0, "arm": -55.0, "bucket": -75.0}
+# sy135 baked rest rotations about X (rest_transforms_godot), CASCaded down
+# the pivot chain: runtime world quat of arm = Rx(35-55)=Rx(-20), etc.
+SY135_REST_X_DEG = {"boom": 35.0, "arm": -20.0, "bucket": -95.0}
 
 
 def q_rest(link: str, extra_deg: float = 0.0) -> tuple:
@@ -102,16 +102,16 @@ class ContinuousPitchUnwrapTest(unittest.TestCase):
     uses bkt-arm differences, so a fold mid-dig breaks the model."""
 
     def test_arm_curling_past_vertical_stays_monotonic(self) -> None:
-        # sy135 arm: rest frame Rx(-55); digging curls further down.
+        # sy135 arm: rest world Rx(-20); digging curls further down through
+        # the vertical. Wire pitch must grow monotonically (real-IMU like).
         pitches = []
-        for deg in range(-55, -176, -10):
-            st = state_for({"arm": q_rest("arm") if deg == -55 else q_axis_angle(X, float(deg))})
+        for extra in range(0, 121, 10):
+            st = state_for({"arm": q_rest("arm", -float(extra))})
             pitches.append(st.link_rpy("arm")[1])
         diffs = [b - a for a, b in zip(pitches, pitches[1:])]
         self.assertTrue(all(d > 1.0 for d in diffs),
                         f"pitch not monotonically increasing through vertical: {pitches}")
-        self.assertLess(pitches[-1], 120.5)
-        self.assertGreater(pitches[-1], 119.0)
+        self.assertAlmostEqual(pitches[-1], 120.0, delta=0.5)
 
     def test_heading_rotation_does_not_trigger_unwrap(self) -> None:
         # slewing backward puts world yaw beyond +/-90 with up_y >= 0:
@@ -151,7 +151,11 @@ class MountCompensationTest(unittest.TestCase):
         self.assertAlmostEqual(boom_phi, 47.6, delta=1.0)
 
     def test_tables_match_manifest_derivation(self) -> None:
-        """Lock table values against manifest-derived expectations."""
+        """Lock table values against world-cascaded manifest derivation.
+
+        comp[link] = frame world rest elevation (segments horizontal for
+        sy135), accumulating parent chain rest rotations.
+        """
         sy135 = json.loads(
             (REPO / "godot/client/resources/visual/sy135_visual_manifest.json").read_text(encoding="utf-8"))
         rt = sy135["calibration"]["rest_transforms_godot"]
@@ -161,9 +165,11 @@ class MountCompensationTest(unittest.TestCase):
             fz = (-m[0][2], -m[1][2], -m[2][2])
             return math.degrees(math.atan2(fz[1], math.hypot(fz[0], fz[2])))
 
+        # cascade: boom frame sits on identity chassis; arm on boom; bucket on arm
+        acc = 0.0
         for link in ("boom", "arm", "bucket"):
-            expected = round(fwd_elev(f"{link}_link"), 2)  # seg elev is 0 for sy135
-            self.assertAlmostEqual(IMU_MOUNT_COMPENSATION_DEG["sy135"][link], expected, delta=0.02)
+            acc += fwd_elev(f"{link}_link")
+            self.assertAlmostEqual(IMU_MOUNT_COMPENSATION_DEG["sy135"][link], round(acc, 2), delta=0.02)
 
 
 class DownstreamSensor2AngParityTest(unittest.TestCase):
