@@ -175,7 +175,7 @@ def run(args: argparse.Namespace) -> int:
                 continue
             sinks = active_sinks()
             if sinks:
-                emit_frames(sinks, scheduler, sample, args.rtk_byteorder)
+                emit_frames(sinks, scheduler, sample, args.rtk_byteorder, args.model)
                 csv_rows = writer.row_count if writer is not None else 0
                 if args.max_rows and csv_rows >= args.max_rows:
                     break
@@ -215,8 +215,9 @@ def emit_frames(
     scheduler: FrameScheduler,
     sample: TelemetrySample,
     rtk_byteorder: str = "little",
+    model: str = DEFAULT_MODEL,
 ) -> None:
-    state = MachineState(sample, model=args.model)
+    state = MachineState(sample, model=model)
     tick = float(sample.tick_ms)
 
     if scheduler.due("imu", tick):
