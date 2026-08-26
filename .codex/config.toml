@@ -37,3 +37,24 @@ project_doc_fallback_filenames = ["AGENTS.md"]
 # (this file) takes precedence over user-level `~/.codex/config.toml`.
 [agents]
 max_depth = 1
+
+[mcp_servers."godot-ai"]
+command = "C:\\Users\\rosatus\\AppData\\Roaming\\uv\\python\\cpython-3.11-windows-x86_64-none/pythonw.exe"
+args = [
+  "-c",
+  "import subprocess,sys; raise SystemExit(subprocess.call(sys.argv[1:], stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr, creationflags=0x08000000))",
+  "C:\\Users\\rosatus\\AppData\\Local\\Microsoft\\WinGet\\Packages\\astral-sh.uv_Microsoft.Winget.Source_8wekyb3d8bbwe\\uvx.exe",
+  "--link-mode",
+  "copy",
+  "--from",
+  "godot-ai==3.2.0",
+  "godot-ai",
+  "attach",
+  "--port",
+  "8000",
+  "--ws-port",
+  "9500",
+]
+enabled = true
+startup_timeout_sec = 60
+tool_timeout_sec = 360
