@@ -2,10 +2,10 @@
 
 Control (bridge -> gateway), 12 bytes LE "<IBBHI":
     magic 0x43544E43 "CTNC" | ver=1 | cmd | reserved u16 | seq u32
-    cmd: 1=RECORD_START 2=RECORD_STOP 3=SHUTDOWN
+    cmd: 1=RECORD_START 2=RECORD_STOP 3=SHUTDOWN 4=ICT_START 5=ICT_STOP
 
 Heartbeat (gateway -> bridge), 16 bytes LE "<IBBHQ":
-    magic 0x43544E4B "CTNK" | ver=1 | flags(bit0=recording) | reserved u16 | tick_ms u64
+    magic 0x43544E4B "CTNK" | ver=1 | flags(bit0=recording, bit1=platform_linux) | reserved u16 | tick_ms u64
 
 Session-done (gateway -> bridge after a stopped segment is closed),
 variable length LE "<IBBH" + utf8 path:
@@ -24,8 +24,11 @@ PROTOCOL_VERSION = 1
 CMD_RECORD_START = 1
 CMD_RECORD_STOP = 2
 CMD_SHUTDOWN = 3
+CMD_ICT_START = 4
+CMD_ICT_STOP = 5
 
 HEARTBEAT_FLAG_RECORDING = 0x01
+HEARTBEAT_FLAG_PLATFORM_LINUX = 0x02
 
 _CONTROL_STRUCT = struct.Struct("<IBBHI")
 _HEARTBEAT_STRUCT = struct.Struct("<IBBHQ")
@@ -42,23 +45,39 @@ def parse_control(data: bytes) -> int | None:
     magic, version, cmd, _reserved, _seq = _CONTROL_STRUCT.unpack(data)
     if magic != CONTROL_MAGIC or version != PROTOCOL_VERSION:
         return None
-    if cmd not in (CMD_RECORD_START, CMD_RECORD_STOP, CMD_SHUTDOWN):
+    if cmd not in (CMD_RECORD_START, CMD_RECORD_STOP, CMD_SHUTDOWN, CMD_ICT_START, CMD_ICT_STOP):
         return None
     return cmd
 
 
-def build_heartbeat(tick_ms: int, recording: bool) -> bytes:
-    flags = HEARTBEAT_FLAG_RECORDING if recording else 0
+def build_heartbeat(tick_ms: int, recording: bool, platform_linux: bool = False) -> bytes:
+    flags = 0
+    if recording:
+        flags |= HEARTBEAT_FLAG_RECORDING
+    if platform_linux:
+        flags |= HEARTBEAT_FLAG_PLATFORM_LINUX
     return _HEARTBEAT_STRUCT.pack(HEARTBEAT_MAGIC, PROTOCOL_VERSION, flags, 0, tick_ms & 0xFFFFFFFFFFFFFFFF)
 
 
 def parse_heartbeat(data: bytes) -> tuple[bool, int] | None:
+    parsed = parse_heartbeat_flags(data)
+    if parsed is None:
+        return None
+    recording, _platform_linux, tick_ms = parsed
+    return recording, tick_ms
+
+
+def parse_heartbeat_flags(data: bytes) -> tuple[bool, bool, int] | None:
     if len(data) != _HEARTBEAT_STRUCT.size:
         return None
     magic, version, flags, _reserved, tick_ms = _HEARTBEAT_STRUCT.unpack(data)
     if magic != HEARTBEAT_MAGIC or version != PROTOCOL_VERSION:
         return None
-    return bool(flags & HEARTBEAT_FLAG_RECORDING), tick_ms
+    return (
+        bool(flags & HEARTBEAT_FLAG_RECORDING),
+        bool(flags & HEARTBEAT_FLAG_PLATFORM_LINUX),
+        tick_ms,
+    )
 
 
 def build_session_done(path: str) -> bytes:

@@ -55,6 +55,7 @@ var _ignore_quality_toggle := false
 @onready var _diagnostics_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/Diagnostics
 @onready var _can_status_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/CANStatus
 @onready var _can_output_button: Button = $StatusPanel/Margin/VBox/Tools/CANOutputToggle
+@onready var _ict_button: Button = $StatusPanel/Margin/VBox/Tools/ICTConnectToggle
 @onready var _bucket_volume_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/BucketVolume
 @onready var _advanced_panel: VBoxContainer = $StatusPanel/Margin/VBox/AdvancedPanel
 @onready var _start_button: Button = $StatusPanel/Margin/VBox/Actions/Start
@@ -94,6 +95,7 @@ func _ready() -> void:
 	_mute_audio_button.toggled.connect(_on_audio_muted)
 	_test_graphics_button.toggled.connect(_on_test_graphics_toggled)
 	_can_output_button.pressed.connect(_on_can_output_pressed)
+	_ict_button.pressed.connect(_on_ict_pressed)
 	_guide_close_button.pressed.connect(_on_guide_closed)
 	_reset_view_button.pressed.connect(_on_reset_view_pressed)
 	_confirmation.confirmed.connect(_on_destructive_confirmed)
@@ -357,31 +359,74 @@ func _offer_segment_save(bridge: Node) -> void:
 	dialog.popup_centered(Vector2i(900, 600))
 
 
+func _on_ict_pressed() -> void:
+	var bridge := _can_bridge()
+	if bridge == null:
+		_ict_button.button_pressed = false
+		return
+	var enable := _ict_button.button_pressed
+	if enable and not (bridge.is_gateway_online() and bridge.is_linux_gateway()):
+		push_warning("ICT requires an online Linux gateway")
+		_ict_button.button_pressed = false
+		return
+	bridge.set_ict_connected(enable)
+	_refresh_can_status()
+
+
 func _refresh_can_status() -> void:
 	var bridge := _can_bridge()
 	if bridge == null:
 		_can_status_label.text = "CAN Gateway: unavailable"
 		_can_output_button.text = "开始记录 CAN"
 		_can_output_button.button_pressed = false
+		_set_ict_button(false, false, "CAN 网关不可用")
 		return
 	match int(bridge.get_status()):
 		0:
 			_can_status_label.text = "CAN Gateway: offline"
 			_can_output_button.text = "开始记录 CAN（离线，点击重试）"
 			_can_output_button.button_pressed = false
+			_set_ict_button(bridge.is_linux_gateway(), false, "网关离线，连接后重试")
 		1:
 			_can_status_label.text = "CAN Gateway: online (idle)"
 			_can_output_button.text = "开始记录 CAN"
 			_can_output_button.button_pressed = false
+			_set_ict_button(
+				bridge.is_linux_gateway(),
+				bridge.is_ict_active(),
+				"" if bridge.is_linux_gateway() else "当前为 Windows 网关（仅 CSV 输出）；Linux 网关支持 vcan 直发"
+			)
 		2:
 			_can_status_label.text = "CAN Gateway: recording"
 			_can_output_button.text = "停止并保存"
 			_can_output_button.button_pressed = true
+			_set_ict_button(
+				bridge.is_linux_gateway(),
+				bridge.is_ict_active(),
+				"" if bridge.is_linux_gateway() else "当前为 Windows 网关（仅 CSV 输出）；Linux 网关支持 vcan 直发"
+			)
+
+
+func _set_ict_button(linux_gateway: bool, active: bool, disabled_reason: String) -> void:
+	var usable := linux_gateway
+	_ict_button.disabled = not usable
+	_ict_button.tooltip_text = disabled_reason if not usable else ""
+	if not usable:
+		_ict_button.text = "连接 ICT（需 Linux 网关）"
+		_ict_button.button_pressed = false
+	elif active:
+		_ict_button.text = "断开 ICT"
+		_ict_button.button_pressed = true
+	else:
+		_ict_button.text = "连接 ICT"
+		_ict_button.button_pressed = false
 
 
 func _can_bridge() -> Node:
-	var scene := get_tree().root.get_node_or_null("CanTelemetryBridge")
-	return scene
+	var tree := get_tree()
+	if tree == null:
+		return null
+	return tree.root.get_node_or_null("CanTelemetryBridge")
 
 
 

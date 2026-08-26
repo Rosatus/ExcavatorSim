@@ -16,6 +16,8 @@ const PROTOCOL_VERSION := 1
 const CMD_RECORD_START := 1
 const CMD_RECORD_STOP := 2
 const CMD_SHUTDOWN := 3
+const CMD_ICT_START := 4
+const CMD_ICT_STOP := 5
 const HEARTBEAT_TIMEOUT_MS := 2500
 
 enum GatewayStatus { OFFLINE, ONLINE, RECORDING }
@@ -38,6 +40,8 @@ var _send_buffer := PackedByteArray()
 var _gateway_pid := -1
 var _last_heartbeat_ms := -1
 var _heartbeat_recording := false
+var _gateway_is_linux := false
+var _ict_active := false
 var _control_seq := 0
 var _last_segment_path := ""
 
@@ -121,6 +125,25 @@ func set_recording(enabled: bool) -> void:
 		_send_control(CMD_RECORD_STOP)
 
 
+func is_linux_gateway() -> bool:
+	return _gateway_is_linux
+
+
+func is_ict_active() -> bool:
+	return _ict_active
+
+
+func set_ict_connected(enabled: bool) -> void:
+	if enabled:
+		if _gateway_pid <= 0:
+			spawn_gateway()
+		_ict_active = true
+		_send_control(CMD_ICT_START)
+	else:
+		_ict_active = false
+		_send_control(CMD_ICT_STOP)
+
+
 func respawn_gateway() -> bool:
 	return spawn_gateway()
 
@@ -132,18 +155,20 @@ func respawn_gateway() -> bool:
 ## gateway.exe (launched directly); dev checkouts use python + gateway.py.
 func _resolve_gateway_command() -> PackedStringArray:
 	var exe_dir := OS.get_executable_path().get_base_dir()
-	for candidate in [
-		exe_dir.path_join("can_gateway/gateway.exe"),
-		exe_dir.path_join("gateway.exe"),
-	]:
-		if FileAccess.file_exists(candidate):
-			return PackedStringArray([
-				candidate,
-				"--host", remote_host,
-				"--port", str(remote_port),
-				"--ack-port", str(ack_port),
-				"--out", _resolve_output_dir(),
-			])
+	var native_names := ["gateway.exe"] if OS.get_name() == "Windows" else ["gateway"]
+	for candidate_name in native_names:
+		for candidate in [
+			exe_dir.path_join("can_gateway/" + candidate_name),
+			exe_dir.path_join(candidate_name),
+		]:
+			if FileAccess.file_exists(candidate):
+				return PackedStringArray([
+					candidate,
+					"--host", remote_host,
+					"--port", str(remote_port),
+					"--ack-port", str(ack_port),
+					"--out", _resolve_output_dir(),
+				])
 	var script := _resolve_gateway_script()
 	if script.is_empty():
 		return PackedStringArray()
@@ -203,6 +228,7 @@ func _poll_heartbeats() -> void:
 		if packet.size() == 16 and _read_u32(packet, 0) == HEARTBEAT_MAGIC \
 				and packet[4] == PROTOCOL_VERSION:
 			_heartbeat_recording = (packet[5] & 0x01) != 0
+			_gateway_is_linux = (packet[5] & 0x02) != 0
 			_last_heartbeat_ms = Time.get_ticks_msec()
 		elif _read_u32(packet, 0) == SESSION_DONE_MAGIC and packet.size() > 8:
 			var path_bytes := packet.slice(8)

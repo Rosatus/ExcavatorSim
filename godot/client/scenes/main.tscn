@@ -464,6 +464,13 @@ size_flags_horizontal = 3
 text = "CAN 输出"
 toggle_mode = true
 
+[node name="ICTConnectToggle" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Tools"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "连接 ICT（需 Linux 网关）"
+toggle_mode = true
+disabled = true
+
 [node name="AdvancedPanel" type="VBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=780181745]
 visible = false
 layout_mode = 2

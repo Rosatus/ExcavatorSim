@@ -30,7 +30,26 @@ Godot: tests/can_gateway_e2e_test.gd                     # 进程监督+录制�
 ```
 
 参数：`--port` `--imu-hz/--slew-hz/--rtk-hz/--travel-hz`、
-`--rtk-byteorder {big,little}`。
+`--rtk-byteorder {big,little}`、`--sink {csv,vcan}`（默认 csv）、
+`--interface vcan0`、`--setup-vcan`。
+
+## Linux / SocketCAN（vcan 直发）
+
+`--sink vcan` 将编码帧经 `AF_CAN CAN_RAW` 实时写入 vcan 网卡
+（供 CANape/ICT 测试台消费），与 CSV 录制相互独立；游戏内
+[连接 ICT] 按钮仅在网关为 Linux 版时可用（心跳 flags.bit1 上报平台）。
+
+```bash
+# WSL 出包（产物 ELF → dist/can_gateway_linux/gateway）
+cd tools/can_gateway && ./dist_linux.sh        # 优先 uv，缺 uv 时回退 venv+pip
+
+# 目标机：准备 vcan 并直发（需 root 或 sudo）
+./gateway --setup-vcan --interface vcan0
+./gateway --sink vcan --interface vcan0        # + 游戏内 [连接 ICT]
+```
+
+注意：WSL2 默认内核可能无 CONFIG_CAN/VCAN（报 "AF_CAN unavailable"），
+需自编译内核或用真实 Linux。构建机 glibc 需不高于目标机。
 
 ## 关键约定
 
@@ -52,9 +71,12 @@ Godot: tests/can_gateway_e2e_test.gd                     # 进程监督+录制�
 
 ## 文件
 
-- `gateway.py` — 收包循环 + 帧率调度 + 冒烟模式
+- `gateway.py` — 收包循环 + 帧率调度 + 冒烟模式 + sink 分派（CSV/vcan）
 - `conventions.py` — 包解析 / 四元数→ZYX 欧拉 / ENU→大地坐标 / 行走语义
 - `csv_writer.py` — CANape CSV 方言（UTF-8-sig，被对方 read_can_csv 消费）
+- `sinks.py` — FrameSink 抽象：CsvFrameSink / SocketCanSink（AF_CAN 直发）
+- `vcan_setup.py` — vcan 接口检测/自动创建（移植自 dev_arch can_replay）
+- `dist_linux.sh` — WSL/Linux 打包脚本（uv 优先）→ dist/can_gateway_linux/gateway
 - `encoders/` — ruifen_imu / dxg_slew / sinan_rtk / travel_pilot
 - `tests/` — 金样本往返（实采 24 行×15 ID）+ 合成扫描 + 语义断言 +
   对方解析器兼容冒烟；`extract_golden.py` 一键重建夹具

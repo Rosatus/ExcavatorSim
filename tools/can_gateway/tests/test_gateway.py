@@ -20,14 +20,19 @@ from conventions import (  # noqa: E402
     parse_packet,
 )
 from control_protocol import (  # noqa: E402
+    CMD_ICT_START,
+    CMD_ICT_STOP,
     CMD_RECORD_START,
     CMD_RECORD_STOP,
     CMD_SHUTDOWN,
+    HEARTBEAT_FLAG_PLATFORM_LINUX,
+    HEARTBEAT_FLAG_RECORDING,
     build_control,
     build_heartbeat,
     build_session_done,
     parse_control,
     parse_heartbeat,
+    parse_heartbeat_flags,
     parse_session_done,
 )
 from csv_writer import CanapeCsvWriter  # noqa: E402
@@ -243,7 +248,7 @@ class PacketAndCsvTest(unittest.TestCase):
 
 class ControlProtocolTest(unittest.TestCase):
     def test_control_roundtrip(self) -> None:
-        for cmd in (CMD_RECORD_START, CMD_RECORD_STOP, CMD_SHUTDOWN):
+        for cmd in (CMD_RECORD_START, CMD_RECORD_STOP, CMD_SHUTDOWN, CMD_ICT_START, CMD_ICT_STOP):
             self.assertEqual(parse_control(build_control(cmd, seq=7)), cmd)
 
     def test_control_rejects_garbage(self) -> None:
@@ -258,6 +263,18 @@ class ControlProtocolTest(unittest.TestCase):
         self.assertEqual(rec, (True, 5678))
         self.assertIsNone(parse_heartbeat(b"x" * 15))
         self.assertIsNone(parse_heartbeat(bytes(16)))
+
+    def test_heartbeat_platform_flag(self) -> None:
+        win = parse_heartbeat_flags(build_heartbeat(10, False, False))
+        linux = parse_heartbeat_flags(build_heartbeat(20, True, True))
+        self.assertEqual(win, (False, False, 10))
+        self.assertEqual(linux, (True, True, 20))
+        # legacy 2-tuple parser ignores platform bit
+        self.assertEqual(parse_heartbeat(build_heartbeat(20, True, True)), (True, 20))
+        raw = build_heartbeat(1, False, True)
+        flags = struct.unpack("<IBBHQ", raw)[2]
+        self.assertEqual(flags & HEARTBEAT_FLAG_PLATFORM_LINUX, HEARTBEAT_FLAG_PLATFORM_LINUX)
+        self.assertEqual(flags & HEARTBEAT_FLAG_RECORDING, 0)
 
     def test_session_done_roundtrip(self) -> None:
         path = "E:/dir/can_telemetry_20260825_120000.csv"

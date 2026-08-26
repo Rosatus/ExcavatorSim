@@ -1,4 +1,4 @@
-﻿"""CAN telemetry gateway: sim UDP packets -> SY135C CAN frames -> CSV.
+﻿"""CAN telemetry gateway: sim UDP packets -> SY135C CAN frames -> CSV / SocketCAN.
 
 Reverse of GuideSystem/services/can ProtocolParser decode logic.
 See .trellis/tasks/08-25-can-telemetry-gateway/design.md for the byte layouts.
@@ -15,9 +15,12 @@ from pathlib import Path
 
 from conventions import MachineState, TelemetrySample, parse_packet
 from control_protocol import (
+    CMD_ICT_START,
+    CMD_ICT_STOP,
     CMD_RECORD_START,
     CMD_RECORD_STOP,
     CMD_SHUTDOWN,
+    HEARTBEAT_FLAG_PLATFORM_LINUX,
     HEARTBEAT_FLAG_RECORDING,
     build_heartbeat,
     build_session_done,
@@ -31,6 +34,8 @@ from encoders.sinan_rtk import (
     build_rtk_frames,
 )
 from encoders.travel_pilot import encode_travel_frame
+from sinks import CsvFrameSink, FrameSink, SocketCanSink
+from vcan_setup import VcanSetupError, ensure_vcan_interface
 
 PACKET_MAGIC = 0x314E5443
 HEARTBEAT_INTERVAL_S = 0.5
@@ -63,6 +68,12 @@ def run(args: argparse.Namespace) -> int:
     out_path = Path(args.out)
     out_path.mkdir(parents=True, exist_ok=True)
 
+    vcan_sink: SocketCanSink | None = None
+    if args.sink == "vcan":
+        vcan_sink = _open_vcan(args.interface)
+        if vcan_sink is None:
+            return 1
+
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((args.host, args.port))
     sock.settimeout(0.05)
@@ -78,14 +89,29 @@ def run(args: argparse.Namespace) -> int:
     recording = False
     last_heartbeat_s = 0.0
     ctrl_seq = 0
-    print(f"gateway listening on {args.host}:{args.port} (out={out_path})")
+    platform_linux = hasattr(socket, "AF_CAN")
+    print(f"gateway listening on {args.host}:{args.port} (out={out_path}, sink={args.sink})")
+
+    def active_sinks() -> list[FrameSink]:
+        sinks: list[FrameSink] = []
+        if recording and writer is not None:
+            sinks.append(CsvFrameSink(writer))
+        if vcan_sink is not None:
+            sinks.append(vcan_sink)
+        return sinks
 
     try:
         while True:
             now_s = time.time()
             if now_s - last_heartbeat_s >= HEARTBEAT_INTERVAL_S:
-                flags = HEARTBEAT_FLAG_RECORDING if recording else 0
-                sock.sendto(build_heartbeat(int(now_s * 1000) & 0xFFFFFFFFFFFFFFFF, bool(flags)), ack_addr)
+                sock.sendto(
+                    build_heartbeat(
+                        int(now_s * 1000) & 0xFFFFFFFFFFFFFFFF,
+                        recording,
+                        platform_linux,
+                    ),
+                    ack_addr,
+                )
                 last_heartbeat_s = now_s
             try:
                 data, _addr = sock.recvfrom(4096)
@@ -110,6 +136,18 @@ def run(args: argparse.Namespace) -> int:
                         print(f"segment saved: {writer.path}")
                         writer = None
                     print("recording stopped")
+                elif cmd == CMD_ICT_START:
+                    if vcan_sink is None:
+                        vcan_sink = _open_vcan(args.interface)
+                    if vcan_sink is not None:
+                        print(f"ICT connected: {vcan_sink.peer_name()}")
+                    else:
+                        print("ICT connect failed", file=sys.stderr)
+                elif cmd == CMD_ICT_STOP:
+                    if vcan_sink is not None:
+                        vcan_sink.close()
+                        vcan_sink = None
+                    print("ICT disconnected")
                 elif cmd == CMD_SHUTDOWN:
                     print("shutdown requested")
                     break
@@ -119,9 +157,11 @@ def run(args: argparse.Namespace) -> int:
             if sample is None:
                 print("bad packet (magic/version/size), dropped", file=sys.stderr)
                 continue
-            if recording and writer is not None:
-                emit_frames(writer, scheduler, sample, args.rtk_byteorder)
-                if args.max_rows and writer.row_count >= args.max_rows:
+            sinks = active_sinks()
+            if sinks:
+                emit_frames(sinks, scheduler, sample, args.rtk_byteorder)
+                csv_rows = writer.row_count if writer is not None else 0
+                if args.max_rows and csv_rows >= args.max_rows:
                     break
     except KeyboardInterrupt:
         pass
@@ -130,13 +170,32 @@ def run(args: argparse.Namespace) -> int:
         path = writer._path if writer is not None else "(no session)"
         if writer is not None:
             writer.close()
+        if vcan_sink is not None:
+            vcan_sink.close()
         print(f"closed {path} ({rows} frames)")
         sock.close()
     return 0
 
 
+def _open_vcan(interface: str) -> SocketCanSink | None:
+    try:
+        sink = SocketCanSink(interface, setup_check=False)
+        ensure_vcan_interface(interface)
+        return sink
+    except (RuntimeError, VcanSetupError) as exc:
+        detail = str(exc).strip()
+        hint = ""
+        if isinstance(exc, OSError) or "AF_CAN" in detail or "No such device" in detail:
+            hint = (
+                " (WSL2 default kernels lack CONFIG_CAN/VCAN; run on real Linux "
+                "or a CAN-enabled kernel)"
+            )
+        print(f"vcan open failed for '{interface}': {detail}{hint}", file=sys.stderr)
+        return None
+
+
 def emit_frames(
-    writer: CanapeCsvWriter,
+    sinks: list[FrameSink],
     scheduler: FrameScheduler,
     sample: TelemetrySample,
     rtk_byteorder: str = "little",
@@ -148,21 +207,28 @@ def emit_frames(
         for link in ("body", "boom", "arm", "bucket"):
             roll, pitch, yaw = state.link_rpy(link)
             slots = state.sensor_slots(roll, pitch, yaw)
-            writer.append(RUFINEN_IDS[link], encode_ruifen_frame(slots))
+            frame = encode_ruifen_frame(slots)
+            for sink in sinks:
+                sink.append(RUFINEN_IDS[link], frame)
         scheduler.advance("imu", tick)
 
     if scheduler.due("slew", tick):
-        writer.append(0x18FFF000, encode_slew_frame(state.slew_degrees()))
+        frame = encode_slew_frame(state.slew_degrees())
+        for sink in sinks:
+            sink.append(0x18FFF000, frame)
         scheduler.advance("slew", tick)
 
     if scheduler.due("travel", tick):
         left, right = state.travel_pressures()
-        writer.append(0x256, encode_travel_frame(left, right))
+        frame = encode_travel_frame(left, right)
+        for sink in sinks:
+            sink.append(0x256, frame)
         scheduler.advance("travel", tick)
 
     if scheduler.due("rtk", tick):
         for can_id, payload in build_rtk_frames(state, rtk_byteorder).items():
-            writer.append(can_id, payload)
+            for sink in sinks:
+                sink.append(can_id, payload)
         scheduler.advance("rtk", tick)
 
 
@@ -178,8 +244,29 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-rows", type=int, default=0, help="stop after N rows (smoke)")
     parser.add_argument("--rtk-byteorder", choices=("big", "little"), default="little")
     parser.add_argument("--ack-port", type=int, default=29765, help="heartbeat destination port")
+    parser.add_argument(
+        "--sink",
+        choices=("csv", "vcan"),
+        default="csv",
+        help="frame output: csv segments (default) or SocketCAN vcan direct send",
+    )
+    parser.add_argument("--interface", default="vcan0", help="SocketCAN interface for --sink vcan / --setup-vcan")
+    parser.add_argument(
+        "--setup-vcan",
+        action="store_true",
+        help="create/bring up the vcan interface, then exit",
+    )
     parser.add_argument("--smoke", action="store_true", help="self-inject synthetic packets")
     args = parser.parse_args(argv)
+
+    if args.setup_vcan:
+        try:
+            ensure_vcan_interface(args.interface)
+        except VcanSetupError as exc:
+            print(f"vcan setup failed: {exc}", file=sys.stderr)
+            return 1
+        print(f"SocketCAN interface ready: {args.interface}")
+        return 0
 
     if args.max_rows:
         # Smoke mode: synthesize packets locally instead of waiting on the game.
@@ -199,8 +286,18 @@ def run_with_injection(args: argparse.Namespace, sender: socket.socket) -> int:
     scheduler = FrameScheduler(rates)
     out_path = Path(args.out)
     out_path.mkdir(parents=True, exist_ok=True)
+
+    vcan_sink: SocketCanSink | None = None
+    if args.sink == "vcan":
+        vcan_sink = _open_vcan(args.interface)
+        if vcan_sink is None:
+            return 1
+
     csv_path = out_path / "can_telemetry_smoke.csv"
     writer = CanapeCsvWriter(csv_path)
+    sinks: list[FrameSink] = [CsvFrameSink(writer)]
+    if vcan_sink is not None:
+        sinks.append(vcan_sink)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((args.host, args.port))
     sock.settimeout(0.5)
@@ -217,10 +314,12 @@ def run_with_injection(args: argparse.Namespace, sender: socket.socket) -> int:
             sample = parse_packet(data)
             if sample is None:
                 continue
-            emit_frames(writer, scheduler, sample)
+            emit_frames(sinks, scheduler, sample)
             time.sleep(0.006)
     finally:
         writer.close()
+        if vcan_sink is not None:
+            vcan_sink.close()
         sock.close()
         print(f"smoke wrote {writer.row_count} frames -> {csv_path}")
     return 0 if writer.row_count >= args.max_rows else 1

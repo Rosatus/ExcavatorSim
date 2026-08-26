@@ -75,6 +75,16 @@ func _run() -> void:
 	_check(rows_final >= rows_after_start, "stop keeps the captured segment on disk")
 	_check(not left_recording, "status leaves RECORDING after stop")
 
+	# Platform flag: a Windows-spawned gateway must not report linux.
+	_check(bridge.is_linux_gateway() == (OS.get_name() != "Windows"),
+		"platform bit matches host OS expectation")
+	# ICT command path: send stop on an inactive session must be a safe no-op.
+	bridge.set_ict_connected(false)
+	_check(bridge.is_ict_active() == false, "ICT stop no-op when inactive")
+	bridge.set_ict_connected(true)
+	_check(bridge.is_ict_active() == true, "ICT connect marks active state")
+	bridge.set_ict_connected(false)
+
 	scene.queue_free()
 	await process_frame
 	if _failures == 0:
