@@ -1,0 +1,6 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Verify one input conversion owner, lifecycle re-arm, HUD truth, and unchanged authority boundaries."}
+{"file":".trellis/spec/frontend/motion-transport.md","reason":"Verify v4 negotiation, explicit axis semantics, mismatch rejection, and input safety."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Verify deterministic regressions, typing, provenance, and project gates."}
+{"file":".trellis/spec/backend/runtime-profiles.md","reason":"Verify gateway-only and compatibility motion paths interpret operator axes correctly."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Audit exactly-once conversion and prevent duplicate/private payload interpretations."}
+{"file":".trellis/tasks/08-27-unify-operator-input-semantics/research/axis-contract-analysis.md","reason":"Use the traced flow and model-sign table as review evidence."}

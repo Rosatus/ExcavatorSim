@@ -1,0 +1,7 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Owns model input, local Jolt articulation, HUD, lifecycle, and authority boundaries."}
+{"file":".trellis/spec/frontend/motion-transport.md","reason":"Owns hello negotiation, input_snapshot semantics, reconnect, and input safety."}
+{"file":".trellis/spec/backend/authority-and-concurrency.md","reason":"Preserve Python runtime input ownership and fixed-step command application."}
+{"file":".trellis/spec/backend/runtime-profiles.md","reason":"Keep gateway-only and Python compatibility profile behavior distinct."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Requires deterministic cross-layer tests, typing, provenance, and full verify gate."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"The operator vector crosses device, Godot, protocol, Python, simulation, and pose boundaries."}
+{"file":".trellis/tasks/08-27-unify-operator-input-semantics/research/axis-contract-analysis.md","reason":"Contains the traced current flow, root cause, selected semantic table, model signs, and compatibility decision."}
