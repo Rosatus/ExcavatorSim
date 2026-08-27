@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Verify the HUD is presentation-only and input/authority boundaries remain intact."}
+{"file":".trellis/spec/frontend/motion-transport.md","reason":"Verify exact key semantics, fixed axis order, and unchanged gamepad mappings."}
+{"file":".trellis/spec/backend/can-gateway-control.md","reason":"Verify physical handshake truth, stale clearing, and protocol-v1 compatibility across Python and Godot."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Run focused and full deterministic checks, including real-process E2E."}
+{"file":".trellis/tasks/08-27-excavator-controls-hud-ict-indicator/research/code-evidence.md","reason":"Cross-check implementation and tests against verified source anchors and known baseline exclusions."}

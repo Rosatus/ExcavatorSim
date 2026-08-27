@@ -1,0 +1,6 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Preserve Godot input, presentation, and authority ownership while adding canonical keys and an observational HUD."}
+{"file":".trellis/spec/frontend/motion-transport.md","reason":"Preserve logical action order, input safety, and model-specific gamepad behavior."}
+{"file":".trellis/spec/backend/can-gateway-control.md","reason":"Extend the existing heartbeat/ICT lifecycle contract additively without changing relay or gateway ownership semantics."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Apply deterministic protocol, input, UI, and process-lifecycle tests."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Keep failed handshakes and stale gateway state fail-closed and non-misleading."}
+{"file":".trellis/tasks/08-27-excavator-controls-hud-ict-indicator/research/code-evidence.md","reason":"Use verified input, HUD, PC001 handshake, heartbeat, and test anchors."}
