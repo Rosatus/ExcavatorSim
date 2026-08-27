@@ -1611,3 +1611,36 @@ Remapped product keyboard controls to WASD/IJKL and RF/YH, added a responsive lo
 ### Next Steps
 
 - None - task complete
+
+
+## Session 43: Unify operator input semantics
+
+**Date**: 2026-08-27
+**Task**: Unify operator input semantics
+**Branch**: `main`
+
+### Summary
+
+Introduced protocol v4 operator-axis semantics, generated shared SY205/SY135 command profiles, and applied exactly-once mapping in Godot local motion and Python compatibility simulation with cross-runtime regression coverage.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `881888c` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
