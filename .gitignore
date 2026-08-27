@@ -13,3 +13,6 @@ build/
 dist/
 output/
 gateway.spec
+
+# godot debug build artifact (stray, git-tracked import never existed)
+godot/client/addons/terrain_3d/bin/~libterrain.windows.debug.x86_64.dll
