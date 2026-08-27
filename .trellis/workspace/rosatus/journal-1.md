@@ -1576,3 +1576,38 @@ Added endpoint-aware gateway restart supervision and a repeatable 50 Hz, 10-seco
 ### Next Steps
 
 - None - task complete
+
+
+## Session 42: Excavator controls HUD and ICT handshake status
+
+**Date**: 2026-08-27
+**Task**: Excavator controls HUD and ICT handshake status
+**Branch**: `main`
+
+### Summary
+
+Remapped product keyboard controls to WASD/IJKL and RF/YH, added a responsive lower-right semantic input HUD, projected physical PC001 handshake truth through additive CTNK flag 0x04 into a red/green/neutral Godot indicator, preserved forwarding-state separation and protocol compatibility, and validated Python gateway tests, the 30-script Godot matrix, real-process reconnect/restart E2E, and packaged gateway behavior.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b1f82e6` | (see git log) |
+| `c4f4827` | (see git log) |
+| `54892a8` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
