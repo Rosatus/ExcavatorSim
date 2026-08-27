@@ -73,14 +73,19 @@ class TcpPc001SinkTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.sink.close()
 
+    def wait_handshake_state(self, expected: bool, timeout: float = 2.0) -> bool:
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if self.sink.is_handshake_connected() == expected:
+                return True
+            time.sleep(0.02)
+        return self.sink.is_handshake_connected() == expected
+
     def test_handshake_and_frame_bytes(self) -> None:
+        self.assertFalse(self.sink.is_handshake_connected())
         client = _Client(self.port)
         try:
-            # wait for client registration
-            for _ in range(50):
-                if "connected" in self.sink.peer_name():
-                    break
-                time.sleep(0.02)
+            self.assertTrue(self.wait_handshake_state(True))
             self.sink.append(0x256, b"\x09\x00\x00\x00\xfb\xff\xff\xff")
             count, frames = client.recv_batch()
             self.assertEqual(count, 1)
@@ -90,15 +95,24 @@ class TcpPc001SinkTest(unittest.TestCase):
         finally:
             client.close()
 
+    def test_handshake_state_clears_on_disconnect_and_close(self) -> None:
+        client = _Client(self.port)
+        self.assertTrue(self.wait_handshake_state(True))
+        client.close()
+        self.assertTrue(self.wait_handshake_state(False))
+        replacement = _Client(self.port)
+        self.assertTrue(self.wait_handshake_state(True))
+        self.sink.close()
+        self.assertFalse(self.sink.is_handshake_connected())
+        replacement.close()
+
     def test_bad_handshake_rejected_then_recovery(self) -> None:
         bad = _Client(self.port, handshake=b"WRONG")
         bad.close()
+        self.assertTrue(self.wait_handshake_state(False))
         good = _Client(self.port)
         try:
-            for _ in range(50):
-                if "connected" in self.sink.peer_name():
-                    break
-                time.sleep(0.02)
+            self.assertTrue(self.wait_handshake_state(True))
             self.sink.append(0x123, b"\x01" * 8)
             count, frames = good.recv_batch()
             self.assertEqual(count, 1)
@@ -160,17 +174,18 @@ class TcpPc001SinkTest(unittest.TestCase):
         finally:
             client.close()
 
-    def test_reconnect_recovers_and_requeues(self) -> None:
+    def test_reconnect_recovers_and_drains_pending(self) -> None:
         first = _Client(self.port)
         for _ in range(50):
             if "connected" in self.sink.peer_name():
                 break
             time.sleep(0.02)
+        first.close()
+        self.assertTrue(self.wait_handshake_state(False))
+        # Queue only after the disconnect is observed. A successful TCP send
+        # cannot prove whether the peer read the bytes, so "send then close"
+        # is not a deterministic requeue contract.
         self.sink.append(0x111, b"\x03" * 8)
-        first.close()  # drop without reading: frame should be requeued
-        deadline = time.time() + 2
-        while time.time() < deadline and self.sink._client is None:
-            time.sleep(0.02)
 
         second = _Client(self.port)
         try:

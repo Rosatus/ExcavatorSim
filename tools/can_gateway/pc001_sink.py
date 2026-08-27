@@ -17,6 +17,7 @@ from __future__ import annotations
 import socket
 import struct
 import threading
+from contextlib import suppress
 
 from sinks import pack_can_frame
 
@@ -36,6 +37,7 @@ class TcpPc001Sink:
         self.host = host
         self.port = port
         self._lock = threading.Lock()
+        self._client_lock = threading.Lock()
         self._pending: list[bytes] = []
         self._client: socket.socket | None = None
         self._closing = False
@@ -53,9 +55,13 @@ class TcpPc001Sink:
         self._thread.start()
 
     def peer_name(self) -> str:
-        client = self._client
-        state = "connected" if client is not None else "waiting"
+        state = "connected" if self.is_handshake_connected() else "waiting"
         return f"tcp:{self.host}:{self.port} ({state})"
+
+    def is_handshake_connected(self) -> bool:
+        """Return true only while an accepted PC001 client socket is current."""
+        with self._client_lock:
+            return not self._closing and self._client is not None
 
     def append(self, can_id: int, payload: bytes) -> None:
         if self._closing:
@@ -72,22 +78,19 @@ class TcpPc001Sink:
         if self._closing:
             return
         self._closing = True
-        try:
+        with suppress(OSError):
             self._server.close()
-        except OSError:
-            pass
         self._drop_client()
         self._thread.join(timeout=2.0)
 
     # --- internal ---
 
     def _drop_client(self) -> None:
-        client, self._client = self._client, None
+        with self._client_lock:
+            client, self._client = self._client, None
         if client is not None:
-            try:
+            with suppress(OSError):
                 client.close()
-            except OSError:
-                pass
 
     def _serve_loop(self) -> None:
         while not self._closing:
@@ -96,17 +99,14 @@ class TcpPc001Sink:
             except OSError:
                 break
             if not self._handshake(client):
-                try:
+                with suppress(OSError):
                     client.close()
-                except OSError:
-                    pass
                 continue
-            old, self._client = self._client, client
+            with self._client_lock:
+                old, self._client = self._client, client
             if old is not None and old is not client:
-                try:
+                with suppress(OSError):
                     old.close()
-                except OSError:
-                    pass
             print(f"PC001 client connected from {_addr}")
             self._client_session(client)
 
@@ -120,9 +120,10 @@ class TcpPc001Sink:
             return False
 
     def _client_session(self, client: socket.socket) -> None:
+        batch = b""
         try:
             client.settimeout(SEND_TIMEOUT_S)
-            while not self._closing and self._client is client:
+            while not self._closing and self._is_current_client(client):
                 batch = self._take_batch()
                 if not batch:
                     # idle poll; keep detecting dead peers via timeout
@@ -132,13 +133,14 @@ class TcpPc001Sink:
         except OSError:
             pass
         finally:
-            if self._client is client:
-                self._client = None
+            with self._client_lock:
+                was_current = self._client is client
+                if was_current:
+                    self._client = None
+            if was_current:
                 self._requeue(batch)
-            try:
+            with suppress(OSError):
                 client.close()
-            except OSError:
-                pass
 
     def _take_batch(self) -> bytes:
         with self._lock:
@@ -153,14 +155,15 @@ class TcpPc001Sink:
         """Put unsent frames of a failed batch back for the next client."""
         if len(batch) <= BATCH_PREFIX_STRUCT.size:
             return
-        body = batch[BATCH_PREFIX_STRUCT.size:]
-        frames = [body[i:i + SINGLE_FRAME_SIZE] for i in range(0, len(body), SINGLE_FRAME_SIZE)]
+        body = batch[BATCH_PREFIX_STRUCT.size :]
+        frames = [body[i : i + SINGLE_FRAME_SIZE] for i in range(0, len(body), SINGLE_FRAME_SIZE)]
         with self._lock:
             self._pending = frames + self._pending
 
     def _flush_pending(self) -> None:
         """Best-effort immediate drain from the caller's thread."""
-        client = self._client
+        with self._client_lock:
+            client = self._client
         if client is None:
             return
         batch = self._take_batch()
@@ -169,7 +172,11 @@ class TcpPc001Sink:
         try:
             client.sendall(batch)
         except OSError:
-            pass
+            self._requeue(batch)
+
+    def _is_current_client(self, client: socket.socket) -> bool:
+        with self._client_lock:
+            return self._client is client
 
     def _probe_alive(self, client: socket.socket) -> None:
         """Detect peer disconnects while idle; recv raises on EOF/reset.

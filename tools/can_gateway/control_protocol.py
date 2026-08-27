@@ -6,7 +6,7 @@ Control (bridge -> gateway), 12 bytes LE "<IBBHI":
          6=TIMED_CAN_START
 
 Heartbeat (gateway -> bridge), 16 bytes LE "<IBBHQ":
-    magic 0x43544E4B "CTNK" | ver=1 | flags(recording/linux) |
+    magic 0x43544E4B "CTNK" | ver=1 | flags(recording/linux/PC001 handshake) |
     reserved u16 | tick_ms u64
 
 Session-done (gateway -> bridge after a stopped segment is closed),
@@ -43,6 +43,7 @@ _VALID_COMMANDS = frozenset(
 
 HEARTBEAT_FLAG_RECORDING = 0x01
 HEARTBEAT_FLAG_PLATFORM_LINUX = 0x02
+HEARTBEAT_FLAG_ICT_HANDSHAKE = 0x04
 
 _CONTROL_STRUCT = struct.Struct("<IBBHI")
 _HEARTBEAT_STRUCT = struct.Struct("<IBBHQ")
@@ -64,12 +65,19 @@ def parse_control(data: bytes) -> int | None:
     return cmd
 
 
-def build_heartbeat(tick_ms: int, recording: bool, platform_linux: bool = False) -> bytes:
+def build_heartbeat(
+    tick_ms: int,
+    recording: bool,
+    platform_linux: bool = False,
+    ict_handshake: bool = False,
+) -> bytes:
     flags = 0
     if recording:
         flags |= HEARTBEAT_FLAG_RECORDING
     if platform_linux:
         flags |= HEARTBEAT_FLAG_PLATFORM_LINUX
+    if ict_handshake:
+        flags |= HEARTBEAT_FLAG_ICT_HANDSHAKE
     return _HEARTBEAT_STRUCT.pack(
         HEARTBEAT_MAGIC, PROTOCOL_VERSION, flags, 0, tick_ms & 0xFFFFFFFFFFFFFFFF
     )

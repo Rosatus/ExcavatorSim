@@ -21,6 +21,7 @@ from control_protocol import (  # noqa: E402
     CMD_RECORD_STOP,
     CMD_SHUTDOWN,
     CMD_TIMED_CAN_START,
+    HEARTBEAT_FLAG_ICT_HANDSHAKE,
     HEARTBEAT_FLAG_PLATFORM_LINUX,
     HEARTBEAT_FLAG_RECORDING,
     build_control,
@@ -317,6 +318,14 @@ class ControlProtocolTest(unittest.TestCase):
         flags = struct.unpack("<IBBHQ", raw)[2]
         self.assertEqual(flags & HEARTBEAT_FLAG_PLATFORM_LINUX, HEARTBEAT_FLAG_PLATFORM_LINUX)
         self.assertEqual(flags & HEARTBEAT_FLAG_RECORDING, 0)
+
+    def test_heartbeat_ict_handshake_flag_is_additive(self) -> None:
+        raw = build_heartbeat(30, False, False, True)
+        self.assertEqual(len(raw), 16)
+        flags = struct.unpack("<IBBHQ", raw)[2]
+        self.assertEqual(flags & HEARTBEAT_FLAG_ICT_HANDSHAKE, HEARTBEAT_FLAG_ICT_HANDSHAKE)
+        self.assertEqual(parse_heartbeat(raw), (False, 30))
+        self.assertEqual(parse_heartbeat_flags(raw), (False, False, 30))
 
     def test_session_done_roundtrip(self) -> None:
         path = "E:/dir/can_telemetry_20260825_120000.csv"

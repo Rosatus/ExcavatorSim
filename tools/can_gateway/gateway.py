@@ -172,11 +172,15 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
             timed_can.service(monotonic_s, active_sinks())
             now_s = time.time()
             if now_s - last_heartbeat_s >= HEARTBEAT_INTERVAL_S:
+                ict_handshake = (
+                    isinstance(ict_sink, TcpPc001Sink) and ict_sink.is_handshake_connected()
+                )
                 sock.sendto(
                     build_heartbeat(
                         int(now_s * 1000) & 0xFFFFFFFFFFFFFFFF,
                         recording,
                         platform_linux,
+                        ict_handshake,
                     ),
                     ack_addr,
                 )
