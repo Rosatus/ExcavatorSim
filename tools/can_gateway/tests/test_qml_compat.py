@@ -42,6 +42,20 @@ def qy(degrees: float) -> tuple[float, float, float, float]:
     return 0.0, math.sin(half), 0.0, math.cos(half)
 
 
+def _wrap_signed_degrees(value: float) -> float:
+    return (value + 180.0) % 360.0 - 180.0
+
+
+def _qml_render_local_joints(
+    qml_joint_deg: tuple[float, float, float],
+) -> tuple[float, float, float]:
+    return (
+        _wrap_signed_degrees(qml_joint_deg[0]),
+        _wrap_signed_degrees(qml_joint_deg[1] + 180.0),
+        _wrap_signed_degrees(qml_joint_deg[2] + 180.0),
+    )
+
+
 def make_sample(
     tick_ms: int = 1000,
     boom_world_deg: float = 35.0,
@@ -144,6 +158,17 @@ class QmlPoseMappingTest(unittest.TestCase):
         )
         self.assertEqual(projection.satellite_status, 4)
 
+    def test_qml_rendered_neutral_local_joints_match_godot_relations(self) -> None:
+        projection = QmlCanMapper(self.profile).project(make_sample())
+
+        # WorkingModel3DView applies boomPhi directly, then armPhi + 180 and
+        # bktPhi + 180. Compare those rendered local-X rotations with the
+        # actual Godot upper->boom->arm->bucket neutral relations.
+        qml_render_local = _qml_render_local_joints(projection.qml_joint_deg)
+        godot_local = (35.0, -90.0, -50.0)
+        for actual, expected in zip(qml_render_local, godot_local, strict=True):
+            self.assertAlmostEqual(actual, expected, places=6)
+
     def test_positive_arm_joint_changes_only_qml_arm(self) -> None:
         # The arm and all descendants inherit the +10 degree local arm twist.
         projection = QmlCanMapper(self.profile).project(
@@ -171,6 +196,17 @@ class QmlPoseMappingTest(unittest.TestCase):
                 expected[index] += delta
                 with self.subTest(joint=index, delta=delta):
                     for actual, wanted in zip(projection.qml_joint_deg, expected, strict=True):
+                        self.assertAlmostEqual(actual, wanted, places=6)
+                    godot_local = (
+                        angles[0],
+                        angles[1] - angles[0],
+                        angles[2] - angles[1],
+                    )
+                    for actual, wanted in zip(
+                        _qml_render_local_joints(projection.qml_joint_deg),
+                        godot_local,
+                        strict=True,
+                    ):
                         self.assertAlmostEqual(actual, wanted, places=6)
 
     def test_identity_and_cardinal_forward_axes_are_godot_minus_z(self) -> None:
@@ -219,10 +255,28 @@ class QmlGatewayIntegrationTest(unittest.TestCase):
         emit_frames([sink], scheduler, sample, qml_mapper=QmlCanMapper(self.profile))
         frames = dict(sink.frames)
 
+        decoded_rpy = {}
         for link, can_id in RUFINEN_IDS.items():
             actual_rpy = reported_rpy(frames[can_id])
+            decoded_rpy[link] = actual_rpy
             for actual, wanted in zip(actual_rpy, expected.imu_rpy_deg[link], strict=True):
                 self.assertAlmostEqual(actual, wanted, delta=0.011)
+
+        calibration = self.profile.calibration
+        decoded_qml_joints = sensor2ang_from_reported(
+            decoded_rpy["body"][1] + calibration.car_roll_error_deg,
+            decoded_rpy["boom"][1],
+            decoded_rpy["arm"][1],
+            decoded_rpy["bucket"][1],
+            calibration,
+        )
+        for actual, wanted in zip(
+            _qml_render_local_joints(decoded_qml_joints),
+            (35.0, -90.0, -50.0),
+            strict=True,
+        ):
+            self.assertAlmostEqual(actual, wanted, delta=0.04)
+
         self.assertEqual(decode_status(frames[RTK_IDS_ORDERED[1]])["satelliteStatus"], 4)
         self.assertAlmostEqual(
             decode_heading(frames[RTK_IDS_ORDERED[9]]),

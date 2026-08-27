@@ -38,6 +38,11 @@ must remain byte-compatible.
 - Boom, arm and bucket inputs come from adjacent-link local-X twist relative to
   the profile neutral alignment. Off-axis residuals, gimbal singularities and
   unreachable four-bar branches are rejected.
+- Profile alignment values are QML kinematic outputs, not raw IMU calibration
+  offsets. The QML 3D renderer applies local X rotations as
+  `(boomPhi, armPhi + 180 degrees, bktPhi + 180 degrees)`. Therefore the SY135
+  Godot neutral relations `(+35, -90, -50)` require QML neutral targets
+  `(+35, +90, +130)` before joint deltas are added.
 - QML profile frames use the reference parser's mixed endian contract: A800
   velocity components are signed big-endian; the remaining supported RTK and
   IMU/work-equipment payload fields retain their documented byte order.
@@ -66,6 +71,10 @@ at tick 101. The gateway validates the bundled profile, projects the sample once
 pre-encodes all due frames, and QML's parser plus calibration reconstruct the
 same root and joint pose within the locked numeric tolerances.
 
+Base: at the SY135 neutral pose, QML receives kinematic outputs `(35, 90, 130)`;
+its renderer applies `(35, 270, 310)`, which are the same signed local rotations
+as Godot `(35, -90, -50)`.
+
 Boundary: a legal bucket pose near either end of the configured monotonic
 four-bar interval is accepted only if forward substitution reproduces the
 measured adjacent twist.
@@ -80,6 +89,11 @@ or work-equipment family.
   directions, calibration inverse, GNSSA round-trip, four-bar forward
   substitution, gimbal/off-axis/range rejection, non-finite input and monotonic
   ticks.
+- Neutral and isolated-joint mapping tests must independently apply the QML
+  renderer's `+180 degree` arm/bucket offsets and compare each resulting local
+  rotation with the corresponding Godot adjacent-frame relation. A
+  `Sensor2Ang` inverse/forward round-trip alone is insufficient because it can
+  prove a wrong neutral alignment self-consistent.
 - Encoder tests decode payload bytes using the reference `ProtocolParser`
   endianness, including an explicit A800 signed big-endian assertion.
 - SocketCAN and PC001 tests cover extended IDs A900 and the four Ruifen IDs plus
@@ -105,3 +119,9 @@ of the other frames and all legacy behavior.
 Wrong: emit frames as each field is calculated and silently recover with legacy
 values. Correct: validate and pre-encode the whole due family, then append it
 atomically from the mapper's perspective; profile errors drop the sample.
+
+Wrong: use the three component IMU calibration offsets, or the result of feeding
+zero pitch to `Sensor2Ang`, as the model's neutral QML joint outputs. Correct:
+derive profile neutral outputs from the QML renderer's local-pivot equations and
+the Godot adjacent-frame neutral relations, then validate both neutral and
+isolated motion after the renderer offsets are applied.

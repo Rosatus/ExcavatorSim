@@ -11,9 +11,12 @@ rtk_attitude = "upper"
 slew_center = "upper"
 
 [alignment]
-boom_phi_neutral_deg = 0.4713
-arm_phi_neutral_deg = 144.3359
-bucket_phi_neutral_deg = 49.46897405197569
+# WorkingModel3DView applies boomPhi directly and adds 180 degrees to armPhi
+# and bktPhi before rotating the three local-X pivots. These targets therefore
+# render the same neutral local relations as Godot: +35 / -90 / -50 degrees.
+boom_phi_neutral_deg = 35.0
+arm_phi_neutral_deg = 90.0
+bucket_phi_neutral_deg = 130.0
 boom_sign = 1.0
 arm_sign = 1.0
 bucket_sign = 1.0
