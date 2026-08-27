@@ -6,6 +6,8 @@ extends SceneTree
 const MAIN_SCENE := "res://scenes/main.tscn"
 const OUTPUT_DIR := "res://../../output/can_gateway"
 const SETTLE_FRAMES := 30
+const TEST_GATEWAY_PORT := 39764
+const TEST_ACK_PORT := 39765
 
 
 var _failures := 0
@@ -20,17 +22,34 @@ func _run() -> void:
 		print("can_gateway_e2e: SKIP (python not on PATH)")
 		quit(0)
 		return
-	var packed := load(MAIN_SCENE) as PackedScene
-	var scene := packed.instantiate()
-	root.add_child(scene)
-	for i in SETTLE_FRAMES:
-		await process_frame
-
 	var bridge := root.get_node_or_null("CanTelemetryBridge")
 	if bridge == null:
 		print("FAIL: CanTelemetryBridge autoload missing")
 		quit(1)
 		return
+	# Avoid colliding with a running packaged product on the production ports.
+	bridge.remote_port = TEST_GATEWAY_PORT
+	bridge.ack_port = TEST_ACK_PORT
+	var gateway_command: PackedStringArray = bridge.call("_resolve_gateway_command")
+	_check(
+		gateway_command.has("--compat-profile")
+		and gateway_command.has("builtin:qml-sy135-ground-truth"),
+		"gateway command carries the QML compatibility profile"
+	)
+	var packed := load(MAIN_SCENE) as PackedScene
+	var scene := packed.instantiate()
+	root.add_child(scene)
+	current_scene = scene
+	for i in SETTLE_FRAMES:
+		await process_frame
+	var session := scene.get_node_or_null("ProductSession") as ProductSession
+	if session == null or not session.request_model_switch("sy135") or not session.request_start():
+		print("FAIL: SY135 product session did not start")
+		quit(1)
+		return
+	session.set_focused(true)
+	for i in 8:
+		await physics_frame
 
 	# A stale gateway from an earlier run may hold the port; force a fresh spawn.
 	var online := false
@@ -85,8 +104,11 @@ func _run() -> void:
 	_check(bridge.is_ict_active() == true, "ICT connect marks active state")
 	bridge.set_ict_connected(false)
 
+	session.request_reset()
 	scene.queue_free()
 	await process_frame
+	if current_scene == scene:
+		current_scene = null
 	if _failures == 0:
 		print("can_gateway_e2e_test: PASS")
 		quit(0)
@@ -105,7 +127,7 @@ func _check(condition: bool, label: String) -> void:
 
 func _send_shutdown_probe() -> void:
 	var peer := PacketPeerUDP.new()
-	peer.set_dest_address("127.0.0.1", 29764)
+	peer.set_dest_address("127.0.0.1", TEST_GATEWAY_PORT)
 	var buffer := StreamPeerBuffer.new()
 	buffer.big_endian = false
 	buffer.put_32(0x43544E43)
@@ -153,9 +175,13 @@ func _count_rows(path: String) -> int:
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
 		return 0
-	var rows := -1
+	var rows := 0
+	var header_seen := false
 	while not file.eof_reached():
-		file.get_line()
-		rows += 1
+		var line := file.get_line()
+		if not header_seen:
+			header_seen = true
+		elif not line.strip_edges().is_empty():
+			rows += 1
 	file.close()
-	return max(rows, 0)
+	return rows

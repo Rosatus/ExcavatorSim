@@ -46,6 +46,7 @@ BUILD_DIR="$script_dir/build-linux"
     --workpath "$BUILD_DIR" \
     --specpath "$script_dir" \
     --paths "$script_dir" \
+    --add-data "$script_dir/resources:resources" \
     gateway.py
 
 chmod +x "$DIST_DIR/gateway"

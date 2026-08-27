@@ -18,6 +18,7 @@ not publish product pose and the shadow boundary remains observational.
 | [Runtime Profiles](./runtime-profiles.md) | Gateway default and explicit Python compatibility service composition |
 | [Simulation Truth Shadow](./shadow-truth.md) | Negotiated Godot observation schema, isolation, ordering, and diagnostics |
 | [Sensor Telemetry](./sensor-telemetry.md) | Fixed-tick sensor batches, identity/order guards, freshness, and gateway isolation |
+| [QML-Compatible CAN Projection](./can-qml-compatibility.md) | QML-canonical pose projection, strict profiles, CAN byte order/EFF handling, and fail-closed behavior |
 
 Pre-development checklist:
 

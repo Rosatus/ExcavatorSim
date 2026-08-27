@@ -1,0 +1,8 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend quality-check entry point and required verification command."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Determinism, cross-layer regression and provenance review criteria."}
+{"file":".trellis/spec/backend/sensor-telemetry.md","reason":"Review telemetry identity/order/source-frame behavior."}
+{"file":".trellis/spec/frontend/index.md","reason":"Godot client quality boundary and required checks."}
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Review that no second pose writer or presentation authority was introduced."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Review the complete Godot-to-CAN-to-QML coordinate and payload flow."}
+{"file":".trellis/tasks/08-27-csv-attitude-parity-diagnosis/research/qml-canonical-contract.md","reason":"Check implementation against the immutable QML calibration and pose oracle."}
+{"file":".trellis/tasks/08-27-csv-attitude-parity-diagnosis/research/cross-repo-pose-parity.md","reason":"Check replay byte identity and final pose evidence closure."}

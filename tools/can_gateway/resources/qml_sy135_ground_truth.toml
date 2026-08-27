@@ -1,0 +1,42 @@
+[profile]
+version = 1
+target = "qml-guidance-3d"
+model_id = "sy135"
+calibration_file = "qml_ground_truth_calibration.toml"
+calibration_sha256 = "47cab86524d35866a0fa4fd7490feb0ab8ca4a0645b89ddc29f6380fed421b56"
+
+[frames]
+body_imu = "upper"
+rtk_attitude = "upper"
+slew_center = "upper"
+
+[alignment]
+boom_phi_neutral_deg = 0.4713
+arm_phi_neutral_deg = 144.3359
+bucket_phi_neutral_deg = 49.46897405197569
+boom_sign = 1.0
+arm_sign = 1.0
+bucket_sign = 1.0
+
+[neutral_relation]
+swing_deg = 0.0
+boom_deg = 35.0
+arm_deg = -90.0
+bucket_deg = -50.0
+
+[bucket_inverse]
+min_mnq_deg = 0.0
+max_mnq_deg = 180.0
+tolerance_deg = 0.000001
+
+[gnss]
+# Vehicle frame is X right, Y forward, Z up. The reference UI identifies the
+# primary antenna as right and secondary as left. This synthetic one-metre
+# baseline is explicit/profile-bound until field mount geometry is supplied.
+vice_offset_vehicle_m = [-1.0, 0.0, 0.0]
+satellite_status = 4
+
+[tolerance]
+off_axis_quaternion = 0.0001
+gimbal_cosine = 0.000001
+joint_forward_error_deg = 0.00001

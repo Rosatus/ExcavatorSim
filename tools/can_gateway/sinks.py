@@ -17,6 +17,8 @@ from vcan_setup import VcanSetupError, require_vcan_interface
 CAN_FRAME_STRUCT = struct.Struct("<IBBBB8s")
 CAN_FRAME_DLC = 8
 CAN_SFF_MASK = 0x7FF
+CAN_EFF_MASK = 0x1FFFFFFF
+CAN_EFF_FLAG = 0x80000000
 
 
 class FrameSink(Protocol):
@@ -27,8 +29,15 @@ class FrameSink(Protocol):
 
 def pack_can_frame(can_id: int, payload: bytes) -> bytes:
     """16-byte Linux can_frame (can_id, dlc, pad, res0, len8_dlc, data[8])."""
+    if can_id < 0:
+        raise ValueError("CAN ID must be non-negative")
+    flagged = bool(can_id & CAN_EFF_FLAG)
+    raw_id = can_id & CAN_EFF_MASK
+    if can_id & ~(CAN_EFF_FLAG | CAN_EFF_MASK):
+        raise ValueError(f"unsupported CAN ID flags: 0x{can_id:X}")
+    packed_id = raw_id | CAN_EFF_FLAG if flagged or raw_id > CAN_SFF_MASK else raw_id
     data = payload.ljust(CAN_FRAME_DLC, b"\x00")[:CAN_FRAME_DLC]
-    return CAN_FRAME_STRUCT.pack(can_id & CAN_SFF_MASK, CAN_FRAME_DLC, 0, 0, 0, data)
+    return CAN_FRAME_STRUCT.pack(packed_id, CAN_FRAME_DLC, 0, 0, 0, data)
 
 
 class CsvFrameSink:

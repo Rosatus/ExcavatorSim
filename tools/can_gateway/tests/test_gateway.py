@@ -161,6 +161,11 @@ class RtkGoldenTest(unittest.TestCase):
         status = decode_status(encode_status_frame(gps_age_cs=42))
         self.assertEqual(status["gpsAgeCs"], 42)
         self.assertEqual(status["gpsNumStatsUsed"], status["viceGpsNumStatsUsed"])
+        self.assertEqual(status["satelliteStatus"], 0)
+        self.assertEqual(
+            decode_status(encode_status_frame(satellite_status=4))["satelliteStatus"],
+            4,
+        )
         lon = decode_geo_int64(encode_lon_frame(120.09331234))
         self.assertAlmostEqual(lon, 120.09331234, places=7)
         alt = decode_alt(encode_alt_frame(-12.345))

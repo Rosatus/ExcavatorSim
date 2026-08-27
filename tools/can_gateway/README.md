@@ -21,6 +21,11 @@ headless（测试/CI）不自动 spawn，测试显式调 spawn_gateway()。
 # 单独手动运行 gateway（调试）
 python tools/can_gateway/gateway.py --out output/can_gateway
 
+# 按 QML 只读代码语义投影 SY135 CAN（产品默认配置）
+python tools/can_gateway/gateway.py --model sy135 `
+  --compat-profile builtin:qml-sy135-ground-truth `
+  --out output/can_gateway
+
 # 冒烟（无需游戏，自注入合成包）
 python tools/can_gateway/gateway.py --smoke --max-rows 40
 
@@ -30,7 +35,8 @@ Godot: tests/can_gateway_e2e_test.gd                     # 进程监督+录制�
 ```
 
 参数：`--port` `--imu-hz/--slew-hz/--rtk-hz/--travel-hz`、
-`--rtk-byteorder {big,little}`、`--sink {csv,vcan}`（默认 csv）、
+`--rtk-byteorder {big,little}`、`--compat-profile PATH|builtin:qml-sy135-ground-truth`、
+`--qml-calibration PATH`、`--sink {csv,vcan,tcp}`（默认 csv）、
 `--interface vcan0`、`--setup-vcan`。
 
 ## Linux / SocketCAN（vcan 直发）
@@ -75,8 +81,10 @@ ExcavatorSim gateway.exe (--sink tcp)          ICT 侧 (LinuxPC)
 
 - **编码权威 = dev_arch2.0 `GuideSystem/services/can/protocolparser.cpp`**
   （DBC 与运行时解析存在分歧处一律跟随 parser）。
-- **CGI610 全族小端**（含速度帧 ve/vn/vu/v；2026-08-25 按产品决策由大端
-  统一为小端）。金样本测试断言默认编码器可逐字节复现实采帧。
+- legacy 无 profile 模式维持 **CGI610 全族小端**，金样本测试断言默认编码器可
+  逐字节复现实采帧。`qml-guidance-3d` compatibility profile 单独把 A800
+  ve/vn/vu/v 编成大端，因为只读 QML `ProtocolParser` 对这四个 i16 使用网络序；
+  其余 RTK 帧仍遵循 profile 的小端合同。
   注意：parser 的 `parseCgi610CarV` 代码结构是大端（`(data[0]<<8)+data[1]`，
   全族唯一交叉），与 DBC/实采矛盾且两份实采均为零速帧无法仲裁——
   **若真车回放发现速度异常，优先核查 parser 此函数**。
@@ -99,6 +107,9 @@ ExcavatorSim gateway.exe (--sink tcp)          ICT 侧 (LinuxPC)
   该表与下游 calibration.toml 现值（pitch_error_IMU_Boom=0.4713 等）**成套**；
   下游零改动即可渲染正确 rest 形状（Sensor2Ang 复刻测试锁定）。模型经
   `--model`/bridge spawn argv 选择，默认 sy135。
+  这张表仅属于 legacy 无 profile 路径；QML compatibility profile 使用实际
+  相邻 link 中性旋转（swing 0 / boom +35 / arm -90 / bucket -50）并反演完整
+  `ProtocolParser → GuidancePeriodicService → lib_kin` 调用链，不能混用两套零位。
 - 行走压力 0x256：无符号 u16 先导压力（kg，合法域 0~50），≥8 判移动 →
   行走发 +9（幅值恒正，**本帧不表达方向**），静止发 0。
 - 轴系/安装标定集中在 `conventions.py`（ORIGIN_*、MOUNTING 相关纯数据），
@@ -108,6 +119,8 @@ ExcavatorSim gateway.exe (--sink tcp)          ICT 侧 (LinuxPC)
 
 - `gateway.py` — 收包循环 + 帧率调度 + 冒烟模式 + sink 分派（CSV/vcan）
 - `conventions.py` — 包解析 / 四元数→ZYX 欧拉 / ENU→大地坐标 / 行走语义
+- `qml_profile.py` / `qml_compat.py` — 严格 profile/标定加载与 QML 数学逆投影
+- `resources/` — SHA-256 绑定的 QML profile 与 ground-truth calibration
 - `csv_writer.py` — CANape CSV 方言（UTF-8-sig，被对方 read_can_csv 消费）
 - `sinks.py` — FrameSink 抽象：CsvFrameSink / SocketCanSink（AF_CAN 直发）
 - `pc001_sink.py` — PC001 TCP 服务端 sink（Windows ICT，字节兼容 dev_arch 桥）

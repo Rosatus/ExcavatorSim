@@ -29,6 +29,10 @@ enum GatewayStatus { OFFLINE, ONLINE, RECORDING }
 @export var python_command := "python"
 ## Machine model selecting the gateway IMU mount-compensation table.
 @export var model_id := "sy135"
+## QML is the CAN semantic authority; the gateway fails closed if this strict
+## profile or its SHA-bound calibration cannot be loaded.
+@export var compatibility_profile := "builtin:qml-sy135-ground-truth"
+@export_file("*.toml") var qml_calibration_path := ""
 
 var _udp: PacketPeerUDP = null
 var _ack: PacketPeerUDP = null
@@ -178,7 +182,7 @@ func _resolve_gateway_command() -> PackedStringArray:
 		]:
 			if FileAccess.file_exists(candidate):
 				if OS.get_name() == "Windows":
-					return PackedStringArray([
+					return _with_compatibility_args(PackedStringArray([
 						candidate,
 						"--host", remote_host,
 						"--port", str(remote_port),
@@ -188,26 +192,38 @@ func _resolve_gateway_command() -> PackedStringArray:
 						"--tcp-host", tcp_host,
 						"--tcp-port", str(tcp_port),
 						"--model", model_id,
-					])
-				return PackedStringArray([
+					]))
+				return _with_compatibility_args(PackedStringArray([
 					candidate,
 					"--host", remote_host,
 					"--port", str(remote_port),
 					"--ack-port", str(ack_port),
 					"--out", _resolve_output_dir(),
 					"--model", model_id,
-				])
+				]))
 	var script := _resolve_gateway_script()
 	if script.is_empty():
 		return PackedStringArray()
-	return PackedStringArray([
+	return _with_compatibility_args(PackedStringArray([
 		python_command, script,
 		"--host", remote_host,
 		"--port", str(remote_port),
 		"--ack-port", str(ack_port),
 		"--out", _resolve_output_dir(),
 		"--model", model_id,
-	])
+	]))
+
+
+func _with_compatibility_args(argv: PackedStringArray) -> PackedStringArray:
+	var profile := compatibility_profile.strip_edges()
+	if not profile.is_empty():
+		argv.append_array(PackedStringArray(["--compat-profile", profile]))
+	var calibration := qml_calibration_path.strip_edges()
+	if not calibration.is_empty():
+		if calibration.begins_with("res://") or calibration.begins_with("user://"):
+			calibration = ProjectSettings.globalize_path(calibration)
+		argv.append_array(PackedStringArray(["--qml-calibration", calibration]))
+	return argv
 
 
 func spawn_gateway() -> bool:

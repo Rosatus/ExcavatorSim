@@ -1,0 +1,8 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend pre-development checklist and verification entry point."}
+{"file":".trellis/spec/backend/sensor-telemetry.md","reason":"Godot fixed-tick observational telemetry identity, ordering, units and gateway isolation contract."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Deterministic cross-layer tests, provenance and full backend verification requirements."}
+{"file":".trellis/spec/frontend/index.md","reason":"Godot client pre-development boundary and required integration documentation."}
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Godot authoritative pose ownership and single-writer constraints."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Coordinate conversion and end-to-end data-flow checklist for the CAN/QML boundary."}
+{"file":".trellis/tasks/08-27-csv-attitude-parity-diagnosis/research/qml-canonical-contract.md","reason":"Canonical QML inputs, calibration inverse, basis conversion and executable oracle contract."}
+{"file":".trellis/tasks/08-27-csv-attitude-parity-diagnosis/research/cross-repo-pose-parity.md","reason":"Verified replay semantics, source-frame diagnosis and runtime evidence gaps."}

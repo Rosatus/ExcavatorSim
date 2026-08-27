@@ -444,6 +444,8 @@ func _set_ict_button(online: bool, linux_gateway: bool, active: bool, disabled_r
 
 
 func _can_bridge() -> Node:
+	if not is_inside_tree():
+		return null
 	var tree := get_tree()
 	if tree == null:
 		return null

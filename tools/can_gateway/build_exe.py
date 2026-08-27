@@ -19,17 +19,25 @@ def main() -> int:
     # Use the uv-managed PyInstaller (project avoids pip-installing into the
     # interpreter); fall back to an in-interpreter module if present.
     pyinstaller = ["uv", "tool", "run", "pyinstaller"]
-    probe = subprocess.run(pyinstaller + ["--version"], capture_output=True, text=True)
+    probe = subprocess.run([*pyinstaller, "--version"], capture_output=True, text=True)
     if probe.returncode != 0:
         pyinstaller = [sys.executable, "-m", "PyInstaller"]
-    cmd = pyinstaller + [
+    cmd = [
+        *pyinstaller,
         "--onefile",
         "--console",
-        "--name", "gateway",
-        "--distpath", str(DIST),
-        "--workpath", str(ROOT / "build" / "pyinstaller"),
-        "--specpath", str(ROOT / "build" / "pyinstaller"),
-        "--paths", str(GW_DIR),
+        "--name",
+        "gateway",
+        "--distpath",
+        str(DIST),
+        "--workpath",
+        str(ROOT / "build" / "pyinstaller"),
+        "--specpath",
+        str(ROOT / "build" / "pyinstaller"),
+        "--paths",
+        str(GW_DIR),
+        "--add-data",
+        f"{GW_DIR / 'resources'};resources",
         str(GW_DIR / "gateway.py"),
     ]
     print(" ".join(cmd))

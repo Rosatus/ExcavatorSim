@@ -13,7 +13,7 @@ if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
 from csv_writer import CanapeCsvWriter  # noqa: E402
-from sinks import CsvFrameSink, SocketCanSink, pack_can_frame  # noqa: E402
+from sinks import CAN_EFF_FLAG, CsvFrameSink, SocketCanSink, pack_can_frame  # noqa: E402
 
 
 class PackCanFrameTest(unittest.TestCase):
@@ -31,9 +31,15 @@ class PackCanFrameTest(unittest.TestCase):
         self.assertEqual(data[:1], b"\xaa")
         self.assertTrue(all(b == 0 for b in data[1:]))
 
-    def test_extended_id_masked_to_sff(self):
-        can_id = struct.unpack("<I", pack_can_frame(0x18FFF000 | 0x1FFF0000, b"")[:4])[0]
-        self.assertLessEqual(can_id, 0x7FF)
+    def test_extended_id_preserves_29_bits_and_sets_eff_flag(self):
+        for raw_id in (0x800, 0x0CFDA000, 0x18FF3A00, 0x18FFF000, 0x1FFFFFFF):
+            can_id = struct.unpack("<I", pack_can_frame(raw_id, b"")[:4])[0]
+            self.assertEqual(can_id, raw_id | CAN_EFF_FLAG)
+
+    def test_standard_and_already_flagged_ids_are_preserved(self):
+        self.assertEqual(struct.unpack("<I", pack_can_frame(0x7FF, b"")[:4])[0], 0x7FF)
+        flagged = CAN_EFF_FLAG | 0x18FF3A00
+        self.assertEqual(struct.unpack("<I", pack_can_frame(flagged, b"")[:4])[0], flagged)
 
 
 class CsvFrameSinkTest(unittest.TestCase):
@@ -87,6 +93,10 @@ class SocketCanSinkTest(unittest.TestCase):
     def test_append_sends_packed_frame(self):
         fake = _FakeSocket()
         self._patch_socket(lambda *a, **k: fake)
+        sink = SocketCanSink("vcan0", setup_check=False)
+        sink.append(0x18FF3A00, b"\x01" * 8)
+        self.assertEqual(struct.unpack("<I", fake.sent[0][:4])[0], CAN_EFF_FLAG | 0x18FF3A00)
+        sink.close()
 
     def test_af_can_unavailable_message(self):
         class SocketFail:

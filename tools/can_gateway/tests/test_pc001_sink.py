@@ -20,6 +20,7 @@ from pc001_sink import (  # noqa: E402
     SINGLE_FRAME_SIZE,
     TcpPc001Sink,
 )
+from sinks import CAN_EFF_FLAG  # noqa: E402
 
 
 def free_port() -> int:
@@ -104,6 +105,19 @@ class TcpPc001SinkTest(unittest.TestCase):
             self.assertEqual(frames[0][0], 0x123)
         finally:
             good.close()
+
+    def test_extended_id_is_sent_with_socketcan_eff_flag(self) -> None:
+        client = _Client(self.port)
+        try:
+            for _ in range(50):
+                if "connected" in self.sink.peer_name():
+                    break
+                time.sleep(0.02)
+            self.sink.append(0x18FF3A00, b"\x44" * 8)
+            _count, frames = client.recv_batch()
+            self.assertEqual(frames[0][0], CAN_EFF_FLAG | 0x18FF3A00)
+        finally:
+            client.close()
 
     def test_no_client_append_is_safe(self) -> None:
         self.sink.append(0x456, b"\x02" * 8)

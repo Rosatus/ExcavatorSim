@@ -241,9 +241,6 @@ def quat_to_yup_euler_deg(q: tuple[float, float, float, float]) -> tuple[float, 
 
 
 def basis_forward_from_quat(q: tuple[float, float, float, float]) -> tuple[float, float, float]:
-    """Third row of the rotation matrix (negative Z axis) = Godot forward."""
-    x, y, z, w = q
-    fx = -2.0 * (y * y + z * z) + 1.0
-    fy = 2.0 * (x * y + w * z)
-    fz = 2.0 * (x * z - w * y)
-    return fx, fy, fz
+    """Godot local -Z axis expressed in world coordinates."""
+    matrix = _quat_to_matrix_rows(q)
+    return -matrix[0][2], -matrix[1][2], -matrix[2][2]
