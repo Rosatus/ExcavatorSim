@@ -12,3 +12,4 @@ godot/.cache/
 build/
 dist/
 output/
+gateway.spec
