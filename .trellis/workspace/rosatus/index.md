@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 39
-- **Last Active**: 2026-08-25
+- **Total Sessions**: 40
+- **Last Active**: 2026-08-27
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1512 | Active |
+| `journal-1.md` | ~1545 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 40 | 2026-08-27 | QML-canonical CAN pose parity | `539f833` | `main` |
 | 39 | 2026-08-25 | Close product experience validation | `e6c4250`, `79f8c9e` | `main` |
 | 38 | 2026-08-24 | Implement full bucket soil tool contract | `4889ea0` | `main` |
 | 37 | 2026-08-24 | Freeze visual baseline evidence | `a604541`, `86eed3c` | `main` |

@@ -1510,3 +1510,36 @@ Closed the accumulated SY205/SY135 product experience defects, model-specific XI
 ### Next Steps
 
 - None - task complete
+
+
+## Session 40: QML-canonical CAN pose parity
+
+**Date**: 2026-08-27
+**Task**: QML-canonical CAN pose parity
+**Branch**: `main`
+
+### Summary
+
+Implemented strict QML compatibility profiles and calibration binding, Godot-to-QML pose and joint inverse mapping, QML-consumable RTK/CAN transport semantics, Godot launch integration, packaging, regression tests, and executable Trellis contracts. Verified Python 74-test suite, focused Godot E2E and pose checkpoints, static checks, Windows onefile build, and strict-profile smoke output.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `539f833` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
