@@ -1644,3 +1644,37 @@ Introduced protocol v4 operator-axis semantics, generated shared SY205/SY135 com
 ### Next Steps
 
 - None - task complete
+
+
+## Session 44: Correct SY135 QML Neutral Semantics
+
+**Date**: 2026-08-27
+**Task**: Correct SY135 QML Neutral Semantics
+**Branch**: `main`
+
+### Summary
+
+Verified the external QML renderer's arm and bucket +180-degree offsets, corrected the built-in SY135 neutral outputs to 35/90/130 degrees, added renderer-aware mapping and CAN regressions, documented the contract, tracked the Godot checkpoint UID, and validated 182 backend tests plus the 31-script Godot matrix. The final standalone-path scan remains blocked only by the existing Windows-inaccessible tools/can_gateway/.venv-linux/lib64 link.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cb6cfe1` | (see git log) |
+| `400553c` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

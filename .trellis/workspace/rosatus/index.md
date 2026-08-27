@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 43
+- **Total Sessions**: 44
 - **Last Active**: 2026-08-27
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1646 | Active |
+| `journal-1.md` | ~1680 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 44 | 2026-08-27 | Correct SY135 QML Neutral Semantics | `cb6cfe1`, `400553c` | `main` |
 | 43 | 2026-08-27 | Unify operator input semantics | `881888c` | `main` |
 | 42 | 2026-08-27 | Excavator controls HUD and ICT handshake status | `b1f82e6`, `c4f4827`, `54892a8` | `main` |
 | 41 | 2026-08-27 | ICT endpoint restart and timed CAN trigger | `4ab4607` | `main` |
