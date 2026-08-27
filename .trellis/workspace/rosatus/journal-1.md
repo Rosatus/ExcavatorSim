@@ -1543,3 +1543,36 @@ Implemented strict QML compatibility profiles and calibration binding, Godot-to-
 ### Next Steps
 
 - None - task complete
+
+
+## Session 41: ICT endpoint restart and timed CAN trigger
+
+**Date**: 2026-08-27
+**Task**: ICT endpoint restart and timed CAN trigger
+**Branch**: `main`
+
+### Summary
+
+Added endpoint-aware gateway restart supervision and a repeatable 50 Hz, 10-second 0x18FFF100 CAN trigger for recording and ICT sinks; validated Python, Godot, packaged gateway, and protocol boundaries.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4ab4607` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
