@@ -77,13 +77,15 @@ forward/reverse to `Y/H`. XInput-compatible controllers feed the same actions:
 LT/LB control the left track forward/reverse and RT/RB control the right track
 forward/reverse. Work equipment follows the ISO excavator pattern without
 changing the four-axis command order: left stick X/Y controls swing/arm and
-right stick Y/X controls boom/bucket. MotionClient replaces only the joy-axis
-events with the active model's direction profile: SY205 reverses all four stick
-channels and SY135 reverses only swing. ProductSession refreshes that profile on
-offline model activation. The keyboard mirrors the physical stick layout:
-`W/S` arm out/in, `A/D` swing left/right, `I/K` boom down/up, and `J/L`
-bucket curl/dump. Keyboard actions, protocol order, physical joint axes, and
-joint limits remain unchanged. Jolt does not assume every visual asset faces local
+right stick Y/X controls boom/bucket. MotionClient replaces the owned key and
+joy-axis events with independent active-model direction profiles. The keyboard
+profile reverses swing/arm/bucket for SY205 and swing/boom for SY135; the
+gamepad profile still reverses all four stick channels for SY205 and only swing
+for SY135. ProductSession refreshes both profiles on offline model activation.
+The physical keyboard keeps the intended operator outcomes: `W/S` arm out/in,
+`A/D` swing left/right, `I/K` boom down/up, and `J/L` bucket curl/dump. Protocol
+order, physical joint axes, and joint limits remain unchanged. Jolt does not
+assume every visual asset faces local
 `-Z`: the optional rig field `tracks.local_forward_axis` defaults to `-Z`, while
 SY205 explicitly declares `+Z`. Forward, vehicle right, probe placement,
 traction, signed speed, stop cleanup, and pitch telemetry derive from that same

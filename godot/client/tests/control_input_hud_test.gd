@@ -1,19 +1,47 @@
 extends SceneTree
 
 const HUD_SCENE := "res://scenes/control_input_hud.tscn"
-const ACTION_CONTRACT := {
-	"motion_arm_positive": {"key": KEY_W, "path": "Margin/VBox/Sticks/LeftStick/Grid/W", "copy": "W\n小臂伸"},
-	"motion_swing_negative": {"key": KEY_A, "path": "Margin/VBox/Sticks/LeftStick/Grid/A", "copy": "A\n左回转"},
-	"motion_arm_negative": {"key": KEY_S, "path": "Margin/VBox/Sticks/LeftStick/Grid/S", "copy": "S\n小臂收"},
-	"motion_swing_positive": {"key": KEY_D, "path": "Margin/VBox/Sticks/LeftStick/Grid/D", "copy": "D\n右回转"},
-	"motion_boom_positive": {"key": KEY_I, "path": "Margin/VBox/Sticks/RightStick/Grid/I", "copy": "I\n大臂降"},
-	"motion_bucket_negative": {"key": KEY_J, "path": "Margin/VBox/Sticks/RightStick/Grid/J", "copy": "J\n铲斗收"},
-	"motion_boom_negative": {"key": KEY_K, "path": "Margin/VBox/Sticks/RightStick/Grid/K", "copy": "K\n大臂升"},
-	"motion_bucket_positive": {"key": KEY_L, "path": "Margin/VBox/Sticks/RightStick/Grid/L", "copy": "L\n铲斗翻"},
-	"track_left_forward": {"key": KEY_R, "path": "Margin/VBox/Tracks/LeftTrack/Keys/R", "copy": "R  前进"},
-	"track_left_reverse": {"key": KEY_F, "path": "Margin/VBox/Tracks/LeftTrack/Keys/F", "copy": "F  后退"},
-	"track_right_forward": {"key": KEY_Y, "path": "Margin/VBox/Tracks/RightTrack/Keys/Y", "copy": "Y  前进"},
-	"track_right_reverse": {"key": KEY_H, "path": "Margin/VBox/Tracks/RightTrack/Keys/H", "copy": "H  后退"},
+const KEY_CONTRACT := {
+	KEY_W: {"path": "Margin/VBox/Sticks/LeftStick/Grid/W", "copy": "W\n小臂伸"},
+	KEY_A: {"path": "Margin/VBox/Sticks/LeftStick/Grid/A", "copy": "A\n左回转"},
+	KEY_S: {"path": "Margin/VBox/Sticks/LeftStick/Grid/S", "copy": "S\n小臂收"},
+	KEY_D: {"path": "Margin/VBox/Sticks/LeftStick/Grid/D", "copy": "D\n右回转"},
+	KEY_I: {"path": "Margin/VBox/Sticks/RightStick/Grid/I", "copy": "I\n大臂降"},
+	KEY_J: {"path": "Margin/VBox/Sticks/RightStick/Grid/J", "copy": "J\n铲斗收"},
+	KEY_K: {"path": "Margin/VBox/Sticks/RightStick/Grid/K", "copy": "K\n大臂升"},
+	KEY_L: {"path": "Margin/VBox/Sticks/RightStick/Grid/L", "copy": "L\n铲斗翻"},
+	KEY_R: {"path": "Margin/VBox/Tracks/LeftTrack/Keys/R", "copy": "R  前进"},
+	KEY_F: {"path": "Margin/VBox/Tracks/LeftTrack/Keys/F", "copy": "F  后退"},
+	KEY_Y: {"path": "Margin/VBox/Tracks/RightTrack/Keys/Y", "copy": "Y  前进"},
+	KEY_H: {"path": "Margin/VBox/Tracks/RightTrack/Keys/H", "copy": "H  后退"},
+}
+const MODEL_ACTION_KEYS := {
+	"sy205": {
+		"motion_swing_positive": KEY_A,
+		"motion_swing_negative": KEY_D,
+		"motion_boom_positive": KEY_I,
+		"motion_boom_negative": KEY_K,
+		"motion_arm_positive": KEY_S,
+		"motion_arm_negative": KEY_W,
+		"motion_bucket_positive": KEY_J,
+		"motion_bucket_negative": KEY_L,
+	},
+	"sy135": {
+		"motion_swing_positive": KEY_A,
+		"motion_swing_negative": KEY_D,
+		"motion_boom_positive": KEY_K,
+		"motion_boom_negative": KEY_I,
+		"motion_arm_positive": KEY_W,
+		"motion_arm_negative": KEY_S,
+		"motion_bucket_positive": KEY_L,
+		"motion_bucket_negative": KEY_J,
+	},
+}
+const TRACK_ACTION_KEYS := {
+	"track_left_forward": KEY_R,
+	"track_left_reverse": KEY_F,
+	"track_right_forward": KEY_Y,
+	"track_right_reverse": KEY_H,
 }
 
 var failures: Array[String] = []
@@ -37,8 +65,13 @@ func _run() -> void:
 	await process_frame
 	await _check_layout(hud, Vector2i(1280, 720))
 	await _check_layout(hud, Vector2i(1920, 1080))
-	_check_copy_and_mouse_contract(hud)
+	_check_copy_and_mouse_contract(hud, "sy205")
 	_check_input_feedback(hud)
+	var motion_client := MotionClient.new()
+	motion_client.configure_equipment_gamepad_model("sy135")
+	motion_client.free()
+	hud.refresh_input_state_for_test()
+	_check_model_action_tiles(hud, "sy135")
 	hud.queue_free()
 	await process_frame
 	_finish(original_scale_size, original_window_size)
@@ -64,20 +97,25 @@ func _check_layout(hud: ControlInputHUD, resolution: Vector2i) -> void:
 		_fail("control input HUD background is not translucent")
 
 
-func _check_copy_and_mouse_contract(hud: ControlInputHUD) -> void:
-	if ControlInputHUD.ACTION_TILE_PATHS.size() != 12:
+func _check_copy_and_mouse_contract(hud: ControlInputHUD, model_id: String) -> void:
+	if ControlInputHUD.ACTION_TILE_PATHS.size() != 12 or ControlInputHUD.KEY_TILE_PATHS.size() != 12:
 		_fail("control input HUD does not own all twelve actions")
-	for action in ControlInputHUD.ACTION_TILE_PATHS:
-		var tile := hud.get_action_tile_for_test(action)
+	for keycode in KEY_CONTRACT:
+		var expected: Dictionary = KEY_CONTRACT[keycode]
+		if String(ControlInputHUD.KEY_TILE_PATHS[keycode]) != String(expected["path"]):
+			_fail("control input HUD uses the wrong tile for key %s" % keycode)
+		var tile := hud.get_node_or_null(ControlInputHUD.KEY_TILE_PATHS[keycode]) as PanelContainer
 		if tile == null:
-			_fail("control input HUD is missing tile for %s" % action)
+			_fail("control input HUD is missing tile for key %s" % keycode)
 			continue
-		var expected: Dictionary = ACTION_CONTRACT[action]
-		if String(ControlInputHUD.ACTION_TILE_PATHS[action]) != String(expected["path"]):
-			_fail("control input HUD uses the wrong tile for %s" % action)
 		var label := tile.get_node_or_null("Label") as Label
 		if label == null or label.text != String(expected["copy"]):
-			_fail("control input HUD uses the wrong copy for %s" % action)
+			_fail("control input HUD uses the wrong copy for key %s" % keycode)
+	_check_model_action_tiles(hud, model_id)
+	var all_action_keys := (MODEL_ACTION_KEYS[model_id] as Dictionary).duplicate()
+	all_action_keys.merge(TRACK_ACTION_KEYS)
+	for action in all_action_keys:
+		var expected_key := int(all_action_keys[action])
 		var key_events: Array[InputEventKey] = []
 		var joy_events: Array[InputEvent] = []
 		for event in InputMap.action_get_events(action):
@@ -87,7 +125,7 @@ func _check_copy_and_mouse_contract(hud: ControlInputHUD) -> void:
 				joy_events.append(event)
 		if (
 			key_events.size() != 1
-			or key_events[0].physical_keycode != int(expected["key"])
+			or key_events[0].physical_keycode != expected_key
 		):
 			_fail("product InputMap uses the wrong keyboard binding for %s" % action)
 		if joy_events.size() != 1:
@@ -97,6 +135,17 @@ func _check_copy_and_mouse_contract(hud: ControlInputHUD) -> void:
 		if key_name not in copy:
 			_fail("control input HUD omitted key %s" % key_name)
 	_check_mouse_ignore_recursive(hud)
+
+
+func _check_model_action_tiles(hud: ControlInputHUD, model_id: String) -> void:
+	var expected_action_keys := (MODEL_ACTION_KEYS[model_id] as Dictionary).duplicate()
+	expected_action_keys.merge(TRACK_ACTION_KEYS)
+	for action in expected_action_keys:
+		var expected_key := int(expected_action_keys[action])
+		var expected_path := ControlInputHUD.KEY_TILE_PATHS[expected_key] as NodePath
+		var expected_tile := hud.get_node_or_null(expected_path) as PanelContainer
+		if hud.get_action_tile_for_test(action) != expected_tile:
+			_fail("%s HUD action %s did not follow key %s" % [model_id, action, expected_key])
 
 
 func _check_input_feedback(hud: ControlInputHUD) -> void:
@@ -143,7 +192,9 @@ func _check_input_feedback(hud: ControlInputHUD) -> void:
 
 
 func _install_product_input_map() -> void:
-	for action in ACTION_CONTRACT:
+	var actions := (MODEL_ACTION_KEYS["sy205"] as Dictionary).duplicate()
+	actions.merge(TRACK_ACTION_KEYS)
+	for action in actions:
 		if not InputMap.has_action(action):
 			InputMap.add_action(action)
 		var stale_key := InputEventKey.new()
@@ -154,7 +205,7 @@ func _install_product_input_map() -> void:
 		stale_axis.axis_value = 1.0
 		InputMap.action_add_event(action, stale_axis)
 	var motion_client := MotionClient.new()
-	motion_client.call("_ensure_input_actions")
+	motion_client.configure_equipment_gamepad_model("sy205")
 	motion_client.free()
 	var chassis := TrackedChassisController.new()
 	chassis.call("_ensure_input_actions")

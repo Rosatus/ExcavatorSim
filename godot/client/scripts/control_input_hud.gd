@@ -15,6 +15,20 @@ const ACTION_TILE_PATHS := {
 	"track_right_forward": NodePath("Margin/VBox/Tracks/RightTrack/Keys/Y"),
 	"track_right_reverse": NodePath("Margin/VBox/Tracks/RightTrack/Keys/H"),
 }
+const KEY_TILE_PATHS := {
+	KEY_W: NodePath("Margin/VBox/Sticks/LeftStick/Grid/W"),
+	KEY_A: NodePath("Margin/VBox/Sticks/LeftStick/Grid/A"),
+	KEY_S: NodePath("Margin/VBox/Sticks/LeftStick/Grid/S"),
+	KEY_D: NodePath("Margin/VBox/Sticks/LeftStick/Grid/D"),
+	KEY_I: NodePath("Margin/VBox/Sticks/RightStick/Grid/I"),
+	KEY_J: NodePath("Margin/VBox/Sticks/RightStick/Grid/J"),
+	KEY_K: NodePath("Margin/VBox/Sticks/RightStick/Grid/K"),
+	KEY_L: NodePath("Margin/VBox/Sticks/RightStick/Grid/L"),
+	KEY_R: NodePath("Margin/VBox/Tracks/LeftTrack/Keys/R"),
+	KEY_F: NodePath("Margin/VBox/Tracks/LeftTrack/Keys/F"),
+	KEY_Y: NodePath("Margin/VBox/Tracks/RightTrack/Keys/Y"),
+	KEY_H: NodePath("Margin/VBox/Tracks/RightTrack/Keys/H"),
+}
 
 const IDLE_BACKGROUND := Color(0.075, 0.105, 0.135, 0.88)
 const IDLE_BORDER := Color(0.25, 0.43, 0.55, 0.9)
@@ -33,11 +47,7 @@ func _ready() -> void:
 	_idle_style = _make_tile_style(IDLE_BACKGROUND, IDLE_BORDER)
 	_active_style = _make_tile_style(ACTIVE_BACKGROUND, ACTIVE_BORDER)
 	_set_mouse_ignore_recursive(self)
-	for action in ACTION_TILE_PATHS:
-		var tile := get_node_or_null(ACTION_TILE_PATHS[action]) as PanelContainer
-		if tile != null:
-			_tiles[action] = tile
-			_set_tile_active(tile, false)
+	_refresh_action_tiles()
 	refresh_input_state_for_test()
 
 
@@ -46,6 +56,7 @@ func _process(_delta: float) -> void:
 
 
 func refresh_input_state_for_test() -> void:
+	_refresh_action_tiles()
 	for action in _tiles:
 		var active := InputMap.has_action(action) and Input.is_action_pressed(action)
 		_set_tile_active(_tiles[action] as PanelContainer, active)
@@ -57,7 +68,31 @@ func is_action_highlighted_for_test(action: String) -> bool:
 
 
 func get_action_tile_for_test(action: String) -> PanelContainer:
+	_refresh_action_tiles()
 	return _tiles.get(action) as PanelContainer
+
+
+func _refresh_action_tiles() -> void:
+	var next_tiles := {}
+	for action in ACTION_TILE_PATHS:
+		var tile_path := ACTION_TILE_PATHS[action] as NodePath
+		if InputMap.has_action(action):
+			for event in InputMap.action_get_events(action):
+				if event is InputEventKey:
+					var keycode := (event as InputEventKey).physical_keycode
+					if KEY_TILE_PATHS.has(keycode):
+						tile_path = KEY_TILE_PATHS[keycode] as NodePath
+						break
+		var tile := get_node_or_null(tile_path) as PanelContainer
+		if tile != null:
+			next_tiles[action] = tile
+	if next_tiles == _tiles:
+		return
+	for tile in _tiles.values():
+		_set_tile_active(tile as PanelContainer, false)
+	_tiles = next_tiles
+	for tile in _tiles.values():
+		_set_tile_active(tile as PanelContainer, false)
 
 
 func _set_tile_active(tile: PanelContainer, active: bool) -> void:

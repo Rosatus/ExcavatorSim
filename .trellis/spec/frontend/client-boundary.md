@@ -86,10 +86,12 @@ track forward/reverse `Y/H`. Work equipment follows the ISO excavator layout:
 left-stick `W/S` is arm out/in, `A/D` is swing left/right, right-stick `I/K` is
 boom down/up, and `J/L` is bucket curl/dump. XInput-compatible controllers map
 LT/LB to left forward/reverse and RT/RB to right forward/reverse; left stick
-X/Y remains swing/arm and right stick Y/X remains boom/bucket. Action/channel
-semantics and keyboard signs are global, but the
-canonical `InputEventJoypadMotion` signs are selected per active model: SY205
-reverses swing/boom/arm/bucket and SY135 reverses only swing. A rig's optional
+X/Y remains swing/arm and right stick Y/X remains boom/bucket. Protocol channel
+semantics remain global, while runtime key and joy events compensate each
+model's physical direction independently. The keyboard profile reverses
+swing/arm/bucket for SY205 and swing/boom for SY135. The canonical
+`InputEventJoypadMotion` profile remains SY205 swing/boom/arm/bucket reversed
+and SY135 swing reversed. A rig's optional
 `tracks.local_forward_axis` is `-Z` or `+Z` and
 defaults to `-Z` for backward compatibility. Vehicle right is derived from
 forward × up; it is never hard-coded independently from forward.
@@ -126,11 +128,12 @@ forward × up; it is never hard-coded independently from forward.
   InputMap or motion commands, and recursively uses `MOUSE_FILTER_IGNORE`.
   Therefore opposing keys may both highlight while their resolved axis remains
   zero, and orbit/zoom pointer input passes through the lower-right HUD.
-- Model-specific XInput direction is expressed only by
+- Model-specific input direction is expressed only by
+  `MotionClient.MODEL_KEYBOARD_DIRECTION_MULTIPLIERS` and
   `MotionClient.MODEL_GAMEPAD_DIRECTION_MULTIPLIERS`. ProductSession refreshes
-  the owned joy events after successful initial/model activation; compatibility
-  transport refreshes them after hello acceptance. Do not invert keyboard
-  events, protocol channels, rig joint axes, or presentation pivots.
+  the owned key and joy events after successful initial/model activation;
+  compatibility transport refreshes them after hello acceptance. Do not invert
+  protocol channels, rig joint axes, or presentation pivots.
 - Each model descriptor must provide track/contact dimensions, independent
   front/rear/left/right support offsets, speed/acceleration/brake/coast values,
   pivot scale, slope limits, slip coefficients, minimum traction, and support
@@ -171,7 +174,7 @@ an unattended soak cannot accidentally weaken the product safety behavior.
 | Matching derived ray hit | Accept only a bounded height-compatible hint |
 | Focus/reconnect/model/world reset | Clear commands and velocities; reset pose where required |
 | Stale/duplicate runtime gamepad event | Replace it with exactly one canonical joy binding for that action |
-| Stale/duplicate product keyboard event | Replace it with exactly one current `WASD`/`IJKL`/`RF`/`YH` key event |
+| Stale/duplicate product keyboard event | Replace it with exactly one current model-profiled `WASD`/`IJKL` event or global `RF`/`YH` track event |
 | Opposing semantic actions held | Resolve motion to zero while highlighting both HUD tiles |
 | Pointer input over control HUD | Pass through every descendant; HUD never consumes camera input |
 | Gamepad held during re-arm | Keep the corresponding track/equipment output zero until all owned controls return neutral |
@@ -195,12 +198,12 @@ an unattended soak cannot accidentally weaken the product safety behavior.
   identity fallback.
 - Lifecycle tests assert reconnect, model activation, world reset, focus loss,
   and controller disable clearing behavior.
-- Input tests assert the exact ISO joy axis and sign for all eight equipment
-  actions, exact `WASD`/`IJKL` equipment keys, exact `R/F` and `Y/H` track keys,
-  exact LT/LB/RT/RB track bindings, idempotent runtime registration, and
+- Input tests assert the exact ISO joy axis/sign and model-profiled keyboard key
+  for all eight equipment actions, exact `R/F` and `Y/H` track keys, exact
+  LT/LB/RT/RB track bindings, idempotent runtime registration, and
   current-device prompt switching without weakening neutral re-arm.
-- Input tests select both model profiles, assert exact JoypadMotion axis/sign
-  pairs with unchanged keys, reject unknown profiles, and prove offline model
+- Input tests select both model profiles, assert exact keyboard key and
+  JoypadMotion axis/sign pairs, reject unknown profiles, and prove offline model
   switching refreshes the active profile.
 - The standalone HUD test binds every semantic action to its exact physical
   key, named tile and copy; it also asserts 1280x720/1920x1080 containment,
@@ -218,8 +221,8 @@ Correct: ChassisMotionRoot owns travel; MotionPresentation composes below it
 Wrong: bucket remains on LT/RT while separate callbacks drive tracks
 Correct: canonical InputMap events put bucket on right-stick X and feed LT/LB/RT/RB into the existing track actions
 
-Wrong: SY135 joystick swing is reversed -> flip its physical joint axis and also reverse keyboard A/D
-Correct: retain rig/keyboard semantics and flip only SY135 swing JoypadMotion events on model activation
+Wrong: a model's keyboard direction is reversed -> flip its protocol channel or physical joint axis
+Correct: retain protocol/rig semantics and replace only that model's owned keyboard events on activation
 
 Wrong: keep the old Q/A, W/S track keys beside the new joystick layout and let both fire
 Correct: erase owned runtime key/joy events, then install one canonical RF/YH track and WASD/IJKL equipment layout

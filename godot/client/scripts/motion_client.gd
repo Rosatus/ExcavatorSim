@@ -42,6 +42,20 @@ const MODEL_GAMEPAD_DIRECTION_MULTIPLIERS := {
 	"sy205": {"swing": -1.0, "boom": -1.0, "arm": -1.0, "bucket": -1.0},
 	"sy135": {"swing": -1.0, "boom": 1.0, "arm": 1.0, "bucket": 1.0},
 }
+const MODEL_KEYBOARD_DIRECTION_MULTIPLIERS := {
+	"sy205": {"swing": -1.0, "boom": 1.0, "arm": -1.0, "bucket": -1.0},
+	"sy135": {"swing": -1.0, "boom": -1.0, "arm": 1.0, "bucket": 1.0},
+}
+const OPPOSITE_EQUIPMENT_ACTIONS := {
+	"motion_swing_positive": "motion_swing_negative",
+	"motion_swing_negative": "motion_swing_positive",
+	"motion_boom_positive": "motion_boom_negative",
+	"motion_boom_negative": "motion_boom_positive",
+	"motion_arm_positive": "motion_arm_negative",
+	"motion_arm_negative": "motion_arm_positive",
+	"motion_bucket_positive": "motion_bucket_negative",
+	"motion_bucket_negative": "motion_bucket_positive",
+}
 const COMMAND_ACTIONS := {"motion_start": KEY_F6, "motion_pause": KEY_F7, "motion_reset": KEY_F8}
 
 @export var endpoint := DEFAULT_ENDPOINT
@@ -147,7 +161,10 @@ func set_preflight_optional_capabilities_for_test(optional_capabilities: Array[S
 
 
 func configure_equipment_gamepad_model(model_id: String) -> bool:
-	if not MODEL_GAMEPAD_DIRECTION_MULTIPLIERS.has(model_id):
+	if (
+		not MODEL_GAMEPAD_DIRECTION_MULTIPLIERS.has(model_id)
+		or not MODEL_KEYBOARD_DIRECTION_MULTIPLIERS.has(model_id)
+	):
 		return false
 	_equipment_gamepad_model_id = model_id
 	_ensure_input_actions()
@@ -967,22 +984,30 @@ func _set_error(code: String, message: String, recoverable: bool, request_id: St
 
 
 func _ensure_input_actions() -> void:
-	var direction_profile := MODEL_GAMEPAD_DIRECTION_MULTIPLIERS.get(
+	var gamepad_direction_profile := MODEL_GAMEPAD_DIRECTION_MULTIPLIERS.get(
 		_equipment_gamepad_model_id, MODEL_GAMEPAD_DIRECTION_MULTIPLIERS["sy205"]
+	) as Dictionary
+	var keyboard_direction_profile := MODEL_KEYBOARD_DIRECTION_MULTIPLIERS.get(
+		_equipment_gamepad_model_id, MODEL_KEYBOARD_DIRECTION_MULTIPLIERS["sy205"]
 	) as Dictionary
 	for action in INPUT_ACTIONS:
 		if not InputMap.has_action(action):
 			InputMap.add_action(action, 0.08)
 		var definition: Dictionary = INPUT_ACTIONS[action]
-		# Product work-equipment actions own one keyboard key and one canonical
-		# gamepad axis. Replace stale runtime mappings before installing the
-		# current layout so hot reload/model refresh cannot retain old keys.
+		# Product work-equipment actions own one model-calibrated keyboard key
+		# and one model-calibrated gamepad axis. Replace stale runtime mappings
+		# so hot reload/model refresh cannot retain the previous model's signs.
 		for existing in InputMap.action_get_events(action):
 			if existing is InputEventKey or existing is InputEventJoypadMotion:
 				InputMap.action_erase_event(action, existing)
-		for keycode in definition["keys"]:
+		var channel := String(definition["channel"])
+		var keyboard_source_action := String(action)
+		if float(keyboard_direction_profile.get(channel, 1.0)) < 0.0:
+			keyboard_source_action = String(OPPOSITE_EQUIPMENT_ACTIONS[action])
+		var keyboard_definition := INPUT_ACTIONS[keyboard_source_action] as Dictionary
+		for keycode in keyboard_definition["keys"]:
 			_add_key_event(action, int(keycode))
-		var direction_multiplier := float(direction_profile.get(String(definition["channel"]), 1.0))
+		var direction_multiplier := float(gamepad_direction_profile.get(channel, 1.0))
 		_add_joy_axis_event(
 			action,
 			int(definition["joy_axis"]),

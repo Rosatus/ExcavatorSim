@@ -12,15 +12,27 @@ const VERSIONS := {
 	"terrain_algorithm_version": "terrain-algorithm-v2",
 	"visual_model_version": "original-skin-v1",
 }
-const EXPECTED_EQUIPMENT_KEYS := {
-	"motion_swing_positive": KEY_D,
-	"motion_swing_negative": KEY_A,
-	"motion_boom_positive": KEY_I,
-	"motion_boom_negative": KEY_K,
-	"motion_arm_positive": KEY_W,
-	"motion_arm_negative": KEY_S,
-	"motion_bucket_positive": KEY_L,
-	"motion_bucket_negative": KEY_J,
+const EXPECTED_EQUIPMENT_KEYS_BY_MODEL := {
+	"sy205": {
+		"motion_swing_positive": KEY_A,
+		"motion_swing_negative": KEY_D,
+		"motion_boom_positive": KEY_I,
+		"motion_boom_negative": KEY_K,
+		"motion_arm_positive": KEY_S,
+		"motion_arm_negative": KEY_W,
+		"motion_bucket_positive": KEY_J,
+		"motion_bucket_negative": KEY_L,
+	},
+	"sy135": {
+		"motion_swing_positive": KEY_A,
+		"motion_swing_negative": KEY_D,
+		"motion_boom_positive": KEY_K,
+		"motion_boom_negative": KEY_I,
+		"motion_arm_positive": KEY_W,
+		"motion_arm_negative": KEY_S,
+		"motion_bucket_positive": KEY_L,
+		"motion_bucket_negative": KEY_J,
+	},
 }
 
 
@@ -317,6 +329,7 @@ func _assert_equipment_bindings(client: MotionClient, model_id: String) -> int:
 	if _check(client.configure_equipment_gamepad_model(model_id), "%s gamepad profile is supported" % model_id) != 0:
 		return 1
 	var direction_profile := MotionClient.MODEL_GAMEPAD_DIRECTION_MULTIPLIERS[model_id] as Dictionary
+	var expected_keys := EXPECTED_EQUIPMENT_KEYS_BY_MODEL[model_id] as Dictionary
 	for action in MotionClient.INPUT_ACTIONS:
 		var definition: Dictionary = MotionClient.INPUT_ACTIONS[action]
 		var expected_sign := (
@@ -330,7 +343,7 @@ func _assert_equipment_bindings(client: MotionClient, model_id: String) -> int:
 		for event in InputMap.action_get_events(action):
 			if event is InputEventKey:
 				key_count += 1
-				if (event as InputEventKey).physical_keycode == int(EXPECTED_EQUIPMENT_KEYS[action]):
+				if (event as InputEventKey).physical_keycode == int(expected_keys[action]):
 					key_matches += 1
 			elif event is InputEventJoypadMotion:
 				joy_count += 1
@@ -339,7 +352,7 @@ func _assert_equipment_bindings(client: MotionClient, model_id: String) -> int:
 					joy_matches += 1
 		if _check(
 			key_count == 1 and key_matches == 1 and joy_count == 1 and joy_matches == 1,
-			"%s keeps keyboard and its calibrated ISO gamepad binding for %s" % [model_id, action],
+			"%s installs its calibrated keyboard and gamepad binding for %s" % [model_id, action],
 		) != 0:
 			return 1
 	return 0
