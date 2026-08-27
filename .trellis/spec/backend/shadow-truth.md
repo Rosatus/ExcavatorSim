@@ -15,7 +15,7 @@ truth shape locally, but it is not a valid shadow transport profile.
 - Client WebSocket envelope:
 
 ```json
-{"type":"simulation_truth_shadow","protocol_version":"godot-pinocchio-v3","snapshot":{}}
+{"type":"simulation_truth_shadow","protocol_version":"godot-pinocchio-v4","snapshot":{}}
 ```
 
 - Godot producer: `MotionClient.queue_simulation_truth_shadow(snapshot: Dictionary) -> bool`.

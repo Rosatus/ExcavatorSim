@@ -4,6 +4,8 @@ import pytest
 
 from babylon_sim.input_router import InputRouter, InputRouterError, InputSnapshot
 
+IDENTITY_SIGNS = (1.0, 1.0, 1.0, 1.0)
+
 
 class Clock:
     def __init__(self) -> None:
@@ -25,7 +27,7 @@ def snapshot(
 
 def test_zero_arming_sequence_and_latest_value() -> None:
     clock = Clock()
-    router = InputRouter(clock=clock)
+    router = InputRouter(clock=clock, operator_to_joint_signs=IDENTITY_SIGNS)
     with pytest.raises(InputRouterError) as rejected:
         router.submit(snapshot(0, (1.0, 0.0, 0.0, 0.0)), client_id="client")
     assert rejected.value.code == "not_armed"
@@ -37,7 +39,7 @@ def test_zero_arming_sequence_and_latest_value() -> None:
 
 
 def test_stale_sequence_is_rejected() -> None:
-    router = InputRouter()
+    router = InputRouter(operator_to_joint_signs=IDENTITY_SIGNS)
     router.submit(snapshot(1, (0.0, 0.0, 0.0, 0.0)), client_id="client")
     with pytest.raises(InputRouterError) as rejected:
         router.submit(snapshot(1, (0.0, 0.0, 0.0, 0.0)), client_id="client")
@@ -45,7 +47,7 @@ def test_stale_sequence_is_rejected() -> None:
 
 
 def test_sequence_remains_monotonic_after_same_client_disconnect_snapshot() -> None:
-    router = InputRouter()
+    router = InputRouter(operator_to_joint_signs=IDENTITY_SIGNS)
     router.submit(snapshot(10, (0.0, 0.0, 0.0, 0.0)), client_id="client")
     router.submit(
         snapshot(11, (0.0, 0.0, 0.0, 0.0), connected=False),
@@ -57,7 +59,7 @@ def test_sequence_remains_monotonic_after_same_client_disconnect_snapshot() -> N
 
 
 def test_active_source_release_remains_connected_zero() -> None:
-    router = InputRouter()
+    router = InputRouter(operator_to_joint_signs=IDENTITY_SIGNS)
     router.submit(snapshot(0, (0.0, 0.0, 0.0, 0.0)), client_id="client")
     router.submit(snapshot(1, (1.0, 0.0, 0.0, 0.0)), client_id="client")
     assert router.command(timestamp=0.0, sequence_number=0).connected
@@ -72,7 +74,7 @@ def test_active_source_release_remains_connected_zero() -> None:
 
 def test_lease_expiry_disconnects_and_requires_rearming() -> None:
     clock = Clock()
-    router = InputRouter(clock=clock)
+    router = InputRouter(clock=clock, operator_to_joint_signs=IDENTITY_SIGNS)
     router.submit(snapshot(0, (0.0, 0.0, 0.0, 0.0)), client_id="client")
     router.submit(snapshot(1, (1.0, 0.0, 0.0, 0.0)), client_id="client")
     assert router.command(timestamp=0.0, sequence_number=0).connected
@@ -86,7 +88,7 @@ def test_lease_expiry_disconnects_and_requires_rearming() -> None:
 
 
 def test_disconnect_client_is_idempotent_and_releases_source() -> None:
-    router = InputRouter()
+    router = InputRouter(operator_to_joint_signs=IDENTITY_SIGNS)
     router.submit(snapshot(0, (0.0, 0.0, 0.0, 0.0)), client_id="first")
     router.submit(snapshot(1, (1.0, 0.0, 0.0, 0.0)), client_id="first")
     router.command(timestamp=0.0, sequence_number=0)
@@ -99,7 +101,7 @@ def test_disconnect_client_is_idempotent_and_releases_source() -> None:
 
 
 def test_source_count_is_bounded() -> None:
-    router = InputRouter(max_sources=1)
+    router = InputRouter(max_sources=1, operator_to_joint_signs=IDENTITY_SIGNS)
     router.submit(snapshot(0, (0.0, 0.0, 0.0, 0.0), source="a"), client_id="client")
     with pytest.raises(InputRouterError) as rejected:
         router.submit(snapshot(1, (0.0, 0.0, 0.0, 0.0), source="b"), client_id="client")

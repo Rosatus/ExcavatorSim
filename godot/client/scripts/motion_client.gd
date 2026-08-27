@@ -27,35 +27,7 @@ const PREFLIGHT_TIMEOUT_SECONDS := 1.5
 const HELLO_TIMEOUT_SECONDS := 3.0
 const RECONNECT_INITIAL_SECONDS := 0.25
 const RECONNECT_MAX_SECONDS := 5.0
-const INPUT_ACTIONS := {
-	"motion_swing_positive": {"keys": [KEY_D], "channel": "swing", "joy_axis": JOY_AXIS_LEFT_X, "joy_sign": 1.0},
-	"motion_swing_negative": {"keys": [KEY_A], "channel": "swing", "joy_axis": JOY_AXIS_LEFT_X, "joy_sign": -1.0},
-	# ISO excavator pattern: left stick owns swing/arm; right stick owns boom/bucket.
-	"motion_boom_positive": {"keys": [KEY_I], "channel": "boom", "joy_axis": JOY_AXIS_RIGHT_Y, "joy_sign": 1.0},
-	"motion_boom_negative": {"keys": [KEY_K], "channel": "boom", "joy_axis": JOY_AXIS_RIGHT_Y, "joy_sign": -1.0},
-	"motion_arm_positive": {"keys": [KEY_W], "channel": "arm", "joy_axis": JOY_AXIS_LEFT_Y, "joy_sign": -1.0},
-	"motion_arm_negative": {"keys": [KEY_S], "channel": "arm", "joy_axis": JOY_AXIS_LEFT_Y, "joy_sign": 1.0},
-	"motion_bucket_positive": {"keys": [KEY_L], "channel": "bucket", "joy_axis": JOY_AXIS_RIGHT_X, "joy_sign": 1.0},
-	"motion_bucket_negative": {"keys": [KEY_J], "channel": "bucket", "joy_axis": JOY_AXIS_RIGHT_X, "joy_sign": -1.0},
-}
-const MODEL_GAMEPAD_DIRECTION_MULTIPLIERS := {
-	"sy205": {"swing": -1.0, "boom": -1.0, "arm": -1.0, "bucket": -1.0},
-	"sy135": {"swing": -1.0, "boom": 1.0, "arm": 1.0, "bucket": 1.0},
-}
-const MODEL_KEYBOARD_DIRECTION_MULTIPLIERS := {
-	"sy205": {"swing": -1.0, "boom": 1.0, "arm": -1.0, "bucket": -1.0},
-	"sy135": {"swing": -1.0, "boom": -1.0, "arm": 1.0, "bucket": 1.0},
-}
-const OPPOSITE_EQUIPMENT_ACTIONS := {
-	"motion_swing_positive": "motion_swing_negative",
-	"motion_swing_negative": "motion_swing_positive",
-	"motion_boom_positive": "motion_boom_negative",
-	"motion_boom_negative": "motion_boom_positive",
-	"motion_arm_positive": "motion_arm_negative",
-	"motion_arm_negative": "motion_arm_positive",
-	"motion_bucket_positive": "motion_bucket_negative",
-	"motion_bucket_negative": "motion_bucket_positive",
-}
+const INPUT_ACTIONS := EquipmentCommandMapper.INPUT_ACTIONS
 const COMMAND_ACTIONS := {"motion_start": KEY_F6, "motion_pause": KEY_F7, "motion_reset": KEY_F8}
 
 @export var endpoint := DEFAULT_ENDPOINT
@@ -112,11 +84,11 @@ var _shadow_elapsed := 0.0
 var _pending_shadow_truth: Dictionary = {}
 var _sensor_elapsed := 0.0
 var _pending_sensor_telemetry: Dictionary = {}
-var _equipment_gamepad_model_id := ""
+var _equipment_command_mapper := EquipmentCommandMapper.new()
 
 
 func _ready() -> void:
-	configure_equipment_gamepad_model(desired_model_id)
+	configure_equipment_model(desired_model_id)
 	_ensure_preflight_request()
 	endpoint = String(ProjectSettings.get_setting("motion/endpoint", endpoint))
 	auto_connect = bool(ProjectSettings.get_setting("gateway/enabled", auto_connect))
@@ -160,19 +132,15 @@ func set_preflight_optional_capabilities_for_test(optional_capabilities: Array[S
 	auto_connect = false
 
 
-func configure_equipment_gamepad_model(model_id: String) -> bool:
-	if (
-		not MODEL_GAMEPAD_DIRECTION_MULTIPLIERS.has(model_id)
-		or not MODEL_KEYBOARD_DIRECTION_MULTIPLIERS.has(model_id)
-	):
+func configure_equipment_model(model_id: String) -> bool:
+	if not _equipment_command_mapper.configure_model(model_id):
 		return false
-	_equipment_gamepad_model_id = model_id
 	_ensure_input_actions()
 	return true
 
 
-func get_equipment_gamepad_model_id() -> String:
-	return _equipment_gamepad_model_id
+func get_equipment_model_id() -> String:
+	return _equipment_command_mapper.get_model_id()
 
 
 func connect_to_service() -> void:
@@ -385,7 +353,7 @@ func get_render_pose() -> Dictionary:
 func get_authoritative_input_axes() -> Vector4:
 	if not _focused:
 		return Vector4.ZERO
-	return _read_input_axes()
+	return _equipment_command_mapper.to_joint_axes(_read_operator_axes())
 
 
 func get_status_snapshot() -> Dictionary:
@@ -662,8 +630,11 @@ func _accept_hello_ack(payload: Dictionary) -> void:
 	_zero_armed = false
 	_retry_delay = RECONNECT_INITIAL_SECONDS
 	_retry_elapsed = 0.0
+	if not configure_equipment_model(active_model_id):
+		_set_error("equipment_command_profile_invalid", _equipment_command_mapper.get_last_error(), false)
+		_set_connection_state(STATE_FAULT)
+		return
 	_set_connection_state(STATE_READY)
-	configure_equipment_gamepad_model(active_model_id)
 	model_changed.emit(active_model_id)
 	authority_changed.emit(session_id, simulation_epoch, _generation)
 	pose_cleared.emit(_generation, "hello_ack")
@@ -770,7 +741,7 @@ func _accept_status(payload: Dictionary) -> void:
 
 
 func _send_current_input() -> void:
-	var axes := _read_input_axes()
+	var axes := _read_operator_axes()
 	if not _focused:
 		axes = Vector4.ZERO
 	if not _zero_armed and not _is_zero(axes):
@@ -875,15 +846,10 @@ func _send_payload(payload: Dictionary) -> bool:
 	return true
 
 
-func _read_input_axes() -> Vector4:
+func _read_operator_axes() -> Vector4:
 	if _test_axes_override:
 		return _test_axes
-	return Vector4(
-		Input.get_axis("motion_swing_negative", "motion_swing_positive"),
-		Input.get_axis("motion_boom_negative", "motion_boom_positive"),
-		Input.get_axis("motion_arm_negative", "motion_arm_positive"),
-		Input.get_axis("motion_bucket_negative", "motion_bucket_positive"),
-	)
+	return _equipment_command_mapper.read_operator_axes()
 
 
 func _handle_lifecycle_actions() -> void:
@@ -984,34 +950,22 @@ func _set_error(code: String, message: String, recoverable: bool, request_id: St
 
 
 func _ensure_input_actions() -> void:
-	var gamepad_direction_profile := MODEL_GAMEPAD_DIRECTION_MULTIPLIERS.get(
-		_equipment_gamepad_model_id, MODEL_GAMEPAD_DIRECTION_MULTIPLIERS["sy205"]
-	) as Dictionary
-	var keyboard_direction_profile := MODEL_KEYBOARD_DIRECTION_MULTIPLIERS.get(
-		_equipment_gamepad_model_id, MODEL_KEYBOARD_DIRECTION_MULTIPLIERS["sy205"]
-	) as Dictionary
 	for action in INPUT_ACTIONS:
 		if not InputMap.has_action(action):
 			InputMap.add_action(action, 0.08)
 		var definition: Dictionary = INPUT_ACTIONS[action]
-		# Product work-equipment actions own one model-calibrated keyboard key
-		# and one model-calibrated gamepad axis. Replace stale runtime mappings
-		# so hot reload/model refresh cannot retain the previous model's signs.
+		# Product work-equipment actions own one model-independent operator key
+		# and one model-independent gamepad direction. Model joint signs live in
+		# EquipmentCommandMapper and never mutate InputMap.
 		for existing in InputMap.action_get_events(action):
 			if existing is InputEventKey or existing is InputEventJoypadMotion:
 				InputMap.action_erase_event(action, existing)
-		var channel := String(definition["channel"])
-		var keyboard_source_action := String(action)
-		if float(keyboard_direction_profile.get(channel, 1.0)) < 0.0:
-			keyboard_source_action = String(OPPOSITE_EQUIPMENT_ACTIONS[action])
-		var keyboard_definition := INPUT_ACTIONS[keyboard_source_action] as Dictionary
-		for keycode in keyboard_definition["keys"]:
+		for keycode in definition["keys"]:
 			_add_key_event(action, int(keycode))
-		var direction_multiplier := float(gamepad_direction_profile.get(channel, 1.0))
 		_add_joy_axis_event(
 			action,
 			int(definition["joy_axis"]),
-			float(definition["joy_sign"]) * direction_multiplier,
+			float(definition["joy_sign"]),
 		)
 	for action in COMMAND_ACTIONS:
 		if not InputMap.has_action(action):

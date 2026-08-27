@@ -112,7 +112,7 @@ class InputMessage:
     client_sequence: int
     connected: bool
     focused: bool
-    axes: tuple[float, float, float, float]
+    operator_axes: tuple[float, float, float, float]
     client_sent_ms: float
 
 
@@ -314,12 +314,14 @@ def decode_client_message(raw: str | bytes, *, max_bytes: int = MAX_MESSAGE_BYTE
                 "invalid_sequence", "client_sequence must be an unsigned 64-bit integer"
             )
         axes_list = cast(list[float], payload["axes"])
-        axes = cast(tuple[float, float, float, float], tuple(float(value) for value in axes_list))
+        operator_axes = cast(
+            tuple[float, float, float, float], tuple(float(value) for value in axes_list)
+        )
         return InputMessage(
             client_sequence=sequence,
             connected=payload["connected"],
             focused=payload["focused"],
-            axes=axes,
+            operator_axes=operator_axes,
             client_sent_ms=float(payload["client_sent_ms"]),
         )
     if message_type == "command":

@@ -107,6 +107,23 @@ def normalize_axes(
     )
 
 
+def map_operator_command_to_joints(
+    command: ControlCommand,
+    signs: tuple[float, float, float, float],
+) -> ControlCommand:
+    if len(signs) != len(ACTIVE_JOINT_NAMES) or any(sign not in (-1.0, 1.0) for sign in signs):
+        raise ValueError("operator-to-joint signs must contain exactly four values in {-1, 1}")
+    return ControlCommand(
+        timestamp=command.timestamp,
+        sequence_number=command.sequence_number,
+        channels=tuple(value * sign for value, sign in zip(command.channels, signs, strict=True)),
+        source=command.source,
+        connected=command.connected,
+        input_client_sequence=command.input_client_sequence,
+        diagnostics=command.diagnostics,
+    )
+
+
 def command_from_keys(
     pressed_keys: Iterable[str], *, timestamp: float, sequence_number: int
 ) -> ControlCommand:

@@ -1,0 +1,31 @@
+{
+  "schema_version": "equipment-command-profile-v1",
+  "axis_order": [
+    "swing",
+    "boom",
+    "arm",
+    "bucket"
+  ],
+  "positive_semantics": [
+    "right_rotation",
+    "boom_raise",
+    "arm_extend",
+    "bucket_curl"
+  ],
+  "negative_semantics": [
+    "left_rotation",
+    "boom_lower",
+    "arm_retract",
+    "bucket_dump"
+  ],
+  "models": {
+    "sy205": {
+      "semantic_to_joint_signs": [-1, -1, -1, 1],
+      "evidence": "Corrected SY205 physical-key direction matrix and isolated joint-coordinate trace."
+    },
+    "sy135": {
+      "semantic_to_joint_signs": [-1, 1, 1, -1],
+      "evidence": "Corrected SY135 physical-key direction matrix and isolated joint-coordinate trace."
+    }
+  }
+}

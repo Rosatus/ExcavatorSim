@@ -31,8 +31,8 @@ func _run() -> void:
 			_fail("offline startup did not begin stopped")
 		if presentation.get_active_model_id() != "sy205":
 			_fail("offline startup did not activate SY205")
-		if client.get_equipment_gamepad_model_id() != "sy205":
-			_fail("offline startup did not install the SY205 gamepad direction profile")
+		if client.get_equipment_model_id() != "sy205":
+			_fail("offline startup did not select the SY205 equipment command profile")
 		var site_identity := String(dressing.get_status_snapshot().get("layout_identity", ""))
 		if site_identity.is_empty() or int(dressing.get_status_snapshot().get("collision_objects", -1)) != 0:
 			_fail("offline worksite dressing was not deterministic and collision-free")
@@ -80,8 +80,8 @@ func _run() -> void:
 			_fail("offline pause failed")
 		if not session.request_model_switch("sy135") or presentation.get_active_model_id() != "sy135":
 			_fail("offline SY135 switch failed")
-		if client.get_equipment_gamepad_model_id() != "sy135":
-			_fail("offline SY135 switch did not refresh gamepad directions")
+		if client.get_equipment_model_id() != "sy135":
+			_fail("offline SY135 switch did not select the command profile")
 		if String(dressing.get_status_snapshot().get("layout_identity", "")) != site_identity:
 			_fail("model switch changed model-independent worksite placement")
 		if _visible_model_count(scene.get_node("ChassisMotionRoot/PresentationRoot")) != 1:

@@ -2,7 +2,13 @@ from __future__ import annotations
 
 import pytest
 
-from babylon_sim.control import AxisProfile, ControlCommand, command_from_keys, shape_axis
+from babylon_sim.control import (
+    AxisProfile,
+    ControlCommand,
+    command_from_keys,
+    map_operator_command_to_joints,
+    shape_axis,
+)
 
 
 def test_axis_shaping_applies_dead_zone_sensitivity_and_inversion() -> None:
@@ -27,3 +33,15 @@ def test_disconnected_command_is_zero_and_correlated() -> None:
     assert command.connected is False
     assert command.input_client_sequence == 9
     assert "input_disconnected" in command.diagnostics
+
+
+def test_operator_command_maps_to_joint_coordinates_once() -> None:
+    operator = ControlCommand(
+        timestamp=1.0,
+        sequence_number=4,
+        channels=(1.0, -0.5, 0.25, -1.0),
+        source="godot",
+    )
+    mapped = map_operator_command_to_joints(operator, (-1.0, -1.0, -1.0, 1.0))
+    assert mapped.channels == (-1.0, 0.5, -0.25, -1.0)
+    assert mapped.sequence_number == operator.sequence_number

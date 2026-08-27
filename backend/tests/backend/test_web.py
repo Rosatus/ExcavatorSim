@@ -56,7 +56,7 @@ async def test_motion_only_negotiates_capabilities_and_rejects_optional_routes(
         await ws.send_json(
             {
                 "type": "hello",
-                "protocol_version": "godot-pinocchio-v3",
+                "protocol_version": "godot-pinocchio-v4",
                 "capabilities": ["input_snapshot", "commands", "playback", "recording", "terrain"],
             }
         )
@@ -118,7 +118,7 @@ async def test_gateway_only_handshake_has_no_python_view_state(
         await ws.send_json(
             {
                 "type": "hello",
-                "protocol_version": "godot-pinocchio-v3",
+                "protocol_version": "godot-pinocchio-v4",
                 "capabilities": ["input_snapshot", "commands"],
                 "optional_capabilities": ["sensor_telemetry_v1"],
             }
@@ -155,7 +155,7 @@ async def test_bucket_feedback_requires_negotiation_and_expires_with_session(
         await ws.send_json(
             {
                 "type": "hello",
-                "protocol_version": "godot-pinocchio-v3",
+                "protocol_version": "godot-pinocchio-v4",
                 "capabilities": ["input_snapshot", "commands"],
                 "optional_capabilities": ["bucket_load_feedback_v1"],
             }
@@ -166,7 +166,7 @@ async def test_bucket_feedback_requires_negotiation_and_expires_with_session(
         ]
         feedback = {
             "type": "bucket_load_feedback",
-            "protocol_version": "godot-pinocchio-v3",
+            "protocol_version": "godot-pinocchio-v4",
             "session_id": hello["session_id"],
             "simulation_epoch": hello["simulation_epoch"],
             "model_id": "sy205",
@@ -201,7 +201,7 @@ async def test_bucket_feedback_requires_negotiation_and_expires_with_session(
         await unnegotiated.send_json(
             {
                 "type": "hello",
-                "protocol_version": "godot-pinocchio-v3",
+                "protocol_version": "godot-pinocchio-v4",
                 "capabilities": ["input_snapshot", "commands"],
             }
         )
@@ -271,7 +271,7 @@ async def test_health_model_and_realtime_round_trip(
         await ws.send_json(
             {
                 "type": "hello",
-                "protocol_version": "godot-pinocchio-v3",
+                "protocol_version": "godot-pinocchio-v4",
                 "capabilities": [
                     "input_snapshot", "commands", "latency", "playback", "recording", "terrain"
                 ],

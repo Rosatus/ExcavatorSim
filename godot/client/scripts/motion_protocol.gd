@@ -1,13 +1,13 @@
 class_name MotionProtocol
 extends RefCounted
 
-## The product-side wire boundary for the Godot/Pinocchio v3 WebSocket contract.
+## The product-side wire boundary for the Godot/Pinocchio v4 WebSocket contract.
 ##
 ## MotionClient is deliberately kept free of payload-shape checks.  Every
 ## server frame goes through this normalizer before it can mutate client or
 ## presentation state.
 
-const PROTOCOL_VERSION := "godot-pinocchio-v3"
+const PROTOCOL_VERSION := "godot-pinocchio-v4"
 const STATE_SCHEMA_VERSION := "godot-pinocchio-state-v2"
 const MODEL_VERSION := "sy205-glb-urdf-v4"
 const CALIBRATION_VERSION := "machine-calibration-v2"

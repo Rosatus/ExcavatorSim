@@ -9,7 +9,13 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from .constants import ACTIVE_JOINT_NAMES, INPUT_LEASE_SECONDS
-from .control import DEFAULT_AXIS_PROFILES, AxisProfile, ControlCommand, normalize_axes
+from .control import (
+    DEFAULT_AXIS_PROFILES,
+    AxisProfile,
+    ControlCommand,
+    map_operator_command_to_joints,
+    normalize_axes,
+)
 
 DEFAULT_MAX_INPUT_SOURCES = 8
 MAX_CLIENT_SEQUENCE = (1 << 64) - 1
@@ -26,7 +32,7 @@ class InputSnapshot:
     source: str
     client_sequence: int
     connected: bool
-    axes: tuple[float, ...]
+    operator_axes: tuple[float, ...]
 
     def __post_init__(self) -> None:
         if not isinstance(self.source, str) or not self.source:
@@ -39,22 +45,23 @@ class InputSnapshot:
             raise ValueError("input client_sequence must be an unsigned 64-bit integer")
         if not isinstance(self.connected, bool):
             raise ValueError("input connected must be a boolean")
-        if len(self.axes) != len(ACTIVE_JOINT_NAMES):
+        if len(self.operator_axes) != len(ACTIVE_JOINT_NAMES):
             raise ValueError(f"input axes must contain {len(ACTIVE_JOINT_NAMES)} values")
         if any(
-            isinstance(value, bool) or not isinstance(value, (int, float)) for value in self.axes
+            isinstance(value, bool) or not isinstance(value, (int, float))
+            for value in self.operator_axes
         ):
             raise ValueError("input axes must be finite numbers in [-1, 1]")
-        axes = tuple(float(value) for value in self.axes)
+        axes = tuple(float(value) for value in self.operator_axes)
         if any(not math.isfinite(value) or abs(value) > 1.0 for value in axes):
             raise ValueError("input axes must be finite numbers in [-1, 1]")
         if not self.connected and any(value != 0.0 for value in axes):
             raise ValueError("a disconnected input snapshot must contain zero axes")
-        object.__setattr__(self, "axes", axes)
+        object.__setattr__(self, "operator_axes", axes)
 
     @property
     def is_zero(self) -> bool:
-        return all(value == 0.0 for value in self.axes)
+        return all(value == 0.0 for value in self.operator_axes)
 
 
 @dataclass
@@ -74,6 +81,7 @@ class InputRouter:
         max_sources: int = DEFAULT_MAX_INPUT_SOURCES,
         clock: Callable[[], float] = time.monotonic,
         profiles: tuple[AxisProfile, ...] = DEFAULT_AXIS_PROFILES,
+        operator_to_joint_signs: tuple[float, float, float, float],
     ) -> None:
         if not math.isfinite(lease_seconds) or lease_seconds <= 0.0:
             raise ValueError("input lease_seconds must be finite and positive")
@@ -81,10 +89,15 @@ class InputRouter:
             raise ValueError(f"input profiles must contain {len(ACTIVE_JOINT_NAMES)} values")
         if isinstance(max_sources, bool) or not isinstance(max_sources, int) or max_sources <= 0:
             raise ValueError("input max_sources must be a positive integer")
+        if len(operator_to_joint_signs) != len(ACTIVE_JOINT_NAMES) or any(
+            sign not in (-1.0, 1.0) for sign in operator_to_joint_signs
+        ):
+            raise ValueError("operator-to-joint signs must contain four values in {-1, 1}")
         self.lease_seconds = float(lease_seconds)
         self.max_sources = max_sources
         self._clock = clock
         self._profiles = profiles
+        self._operator_to_joint_signs = operator_to_joint_signs
         self._sources: dict[str, _SourceState] = {}
         self._client_sequences: dict[str, int] = {}
         self._active_source: str | None = None
@@ -207,13 +220,16 @@ class InputRouter:
                     )
                     self._active_source = source
             if active is not None:
-                return normalize_axes(
-                    active.snapshot.axes,
-                    timestamp=timestamp,
-                    sequence_number=sequence_number,
-                    source=active.snapshot.source,
-                    input_client_sequence=active.last_sequence,
-                    profiles=self._profiles,
+                return map_operator_command_to_joints(
+                    normalize_axes(
+                        active.snapshot.operator_axes,
+                        timestamp=timestamp,
+                        sequence_number=sequence_number,
+                        source=active.snapshot.source,
+                        input_client_sequence=active.last_sequence,
+                        profiles=self._profiles,
+                    ),
+                    self._operator_to_joint_signs,
                 )
 
             zero_candidates = [
@@ -228,13 +244,16 @@ class InputRouter:
                 zero = max(
                     zero_candidates, key=lambda state: (state.received_at, state.snapshot.source)
                 )
-                return normalize_axes(
-                    zero.snapshot.axes,
-                    timestamp=timestamp,
-                    sequence_number=sequence_number,
-                    source=zero.snapshot.source,
-                    input_client_sequence=zero.last_sequence,
-                    profiles=self._profiles,
+                return map_operator_command_to_joints(
+                    normalize_axes(
+                        zero.snapshot.operator_axes,
+                        timestamp=timestamp,
+                        sequence_number=sequence_number,
+                        source=zero.snapshot.source,
+                        input_client_sequence=zero.last_sequence,
+                        profiles=self._profiles,
+                    ),
+                    self._operator_to_joint_signs,
                 )
             return ControlCommand.disconnected(
                 timestamp=timestamp,

@@ -15,27 +15,15 @@ const KEY_CONTRACT := {
 	KEY_Y: {"path": "Margin/VBox/Tracks/RightTrack/Keys/Y", "copy": "Y  前进"},
 	KEY_H: {"path": "Margin/VBox/Tracks/RightTrack/Keys/H", "copy": "H  后退"},
 }
-const MODEL_ACTION_KEYS := {
-	"sy205": {
-		"motion_swing_positive": KEY_A,
-		"motion_swing_negative": KEY_D,
-		"motion_boom_positive": KEY_I,
-		"motion_boom_negative": KEY_K,
-		"motion_arm_positive": KEY_S,
-		"motion_arm_negative": KEY_W,
-		"motion_bucket_positive": KEY_J,
-		"motion_bucket_negative": KEY_L,
-	},
-	"sy135": {
-		"motion_swing_positive": KEY_A,
-		"motion_swing_negative": KEY_D,
-		"motion_boom_positive": KEY_K,
-		"motion_boom_negative": KEY_I,
-		"motion_arm_positive": KEY_W,
-		"motion_arm_negative": KEY_S,
-		"motion_bucket_positive": KEY_L,
-		"motion_bucket_negative": KEY_J,
-	},
+const EQUIPMENT_ACTION_KEYS := {
+	"operator_swing_left": KEY_A,
+	"operator_swing_right": KEY_D,
+	"operator_boom_lower": KEY_I,
+	"operator_boom_raise": KEY_K,
+	"operator_arm_extend": KEY_W,
+	"operator_arm_retract": KEY_S,
+	"operator_bucket_curl": KEY_J,
+	"operator_bucket_dump": KEY_L,
 }
 const TRACK_ACTION_KEYS := {
 	"track_left_forward": KEY_R,
@@ -68,7 +56,7 @@ func _run() -> void:
 	_check_copy_and_mouse_contract(hud, "sy205")
 	_check_input_feedback(hud)
 	var motion_client := MotionClient.new()
-	motion_client.configure_equipment_gamepad_model("sy135")
+	motion_client.configure_equipment_model("sy135")
 	motion_client.free()
 	hud.refresh_input_state_for_test()
 	_check_model_action_tiles(hud, "sy135")
@@ -112,7 +100,7 @@ func _check_copy_and_mouse_contract(hud: ControlInputHUD, model_id: String) -> v
 		if label == null or label.text != String(expected["copy"]):
 			_fail("control input HUD uses the wrong copy for key %s" % keycode)
 	_check_model_action_tiles(hud, model_id)
-	var all_action_keys := (MODEL_ACTION_KEYS[model_id] as Dictionary).duplicate()
+	var all_action_keys := EQUIPMENT_ACTION_KEYS.duplicate()
 	all_action_keys.merge(TRACK_ACTION_KEYS)
 	for action in all_action_keys:
 		var expected_key := int(all_action_keys[action])
@@ -138,33 +126,33 @@ func _check_copy_and_mouse_contract(hud: ControlInputHUD, model_id: String) -> v
 
 
 func _check_model_action_tiles(hud: ControlInputHUD, model_id: String) -> void:
-	var expected_action_keys := (MODEL_ACTION_KEYS[model_id] as Dictionary).duplicate()
+	var expected_action_keys := EQUIPMENT_ACTION_KEYS.duplicate()
 	expected_action_keys.merge(TRACK_ACTION_KEYS)
 	for action in expected_action_keys:
 		var expected_key := int(expected_action_keys[action])
 		var expected_path := ControlInputHUD.KEY_TILE_PATHS[expected_key] as NodePath
 		var expected_tile := hud.get_node_or_null(expected_path) as PanelContainer
 		if hud.get_action_tile_for_test(action) != expected_tile:
-			_fail("%s HUD action %s did not follow key %s" % [model_id, action, expected_key])
+			_fail("%s HUD action %s did not stay on key %s" % [model_id, action, expected_key])
 
 
 func _check_input_feedback(hud: ControlInputHUD) -> void:
-	Input.action_press("motion_arm_positive")
-	Input.action_press("motion_swing_positive")
+	Input.action_press("operator_arm_extend")
+	Input.action_press("operator_swing_right")
 	hud.refresh_input_state_for_test()
-	if not hud.is_action_highlighted_for_test("motion_arm_positive"):
+	if not hud.is_action_highlighted_for_test("operator_arm_extend"):
 		_fail("W/arm-out action did not highlight")
-	if not hud.is_action_highlighted_for_test("motion_swing_positive"):
+	if not hud.is_action_highlighted_for_test("operator_swing_right"):
 		_fail("D/swing-right action did not highlight simultaneously")
 
-	Input.action_press("motion_arm_negative")
+	Input.action_press("operator_arm_retract")
 	hud.refresh_input_state_for_test()
 	if (
-		not hud.is_action_highlighted_for_test("motion_arm_positive")
-		or not hud.is_action_highlighted_for_test("motion_arm_negative")
+		not hud.is_action_highlighted_for_test("operator_arm_extend")
+		or not hud.is_action_highlighted_for_test("operator_arm_retract")
 	):
 		_fail("opposing arm directions were not both highlighted")
-	if not is_zero_approx(Input.get_axis("motion_arm_negative", "motion_arm_positive")):
+	if not is_zero_approx(Input.get_axis("operator_arm_retract", "operator_arm_extend")):
 		_fail("opposing arm directions did not resolve motion to zero")
 
 	Input.action_press("track_left_forward")
@@ -192,7 +180,7 @@ func _check_input_feedback(hud: ControlInputHUD) -> void:
 
 
 func _install_product_input_map() -> void:
-	var actions := (MODEL_ACTION_KEYS["sy205"] as Dictionary).duplicate()
+	var actions := EQUIPMENT_ACTION_KEYS.duplicate()
 	actions.merge(TRACK_ACTION_KEYS)
 	for action in actions:
 		if not InputMap.has_action(action):
@@ -205,7 +193,7 @@ func _install_product_input_map() -> void:
 		stale_axis.axis_value = 1.0
 		InputMap.action_add_event(action, stale_axis)
 	var motion_client := MotionClient.new()
-	motion_client.configure_equipment_gamepad_model("sy205")
+	motion_client.configure_equipment_model("sy205")
 	motion_client.free()
 	var chassis := TrackedChassisController.new()
 	chassis.call("_ensure_input_actions")

@@ -2,7 +2,7 @@
 
 Profile id: `godot-pinocchio/rrd-v1`. Producer/reader SDK: exactly `rerun-sdk==0.35.0`. The Godot/Pinocchio service
 accepts this profile only; arbitrary Rerun recordings are out of scope. The profile stays motion-only:
-the importer accepts producer metadata `protocol_version` `godot-pinocchio-v2` or `godot-pinocchio-v3`, but
+the importer accepts producer metadata `protocol_version` `godot-pinocchio-v2`, `godot-pinocchio-v3`, or `godot-pinocchio-v4`, but
 terrain entities remain forbidden and do not change RRD v1 semantics.
 
 Every temporal row has the duration timeline `recording_time` (`duration[ns]`) and sequence timeline

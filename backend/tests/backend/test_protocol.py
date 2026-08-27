@@ -7,6 +7,7 @@ import pytest
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
+from babylon_sim.paths import PROTOCOL_SCHEMA_PATH
 from babylon_sim.protocol import (
     BucketLoadFeedbackMessage,
     CommandMessage,
@@ -37,6 +38,25 @@ def test_manifest_matches_schema_and_hello_decodes() -> None:
     assert message.capabilities == ("input_snapshot", "commands", "latency")
     assert message.requested_model_id == "sy135"
     assert message.optional_capabilities is None
+    assert manifest.protocol_version == "godot-pinocchio-v4"
+    schema = json.loads(PROTOCOL_SCHEMA_PATH.read_text(encoding="utf-8"))
+    description = schema["$defs"]["AxisVector"]["description"]
+    for semantic in ("right rotation", "boom raise", "arm extend", "bucket curl"):
+        assert semantic in description
+
+
+def test_v3_client_cannot_enter_the_v4_input_contract() -> None:
+    with pytest.raises(ProtocolError) as rejected:
+        decode_client_message(
+            json.dumps(
+                {
+                    "type": "hello",
+                    "protocol_version": "godot-pinocchio-v3",
+                    "capabilities": ["input_snapshot", "commands"],
+                }
+            )
+        )
+    assert rejected.value.code == "schema_validation_failed"
 
 
 def test_optional_feedback_offer_and_sample_decode_without_changing_required_capabilities() -> None:
@@ -148,7 +168,7 @@ def test_input_and_command_decode_to_typed_messages() -> None:
         )
     )
     assert isinstance(input_message, InputMessage)
-    assert input_message.axes == (1.0, -1.0, 0.0, 0.5)
+    assert input_message.operator_axes == (1.0, -1.0, 0.0, 0.5)
     command = decode_client_message('{"type":"command","id":"start-1","command":"start"}')
     assert command == CommandMessage("start-1", "start")
     playback = decode_client_message(

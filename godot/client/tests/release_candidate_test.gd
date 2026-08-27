@@ -3,7 +3,7 @@ extends SceneTree
 const MAIN_SCENE := "res://scenes/main.tscn"
 const FIXTURE_PATH := "res://tests/fixtures/sy205_frame_parity_cases.json"
 const VERSIONS := {
-	"protocol_version": "godot-pinocchio-v3",
+	"protocol_version": "godot-pinocchio-v4",
 	"state_schema_version": "godot-pinocchio-state-v2",
 	"model_version": "sy205-glb-urdf-v4",
 	"calibration_version": "machine-calibration-v2",

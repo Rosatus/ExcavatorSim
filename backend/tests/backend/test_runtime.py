@@ -75,7 +75,7 @@ def test_runtime_applies_commands_and_keeps_ticking_while_paused(
         )
         started = runtime.submit_command("client", "start", "start").result(timeout=1.0)
         assert started.lifecycle == "running"
-        _wait_for(lambda: runtime.latest.read().state.joint_position[0] > 0.0)
+        _wait_for(lambda: runtime.latest.read().state.joint_position[0] < 0.0)
 
         paused = runtime.submit_command("client", "pause", "pause").result(timeout=1.0)
         assert paused.lifecycle == "paused"
@@ -186,7 +186,7 @@ def test_simulation_reset_preserves_deformed_terrain_and_clears_bucket(
                 client_sequence=sequence,
                 connected=True,
                 focused=True,
-                axes=(0.0, 1.0, -1.0, -1.0),
+                axes=(0.0, -1.0, 1.0, -1.0),
             )
             sequence += 1
             time.sleep(0.04)

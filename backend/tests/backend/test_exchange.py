@@ -73,7 +73,8 @@ def test_confirmed_import_replaces_timeline_and_return_live_starts_clean_epoch(
         sequence = 1
         deadline = time.perf_counter() + 2.0
         while (
-            runtime.latest.read().state.joint_position[0] <= 0.05 and time.perf_counter() < deadline
+            runtime.latest.read().state.joint_position[0] >= -0.05
+            and time.perf_counter() < deadline
         ):
             runtime.submit_input(
                 "exchange",
@@ -84,7 +85,7 @@ def test_confirmed_import_replaces_timeline_and_return_live_starts_clean_epoch(
             )
             sequence += 1
             time.sleep(0.04)
-        assert runtime.latest.read().state.joint_position[0] > 0.05
+        assert runtime.latest.read().state.joint_position[0] < -0.05
         runtime.submit_input(
             "exchange",
             client_sequence=sequence,
@@ -134,7 +135,7 @@ def test_confirmed_import_replaces_timeline_and_return_live_starts_clean_epoch(
         )
         deadline = time.perf_counter() + 3.0
         while (
-            runtime.latest.read().state.joint_position[0] >= -0.05
+            runtime.latest.read().state.joint_position[0] <= 0.05
             and time.perf_counter() < deadline
         ):
             sequence += 1
@@ -158,10 +159,10 @@ def test_confirmed_import_replaces_timeline_and_return_live_starts_clean_epoch(
             timeout=1.0
         )
         authoritative_pose = runtime.latest.read().state.joint_position
-        assert authoritative_pose[0] < -0.05
+        assert authoritative_pose[0] > 0.05
         imported_recording = runtime.recording.snapshot().materialize()
         assert all(
-            sample[0] > authoritative_pose[0] + 0.02 for sample in imported_recording.joint_position
+            sample[0] < authoritative_pose[0] - 0.02 for sample in imported_recording.joint_position
         )
         assert runtime.recording.snapshot().sample_count == imported_count
         live = runtime.replay.submit("return", result.recording_epoch, "return_live").result(

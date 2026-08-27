@@ -37,6 +37,8 @@ EXPECTED_VERBATIM = {
 EXPECTED_GENERATED = {
     "assets/model/kinematic_excavator.urdf",
     "backend/tests/fixtures/frame-parity/baseline.json",
+    "godot/client/resources/protocol/equipment-command-profile-v1.json",
+    "godot/client/scripts/equipment_command_profile_hash.gd",
     "godot/client/tests/fixtures/sy135_frame_parity_cases.json",
 }
 HEX_40 = re.compile(r"^[0-9a-f]{40}$")

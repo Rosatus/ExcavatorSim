@@ -2,14 +2,14 @@ class_name ControlInputHUD
 extends PanelContainer
 
 const ACTION_TILE_PATHS := {
-	"motion_arm_positive": NodePath("Margin/VBox/Sticks/LeftStick/Grid/W"),
-	"motion_swing_negative": NodePath("Margin/VBox/Sticks/LeftStick/Grid/A"),
-	"motion_arm_negative": NodePath("Margin/VBox/Sticks/LeftStick/Grid/S"),
-	"motion_swing_positive": NodePath("Margin/VBox/Sticks/LeftStick/Grid/D"),
-	"motion_boom_positive": NodePath("Margin/VBox/Sticks/RightStick/Grid/I"),
-	"motion_bucket_negative": NodePath("Margin/VBox/Sticks/RightStick/Grid/J"),
-	"motion_boom_negative": NodePath("Margin/VBox/Sticks/RightStick/Grid/K"),
-	"motion_bucket_positive": NodePath("Margin/VBox/Sticks/RightStick/Grid/L"),
+	"operator_arm_extend": NodePath("Margin/VBox/Sticks/LeftStick/Grid/W"),
+	"operator_swing_left": NodePath("Margin/VBox/Sticks/LeftStick/Grid/A"),
+	"operator_arm_retract": NodePath("Margin/VBox/Sticks/LeftStick/Grid/S"),
+	"operator_swing_right": NodePath("Margin/VBox/Sticks/LeftStick/Grid/D"),
+	"operator_boom_lower": NodePath("Margin/VBox/Sticks/RightStick/Grid/I"),
+	"operator_bucket_curl": NodePath("Margin/VBox/Sticks/RightStick/Grid/J"),
+	"operator_boom_raise": NodePath("Margin/VBox/Sticks/RightStick/Grid/K"),
+	"operator_bucket_dump": NodePath("Margin/VBox/Sticks/RightStick/Grid/L"),
 	"track_left_forward": NodePath("Margin/VBox/Tracks/LeftTrack/Keys/R"),
 	"track_left_reverse": NodePath("Margin/VBox/Tracks/LeftTrack/Keys/F"),
 	"track_right_forward": NodePath("Margin/VBox/Tracks/RightTrack/Keys/Y"),
@@ -76,13 +76,6 @@ func _refresh_action_tiles() -> void:
 	var next_tiles := {}
 	for action in ACTION_TILE_PATHS:
 		var tile_path := ACTION_TILE_PATHS[action] as NodePath
-		if InputMap.has_action(action):
-			for event in InputMap.action_get_events(action):
-				if event is InputEventKey:
-					var keycode := (event as InputEventKey).physical_keycode
-					if KEY_TILE_PATHS.has(keycode):
-						tile_path = KEY_TILE_PATHS[keycode] as NodePath
-						break
 		var tile := get_node_or_null(tile_path) as PanelContainer
 		if tile != null:
 			next_tiles[action] = tile

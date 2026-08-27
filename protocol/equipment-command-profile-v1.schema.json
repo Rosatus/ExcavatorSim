@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://godot-pinocchio.local/protocol/equipment-command-profile-v1.schema.json",
+  "title": "EquipmentCommandProfileV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "axis_order",
+    "positive_semantics",
+    "negative_semantics",
+    "models"
+  ],
+  "properties": {
+    "schema_version": { "const": "equipment-command-profile-v1" },
+    "axis_order": {
+      "const": ["swing", "boom", "arm", "bucket"]
+    },
+    "positive_semantics": {
+      "const": ["right_rotation", "boom_raise", "arm_extend", "bucket_curl"]
+    },
+    "negative_semantics": {
+      "const": ["left_rotation", "boom_lower", "arm_retract", "bucket_dump"]
+    },
+    "models": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sy205", "sy135"],
+      "properties": {
+        "sy205": { "$ref": "#/$defs/ModelCommandProfile" },
+        "sy135": { "$ref": "#/$defs/ModelCommandProfile" }
+      }
+    }
+  },
+  "$defs": {
+    "ModelCommandProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["semantic_to_joint_signs", "evidence"],
+      "properties": {
+        "semantic_to_joint_signs": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": { "type": "integer", "enum": [-1, 1] }
+        },
+        "evidence": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

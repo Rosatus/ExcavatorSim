@@ -3,7 +3,7 @@ extends SceneTree
 const MAIN_SCENE := "res://scenes/main.tscn"
 const FIXTURE_PATH := "res://tests/fixtures/sy205_frame_parity_cases.json"
 const VERSIONS := {
-	"protocol_version": "godot-pinocchio-v3",
+	"protocol_version": "godot-pinocchio-v4",
 	"state_schema_version": "godot-pinocchio-state-v2",
 	"model_version": "sy205-glb-urdf-v4",
 	"calibration_version": "machine-calibration-v2",
@@ -12,27 +12,15 @@ const VERSIONS := {
 	"terrain_algorithm_version": "terrain-algorithm-v2",
 	"visual_model_version": "original-skin-v1",
 }
-const EXPECTED_EQUIPMENT_KEYS_BY_MODEL := {
-	"sy205": {
-		"motion_swing_positive": KEY_A,
-		"motion_swing_negative": KEY_D,
-		"motion_boom_positive": KEY_I,
-		"motion_boom_negative": KEY_K,
-		"motion_arm_positive": KEY_S,
-		"motion_arm_negative": KEY_W,
-		"motion_bucket_positive": KEY_J,
-		"motion_bucket_negative": KEY_L,
-	},
-	"sy135": {
-		"motion_swing_positive": KEY_A,
-		"motion_swing_negative": KEY_D,
-		"motion_boom_positive": KEY_K,
-		"motion_boom_negative": KEY_I,
-		"motion_arm_positive": KEY_W,
-		"motion_arm_negative": KEY_S,
-		"motion_bucket_positive": KEY_L,
-		"motion_bucket_negative": KEY_J,
-	},
+const EXPECTED_EQUIPMENT_KEYS := {
+	"operator_swing_left": KEY_A,
+	"operator_swing_right": KEY_D,
+	"operator_boom_lower": KEY_I,
+	"operator_boom_raise": KEY_K,
+	"operator_arm_extend": KEY_W,
+	"operator_arm_retract": KEY_S,
+	"operator_bucket_curl": KEY_J,
+	"operator_bucket_dump": KEY_L,
 }
 
 
@@ -163,13 +151,13 @@ func _test_motion_client() -> int:
 		client.queue_free()
 		return 1
 	if _check(
-		not client.configure_equipment_gamepad_model("unknown")
-		and client.get_equipment_gamepad_model_id() == "sy135",
-		"unknown model cannot replace the active gamepad direction profile",
+		not client.configure_equipment_model("unknown")
+		and client.get_equipment_model_id().is_empty(),
+		"unknown model disarms the equipment command profile",
 	) != 0:
 		client.queue_free()
 		return 1
-	client.configure_equipment_gamepad_model("sy205")
+	client.configure_equipment_model("sy205")
 	if _check(transport.sent.size() == 2, "hello_ack is followed by a zero-input arming snapshot") != 0:
 		client.queue_free()
 		return 1
@@ -191,6 +179,12 @@ func _test_motion_client() -> int:
 		return 1
 	var input_snapshot: Dictionary = JSON.parse_string(transport.sent[2])
 	if _check(input_snapshot.get("client_sequence") == 1, "input sequence is monotonic") != 0:
+		client.queue_free()
+		return 1
+	if _check(
+		input_snapshot.get("axes") == [0.25, -0.5, 0.75, -1.0],
+		"v4 transport publishes canonical operator axes without model mapping",
+	) != 0:
 		client.queue_free()
 		return 1
 	if _check(input_snapshot.get("focused") == true and input_snapshot.get("connected") == true, "focused input remains connected") != 0:
@@ -325,17 +319,12 @@ func _test_motion_client() -> int:
 func _assert_equipment_bindings(client: MotionClient, model_id: String) -> int:
 	var stale_key := InputEventKey.new()
 	stale_key.physical_keycode = KEY_Q
-	InputMap.action_add_event("motion_swing_positive", stale_key)
-	if _check(client.configure_equipment_gamepad_model(model_id), "%s gamepad profile is supported" % model_id) != 0:
+	InputMap.action_add_event("operator_swing_right", stale_key)
+	if _check(client.configure_equipment_model(model_id), "%s command profile is supported" % model_id) != 0:
 		return 1
-	var direction_profile := MotionClient.MODEL_GAMEPAD_DIRECTION_MULTIPLIERS[model_id] as Dictionary
-	var expected_keys := EXPECTED_EQUIPMENT_KEYS_BY_MODEL[model_id] as Dictionary
 	for action in MotionClient.INPUT_ACTIONS:
 		var definition: Dictionary = MotionClient.INPUT_ACTIONS[action]
-		var expected_sign := (
-			float(definition["joy_sign"])
-			* float(direction_profile[String(definition["channel"])])
-		)
+		var expected_sign := float(definition["joy_sign"])
 		var key_count := 0
 		var key_matches := 0
 		var joy_count := 0
@@ -343,7 +332,7 @@ func _assert_equipment_bindings(client: MotionClient, model_id: String) -> int:
 		for event in InputMap.action_get_events(action):
 			if event is InputEventKey:
 				key_count += 1
-				if (event as InputEventKey).physical_keycode == int(expected_keys[action]):
+				if (event as InputEventKey).physical_keycode == int(EXPECTED_EQUIPMENT_KEYS[action]):
 					key_matches += 1
 			elif event is InputEventJoypadMotion:
 				joy_count += 1
@@ -352,7 +341,7 @@ func _assert_equipment_bindings(client: MotionClient, model_id: String) -> int:
 					joy_matches += 1
 		if _check(
 			key_count == 1 and key_matches == 1 and joy_count == 1 and joy_matches == 1,
-			"%s installs its calibrated keyboard and gamepad binding for %s" % [model_id, action],
+			"%s installs the fixed operator keyboard and gamepad binding for %s" % [model_id, action],
 		) != 0:
 			return 1
 	return 0

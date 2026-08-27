@@ -11,6 +11,7 @@ from concurrent.futures import Future
 from typing import Literal
 
 from .constants import DISPLAY_HZ
+from .equipment_command_profile import load_equipment_command_profile
 from .input_router import InputRouter, InputSnapshot
 from .model_registry import ModelDescriptor
 from .observation_store import ObservationStore
@@ -45,7 +46,11 @@ class GatewayRuntimeController:
     ) -> None:
         self.descriptor = descriptor
         self._clock = clock
-        self.input_router = InputRouter(clock=clock)
+        command_profile = load_equipment_command_profile()
+        self.input_router = InputRouter(
+            clock=clock,
+            operator_to_joint_signs=command_profile.signs_for(descriptor.model_id),
+        )
         self._observations = ObservationStore(clock=clock)
         self._stream_epoch = uuid.uuid4().hex
         self._recording_epoch = uuid.uuid4().hex
@@ -132,7 +137,7 @@ class GatewayRuntimeController:
                 source=f"godot:{client_id}",
                 client_sequence=client_sequence,
                 connected=effective_connected,
-                axes=effective_axes,
+                operator_axes=effective_axes,
             ),
             client_id=client_id,
         )

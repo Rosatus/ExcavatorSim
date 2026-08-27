@@ -72,7 +72,7 @@ async def _probe(
         async with session.ws_connect(f"{base_url}/ws", origin=base_url) as websocket:
             hello: dict[str, object] = {
                 "type": "hello",
-                "protocol_version": "godot-pinocchio-v3",
+                "protocol_version": "godot-pinocchio-v4",
                 "capabilities": ["input_snapshot", "commands"],
             }
             if runtime_profile == "gateway-only":
@@ -90,7 +90,7 @@ async def _probe(
             first = await websocket.receive_str(timeout=3.0)
             message = json.loads(first)
             protocol_version = message.get("versions", {}).get("protocol_version")
-            if message.get("type") != "hello_ack" or protocol_version != "godot-pinocchio-v3":
+            if message.get("type") != "hello_ack" or protocol_version != "godot-pinocchio-v4":
                 raise RuntimeError(f"unexpected WebSocket handshake response: {message}")
             session_id = message.get("session_id")
             if not isinstance(session_id, str):

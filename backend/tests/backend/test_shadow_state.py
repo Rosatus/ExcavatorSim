@@ -305,7 +305,7 @@ def test_shadow_decoder_is_typed_immutable_and_strictly_ordered() -> None:
         json.dumps(
             {
                 "type": "simulation_truth_shadow",
-                "protocol_version": "godot-pinocchio-v3",
+                "protocol_version": "godot-pinocchio-v4",
                 "snapshot": raw,
             }
         )
@@ -391,7 +391,7 @@ async def test_shadow_transport_is_negotiated_observational_and_cleared(
         await ws.send_json(
             {
                 "type": "hello",
-                "protocol_version": "godot-pinocchio-v3",
+                "protocol_version": "godot-pinocchio-v4",
                 "capabilities": ["input_snapshot", "commands"],
                 "optional_capabilities": ["simulation_truth_shadow_v1"],
             }
@@ -404,7 +404,7 @@ async def test_shadow_transport_is_negotiated_observational_and_cleared(
         await ws.send_json(
             {
                 "type": "simulation_truth_shadow",
-                "protocol_version": "godot-pinocchio-v3",
+                "protocol_version": "godot-pinocchio-v4",
                 "snapshot": authoritative,
             }
         )
@@ -414,7 +414,7 @@ async def test_shadow_transport_is_negotiated_observational_and_cleared(
         await ws.send_json(
             {
                 "type": "simulation_truth_shadow",
-                "protocol_version": "godot-pinocchio-v3",
+                "protocol_version": "godot-pinocchio-v4",
                 "snapshot": _snapshot(identity),
             }
         )

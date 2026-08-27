@@ -146,12 +146,12 @@ flowchart LR
 
 | 阶段 | 行为 | 关键事实 |
 |---|---|---|
-| 1. 握手 | 客户端首帧为 `hello`，服务端返回 `hello_ack` | `godot-pinocchio-v3`；hello 超时 3 s；schema 严格校验 [`web.py`](../../backend/src/babylon_sim/web.py#L601-L660)、[`protocol.py`](../../backend/src/babylon_sim/protocol.py#L217-L312) |
+| 1. 握手 | 客户端首帧为 `hello`，服务端返回 `hello_ack` | `godot-pinocchio-v4`；hello 超时 3 s；schema 严格校验 [`web.py`](../../backend/src/babylon_sim/web.py#L601-L660)、[`protocol.py`](../../backend/src/babylon_sim/protocol.py#L217-L312) |
 | 2. 输入 | Godot 30 Hz 发送 `input_snapshot`；失焦、断开和首个武装快照为零轴 | 四轴 `[-1,1]`、sequence 单调、lease 0.2 s [`motion_client.gd`](../../godot/client/scripts/motion_client.gd#L530-L556)、[`input_router.py`](../../backend/src/babylon_sim/input_router.py#L101-L160)、[`constants.py`](../../backend/src/babylon_sim/constants.py#L25-L29) |
 | 3. 仲裁 | `InputRouter` 只接受递增 sequence；要求先发送 connected zero；过期 source 被清理 | 防止失联输入继续运动 [`input_router.py`](../../backend/src/babylon_sim/input_router.py#L177-L283) |
 | 4. 仿真 | runtime 固定 100 Hz、dt 0.01 s；每 tick 最多消费 8 个控制命令；速度/加速度/位置受 calibration 限制 | 固定 deadline，不补步；断连速度归零并标记 emergency stop [`runtime.py`](../../backend/src/babylon_sim/runtime.py#L325-L378)、[`simulation.py`](../../backend/src/babylon_sim/simulation.py#L114-L175) |
 | 5. FK | URDF 要求四个 active joints、`nv == 4`；Pinocchio 计算 frame transforms | joint 顺序 `swing`, `boom`, `arm`, `bucket` [`model.py`](../../backend/src/babylon_sim/model.py#L45-L125)、[`kinematic_excavator.urdf`](../../assets/model/kinematic_excavator.urdf#L142-L163) |
-| 6. 发布 | Runtime latest slot / motion view 输出 joint vectors、五命名 frame、quality flags 和 sequence | runtime publish 与 view schema [`runtime.py`](../../backend/src/babylon_sim/runtime.py#L90-L114)、[`godot-pinocchio-v3.schema.json`](../../protocol/godot-pinocchio-v3.schema.json#L319-L399) |
+| 6. 发布 | Runtime latest slot / motion view 输出 joint vectors、五命名 frame、quality flags 和 sequence | runtime publish 与 view schema [`runtime.py`](../../backend/src/babylon_sim/runtime.py#L90-L114)、[`godot-pinocchio-v4.schema.json`](../../protocol/godot-pinocchio-v4.schema.json#L319-L399) |
 | 7. 消费 | Godot 只接受当前 session/epoch 且严格递增 revision 的 state | 旧 pose、旧 epoch、失联和 stale 会清除/恢复视觉状态 [`motion_client.gd`](../../godot/client/scripts/motion_client.gd#L431-L475)、[`motion-transport.md`](../../.trellis/spec/frontend/motion-transport.md#L26-L53) |
 
 ### 4.2 后端目录地图
@@ -387,7 +387,7 @@ flowchart LR
 | `terrain_view` / `terrain_patch` | Python → legacy client | terrain epoch/revision、Float32 snapshot/patch | 仅 legacy；Godot-first 不镜像 |
 | `playback_*` / `recording_status` | Python ↔ legacy client | recording cursor、source mode、replay lifecycle | 仅 legacy；当前产品不依赖回放 |
 
-完整字段与枚举以 [`godot-pinocchio-v3.schema.json`](../../protocol/godot-pinocchio-v3.schema.json) 为准；此表不复制 schema，避免字段漂移。
+完整字段与枚举以 [`godot-pinocchio-v4.schema.json`](../../protocol/godot-pinocchio-v4.schema.json) 为准；此表不复制 schema，避免字段漂移。
 
 ### 9.3 Godot 内部信号
 
@@ -451,7 +451,7 @@ MCP 测试发现只覆盖 `res://tests/test_*.gd` 的 `McpTestSuite`；产品 co
 | 需要确认的事实 | 第一来源 |
 |---|---|
 | 运行时 profile / optional workers | [`runtime-profiles.md`](../../.trellis/spec/backend/runtime-profiles.md) |
-| WebSocket 消息、字段、版本 | [`godot-pinocchio-v3.schema.json`](../../protocol/godot-pinocchio-v3.schema.json)、[`version-manifest.json`](../../protocol/version-manifest.json) |
+| WebSocket 消息、字段、版本 | [`godot-pinocchio-v4.schema.json`](../../protocol/godot-pinocchio-v4.schema.json)、[`version-manifest.json`](../../protocol/version-manifest.json) |
 | Godot 权威/派生边界 | [`client-boundary.md`](../../.trellis/spec/frontend/client-boundary.md)、[`godot-integration.md`](../godot-integration.md) |
 | 地形/斗土算法与 legacy terrain API | [`terrain-api.md`](../terrain-api.md)、Godot terrain scripts |
 | 视觉 GLB、frame/pivot、资产权利 | [`visual-model.md`](../visual-model.md)、Godot manifest/fixture |

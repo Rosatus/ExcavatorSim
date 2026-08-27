@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://godot-pinocchio.local/protocol/godot-pinocchio-v3.schema.json",
+  "$id": "https://godot-pinocchio.local/protocol/godot-pinocchio-v4.schema.json",
   "title": "GodotPinocchioMessage",
   "oneOf": [
     { "$ref": "#/$defs/Hello" },
@@ -28,7 +28,7 @@
   "$defs": {
     "ProtocolVersion": {
       "type": "string",
-      "const": "godot-pinocchio-v3"
+      "const": "godot-pinocchio-v4"
     },
     "Lifecycle": {
       "type": "string",
@@ -65,6 +65,7 @@
       }
     },
     "AxisVector": {
+      "description": "Canonical operator intent in (swing, boom, arm, bucket) order. Positive means right rotation, boom raise, arm extend, and bucket curl; negative means left rotation, boom lower, arm retract, and bucket dump.",
       "type": "array",
       "minItems": 4,
       "maxItems": 4,

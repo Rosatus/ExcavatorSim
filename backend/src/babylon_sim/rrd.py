@@ -32,7 +32,9 @@ SIMULATION_EPOCH_ENTITY = "/godot_pinocchio/events/simulation_epoch"
 LIFECYCLE_ENTITY = "/godot_pinocchio/events/lifecycle"
 QUALITY_ENTITY = "/godot_pinocchio/events/quality"
 ALLOWED_IMPLICIT_ENTITIES = frozenset({"/__properties"})
-RRD_ACCEPTED_PROTOCOL_VERSIONS = frozenset({"godot-pinocchio-v2", "godot-pinocchio-v3"})
+RRD_ACCEPTED_PROTOCOL_VERSIONS = frozenset(
+    {"godot-pinocchio-v2", "godot-pinocchio-v3", "godot-pinocchio-v4"}
+)
 
 
 class RrdProfileError(ValueError):

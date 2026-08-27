@@ -77,11 +77,13 @@ forward/reverse to `Y/H`. XInput-compatible controllers feed the same actions:
 LT/LB control the left track forward/reverse and RT/RB control the right track
 forward/reverse. Work equipment follows the ISO excavator pattern without
 changing the four-axis command order: left stick X/Y controls swing/arm and
-right stick Y/X controls boom/bucket. MotionClient replaces the owned key and
-joy-axis events with independent active-model direction profiles. The keyboard
-profile reverses swing/arm/bucket for SY205 and swing/boom for SY135; the
-gamepad profile still reverses all four stick channels for SY205 and only swing
-for SY135. ProductSession refreshes both profiles on offline model activation.
+right stick Y/X controls boom/bucket. MotionClient owns one fixed set of
+explicit operator actions for keyboard and gamepad. The canonical vector's
+positive meanings are right rotation, boom raise, arm extend, and bucket curl;
+ProductSession maps it once through the selected model's shared equipment
+command profile before local joint-coordinate motion. Protocol v4 transports
+the unmapped operator vector and Python compatibility motion applies the same
+profile once.
 The physical keyboard keeps the intended operator outcomes: `W/S` arm out/in,
 `A/D` swing left/right, `I/K` boom down/up, and `J/L` bucket curl/dump. Protocol
 order, physical joint axes, and joint limits remain unchanged. Jolt does not

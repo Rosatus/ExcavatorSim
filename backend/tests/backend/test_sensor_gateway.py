@@ -19,7 +19,7 @@ from babylon_sim.web import create_app
 def _batch(identity: SensorTelemetryIdentity, *, batch_sequence: int = 1, tick: int = 1) -> dict:
     return {
         "type": "sensor_telemetry_batch",
-        "protocol_version": "godot-pinocchio-v3",
+        "protocol_version": "godot-pinocchio-v4",
         "session_id": identity.session_id,
         "simulation_epoch": identity.simulation_epoch,
         "model_id": identity.model_id,
@@ -165,7 +165,7 @@ async def test_websocket_sensor_batch_is_negotiated_and_exposed(
         await ws.send_json(
             {
                 "type": "hello",
-                "protocol_version": "godot-pinocchio-v3",
+                "protocol_version": "godot-pinocchio-v4",
                 "capabilities": ["input_snapshot", "commands"],
                 "optional_capabilities": ["sensor_telemetry_v1"],
             }

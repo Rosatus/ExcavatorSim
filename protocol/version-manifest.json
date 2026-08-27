@@ -1,5 +1,5 @@
 {
-  "protocol_version": "godot-pinocchio-v3",
+  "protocol_version": "godot-pinocchio-v4",
   "state_schema_version": "godot-pinocchio-state-v2",
   "model_version": "sy205-glb-urdf-v4",
   "calibration_version": "machine-calibration-v2",

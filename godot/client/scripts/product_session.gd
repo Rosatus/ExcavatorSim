@@ -116,9 +116,14 @@ func request_model_switch(model_id: String) -> bool:
 			_presentation.activate_model_for_test(previous)
 			_chassis.configure_model_for_test(previous)
 		return false
+	if _motion_client != null and not _motion_client.configure_equipment_model(model_id):
+		last_error = {"code": "equipment_command_profile_invalid", "message": model_id}
+		if previous != model_id:
+			_presentation.activate_model_for_test(previous)
+			if _chassis != null:
+				_chassis.configure_model_for_test(previous)
+		return false
 	active_model_id = model_id
-	if _motion_client != null:
-		_motion_client.configure_equipment_gamepad_model(active_model_id)
 	authority_epoch = _new_epoch()
 	generation += 1
 	if _excavation != null:
@@ -137,14 +142,9 @@ func set_focused(value: bool) -> void:
 
 
 func get_equipment_input_axes() -> Vector4:
-	if lifecycle != LIFECYCLE_RUNNING or not focused:
+	if lifecycle != LIFECYCLE_RUNNING or not focused or _motion_client == null:
 		return Vector4.ZERO
-	return Vector4(
-		Input.get_axis("motion_swing_negative", "motion_swing_positive"),
-		Input.get_axis("motion_boom_negative", "motion_boom_positive"),
-		Input.get_axis("motion_arm_negative", "motion_arm_positive"),
-		Input.get_axis("motion_bucket_negative", "motion_bucket_positive")
-	)
+	return _motion_client.get_authoritative_input_axes()
 
 
 func get_status_snapshot() -> Dictionary:
@@ -171,7 +171,11 @@ func _activate_initial_model() -> void:
 	if _chassis != null and not _chassis.active_model_id.is_empty():
 		active_model_id = _chassis.active_model_id
 	if _motion_client != null:
-		_motion_client.configure_equipment_gamepad_model(active_model_id)
+		if not _motion_client.configure_equipment_model(active_model_id):
+			last_error = {"code": "equipment_command_profile_invalid", "message": active_model_id}
+			if _chassis != null:
+				_chassis.set_controller_enabled(false)
+			return
 	_apply_lifecycle()
 	_emit_transition()
 

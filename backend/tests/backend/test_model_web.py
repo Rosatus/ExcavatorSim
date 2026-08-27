@@ -16,7 +16,7 @@ async def _hello(client: TestClient, model_id: str):
     await ws.send_json(
         {
             "type": "hello",
-            "protocol_version": "godot-pinocchio-v3",
+            "protocol_version": "godot-pinocchio-v4",
             "capabilities": ["input_snapshot", "commands"],
             "requested_model_id": model_id,
         }

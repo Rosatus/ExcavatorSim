@@ -1058,7 +1058,7 @@ async def _handle_input(
             client_sequence=message.client_sequence,
             connected=message.connected,
             focused=message.focused,
-            axes=message.axes,
+            axes=message.operator_axes,
         )
     except InputRouterError as exc:
         await send(

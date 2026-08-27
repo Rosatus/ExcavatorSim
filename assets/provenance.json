@@ -135,6 +135,48 @@
       "license": "project-owned-source-assets",
       "generated_at": "2026-08-14",
       "relationship": "sy135-model-frame-parity-fixture"
+    },
+    {
+      "destination_path": "godot/client/resources/protocol/equipment-command-profile-v1.json",
+      "destination_sha256": "5057dcba49feb5c31ccbaa0e99bc3b50d03655f643203b5a5177ed0358535034",
+      "generator": {
+        "path": "backend/scripts/sync_equipment_command_profile.py",
+        "sha256": "0b67068352f7810d62236b440c0cf6e27817be615f62f0baa09d9ed3a9598fff"
+      },
+      "inputs": [
+        {
+          "path": "protocol/equipment-command-profile-v1.json",
+          "sha256": "84ecd8f883ddffbd9e17101bd9e900959be997d5e6b156bdedc2cbb2f00c7e22"
+        },
+        {
+          "path": "protocol/equipment-command-profile-v1.schema.json",
+          "sha256": "cd180b04ff64bef727b9f13c50bd54859d015683e20972542390fba322edb6a5"
+        }
+      ],
+      "license": "AGPL-3.0-only",
+      "generated_at": "2026-08-27",
+      "relationship": "generated-godot-operator-command-profile"
+    },
+    {
+      "destination_path": "godot/client/scripts/equipment_command_profile_hash.gd",
+      "destination_sha256": "2aa1719937a42e19d43ace007d4276a2cd908e6b03ff847ea5a9afc666afa694",
+      "generator": {
+        "path": "backend/scripts/sync_equipment_command_profile.py",
+        "sha256": "0b67068352f7810d62236b440c0cf6e27817be615f62f0baa09d9ed3a9598fff"
+      },
+      "inputs": [
+        {
+          "path": "protocol/equipment-command-profile-v1.json",
+          "sha256": "84ecd8f883ddffbd9e17101bd9e900959be997d5e6b156bdedc2cbb2f00c7e22"
+        },
+        {
+          "path": "protocol/equipment-command-profile-v1.schema.json",
+          "sha256": "cd180b04ff64bef727b9f13c50bd54859d015683e20972542390fba322edb6a5"
+        }
+      ],
+      "license": "AGPL-3.0-only",
+      "generated_at": "2026-08-27",
+      "relationship": "generated-godot-operator-command-profile-hash"
     }
   ],
   "conceptual_derivations": [
@@ -224,10 +266,10 @@
         "symbols": [{ "name": "AxisProfile, ControlCommand, axis normalization", "lines": "13-114" }]
       }],
       "destination_path": "src/babylon_sim/control.py",
-      "destination_sha256": "da05642751d88f1c5d06384b2deee0925f8f566166a3d203ccadebc82fca5f8e",
+      "destination_sha256": "92093081db84582134777daca9ddc17718f8d9ef2a9a8acc0fc732b8b63c3a93",
       "destination_symbols": [{ "name": "control command and axis mapping", "lines": "13-123" }],
       "license": "AGPL-3.0-only",
-      "modified_at": "2026-07-29",
+      "modified_at": "2026-08-27",
       "relationship": "adapted-source",
       "locally_modified": true,
       "tests": ["tests/backend/test_control.py", "frontend/tests/keyboard.test.ts"]
@@ -241,10 +283,10 @@
         "symbols": [{ "name": "InputSnapshot and InputRouter", "lines": "21-287" }]
       }],
       "destination_path": "src/babylon_sim/input_router.py",
-      "destination_sha256": "91276d4f0384e9b9033dfff2efe4e47d347b4a9997d62d7a4aeca5806788c529",
+      "destination_sha256": "d2b80c4fd4f67d8c1f55cf6007df3741b1401f5255659cf061165eaaeeaf04ac",
       "destination_symbols": [{ "name": "InputSnapshot and InputRouter", "lines": "18-288" }],
       "license": "AGPL-3.0-only",
-      "modified_at": "2026-07-29",
+      "modified_at": "2026-08-27",
       "relationship": "adapted-source",
       "locally_modified": true,
       "tests": ["tests/backend/test_input_router.py", "tests/backend/test_web.py"]
@@ -309,9 +351,9 @@
         "symbols": [{ "name": "ControlTests", "lines": "8-43" }]
       }],
       "destination_path": "tests/backend/test_control.py",
-      "destination_sha256": "3bde43974513b89883dc45acf6fb2fd49a3d1c57c40dc9b270f5cc4244491f68",
+      "destination_sha256": "f884eef764300d6c4105f68697f85e3bb59d402a684138d42598c17e7c78b26d",
       "destination_symbols": [{ "name": "control tests", "lines": "1-30" }],
-      "license": "AGPL-3.0-only", "modified_at": "2026-07-29", "relationship": "adapted-test", "locally_modified": true,
+      "license": "AGPL-3.0-only", "modified_at": "2026-08-27", "relationship": "adapted-test", "locally_modified": true,
       "tests": ["tests/backend/test_control.py"]
     },
     {
@@ -321,9 +363,9 @@
         "symbols": [{ "name": "InputRouterTests", "lines": "9-178" }]
       }],
       "destination_path": "tests/backend/test_input_router.py",
-      "destination_sha256": "28aaeaa6611ae304af0fa1e8b88164191c51b94e264bbdbd45b4c73706fa7046",
+      "destination_sha256": "af205c011d55a7a01bd4cdc648a70d432bcb351fd09b4fb209cb571baa26588a",
       "destination_symbols": [{ "name": "input routing and lease tests", "lines": "1-107" }],
-      "license": "AGPL-3.0-only", "modified_at": "2026-07-29", "relationship": "adapted-test", "locally_modified": true,
+      "license": "AGPL-3.0-only", "modified_at": "2026-08-27", "relationship": "adapted-test", "locally_modified": true,
       "tests": ["tests/backend/test_input_router.py"]
     },
     {

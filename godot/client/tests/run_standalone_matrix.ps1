@@ -8,6 +8,7 @@ $ErrorActionPreference = "Stop"
 $projectDir = (Resolve-Path (Join-Path $PSScriptRoot ".." )).Path
 $tests = @(
     "foundation_scene_test.gd",
+    "equipment_command_mapper_test.gd",
     "control_input_hud_test.gd",
     "ict_status_indicator_test.gd",
     # operator_ui_test.gd / motion_client_test.gd: pre-existing failures

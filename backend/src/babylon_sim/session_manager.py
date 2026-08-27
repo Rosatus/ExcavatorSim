@@ -80,7 +80,12 @@ class RuntimeSessionManager:
             descriptor.urdf_path, model_version=descriptor.model_version
         )
         calibration = MachineCalibration.from_json(descriptor.calibration_path)
-        return RuntimeController(model, calibration, profile=profile)
+        return RuntimeController(
+            model,
+            calibration,
+            profile=profile,
+            model_id=descriptor.model_id,
+        )
 
     def _descriptor_for_runtime(self, runtime: ManagedRuntime) -> ModelDescriptor:
         if isinstance(runtime, GatewayRuntimeController):

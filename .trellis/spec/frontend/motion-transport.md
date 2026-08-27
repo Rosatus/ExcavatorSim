@@ -37,7 +37,7 @@ consume Python `view_state` according to the selected runtime contract.
 - The hello request is exactly:
 
   ```json
-  {"type":"hello","protocol_version":"godot-pinocchio-v3",
+  {"type":"hello","protocol_version":"godot-pinocchio-v4",
    "capabilities":["input_snapshot","commands"]}
   ```
 
@@ -49,8 +49,11 @@ consume Python `view_state` according to the selected runtime contract.
   lifecycle, and both advertised capabilities before the client enters
   `ready`.
 - `input_snapshot` carries a per-socket monotonically increasing
-  `client_sequence`, four clamped axes, `connected`, `focused`, and
-  `client_sent_ms`. A zero snapshot is sent first and after focus loss.
+  `client_sequence`, four clamped canonical operator axes in `(swing, boom,
+  arm, bucket)` order, `connected`, `focused`, and `client_sent_ms`. Positive
+  means right rotation, boom raise, arm extend, and bucket curl; negative means
+  left rotation, boom lower, arm retract, and bucket dump. A zero snapshot is
+  sent first and after focus loss.
 - `view_state` is accepted only for the current session/`simulation_epoch` and
   a strictly greater `view_revision`; at most two samples are retained for
   visual interpolation. `buffer_generation` is a recording diagnostic, not a

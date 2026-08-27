@@ -15,9 +15,11 @@ from typing import Literal
 
 from .calibration import MachineCalibration
 from .constants import DISPLAY_HZ, SIMULATION_DT_SECONDS
+from .equipment_command_profile import load_equipment_command_profile
 from .exchange import RecordingExchange
 from .input_router import InputRouter, InputSnapshot
 from .model import ExcavatorModel
+from .model_registry import load_model_registry
 from .observation_store import ObservationStore
 from .protocol import BucketLoadFeedbackMessage, ProtocolError
 from .recording import ChunkedRecordingBuffer
@@ -106,6 +108,7 @@ class RuntimeController:
         calibration: MachineCalibration,
         *,
         profile: SimulationRuntimeProfile = "legacy",
+        model_id: str | None = None,
         clock: Callable[[], float] = time.perf_counter,
     ) -> None:
         if profile not in ("legacy", "motion-only"):
@@ -114,7 +117,23 @@ class RuntimeController:
         self.model = model
         self.calibration = calibration
         self.simulator = Simulator(model, calibration)
-        self.input_router = InputRouter(clock=clock)
+        selected_model_id = model_id
+        if selected_model_id is None:
+            matches = [
+                descriptor.model_id
+                for descriptor in load_model_registry().models.values()
+                if descriptor.model_version == model.model_version
+            ]
+            if len(matches) != 1:
+                raise ValueError(
+                    "runtime model version must resolve to one equipment command profile"
+                )
+            selected_model_id = matches[0]
+        command_profile = load_equipment_command_profile()
+        self.input_router = InputRouter(
+            clock=clock,
+            operator_to_joint_signs=command_profile.signs_for(selected_model_id),
+        )
         self.latest = LatestStateSlot()
         self.recording = ChunkedRecordingBuffer() if profile == "legacy" else None
         self.terrain = TerrainController(self.recording) if self.recording is not None else None
@@ -283,7 +302,7 @@ class RuntimeController:
                 source=f"browser:{client_id}",
                 client_sequence=client_sequence,
                 connected=effective_connected,
-                axes=effective_axes,
+                operator_axes=effective_axes,
             ),
             client_id=client_id,
         )
@@ -571,5 +590,6 @@ def create_runtime(
     calibration: MachineCalibration,
     *,
     profile: SimulationRuntimeProfile = "legacy",
+    model_id: str | None = None,
 ) -> RuntimeController:
-    return RuntimeController(model, calibration, profile=profile)
+    return RuntimeController(model, calibration, profile=profile, model_id=model_id)
