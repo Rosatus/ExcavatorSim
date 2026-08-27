@@ -4,10 +4,10 @@ extends RefCounted
 const TITLE := "EXCAVATOR CONTROL"
 const GUIDE_TITLE := "Quick operator guide"
 const GUIDE_INTRO := "Start the machine, move into the work area, then shape soil with the bucket itself. Digging and dumping happen automatically from physical bucket contact—there is no separate Dig or Deposit command."
-const GUIDE_KEYBOARD := "Keyboard + mouse\nTracks: Q/A left track · W/S right track\nUpper structure: Y/H swing · U/J boom · I/K arm · O/L bucket\nCamera: 1 operator · 2 chase · 3 work tool · 4 inspection · 5 cab · C reset\nMiddle-drag orbit · mouse wheel zoom\nDisplay: Test Grid removes terrain textures and dressing\nSession: F6 start · F7 pause · F8 reset"
+const GUIDE_KEYBOARD := "Keyboard + mouse — ISO excavator layout\nLeft stick: W arm out · S arm in · A/D swing left/right\nRight stick: I boom down · K boom up · J bucket curl · L bucket dump\nTracks: R/F left forward/reverse · Y/H right forward/reverse\nCamera: 1 operator · 2 chase · 3 work tool · 4 inspection · 5 cab · C reset\nMiddle-drag orbit · mouse wheel zoom\nDisplay: Test Grid removes terrain textures and dressing\nSession: F6 start · F7 pause · F8 reset"
 const GUIDE_GAMEPAD := "XInput gamepad — ISO excavator pattern\nLeft stick: X swing · forward arm out · back arm in\nRight stick: forward boom down · back boom up · left bucket curl · right bucket dump\nTracks: LT left forward · LB left reverse · RT right forward · RB right reverse\nCamera: D-pad selects views · right-stick click resets view\nOrbit/zoom use middle-drag and wheel.\nDisplay: Test Grid removes terrain textures and dressing\nSession: F6 start · F7 pause · F8 reset"
 const GUIDE_RECOVERY := "Reset and model changes stop motion, clear terrain and bucket payload, and require controls to return to neutral before motion resumes."
-const CONTROL_HINT_KEYBOARD := "Q/A left + W/S right tracks   Y/H swing   U/J boom   I/K arm   O/L bucket   1–5 views"
+const CONTROL_HINT_KEYBOARD := "WASD left stick · IJKL right stick · R/F left track · Y/H right track · 1–5 views"
 const CONTROL_HINT_GAMEPAD := "ISO sticks: L swing/arm · R boom/bucket   LT/RT tracks forward · LB/RB reverse   D-pad views"
 const SOIL_AUTOMATIC_HINT := "Use the bucket edge and shell directly—cut, carry and dump are automatic."
 

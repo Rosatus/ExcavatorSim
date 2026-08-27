@@ -423,7 +423,7 @@ func controls_visible_status(scene: Node3D) -> Dictionary:
 	ui.show_control_guide()
 	await scene.get_tree().process_frame
 	var copy := _visible_label_copy(ui)
-	var required := ["Q/A", "W/S", "Tracks", "boom", "bucket", "Camera", "F8"]
+	var required := ["WASD", "IJKL", "R/F", "Y/H", "Tracks", "boom", "bucket", "Camera", "F8"]
 	var missing: Array[String] = []
 	for token in required:
 		if token not in copy:

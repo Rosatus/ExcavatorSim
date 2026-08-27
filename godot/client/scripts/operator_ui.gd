@@ -56,6 +56,8 @@ var _ignore_quality_toggle := false
 @onready var _can_status_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/CANStatus
 @onready var _can_output_button: Button = $StatusPanel/Margin/VBox/Tools/CANOutputToggle
 @onready var _ict_button: Button = $StatusPanel/Margin/VBox/Tools/ICTConnectToggle
+@onready var _ict_handshake_lamp: Panel = $StatusPanel/Margin/VBox/Tools/ICTHandshakeStatus/Lamp
+@onready var _ict_handshake_label: Label = $StatusPanel/Margin/VBox/Tools/ICTHandshakeStatus/Label
 @onready var _timed_can_button: Button = $StatusPanel/Margin/VBox/Tools/TimedCANTrigger
 @onready var _ict_host_edit: LineEdit = $StatusPanel/Margin/VBox/AdvancedPanel/ICTHost
 @onready var _ict_port_edit: LineEdit = $StatusPanel/Margin/VBox/AdvancedPanel/ICTPort
@@ -123,6 +125,9 @@ func _ready() -> void:
 		_product_session.model_changed.connect(_on_product_model_changed)
 	if _camera != null:
 		_camera.mode_changed.connect(_on_camera_mode_changed)
+	var can_bridge := _can_bridge()
+	if can_bridge != null and can_bridge.has_signal("ict_link_status_changed"):
+		can_bridge.connect("ict_link_status_changed", _on_ict_link_status_changed)
 	_advanced_panel.visible = false
 	_set_panel_collapsed(false)
 	_sync_test_graphics_toggle()
@@ -418,9 +423,16 @@ func _refresh_can_status() -> void:
 		_can_output_button.text = "开始记录 CAN"
 		_can_output_button.button_pressed = false
 		_set_ict_button(false, false, false, "CAN 网关不可用")
+		_set_ict_handshake_indicator("unavailable")
 		_timed_can_button.disabled = true
 		return
 	var linux_gw: bool = bridge.is_linux_gateway()
+	if linux_gw:
+		_set_ict_handshake_indicator("not_applicable")
+	elif bridge.is_ict_handshake_connected():
+		_set_ict_handshake_indicator("connected")
+	else:
+		_set_ict_handshake_indicator("waiting" if bridge.is_gateway_online() else "offline")
 	match int(bridge.get_status()):
 		0:
 			var gateway_error := String(bridge.get_last_gateway_error())
@@ -465,6 +477,31 @@ func _set_ict_button(online: bool, linux_gateway: bool, active: bool, disabled_r
 	else:
 		_ict_button.text = "连接 ICT"
 		_ict_button.button_pressed = false
+
+
+func _set_ict_handshake_indicator(state: String) -> void:
+	match state:
+		"connected":
+			_ict_handshake_lamp.self_modulate = Color("67dfa0")
+			_ict_handshake_label.text = "已握手"
+			_ict_handshake_label.tooltip_text = "PC001 客户端已完成 who / PC001 握手"
+		"not_applicable":
+			_ict_handshake_lamp.self_modulate = Color("b8c0c8")
+			_ict_handshake_label.text = "直连"
+			_ict_handshake_label.tooltip_text = "Linux/vcan 直连，无需 PC001 TCP 握手"
+		"waiting":
+			_ict_handshake_lamp.self_modulate = Color("ef5350")
+			_ict_handshake_label.text = "待握手"
+			_ict_handshake_label.tooltip_text = "Gateway 在线，等待 PC001 客户端完成握手"
+		_:
+			_ict_handshake_lamp.self_modulate = Color("ef5350")
+			_ict_handshake_label.text = "未连接"
+			_ict_handshake_label.tooltip_text = "尚无已完成握手的 PC001 客户端"
+	_ict_handshake_lamp.tooltip_text = _ict_handshake_label.tooltip_text
+
+
+func _on_ict_link_status_changed(_connected: bool, _platform_linux: bool) -> void:
+	_refresh_can_status()
 
 
 func _can_bridge() -> Node:

@@ -103,10 +103,10 @@ func _check_prompts(ui: MotionOperatorUI) -> void:
 	):
 		_fail("gamepad prompt variant was not readable")
 	var key_event := InputEventKey.new()
-	key_event.physical_keycode = KEY_Q
+	key_event.physical_keycode = KEY_W
 	key_event.pressed = true
 	ui._unhandled_input(key_event)
-	if ui.get_prompt_mode_for_test() != "keyboard" or "Q/A" not in hint.text or "W/S" not in hint.text:
+	if ui.get_prompt_mode_for_test() != "keyboard" or "WASD" not in hint.text or "R/F" not in hint.text:
 		_fail("keyboard prompt variant was not readable")
 
 

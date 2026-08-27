@@ -3,10 +3,10 @@ extends Node3D
 
 const MODEL_CATALOG_PATH := "res://resources/models/model_catalog.json"
 const INPUT_ACTIONS := {
-	"track_left_forward": {"key": KEY_Q, "joy_axis": JOY_AXIS_TRIGGER_LEFT, "joy_sign": 1.0},
-	"track_left_reverse": {"key": KEY_A, "joy_button": JOY_BUTTON_LEFT_SHOULDER},
-	"track_right_forward": {"key": KEY_W, "joy_axis": JOY_AXIS_TRIGGER_RIGHT, "joy_sign": 1.0},
-	"track_right_reverse": {"key": KEY_S, "joy_button": JOY_BUTTON_RIGHT_SHOULDER},
+	"track_left_forward": {"key": KEY_R, "joy_axis": JOY_AXIS_TRIGGER_LEFT, "joy_sign": 1.0},
+	"track_left_reverse": {"key": KEY_F, "joy_button": JOY_BUTTON_LEFT_SHOULDER},
+	"track_right_forward": {"key": KEY_Y, "joy_axis": JOY_AXIS_TRIGGER_RIGHT, "joy_sign": 1.0},
+	"track_right_reverse": {"key": KEY_H, "joy_button": JOY_BUTTON_RIGHT_SHOULDER},
 }
 
 @export var controller_enabled := false

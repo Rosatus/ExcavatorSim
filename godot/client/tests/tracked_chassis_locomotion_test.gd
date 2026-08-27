@@ -1,5 +1,12 @@
 extends SceneTree
 
+const EXPECTED_TRACK_KEYS := {
+	"track_left_forward": KEY_R,
+	"track_left_reverse": KEY_F,
+	"track_right_forward": KEY_Y,
+	"track_right_reverse": KEY_H,
+}
+
 const CATALOG_PATH := "res://resources/models/model_catalog.json"
 const SY205_FIXTURE := "res://tests/fixtures/sy205_frame_parity_cases.json"
 const STEP := 1.0 / 60.0
@@ -173,7 +180,7 @@ func _test_input_actions_and_parent_composition() -> int:
 				joy_events.append(event)
 		if _check(
 			key_events.size() == 1
-			and (key_events[0] as InputEventKey).physical_keycode == int(definition["key"]),
+			and (key_events[0] as InputEventKey).physical_keycode == int(EXPECTED_TRACK_KEYS[action]),
 			"track input action has the wrong keyboard binding: %s" % action,
 		) != 0:
 			host.free()

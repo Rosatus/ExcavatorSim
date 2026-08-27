@@ -31,7 +31,13 @@ func _run() -> void:
 		return
 	# Avoid colliding with a running packaged product on the production ports.
 	bridge.remote_port = TEST_GATEWAY_PORT
+	var existing_ack := bridge.get("_ack") as PacketPeerUDP
+	if existing_ack != null:
+		existing_ack.close()
+	bridge.set("_ack_bound", false)
 	bridge.ack_port = TEST_ACK_PORT
+	_check(bool(bridge.call("_ensure_ack_bound")),
+		"headless E2E binds the isolated gateway heartbeat port")
 	var default_endpoint := bridge.get_desired_tcp_endpoint_for_test() as Dictionary
 	_check(not bridge.set_tcp_endpoint("not a listener", "5678")
 		and bridge.get_desired_tcp_endpoint_for_test() == default_endpoint,
@@ -152,8 +158,67 @@ func _run() -> void:
 		and int(spawned_endpoint.get("port", -1)) == TEST_ICT_RESTART_PORT,
 		"replacement gateway records the requested ICT endpoint")
 	if OS.get_name() == "Windows":
-		_check(await _pc001_handshake(TEST_ICT_RESTART_PORT),
+		var ict_client: StreamPeerTCP = await _connect_pc001(TEST_ICT_RESTART_PORT)
+		_check(ict_client != null,
 			"replacement PC001 listener accepts the unchanged relay handshake")
+		if ict_client != null:
+			_check(await _wait_ict_handshake(bridge, true),
+				"accepted PC001 socket reaches the Godot heartbeat state")
+			await process_frame
+			var ict_status_label := scene.get_node_or_null(
+				"OperatorUI/StatusPanel/Margin/VBox/Tools/ICTHandshakeStatus/Label"
+			) as Label
+			var ict_status_lamp := scene.get_node_or_null(
+				"OperatorUI/StatusPanel/Margin/VBox/Tools/ICTHandshakeStatus/Lamp"
+			) as Panel
+			_check(
+				ict_status_label != null and ict_status_label.text == "已握手"
+				and ict_status_lamp != null
+				and ict_status_lamp.self_modulate.is_equal_approx(Color("67dfa0")),
+				"operator indicator turns green only after PC001 handshake",
+			)
+			bridge.set_ict_connected(false)
+			await create_timer(0.6).timeout
+			_check(bridge.is_ict_handshake_connected(),
+				"disabling ICT forwarding does not hide a live physical handshake")
+			_check(ict_status_label != null and ict_status_label.text == "已握手",
+				"operator indicator stays green while the physical socket is live")
+			ict_client.disconnect_from_host()
+			_check(await _wait_ict_handshake(bridge, false),
+				"PC001 disconnect clears the Godot heartbeat state")
+			await process_frame
+			_check(
+				ict_status_label != null and ict_status_label.text != "已握手"
+				and ict_status_lamp != null
+				and ict_status_lamp.self_modulate.is_equal_approx(Color("ef5350")),
+				"operator indicator returns to red after PC001 disconnect",
+			)
+			bridge.set_ict_connected(true)
+			var replacement_client: StreamPeerTCP = await _connect_pc001(
+				TEST_ICT_RESTART_PORT
+			)
+			var replacement_handshake := false
+			if replacement_client != null:
+				replacement_handshake = await _wait_ict_handshake(bridge, true)
+			_check(replacement_client != null and replacement_handshake,
+				"a replacement PC001 socket restores the handshake state")
+			var handshaken_pid := int(bridge.get_gateway_pid_for_test())
+			bridge.respawn_gateway()
+			_check(not bridge.is_ict_handshake_connected(),
+				"gateway restart clears the handshake state immediately")
+			if replacement_client != null:
+				replacement_client.disconnect_from_host()
+			var restart_recovered := false
+			for i in 80:
+				await create_timer(0.1).timeout
+				if (
+					bridge.is_gateway_online()
+					and int(bridge.get_gateway_pid_for_test()) != handshaken_pid
+				):
+					restart_recovered = true
+					break
+			_check(restart_recovered,
+				"gateway restart recovers before the E2E test exits")
 	bridge.set_ict_connected(false)
 
 	session.request_reset()
@@ -254,17 +319,17 @@ func _count_can_id(path: String, can_id: String) -> int:
 	return count
 
 
-func _pc001_handshake(port: int) -> bool:
+func _connect_pc001(port: int) -> StreamPeerTCP:
 	var client := StreamPeerTCP.new()
 	if client.connect_to_host("127.0.0.1", port) != OK:
-		return false
+		return null
 	for i in 30:
 		client.poll()
 		if client.get_status() == StreamPeerTCP.STATUS_CONNECTED:
 			break
 		await create_timer(0.1).timeout
 	if client.get_status() != StreamPeerTCP.STATUS_CONNECTED:
-		return false
+		return null
 	for i in 20:
 		client.poll()
 		if client.get_available_bytes() >= 3:
@@ -272,11 +337,20 @@ func _pc001_handshake(port: int) -> bool:
 		await create_timer(0.05).timeout
 	if client.get_available_bytes() < 3:
 		client.disconnect_from_host()
-		return false
+		return null
 	var greeting := client.get_data(3)
 	if greeting[0] != OK or (greeting[1] as PackedByteArray).get_string_from_ascii() != "who":
 		client.disconnect_from_host()
-		return false
-	var sent := client.put_data("PC001".to_ascii_buffer()) == OK
-	client.disconnect_from_host()
-	return sent
+		return null
+	if client.put_data("PC001".to_ascii_buffer()) != OK:
+		client.disconnect_from_host()
+		return null
+	return client
+
+
+func _wait_ict_handshake(bridge: Node, expected: bool) -> bool:
+	for i in 40:
+		if bridge.is_ict_handshake_connected() == expected:
+			return true
+		await create_timer(0.1).timeout
+	return bridge.is_ict_handshake_connected() == expected

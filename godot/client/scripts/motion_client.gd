@@ -28,15 +28,15 @@ const HELLO_TIMEOUT_SECONDS := 3.0
 const RECONNECT_INITIAL_SECONDS := 0.25
 const RECONNECT_MAX_SECONDS := 5.0
 const INPUT_ACTIONS := {
-	"motion_swing_positive": {"keys": [KEY_Y], "channel": "swing", "joy_axis": JOY_AXIS_LEFT_X, "joy_sign": 1.0},
-	"motion_swing_negative": {"keys": [KEY_H], "channel": "swing", "joy_axis": JOY_AXIS_LEFT_X, "joy_sign": -1.0},
+	"motion_swing_positive": {"keys": [KEY_D], "channel": "swing", "joy_axis": JOY_AXIS_LEFT_X, "joy_sign": 1.0},
+	"motion_swing_negative": {"keys": [KEY_A], "channel": "swing", "joy_axis": JOY_AXIS_LEFT_X, "joy_sign": -1.0},
 	# ISO excavator pattern: left stick owns swing/arm; right stick owns boom/bucket.
-	"motion_boom_positive": {"keys": [KEY_U], "channel": "boom", "joy_axis": JOY_AXIS_RIGHT_Y, "joy_sign": 1.0},
-	"motion_boom_negative": {"keys": [KEY_J], "channel": "boom", "joy_axis": JOY_AXIS_RIGHT_Y, "joy_sign": -1.0},
-	"motion_arm_positive": {"keys": [KEY_I], "channel": "arm", "joy_axis": JOY_AXIS_LEFT_Y, "joy_sign": -1.0},
-	"motion_arm_negative": {"keys": [KEY_K], "channel": "arm", "joy_axis": JOY_AXIS_LEFT_Y, "joy_sign": 1.0},
-	"motion_bucket_positive": {"keys": [KEY_O], "channel": "bucket", "joy_axis": JOY_AXIS_RIGHT_X, "joy_sign": 1.0},
-	"motion_bucket_negative": {"keys": [KEY_L], "channel": "bucket", "joy_axis": JOY_AXIS_RIGHT_X, "joy_sign": -1.0},
+	"motion_boom_positive": {"keys": [KEY_I], "channel": "boom", "joy_axis": JOY_AXIS_RIGHT_Y, "joy_sign": 1.0},
+	"motion_boom_negative": {"keys": [KEY_K], "channel": "boom", "joy_axis": JOY_AXIS_RIGHT_Y, "joy_sign": -1.0},
+	"motion_arm_positive": {"keys": [KEY_W], "channel": "arm", "joy_axis": JOY_AXIS_LEFT_Y, "joy_sign": -1.0},
+	"motion_arm_negative": {"keys": [KEY_S], "channel": "arm", "joy_axis": JOY_AXIS_LEFT_Y, "joy_sign": 1.0},
+	"motion_bucket_positive": {"keys": [KEY_L], "channel": "bucket", "joy_axis": JOY_AXIS_RIGHT_X, "joy_sign": 1.0},
+	"motion_bucket_negative": {"keys": [KEY_J], "channel": "bucket", "joy_axis": JOY_AXIS_RIGHT_X, "joy_sign": -1.0},
 }
 const MODEL_GAMEPAD_DIRECTION_MULTIPLIERS := {
 	"sy205": {"swing": -1.0, "boom": -1.0, "arm": -1.0, "bucket": -1.0},
@@ -974,13 +974,14 @@ func _ensure_input_actions() -> void:
 		if not InputMap.has_action(action):
 			InputMap.add_action(action, 0.08)
 		var definition: Dictionary = INPUT_ACTIONS[action]
+		# Product work-equipment actions own one keyboard key and one canonical
+		# gamepad axis. Replace stale runtime mappings before installing the
+		# current layout so hot reload/model refresh cannot retain old keys.
+		for existing in InputMap.action_get_events(action):
+			if existing is InputEventKey or existing is InputEventJoypadMotion:
+				InputMap.action_erase_event(action, existing)
 		for keycode in definition["keys"]:
 			_add_key_event(action, int(keycode))
-		# Product work-equipment actions own one canonical gamepad axis. Remove a
-		# stale runtime mapping (including the former bucket triggers) before add.
-		for existing in InputMap.action_get_events(action):
-			if existing is InputEventJoypadMotion:
-				InputMap.action_erase_event(action, existing)
 		var direction_multiplier := float(direction_profile.get(String(definition["channel"]), 1.0))
 		_add_joy_axis_event(
 			action,

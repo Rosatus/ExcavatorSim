@@ -81,11 +81,13 @@ The local actions are `track_left_forward`, `track_left_reverse`,
 `track_right_forward`, and `track_right_reverse`. They never enter the Python
 `Vector4` articulation snapshot.
 
-The production keyboard mapping is left forward/reverse `Q/A` and right
-forward/reverse `W/S`. XInput-compatible controllers map LT/LB to left
-forward/reverse and RT/RB to right forward/reverse. Work equipment uses the ISO
-excavator pattern: left stick X/Y is swing/arm and right stick Y/X is
-boom/bucket. Action/channel semantics and keyboard signs are global, but the
+The production keyboard mapping is left track forward/reverse `R/F` and right
+track forward/reverse `Y/H`. Work equipment follows the ISO excavator layout:
+left-stick `W/S` is arm out/in, `A/D` is swing left/right, right-stick `I/K` is
+boom down/up, and `J/L` is bucket curl/dump. XInput-compatible controllers map
+LT/LB to left forward/reverse and RT/RB to right forward/reverse; left stick
+X/Y remains swing/arm and right stick Y/X remains boom/bucket. Action/channel
+semantics and keyboard signs are global, but the
 canonical `InputEventJoypadMotion` signs are selected per active model: SY205
 reverses swing/boom/arm/bucket and SY135 reverses only swing. A rig's optional
 `tracks.local_forward_axis` is `-Z` or `+Z` and
@@ -115,9 +117,15 @@ forward × up; it is never hard-coded independently from forward.
   `ChassisMotionRoot` to identity and clears track commands and velocities.
 - Keyboard and gamepad events feed the same four track actions and the same
   `(swing, boom, arm, bucket)` equipment vector. Runtime registration replaces
-  stale joy events before installing the canonical mapping; it must not leave
-  the former trigger-driven bucket actions active or create a parallel gamepad
-  command path. Trigger pressure remains analog; shoulder reverse is digital.
+  stale owned keyboard and joy events before installing exactly one canonical
+  key plus the existing gamepad binding; it must not leave an older keyboard
+  layout or the former trigger-driven bucket actions active. Trigger pressure
+  remains analog; shoulder reverse is digital.
+- `ControlInputHUD` is presentation-only. It observes all twelve semantic
+  actions independently through `Input.is_action_pressed()`, never writes the
+  InputMap or motion commands, and recursively uses `MOUSE_FILTER_IGNORE`.
+  Therefore opposing keys may both highlight while their resolved axis remains
+  zero, and orbit/zoom pointer input passes through the lower-right HUD.
 - Model-specific XInput direction is expressed only by
   `MotionClient.MODEL_GAMEPAD_DIRECTION_MULTIPLIERS`. ProductSession refreshes
   the owned joy events after successful initial/model activation; compatibility
@@ -163,6 +171,9 @@ an unattended soak cannot accidentally weaken the product safety behavior.
 | Matching derived ray hit | Accept only a bounded height-compatible hint |
 | Focus/reconnect/model/world reset | Clear commands and velocities; reset pose where required |
 | Stale/duplicate runtime gamepad event | Replace it with exactly one canonical joy binding for that action |
+| Stale/duplicate product keyboard event | Replace it with exactly one current `WASD`/`IJKL`/`RF`/`YH` key event |
+| Opposing semantic actions held | Resolve motion to zero while highlighting both HUD tiles |
+| Pointer input over control HUD | Pass through every descendant; HUD never consumes camera input |
 | Gamepad held during re-arm | Keep the corresponding track/equipment output zero until all owned controls return neutral |
 | One model's XInput direction is reversed | Correct its joy multiplier profile and reinstall only JoypadMotion events |
 
@@ -185,11 +196,16 @@ an unattended soak cannot accidentally weaken the product safety behavior.
 - Lifecycle tests assert reconnect, model activation, world reset, focus loss,
   and controller disable clearing behavior.
 - Input tests assert the exact ISO joy axis and sign for all eight equipment
-  actions, exact LT/LB/RT/RB track bindings, idempotent runtime registration,
-  and current-device prompt switching without weakening neutral re-arm.
+  actions, exact `WASD`/`IJKL` equipment keys, exact `R/F` and `Y/H` track keys,
+  exact LT/LB/RT/RB track bindings, idempotent runtime registration, and
+  current-device prompt switching without weakening neutral re-arm.
 - Input tests select both model profiles, assert exact JoypadMotion axis/sign
   pairs with unchanged keys, reject unknown profiles, and prove offline model
   switching refreshes the active profile.
+- The standalone HUD test binds every semantic action to its exact physical
+  key, named tile and copy; it also asserts 1280x720/1920x1080 containment,
+  translucent styling, recursive mouse-ignore, independent highlights and
+  opposing-axis zero.
 - Godot MCP must drive the four actions and switch both production models in a
   live backend session.
 
@@ -202,8 +218,14 @@ Correct: ChassisMotionRoot owns travel; MotionPresentation composes below it
 Wrong: bucket remains on LT/RT while separate callbacks drive tracks
 Correct: canonical InputMap events put bucket on right-stick X and feed LT/LB/RT/RB into the existing track actions
 
-Wrong: SY135 joystick swing is reversed -> flip its physical joint axis and also reverse keyboard Y/H
+Wrong: SY135 joystick swing is reversed -> flip its physical joint axis and also reverse keyboard A/D
 Correct: retain rig/keyboard semantics and flip only SY135 swing JoypadMotion events on model activation
+
+Wrong: keep the old Q/A, W/S track keys beside the new joystick layout and let both fire
+Correct: erase owned runtime key/joy events, then install one canonical RF/YH track and WASD/IJKL equipment layout
+
+Wrong: resolve each axis first and highlight only the winning HUD direction
+Correct: resolve motion in the controller, but render each held semantic action independently
 ```
 
 ## Scenario: Jolt-authoritative hybrid chassis and work equipment

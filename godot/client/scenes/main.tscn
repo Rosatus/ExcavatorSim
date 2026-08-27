@@ -28,6 +28,7 @@
 [ext_resource type="Script" uid="uid://rs84iev83we6" path="res://scripts/product_session.gd" id="17_product_session"]
 [ext_resource type="Script" uid="uid://ctx4iojwvg4k6" path="res://scripts/construction_site_dressing.gd" id="18_site_dressing"]
 [ext_resource type="Script" uid="uid://cce4qy15353ac" path="res://scripts/machine_feedback.gd" id="19_machine_feedback"]
+[ext_resource type="PackedScene" path="res://scenes/control_input_hud.tscn" id="20_control_hud"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_qkpxi"]
 shader = ExtResource("1_pm3ni")
@@ -151,6 +152,13 @@ corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
 shadow_color = Color(0, 0, 0, 0.5)
 shadow_size = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ict_lamp"]
+bg_color = Color(1, 1, 1, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_fill_background"]
 bg_color = Color(0.1, 0.14, 0.17, 1)
@@ -376,7 +384,7 @@ show_percentage = false
 
 [node name="ControlHint" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=1676260264]
 layout_mode = 2
-text = "Q/A left + W/S right tracks   Y/H swing   U/J boom   I/K arm   O/L bucket"
+text = "WASD left stick · IJKL right stick · R/F left track · Y/H right track"
 autowrap_mode = 2
 
 [node name="AutomaticSoilHint" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=1657688566]
@@ -471,6 +479,26 @@ text = "连接 ICT（需 Linux 网关）"
 toggle_mode = true
 disabled = true
 
+[node name="ICTHandshakeStatus" type="HBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox/Tools"]
+custom_minimum_size = Vector2(76, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="Lamp" type="Panel" parent="OperatorUI/StatusPanel/Margin/VBox/Tools/ICTHandshakeStatus"]
+custom_minimum_size = Vector2(12, 12)
+layout_mode = 2
+mouse_filter = 2
+self_modulate = Color(0.937255, 0.32549, 0.313726, 1)
+theme_override_styles/panel = SubResource("StyleBoxFlat_ict_lamp")
+
+[node name="Label" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox/Tools/ICTHandshakeStatus"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 10
+text = "未连接"
+vertical_alignment = 1
+
 [node name="TimedCANTrigger" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Tools"]
 layout_mode = 2
 size_flags_horizontal = 3
@@ -530,6 +558,8 @@ offset_top = 22.0
 offset_right = 476.0
 offset_bottom = 50.0
 text = "Hide panel"
+
+[node name="ControlInputHUD" parent="OperatorUI" instance=ExtResource("20_control_hud")]
 
 [node name="GuidePanel" type="PanelContainer" parent="OperatorUI" unique_id=1770164644]
 anchors_preset = 8

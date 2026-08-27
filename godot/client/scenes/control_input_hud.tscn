@@ -1,0 +1,363 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/control_input_hud.gd" id="1_control_hud"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hud_panel"]
+bg_color = Color(0.025, 0.04, 0.055, 0.78)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.17, 0.45, 0.62, 0.85)
+corner_radius_top_left = 9
+corner_radius_top_right = 9
+corner_radius_bottom_right = 9
+corner_radius_bottom_left = 9
+shadow_color = Color(0, 0, 0, 0.35)
+shadow_size = 5
+
+[node name="ControlInputHUD" type="PanelContainer"]
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -376.0
+offset_top = -292.0
+offset_right = -16.0
+offset_bottom = -16.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_hud_panel")
+script = ExtResource("1_control_hud")
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="VBox" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 5
+
+[node name="Header" type="HBoxContainer" parent="Margin/VBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Title" type="Label" parent="Margin/VBox/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "挖掘机键盘控制"
+
+[node name="StateHint" type="Label" parent="Margin/VBox/Header"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.55, 0.66, 0.72, 1)
+theme_override_font_sizes/font_size = 10
+text = "按下时点亮"
+horizontal_alignment = 2
+
+[node name="Sticks" type="HBoxContainer" parent="Margin/VBox"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="LeftStick" type="VBoxContainer" parent="Margin/VBox/Sticks"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 2
+
+[node name="Title" type="Label" parent="Margin/VBox/Sticks/LeftStick"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 12
+text = "左摇杆  WASD"
+horizontal_alignment = 1
+
+[node name="Grid" type="GridContainer" parent="Margin/VBox/Sticks/LeftStick"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/h_separation = 3
+theme_override_constants/v_separation = 3
+columns = 3
+
+[node name="TopLeft" type="Control" parent="Margin/VBox/Sticks/LeftStick/Grid"]
+custom_minimum_size = Vector2(48, 38)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="W" type="PanelContainer" parent="Margin/VBox/Sticks/LeftStick/Grid"]
+custom_minimum_size = Vector2(48, 38)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Margin/VBox/Sticks/LeftStick/Grid/W"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 10
+text = "W\n小臂伸"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="TopRight" type="Control" parent="Margin/VBox/Sticks/LeftStick/Grid"]
+custom_minimum_size = Vector2(48, 38)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="A" type="PanelContainer" parent="Margin/VBox/Sticks/LeftStick/Grid"]
+custom_minimum_size = Vector2(48, 38)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Margin/VBox/Sticks/LeftStick/Grid/A"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 10
+text = "A\n左回转"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Center" type="Label" parent="Margin/VBox/Sticks/LeftStick/Grid"]
+custom_minimum_size = Vector2(48, 38)
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.35, 0.5, 0.58, 1)
+text = "L"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="D" type="PanelContainer" parent="Margin/VBox/Sticks/LeftStick/Grid"]
+custom_minimum_size = Vector2(48, 38)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Margin/VBox/Sticks/LeftStick/Grid/D"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 10
+text = "D\n右回转"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BottomLeft" type="Control" parent="Margin/VBox/Sticks/LeftStick/Grid"]
+custom_minimum_size = Vector2(48, 38)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="S" type="PanelContainer" parent="Margin/VBox/Sticks/LeftStick/Grid"]
+custom_minimum_size = Vector2(48, 38)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Margin/VBox/Sticks/LeftStick/Grid/S"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 10
+text = "S\n小臂收"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BottomRight" type="Control" parent="Margin/VBox/Sticks/LeftStick/Grid"]
+custom_minimum_size = Vector2(48, 38)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="RightStick" type="VBoxContainer" parent="Margin/VBox/Sticks"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 2
+
+[node name="Title" type="Label" parent="Margin/VBox/Sticks/RightStick"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 12
+text = "右摇杆  IJKL"
+horizontal_alignment = 1
+
+[node name="Grid" type="GridContainer" parent="Margin/VBox/Sticks/RightStick"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/h_separation = 3
+theme_override_constants/v_separation = 3
+columns = 3
+
+[node name="TopLeft" type="Control" parent="Margin/VBox/Sticks/RightStick/Grid"]
+custom_minimum_size = Vector2(48, 38)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="I" type="PanelContainer" parent="Margin/VBox/Sticks/RightStick/Grid"]
+custom_minimum_size = Vector2(48, 38)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Margin/VBox/Sticks/RightStick/Grid/I"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 10
+text = "I\n大臂降"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="TopRight" type="Control" parent="Margin/VBox/Sticks/RightStick/Grid"]
+custom_minimum_size = Vector2(48, 38)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="J" type="PanelContainer" parent="Margin/VBox/Sticks/RightStick/Grid"]
+custom_minimum_size = Vector2(48, 38)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Margin/VBox/Sticks/RightStick/Grid/J"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 10
+text = "J\n铲斗收"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Center" type="Label" parent="Margin/VBox/Sticks/RightStick/Grid"]
+custom_minimum_size = Vector2(48, 38)
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.35, 0.5, 0.58, 1)
+text = "R"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="L" type="PanelContainer" parent="Margin/VBox/Sticks/RightStick/Grid"]
+custom_minimum_size = Vector2(48, 38)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Margin/VBox/Sticks/RightStick/Grid/L"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 10
+text = "L\n铲斗翻"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BottomLeft" type="Control" parent="Margin/VBox/Sticks/RightStick/Grid"]
+custom_minimum_size = Vector2(48, 38)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="K" type="PanelContainer" parent="Margin/VBox/Sticks/RightStick/Grid"]
+custom_minimum_size = Vector2(48, 38)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Margin/VBox/Sticks/RightStick/Grid/K"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 10
+text = "K\n大臂升"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BottomRight" type="Control" parent="Margin/VBox/Sticks/RightStick/Grid"]
+custom_minimum_size = Vector2(48, 38)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Tracks" type="HBoxContainer" parent="Margin/VBox"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="LeftTrack" type="VBoxContainer" parent="Margin/VBox/Tracks"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 2
+
+[node name="Title" type="Label" parent="Margin/VBox/Tracks/LeftTrack"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 11
+text = "左履带踏板"
+horizontal_alignment = 1
+
+[node name="Keys" type="HBoxContainer" parent="Margin/VBox/Tracks/LeftTrack"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="R" type="PanelContainer" parent="Margin/VBox/Tracks/LeftTrack/Keys"]
+custom_minimum_size = Vector2(74, 34)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Margin/VBox/Tracks/LeftTrack/Keys/R"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 10
+text = "R  前进"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="F" type="PanelContainer" parent="Margin/VBox/Tracks/LeftTrack/Keys"]
+custom_minimum_size = Vector2(74, 34)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Margin/VBox/Tracks/LeftTrack/Keys/F"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 10
+text = "F  后退"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RightTrack" type="VBoxContainer" parent="Margin/VBox/Tracks"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 2
+
+[node name="Title" type="Label" parent="Margin/VBox/Tracks/RightTrack"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 11
+text = "右履带踏板"
+horizontal_alignment = 1
+
+[node name="Keys" type="HBoxContainer" parent="Margin/VBox/Tracks/RightTrack"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="Y" type="PanelContainer" parent="Margin/VBox/Tracks/RightTrack/Keys"]
+custom_minimum_size = Vector2(74, 34)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Margin/VBox/Tracks/RightTrack/Keys/Y"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 10
+text = "Y  前进"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="H" type="PanelContainer" parent="Margin/VBox/Tracks/RightTrack/Keys"]
+custom_minimum_size = Vector2(74, 34)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Margin/VBox/Tracks/RightTrack/Keys/H"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 10
+text = "H  后退"
+horizontal_alignment = 1
+vertical_alignment = 1

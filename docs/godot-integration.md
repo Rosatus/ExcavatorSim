@@ -72,16 +72,18 @@ profile teardown stops forces and clears or rebuilds the complete dynamic rig.
 SY205 and SY135 use separate hash-bound rig and track descriptors with no
 cross-model fallback.
 
-The product keyboard maps left-track forward/reverse to `Q/A` and right-track
-forward/reverse to `W/S`. XInput-compatible controllers feed the same actions:
+The product keyboard maps left-track forward/reverse to `R/F` and right-track
+forward/reverse to `Y/H`. XInput-compatible controllers feed the same actions:
 LT/LB control the left track forward/reverse and RT/RB control the right track
 forward/reverse. Work equipment follows the ISO excavator pattern without
 changing the four-axis command order: left stick X/Y controls swing/arm and
 right stick Y/X controls boom/bucket. MotionClient replaces only the joy-axis
 events with the active model's direction profile: SY205 reverses all four stick
 channels and SY135 reverses only swing. ProductSession refreshes that profile on
-offline model activation; keyboard actions, protocol order, physical joint axes,
-and joint limits remain unchanged. Jolt does not assume every visual asset faces local
+offline model activation. The keyboard mirrors the physical stick layout:
+`W/S` arm out/in, `A/D` swing left/right, `I/K` boom down/up, and `J/L`
+bucket curl/dump. Keyboard actions, protocol order, physical joint axes, and
+joint limits remain unchanged. Jolt does not assume every visual asset faces local
 `-Z`: the optional rig field `tracks.local_forward_axis` defaults to `-Z`, while
 SY205 explicitly declares `+Z`. Forward, vehicle right, probe placement,
 traction, signed speed, stop cleanup, and pitch telemetry derive from that same

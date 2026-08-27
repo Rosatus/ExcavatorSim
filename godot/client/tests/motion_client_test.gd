@@ -12,6 +12,16 @@ const VERSIONS := {
 	"terrain_algorithm_version": "terrain-algorithm-v2",
 	"visual_model_version": "original-skin-v1",
 }
+const EXPECTED_EQUIPMENT_KEYS := {
+	"motion_swing_positive": KEY_D,
+	"motion_swing_negative": KEY_A,
+	"motion_boom_positive": KEY_I,
+	"motion_boom_negative": KEY_K,
+	"motion_arm_positive": KEY_W,
+	"motion_arm_negative": KEY_S,
+	"motion_bucket_positive": KEY_L,
+	"motion_bucket_negative": KEY_J,
+}
 
 
 class FakeTransport extends RefCounted:
@@ -301,6 +311,9 @@ func _test_motion_client() -> int:
 
 
 func _assert_equipment_bindings(client: MotionClient, model_id: String) -> int:
+	var stale_key := InputEventKey.new()
+	stale_key.physical_keycode = KEY_Q
+	InputMap.action_add_event("motion_swing_positive", stale_key)
 	if _check(client.configure_equipment_gamepad_model(model_id), "%s gamepad profile is supported" % model_id) != 0:
 		return 1
 	var direction_profile := MotionClient.MODEL_GAMEPAD_DIRECTION_MULTIPLIERS[model_id] as Dictionary
@@ -310,19 +323,22 @@ func _assert_equipment_bindings(client: MotionClient, model_id: String) -> int:
 			float(definition["joy_sign"])
 			* float(direction_profile[String(definition["channel"])])
 		)
+		var key_count := 0
 		var key_matches := 0
 		var joy_count := 0
 		var joy_matches := 0
 		for event in InputMap.action_get_events(action):
-			if event is InputEventKey and (event as InputEventKey).physical_keycode in definition["keys"]:
-				key_matches += 1
+			if event is InputEventKey:
+				key_count += 1
+				if (event as InputEventKey).physical_keycode == int(EXPECTED_EQUIPMENT_KEYS[action]):
+					key_matches += 1
 			elif event is InputEventJoypadMotion:
 				joy_count += 1
 				var motion := event as InputEventJoypadMotion
 				if motion.axis == int(definition["joy_axis"]) and is_equal_approx(motion.axis_value, expected_sign):
 					joy_matches += 1
 		if _check(
-			key_matches >= 1 and joy_count == 1 and joy_matches == 1,
+			key_count == 1 and key_matches == 1 and joy_count == 1 and joy_matches == 1,
 			"%s keeps keyboard and its calibrated ISO gamepad binding for %s" % [model_id, action],
 		) != 0:
 			return 1

@@ -5,6 +5,8 @@ extends Node
 ## When the gateway is offline the stream is fire-and-forget and gameplay is
 ## unaffected.
 
+signal ict_link_status_changed(handshake_connected: bool, platform_linux: bool)
+
 const DEFAULT_PORT := 29764
 const DEFAULT_ACK_PORT := 29765
 const EMIT_HZ := 50.0
@@ -19,6 +21,9 @@ const CMD_SHUTDOWN := 3
 const CMD_ICT_START := 4
 const CMD_ICT_STOP := 5
 const CMD_TIMED_CAN_START := 6
+const HEARTBEAT_FLAG_RECORDING := 0x01
+const HEARTBEAT_FLAG_PLATFORM_LINUX := 0x02
+const HEARTBEAT_FLAG_ICT_HANDSHAKE := 0x04
 const HEARTBEAT_TIMEOUT_MS := 2500
 const GATEWAY_SHUTDOWN_GRACE_MS := 1500
 const GATEWAY_KILL_GRACE_MS := 1000
@@ -52,6 +57,7 @@ var _gateway_pid := -1
 var _last_heartbeat_ms := -1
 var _heartbeat_recording := false
 var _gateway_is_linux := false
+var _ict_handshake_connected := false
 var _ict_active := false
 var _ict_requested := false
 ## PC001 TCP endpoint for Windows ICT (injected into gateway spawn argv).
@@ -95,6 +101,7 @@ func _physics_process(delta: float) -> void:
 		_ensure_ack_bound()
 	_poll_heartbeats()
 	_service_gateway_lifecycle()
+	_expire_ict_handshake_if_stale()
 	_accum += delta
 	if _accum < 1.0 / EMIT_HZ:
 		return
@@ -150,6 +157,10 @@ func set_recording(enabled: bool) -> void:
 
 func is_linux_gateway() -> bool:
 	return _gateway_is_linux
+
+
+func is_ict_handshake_connected() -> bool:
+	return _ict_handshake_connected and is_gateway_online()
 
 
 ## Validate and store the PC001 listener endpoint. Empty fields select the
@@ -294,6 +305,7 @@ func spawn_gateway() -> bool:
 	_drain_ack_packets()
 	_last_heartbeat_ms = -1
 	_heartbeat_recording = false
+	_set_ict_link_state(false, false)
 	var argv := _resolve_gateway_command()
 	if argv.is_empty():
 		_set_gateway_error("CanTelemetryBridge: no gateway executable/script found")
@@ -313,6 +325,7 @@ func spawn_gateway() -> bool:
 
 func _begin_gateway_restart() -> void:
 	_ict_active = false
+	_set_ict_link_state(false, false)
 	_restart_after_stop = true
 	_gateway_lifecycle = GatewayLifecycle.STOPPING
 	_gateway_deadline_ms = Time.get_ticks_msec() + GATEWAY_SHUTDOWN_GRACE_MS
@@ -329,11 +342,13 @@ func _service_gateway_lifecycle() -> void:
 			_gateway_lifecycle = GatewayLifecycle.IDLE
 			_ict_requested = false
 			_ict_active = false
+			_set_ict_link_state(false, false)
 			_set_gateway_error("CAN gateway exited before its first heartbeat")
 		elif now_ms >= _gateway_deadline_ms:
 			OS.kill(_gateway_pid)
 			_ict_requested = false
 			_ict_active = false
+			_set_ict_link_state(false, false)
 			_restart_after_stop = false
 			_forced_kill_sent = true
 			_gateway_lifecycle = GatewayLifecycle.STOPPING
@@ -357,6 +372,7 @@ func _service_gateway_lifecycle() -> void:
 				_gateway_lifecycle = GatewayLifecycle.FAILED
 				_ict_requested = false
 				_ict_active = false
+				_set_ict_link_state(false, false)
 				_set_gateway_error("CAN gateway process did not stop after termination request")
 
 
@@ -370,6 +386,27 @@ func _activate_ict() -> void:
 func _set_gateway_error(message: String) -> void:
 	_last_gateway_error = message
 	push_warning(message)
+
+
+func _set_ict_link_state(handshake_connected: bool, platform_linux: bool) -> void:
+	if (
+		_ict_handshake_connected == handshake_connected
+		and _gateway_is_linux == platform_linux
+	):
+		return
+	_ict_handshake_connected = handshake_connected
+	_gateway_is_linux = platform_linux
+	ict_link_status_changed.emit(_ict_handshake_connected, _gateway_is_linux)
+
+
+func _expire_ict_handshake_if_stale() -> void:
+	if not _ict_handshake_connected:
+		return
+	if (
+		_last_heartbeat_ms < 0
+		or Time.get_ticks_msec() - _last_heartbeat_ms > HEARTBEAT_TIMEOUT_MS
+	):
+		_set_ict_link_state(false, _gateway_is_linux)
 
 
 func get_last_gateway_error() -> String:
@@ -422,15 +459,18 @@ func _poll_heartbeats() -> void:
 		var packet := _ack.get_packet()
 		if packet.size() == 16 and _read_u32(packet, 0) == HEARTBEAT_MAGIC \
 				and packet[4] == PROTOCOL_VERSION:
-			_heartbeat_recording = (packet[5] & 0x01) != 0
-			_gateway_is_linux = (packet[5] & 0x02) != 0
+			_heartbeat_recording = (packet[5] & HEARTBEAT_FLAG_RECORDING) != 0
 			_last_heartbeat_ms = Time.get_ticks_msec()
 			if _gateway_lifecycle == GatewayLifecycle.STARTING:
 				_gateway_lifecycle = GatewayLifecycle.IDLE
 				_gateway_deadline_ms = -1
 				_last_gateway_error = ""
 				_activate_ict()
-		elif _read_u32(packet, 0) == SESSION_DONE_MAGIC and packet.size() > 8:
+			_set_ict_link_state(
+				(packet[5] & HEARTBEAT_FLAG_ICT_HANDSHAKE) != 0,
+				(packet[5] & HEARTBEAT_FLAG_PLATFORM_LINUX) != 0,
+			)
+		elif packet.size() > 8 and _read_u32(packet, 0) == SESSION_DONE_MAGIC:
 			var path_bytes := packet.slice(8)
 			_last_segment_path = path_bytes.get_string_from_utf8()
 
