@@ -1,4 +1,4 @@
-﻿"""Golden + roundtrip tests. Run: python -m unittest discover -s tools/can_gateway/tests"""
+"""Golden + roundtrip tests. Run: python -m unittest discover -s tools/can_gateway/tests"""
 
 from __future__ import annotations
 
@@ -8,23 +8,19 @@ import struct
 import sys
 import unittest
 from pathlib import Path
+from typing import ClassVar
 
 TOOLS_DIR = Path(__file__).resolve().parents[1]
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
-from conventions import (  # noqa: E402
-    PACKET_MAGIC,
-    PACKET_STRUCT,
-    MachineState,
-    parse_packet,
-)
 from control_protocol import (  # noqa: E402
     CMD_ICT_START,
     CMD_ICT_STOP,
     CMD_RECORD_START,
     CMD_RECORD_STOP,
     CMD_SHUTDOWN,
+    CMD_TIMED_CAN_START,
     HEARTBEAT_FLAG_PLATFORM_LINUX,
     HEARTBEAT_FLAG_RECORDING,
     build_control,
@@ -34,6 +30,12 @@ from control_protocol import (  # noqa: E402
     parse_heartbeat,
     parse_heartbeat_flags,
     parse_session_done,
+)
+from conventions import (  # noqa: E402
+    PACKET_MAGIC,
+    PACKET_STRUCT,
+    MachineState,
+    parse_packet,
 )
 from csv_writer import CanapeCsvWriter  # noqa: E402
 from encoders.dxg_slew import decode_slew, encode_slew_frame  # noqa: E402
@@ -53,7 +55,19 @@ from encoders.sinan_rtk import (  # noqa: E402
     encode_time_frame,
     encode_velocity_frame,
 )
-from encoders.travel_pilot import decode_travel, encode_travel_frame, travel_body_moving  # noqa: E402
+from encoders.travel_pilot import (  # noqa: E402
+    decode_travel,
+    encode_travel_frame,
+    travel_body_moving,
+)
+from gateway import (  # noqa: E402
+    TIMED_CAN_DURATION_S,
+    TIMED_CAN_FRAME_COUNT,
+    TIMED_CAN_ID,
+    TIMED_CAN_PAYLOAD,
+    TIMED_CAN_PERIOD_S,
+    TimedCanBurst,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures" / "golden_capture.json"
 
@@ -63,7 +77,9 @@ def golden_rows(can_id: str) -> list[bytes]:
     return [bytes.fromhex(row) for row in rows]
 
 
-def make_packet(tick_ms: int, swing_rad: float = 0.0, left: float = 0.0, right: float = 0.0) -> bytes:
+def make_packet(
+    tick_ms: int, swing_rad: float = 0.0, left: float = 0.0, right: float = 0.0
+) -> bytes:
     raw = struct.pack("<IBBHQ", PACKET_MAGIC, 1, 0, 0, tick_ms)
     for index in range(5):
         raw += struct.pack("<4f3f", 0.0, 0.0, 0.0, 1.0, float(index), 0.0, 0.0)
@@ -76,14 +92,14 @@ class RuifenGoldenTest(unittest.TestCase):
         for can_id in ("18ff3a00", "18ff3b00", "18ff3c00", "18ff3d00"):
             for payload in golden_rows(can_id):
                 slots = decode_ruifen_slots(payload)
-                counts = tuple(int(round((s + 180.0) * 100.0)) for s in slots)
+                counts = tuple(round((s + 180.0) * 100.0) for s in slots)
                 reencoded = encode_ruifen_frame(counts)
                 self.assertEqual(reencoded[0:6], payload[0:6], f"{can_id}: {payload.hex()}")
 
     def test_full_range_roundtrip_within_quantum(self) -> None:
         for step in range(974):
             slot = max(-179.99, min(179.99, step * 0.37 - 179.99))
-            encoded = encode_ruifen_frame((max(1, int(round((slot + 180.0) / 0.01))), 32768, 65535))
+            encoded = encode_ruifen_frame((max(1, round((slot + 180.0) / 0.01)), 32768, 65535))
             s0 = decode_ruifen_slots(encoded)[0]
             self.assertLessEqual(abs(s0 - slot), 0.010001)
 
@@ -121,7 +137,7 @@ class RtkGoldenTest(unittest.TestCase):
     ground-truth e2e fixture agree. Golden asserts that DEFAULT encoders
     (parser parity) reproduce captured frames byte-for-byte."""
 
-    CASES = {
+    CASES: ClassVar[dict[str, str]] = {
         "0cfda000": "time",
         "0cfda800": "velocity",
         "0cfda900": "heading",
@@ -267,7 +283,14 @@ class PacketAndCsvTest(unittest.TestCase):
 
 class ControlProtocolTest(unittest.TestCase):
     def test_control_roundtrip(self) -> None:
-        for cmd in (CMD_RECORD_START, CMD_RECORD_STOP, CMD_SHUTDOWN, CMD_ICT_START, CMD_ICT_STOP):
+        for cmd in (
+            CMD_RECORD_START,
+            CMD_RECORD_STOP,
+            CMD_SHUTDOWN,
+            CMD_ICT_START,
+            CMD_ICT_STOP,
+            CMD_TIMED_CAN_START,
+        ):
             self.assertEqual(parse_control(build_control(cmd, seq=7)), cmd)
 
     def test_control_rejects_garbage(self) -> None:
@@ -301,6 +324,68 @@ class ControlProtocolTest(unittest.TestCase):
         self.assertEqual(parse_session_done(payload), path)
         self.assertIsNone(parse_session_done(b"tiny"))
         self.assertIsNone(parse_session_done(bytes(16)))
+
+
+class _CaptureSink:
+    def __init__(self) -> None:
+        self.frames: list[tuple[int, bytes]] = []
+
+    def append(self, can_id: int, payload: bytes) -> None:
+        self.frames.append((can_id, payload))
+
+    def close(self) -> None:
+        pass
+
+    def peer_name(self) -> str:
+        return "capture"
+
+
+class TimedCanBurstTest(unittest.TestCase):
+    def test_uninterrupted_virtual_time_emits_exactly_500_frames(self) -> None:
+        burst = TimedCanBurst()
+        sink = _CaptureSink()
+        burst.trigger(10.0)
+        for slot in range(TIMED_CAN_FRAME_COUNT):
+            now_s = 10.0 + slot * TIMED_CAN_PERIOD_S
+            self.assertTrue(burst.service(now_s, [sink]))
+        self.assertFalse(burst.active)
+        self.assertEqual(len(sink.frames), TIMED_CAN_FRAME_COUNT)
+        self.assertEqual(set(sink.frames), {(TIMED_CAN_ID, TIMED_CAN_PAYLOAD)})
+
+    def test_retrigger_replaces_remaining_window_without_overlap(self) -> None:
+        burst = TimedCanBurst()
+        sink = _CaptureSink()
+        burst.trigger(1.0)
+        self.assertTrue(burst.service(1.0, [sink]))
+        self.assertFalse(burst.service(1.01, [sink]))
+        burst.trigger(1.01)
+        self.assertEqual(burst.emitted_count, 0)
+        self.assertTrue(burst.service(1.01, [sink]))
+        self.assertFalse(burst.service(1.02, [sink]))
+        self.assertTrue(burst.service(1.03, [sink]))
+        self.assertEqual(len(sink.frames), 3)
+
+    def test_one_slot_fans_out_to_every_active_sink(self) -> None:
+        burst = TimedCanBurst()
+        recording = _CaptureSink()
+        ict = _CaptureSink()
+        burst.trigger(0.0)
+        self.assertTrue(burst.service(0.0, [recording, ict]))
+        expected = [(TIMED_CAN_ID, TIMED_CAN_PAYLOAD)]
+        self.assertEqual(recording.frames, expected)
+        self.assertEqual(ict.frames, expected)
+
+    def test_late_service_does_not_emit_catchup_burst(self) -> None:
+        burst = TimedCanBurst()
+        sink = _CaptureSink()
+        burst.trigger(0.0)
+        self.assertTrue(burst.service(0.0, [sink]))
+        self.assertTrue(burst.service(1.0, [sink]))
+        self.assertEqual(len(sink.frames), 2)
+        self.assertAlmostEqual(burst.timeout_s(1.0), TIMED_CAN_PERIOD_S)
+        self.assertFalse(burst.service(TIMED_CAN_DURATION_S, [sink]))
+        self.assertFalse(burst.active)
+        self.assertEqual(len(sink.frames), 2)
 
 
 class MachineStateSemanticTest(unittest.TestCase):

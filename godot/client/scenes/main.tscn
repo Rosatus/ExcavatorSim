@@ -471,6 +471,13 @@ text = "连接 ICT（需 Linux 网关）"
 toggle_mode = true
 disabled = true
 
+[node name="TimedCANTrigger" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Tools"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "发送 CAN 触发帧"
+tooltip_text = "发送 0x18FFF100：01 00 00 00 00 00 00 00，50 Hz 持续 10 秒"
+disabled = true
+
 [node name="AdvancedPanel" type="VBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=780181745]
 visible = false
 layout_mode = 2

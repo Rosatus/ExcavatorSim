@@ -3,9 +3,11 @@
 Control (bridge -> gateway), 12 bytes LE "<IBBHI":
     magic 0x43544E43 "CTNC" | ver=1 | cmd | reserved u16 | seq u32
     cmd: 1=RECORD_START 2=RECORD_STOP 3=SHUTDOWN 4=ICT_START 5=ICT_STOP
+         6=TIMED_CAN_START
 
 Heartbeat (gateway -> bridge), 16 bytes LE "<IBBHQ":
-    magic 0x43544E4B "CTNK" | ver=1 | flags(bit0=recording, bit1=platform_linux) | reserved u16 | tick_ms u64
+    magic 0x43544E4B "CTNK" | ver=1 | flags(recording/linux) |
+    reserved u16 | tick_ms u64
 
 Session-done (gateway -> bridge after a stopped segment is closed),
 variable length LE "<IBBH" + utf8 path:
@@ -26,6 +28,18 @@ CMD_RECORD_STOP = 2
 CMD_SHUTDOWN = 3
 CMD_ICT_START = 4
 CMD_ICT_STOP = 5
+CMD_TIMED_CAN_START = 6
+
+_VALID_COMMANDS = frozenset(
+    (
+        CMD_RECORD_START,
+        CMD_RECORD_STOP,
+        CMD_SHUTDOWN,
+        CMD_ICT_START,
+        CMD_ICT_STOP,
+        CMD_TIMED_CAN_START,
+    )
+)
 
 HEARTBEAT_FLAG_RECORDING = 0x01
 HEARTBEAT_FLAG_PLATFORM_LINUX = 0x02
@@ -45,7 +59,7 @@ def parse_control(data: bytes) -> int | None:
     magic, version, cmd, _reserved, _seq = _CONTROL_STRUCT.unpack(data)
     if magic != CONTROL_MAGIC or version != PROTOCOL_VERSION:
         return None
-    if cmd not in (CMD_RECORD_START, CMD_RECORD_STOP, CMD_SHUTDOWN, CMD_ICT_START, CMD_ICT_STOP):
+    if cmd not in _VALID_COMMANDS:
         return None
     return cmd
 
@@ -56,7 +70,9 @@ def build_heartbeat(tick_ms: int, recording: bool, platform_linux: bool = False)
         flags |= HEARTBEAT_FLAG_RECORDING
     if platform_linux:
         flags |= HEARTBEAT_FLAG_PLATFORM_LINUX
-    return _HEARTBEAT_STRUCT.pack(HEARTBEAT_MAGIC, PROTOCOL_VERSION, flags, 0, tick_ms & 0xFFFFFFFFFFFFFFFF)
+    return _HEARTBEAT_STRUCT.pack(
+        HEARTBEAT_MAGIC, PROTOCOL_VERSION, flags, 0, tick_ms & 0xFFFFFFFFFFFFFFFF
+    )
 
 
 def parse_heartbeat(data: bytes) -> tuple[bool, int] | None:
@@ -91,6 +107,6 @@ def parse_session_done(data: bytes) -> str | None:
     if magic != SESSION_DONE_MAGIC or version != PROTOCOL_VERSION:
         return None
     try:
-        return data[_DONE_HEADER.size:].decode("utf-8")
+        return data[_DONE_HEADER.size :].decode("utf-8")
     except UnicodeDecodeError:
         return None

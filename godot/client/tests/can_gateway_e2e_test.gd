@@ -8,6 +8,8 @@ const OUTPUT_DIR := "res://../../output/can_gateway"
 const SETTLE_FRAMES := 30
 const TEST_GATEWAY_PORT := 39764
 const TEST_ACK_PORT := 39765
+const TEST_ICT_PORT := 39774
+const TEST_ICT_RESTART_PORT := 39775
 
 
 var _failures := 0
@@ -30,12 +32,22 @@ func _run() -> void:
 	# Avoid colliding with a running packaged product on the production ports.
 	bridge.remote_port = TEST_GATEWAY_PORT
 	bridge.ack_port = TEST_ACK_PORT
+	var default_endpoint := bridge.get_desired_tcp_endpoint_for_test() as Dictionary
+	_check(not bridge.set_tcp_endpoint("not a listener", "5678")
+		and bridge.get_desired_tcp_endpoint_for_test() == default_endpoint,
+		"invalid ICT host does not mutate the running endpoint")
+	_check(bridge.set_tcp_endpoint("127.0.0.1", str(TEST_ICT_PORT)),
+		"test ICT endpoint is valid")
 	var gateway_command: PackedStringArray = bridge.call("_resolve_gateway_command")
 	_check(
 		gateway_command.has("--compat-profile")
 		and gateway_command.has("builtin:qml-sy135-ground-truth"),
 		"gateway command carries the QML compatibility profile"
 	)
+	if OS.get_name() == "Windows":
+		_check(gateway_command.has("--sink") and gateway_command.has("tcp")
+			and gateway_command.has("--tcp-port") and gateway_command.has(str(TEST_ICT_PORT)),
+			"development gateway command carries PC001 TCP endpoint")
 	var packed := load(MAIN_SCENE) as PackedScene
 	var scene := packed.instantiate()
 	root.add_child(scene)
@@ -94,14 +106,54 @@ func _run() -> void:
 	_check(rows_final >= rows_after_start, "stop keeps the captured segment on disk")
 	_check(not left_recording, "status leaves RECORDING after stop")
 
+	_wipe_output_dir()
+	bridge.set_recording(true)
+	for i in 15:
+		await create_timer(0.1).timeout
+		if int(bridge.get_status()) == 2:
+			break
+	_check(bridge.trigger_timed_can(), "timed CAN command accepted while online")
+	await create_timer(0.3).timeout
+	bridge.set_recording(false)
+	await create_timer(0.2).timeout
+	_check(_count_can_id(_newest_csv(), "0x18FFF100") >= 5,
+		"timed CAN command reaches recording output repeatedly")
+
 	# Platform flag: a Windows-spawned gateway must not report linux.
 	_check(bridge.is_linux_gateway() == (OS.get_name() != "Windows"),
 		"platform bit matches host OS expectation")
-	# ICT command path: send stop on an inactive session must be a safe no-op.
+	# ICT command path: unchanged endpoint reuses the process; changed endpoint
+	# replaces it and only marks active after the new heartbeat.
 	bridge.set_ict_connected(false)
 	_check(bridge.is_ict_active() == false, "ICT stop no-op when inactive")
+	var original_pid := int(bridge.get_gateway_pid_for_test())
 	bridge.set_ict_connected(true)
 	_check(bridge.is_ict_active() == true, "ICT connect marks active state")
+	bridge.set_ict_connected(false)
+	_check(bridge.set_tcp_endpoint("127.0.0.1", str(TEST_ICT_PORT)),
+		"same ICT endpoint remains valid")
+	bridge.set_ict_connected(true)
+	_check(int(bridge.get_gateway_pid_for_test()) == original_pid,
+		"same ICT endpoint does not restart gateway")
+	bridge.set_ict_connected(false)
+	_check(bridge.set_tcp_endpoint("127.0.0.1", str(TEST_ICT_RESTART_PORT)),
+		"replacement ICT endpoint is valid")
+	bridge.set_ict_connected(true)
+	var restarted := false
+	for i in 80:
+		await create_timer(0.1).timeout
+		if bridge.is_gateway_online() and bridge.is_ict_active() \
+				and int(bridge.get_gateway_pid_for_test()) != original_pid:
+			restarted = true
+			break
+	_check(restarted, "changed ICT endpoint restarts gateway and waits for fresh heartbeat")
+	var spawned_endpoint := bridge.get_spawned_tcp_endpoint_for_test() as Dictionary
+	_check(String(spawned_endpoint.get("host", "")) == "127.0.0.1"
+		and int(spawned_endpoint.get("port", -1)) == TEST_ICT_RESTART_PORT,
+		"replacement gateway records the requested ICT endpoint")
+	if OS.get_name() == "Windows":
+		_check(await _pc001_handshake(TEST_ICT_RESTART_PORT),
+			"replacement PC001 listener accepts the unchanged relay handshake")
 	bridge.set_ict_connected(false)
 
 	session.request_reset()
@@ -185,3 +237,46 @@ func _count_rows(path: String) -> int:
 			rows += 1
 	file.close()
 	return rows
+
+
+func _count_can_id(path: String, can_id: String) -> int:
+	if path.is_empty() or not FileAccess.file_exists(path):
+		return 0
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return 0
+	var count := 0
+	while not file.eof_reached():
+		var fields := file.get_csv_line()
+		if fields.size() > 5 and fields[5] == can_id:
+			count += 1
+	file.close()
+	return count
+
+
+func _pc001_handshake(port: int) -> bool:
+	var client := StreamPeerTCP.new()
+	if client.connect_to_host("127.0.0.1", port) != OK:
+		return false
+	for i in 30:
+		client.poll()
+		if client.get_status() == StreamPeerTCP.STATUS_CONNECTED:
+			break
+		await create_timer(0.1).timeout
+	if client.get_status() != StreamPeerTCP.STATUS_CONNECTED:
+		return false
+	for i in 20:
+		client.poll()
+		if client.get_available_bytes() >= 3:
+			break
+		await create_timer(0.05).timeout
+	if client.get_available_bytes() < 3:
+		client.disconnect_from_host()
+		return false
+	var greeting := client.get_data(3)
+	if greeting[0] != OK or (greeting[1] as PackedByteArray).get_string_from_ascii() != "who":
+		client.disconnect_from_host()
+		return false
+	var sent := client.put_data("PC001".to_ascii_buffer()) == OK
+	client.disconnect_from_host()
+	return sent

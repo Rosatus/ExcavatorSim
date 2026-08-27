@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/can-qml-compatibility.md","reason":"Verify the additive frame and endpoint restart do not alter canonical QML/PC001 semantics."}
+{"file":".trellis/spec/backend/can-gateway-control.md","reason":"Verify command 6, endpoint restart state, monotonic scheduling, and sink boundaries against the executable contract."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Verify lifecycle cleanup, deterministic timing tests, and full quality gates."}
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Verify process authority and operator UI boundaries remain coherent."}
+{"file":".trellis/tasks/08-27-ict-restart-timed-can-trigger/research/code-evidence.md","reason":"Cross-check implementation against the code evidence and identified regression points."}

@@ -19,6 +19,7 @@ not publish product pose and the shadow boundary remains observational.
 | [Simulation Truth Shadow](./shadow-truth.md) | Negotiated Godot observation schema, isolation, ordering, and diagnostics |
 | [Sensor Telemetry](./sensor-telemetry.md) | Fixed-tick sensor batches, identity/order guards, freshness, and gateway isolation |
 | [QML-Compatible CAN Projection](./can-qml-compatibility.md) | QML-canonical pose projection, strict profiles, CAN byte order/EFF handling, and fail-closed behavior |
+| [CAN Gateway Control And ICT Lifecycle](./can-gateway-control.md) | CTNC commands, endpoint-aware child supervision, timed CAN bursts, and recording/ICT fan-out |
 
 Pre-development checklist:
 

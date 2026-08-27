@@ -1,0 +1,118 @@
+# CAN Gateway Control And ICT Lifecycle
+
+## Scenario: Endpoint-aware ICT supervision and timed CAN bursts
+
+### 1. Scope / Trigger
+
+Use this contract when changing the Godot operator controls, the locally spawned
+`tools/can_gateway` process, the CTNC control packet, recording/ICT sink fan-out,
+or the PC001 TCP listener lifecycle. QML and the ICT relay remain external,
+unchanged consumers.
+
+### 2. Signatures
+
+```text
+CTNC v1 = little-endian <u32 magic, u8 version, u8 command, u16 reserved, u32 seq>
+command 1 = RECORD_START
+command 2 = RECORD_STOP
+command 3 = SHUTDOWN
+command 4 = ICT_START
+command 5 = ICT_STOP
+command 6 = TIMED_CAN_START
+
+CanTelemetryBridge.set_tcp_endpoint(host: String, port_text: String) -> bool
+CanTelemetryBridge.set_ict_connected(enabled: bool) -> void
+CanTelemetryBridge.trigger_timed_can() -> bool
+TimedCanBurst.trigger(now_s: float) -> None
+TimedCanBurst.service(now_s: float, sinks: list[FrameSink]) -> bool
+```
+
+Command 6 starts raw CAN ID `0x18FFF100`, DLC 8, payload
+`01 00 00 00 00 00 00 00`, nominally every 20 ms for at most 10 seconds and
+500 emissions.
+
+### 3. Contracts
+
+- `CanTelemetryBridge` is the only owner of its gateway child PID, desired TCP
+  endpoint, spawned endpoint, restart state, and deferred ICT request.
+- The existing ICT toggle remains two-step: ON-to-OFF sends disconnect; the next
+  OFF-to-ON validates the panel endpoint and reconnects.
+- An equal desired/spawned endpoint reuses the child. A different endpoint sends
+  shutdown, waits until the exact owned PID exits, drains stale ACK packets,
+  resets heartbeat freshness, then spawns with the new endpoint.
+- A replacement is not online and ICT is not active until a post-spawn heartbeat
+  arrives. A stale heartbeat from the old child cannot complete startup.
+- Forced termination is limited to the exact PID returned by
+  `OS.create_process`; never scan or kill by process name or port.
+- Windows native and Python-development launch paths share the same gateway
+  argument builder and include `--sink tcp --tcp-host HOST --tcp-port PORT`.
+- Command 6 only triggers the Python monotonic scheduler. Godot physics and CTN1
+  telemetry cadence are not the timed frame clock.
+- A repeat command 6 replaces the current burst with one new 10-second window.
+  It does not queue, overlap, or increase the nominal 50 Hz rate.
+- Each actual timed emission resolves `active_sinks()` at that instant and sends
+  the same raw `(id, payload)` to recording and/or ICT sinks. A delayed loop
+  skips missed slots instead of releasing a catch-up burst, and never runs past
+  the 10-second deadline.
+- CSV preserves raw ID `0x18FFF100`; SocketCAN/PC001 packing adds
+  `CAN_EFF_FLAG`, yielding wire ID `0x98FFF100`. PC001 greeting, response and
+  batch framing do not change.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Host is empty | Normalize to listener default `0.0.0.0` |
+| Host is not IPv4/`localhost`, or port is not `1..65535` | Return `false`; do not mutate desired endpoint, child, or ICT state |
+| OFF-to-ON endpoint equals spawned endpoint | Send/reuse ICT start without replacing PID |
+| OFF-to-ON endpoint differs | Stop exact owned PID, wait for release, spawn new argv, await fresh heartbeat, then activate ICT |
+| Child ignores graceful shutdown | Kill only that owned PID after the bounded grace period |
+| Child still exists after termination grace | Enter explicit failed state; do not forget PID or start a competing listener |
+| Child exits or never heartbeats during startup | Keep ICT inactive and expose an actionable gateway error |
+| Timed trigger while gateway offline | Return `false`; emit no control packet |
+| Timed trigger while active | Reset to one new window; no overlapping burst |
+| Gateway loop is late | Emit at most one current frame, skip missed slots, stop at 10 seconds |
+| No sink is active for a scheduled instant | Emit nowhere for that instant; do not create a hidden recording |
+
+### 5. Good / Base / Bad Cases
+
+- Good: edit port while connected, click once to disconnect, click again; the
+  old owned PID exits, a new PID binds the port, a fresh heartbeat arrives, and
+  the unchanged relay performs `who` / `PC001`.
+- Base: reconnect with the same normalized endpoint; PID remains stable and ICT
+  start is sent without a restart.
+- Good: recording and ICT are both available; command 6 feeds both sinks with
+  identical raw frame data while PC001 adds only the EFF transport flag.
+- Bad: call `spawn_gateway()` over a live listener, accept an old heartbeat as
+  proof of the replacement, drive the 50 Hz burst from Godot physics packets,
+  or emit all missed slots in one catch-up burst.
+
+### 6. Tests Required
+
+- Control codec: exact 12-byte v1 round-trip for commands 1 through 6 and
+  rejection of unknown commands.
+- Virtual monotonic scheduler: immediate slot zero, 20 ms uninterrupted cadence,
+  exactly 500 nominal frames, 10-second cutoff, restart-on-retrigger, no overlap,
+  and no catch-up burst.
+- Sink boundaries: CSV raw ID/payload, SocketCAN and loopback PC001 EFF ID,
+  payload, DLC, and channel zero.
+- Godot UI: non-toggle repeatable timed button, offline rejection, invalid
+  endpoint non-mutation, and actionable status.
+- Real-process Godot E2E: same endpoint preserves PID; changed endpoint changes
+  PID, waits for a fresh heartbeat, records the spawned endpoint, and accepts
+  an unchanged PC001 handshake on the new port.
+- Packaged executable: start recording, send command 6 without CTN1 telemetry,
+  observe repeated `0x18FFF100` CSV rows, then stop and shut down.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: endpoint text edit -> spawn a second gateway -> old process still owns UDP/TCP ports
+Correct: OFF-to-ON validation -> exact owned PID shutdown/exit -> new argv -> fresh heartbeat -> ICT_START
+
+Wrong: Godot physics frame -> emit 0x18FFF100 -> visual/UDP stalls reduce or stop the command
+Correct: CTNC command 6 -> Python monotonic deadline -> active_sinks() -> CSV and/or PC001
+
+Wrong: pass 0x98FFF100 into CSV and PC001
+Correct: pass raw 0x18FFF100 to sinks; transport packing alone adds CAN_EFF_FLAG
+```

@@ -21,6 +21,7 @@ from control_protocol import (
     CMD_RECORD_START,
     CMD_RECORD_STOP,
     CMD_SHUTDOWN,
+    CMD_TIMED_CAN_START,
     build_heartbeat,
     build_session_done,
     parse_control,
@@ -45,6 +46,12 @@ from vcan_setup import VcanSetupError, ensure_vcan_interface
 
 PACKET_MAGIC = 0x314E5443
 HEARTBEAT_INTERVAL_S = 0.5
+RECEIVE_POLL_LIMIT_S = 0.05
+TIMED_CAN_ID = 0x18FFF100
+TIMED_CAN_PAYLOAD = bytes.fromhex("01 00 00 00 00 00 00 00")
+TIMED_CAN_PERIOD_S = 1.0 / 50.0
+TIMED_CAN_DURATION_S = 10.0
+TIMED_CAN_FRAME_COUNT = 500
 
 
 class FrameScheduler:
@@ -63,6 +70,54 @@ class FrameScheduler:
         self._next_due_ms[name] = max(tick_ms, due) + period if due > 0 else tick_ms + period
 
 
+class TimedCanBurst:
+    """One restartable fixed-rate CAN burst driven by monotonic seconds."""
+
+    def __init__(self) -> None:
+        self._next_due_s: float | None = None
+        self._end_s: float | None = None
+        self._emitted = 0
+
+    @property
+    def active(self) -> bool:
+        return self._next_due_s is not None
+
+    @property
+    def emitted_count(self) -> int:
+        return self._emitted
+
+    def trigger(self, now_s: float) -> None:
+        self._next_due_s = now_s
+        self._end_s = now_s + TIMED_CAN_DURATION_S
+        self._emitted = 0
+
+    def timeout_s(self, now_s: float, maximum_s: float = RECEIVE_POLL_LIMIT_S) -> float:
+        if self._next_due_s is None:
+            return maximum_s
+        return max(0.0, min(maximum_s, self._next_due_s - now_s))
+
+    def service(self, now_s: float, sinks: list[FrameSink]) -> bool:
+        due_s = self._next_due_s
+        end_s = self._end_s
+        if end_s is not None and now_s >= end_s:
+            self._next_due_s = None
+            self._end_s = None
+            return False
+        if due_s is None or now_s + 1e-9 < due_s:
+            return False
+        for sink in sinks:
+            sink.append(TIMED_CAN_ID, TIMED_CAN_PAYLOAD)
+        self._emitted += 1
+        if self._emitted >= TIMED_CAN_FRAME_COUNT:
+            self._next_due_s = None
+            self._end_s = None
+        else:
+            # Do not burst missed wall-time slots. The next real emission stays
+            # at 50 Hz from whichever slot the gateway was able to service.
+            self._next_due_s = max(due_s + TIMED_CAN_PERIOD_S, now_s + TIMED_CAN_PERIOD_S)
+        return True
+
+
 def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int:
     rates = {
         "imu": args.imu_hz,
@@ -71,6 +126,7 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
         "travel": args.travel_hz,
     }
     scheduler = FrameScheduler(rates)
+    timed_can = TimedCanBurst()
     out_path = Path(args.out)
     out_path.mkdir(parents=True, exist_ok=True)
 
@@ -88,7 +144,7 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((args.host, args.port))
-    sock.settimeout(0.05)
+    sock.settimeout(RECEIVE_POLL_LIMIT_S)
     # Windows: ICMP port-unreachable (e.g. heartbeat before Godot binds the
     # ack port) surfaces as ConnectionResetError on the next recvfrom.
     with contextlib.suppress(AttributeError, OSError):
@@ -112,6 +168,8 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
 
     try:
         while True:
+            monotonic_s = time.monotonic()
+            timed_can.service(monotonic_s, active_sinks())
             now_s = time.time()
             if now_s - last_heartbeat_s >= HEARTBEAT_INTERVAL_S:
                 sock.sendto(
@@ -123,9 +181,10 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                     ack_addr,
                 )
                 last_heartbeat_s = now_s
+            sock.settimeout(timed_can.timeout_s(time.monotonic()))
             try:
                 data, _addr = sock.recvfrom(4096)
-            except (TimeoutError, ConnectionResetError):
+            except (BlockingIOError, TimeoutError, ConnectionResetError):
                 continue
 
             cmd = parse_control(data)
@@ -167,6 +226,10 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                 elif cmd == CMD_SHUTDOWN:
                     print("shutdown requested")
                     break
+                elif cmd == CMD_TIMED_CAN_START:
+                    timed_can.trigger(time.monotonic())
+                    timed_can.service(time.monotonic(), active_sinks())
+                    print("timed CAN burst started: 0x18FFF100 at 50 Hz for 10 s")
                 continue
 
             sample = parse_packet(data)

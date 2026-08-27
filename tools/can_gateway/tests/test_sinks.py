@@ -32,7 +32,7 @@ class PackCanFrameTest(unittest.TestCase):
         self.assertTrue(all(b == 0 for b in data[1:]))
 
     def test_extended_id_preserves_29_bits_and_sets_eff_flag(self):
-        for raw_id in (0x800, 0x0CFDA000, 0x18FF3A00, 0x18FFF000, 0x1FFFFFFF):
+        for raw_id in (0x800, 0x0CFDA000, 0x18FF3A00, 0x18FFF000, 0x18FFF100, 0x1FFFFFFF):
             can_id = struct.unpack("<I", pack_can_frame(raw_id, b"")[:4])[0]
             self.assertEqual(can_id, raw_id | CAN_EFF_FLAG)
 
@@ -54,6 +54,17 @@ class CsvFrameSinkTest(unittest.TestCase):
             body = Path(sink.path).read_text(encoding="utf-8-sig").splitlines()
             self.assertIn("x| " + payload.hex(" ").upper(), body[1])
 
+    def test_timed_extended_frame_keeps_raw_csv_id(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            writer = CanapeCsvWriter(Path(tmp) / "out.csv")
+            sink = CsvFrameSink(writer)
+            sink.append(0x18FFF100, bytes.fromhex("01 00 00 00 00 00 00 00"))
+            sink.close()
+            fields = Path(sink.path).read_text(encoding="utf-8-sig").splitlines()[1].split(",")
+            self.assertEqual(fields[5], "0x18FFF100")
+            self.assertEqual(fields[7], "扩展帧")
+            self.assertEqual(fields[9].strip(), "x| 01 00 00 00 00 00 00 00")
+
 
 class _FakeSocket:
     def __init__(self, *args, **kwargs):
@@ -74,6 +85,7 @@ class _FakeSocket:
 class SocketCanSinkTest(unittest.TestCase):
     def setUp(self):
         import sinks as sinks_mod
+
         self._sinks = sinks_mod
 
     def _patch_socket(self, factory):
@@ -85,9 +97,11 @@ class SocketCanSinkTest(unittest.TestCase):
         if not has_af_can:
             self._sinks.socket.AF_CAN = 29
             self._sinks.socket.CAN_RAW = 1
+
             def restore():
                 del self._sinks.socket.AF_CAN
                 del self._sinks.socket.CAN_RAW
+
             self.addCleanup(restore)
 
     def test_append_sends_packed_frame(self):

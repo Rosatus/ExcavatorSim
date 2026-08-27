@@ -45,9 +45,9 @@ class _Client:
         frames = []
         for i in range(count):
             off = i * SINGLE_FRAME_SIZE
-            can_id, dlc = struct.unpack("<IB", body[off:off + 5])
-            payload = body[off + 8:off + 8 + dlc]
-            channel, = struct.unpack("<i", body[off + CAN_FRAME_SIZE:off + SINGLE_FRAME_SIZE])
+            can_id, dlc = struct.unpack("<IB", body[off : off + 5])
+            payload = body[off + 8 : off + 8 + dlc]
+            (channel,) = struct.unpack("<i", body[off + CAN_FRAME_SIZE : off + SINGLE_FRAME_SIZE])
             frames.append((can_id, payload))
             del channel  # protocol carries it; sink always sends 0
         return count, frames
@@ -116,6 +116,21 @@ class TcpPc001SinkTest(unittest.TestCase):
             self.sink.append(0x18FF3A00, b"\x44" * 8)
             _count, frames = client.recv_batch()
             self.assertEqual(frames[0][0], CAN_EFF_FLAG | 0x18FF3A00)
+        finally:
+            client.close()
+
+    def test_timed_frame_wire_id_and_payload(self) -> None:
+        client = _Client(self.port)
+        try:
+            for _ in range(50):
+                if "connected" in self.sink.peer_name():
+                    break
+                time.sleep(0.02)
+            payload = bytes.fromhex("01 00 00 00 00 00 00 00")
+            self.sink.append(0x18FFF100, payload)
+            count, frames = client.recv_batch()
+            self.assertEqual(count, 1)
+            self.assertEqual(frames, [(CAN_EFF_FLAG | 0x18FFF100, payload)])
         finally:
             client.close()
 

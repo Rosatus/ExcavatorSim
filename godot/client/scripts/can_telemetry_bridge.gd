@@ -18,9 +18,14 @@ const CMD_RECORD_STOP := 2
 const CMD_SHUTDOWN := 3
 const CMD_ICT_START := 4
 const CMD_ICT_STOP := 5
+const CMD_TIMED_CAN_START := 6
 const HEARTBEAT_TIMEOUT_MS := 2500
+const GATEWAY_SHUTDOWN_GRACE_MS := 1500
+const GATEWAY_KILL_GRACE_MS := 1000
+const GATEWAY_STARTUP_TIMEOUT_MS := 5000
 
 enum GatewayStatus { OFFLINE, ONLINE, RECORDING }
+enum GatewayLifecycle { IDLE, STARTING, STOPPING, FAILED }
 
 @export var remote_host := "127.0.0.1"
 @export var remote_port := DEFAULT_PORT
@@ -48,9 +53,17 @@ var _last_heartbeat_ms := -1
 var _heartbeat_recording := false
 var _gateway_is_linux := false
 var _ict_active := false
+var _ict_requested := false
 ## PC001 TCP endpoint for Windows ICT (injected into gateway spawn argv).
 var tcp_host := "0.0.0.0"
 var tcp_port := 5678
+var _spawned_tcp_host := ""
+var _spawned_tcp_port := -1
+var _gateway_lifecycle := GatewayLifecycle.IDLE
+var _gateway_deadline_ms := -1
+var _restart_after_stop := false
+var _forced_kill_sent := false
+var _last_gateway_error := ""
 var _control_seq := 0
 var _last_segment_path := ""
 
@@ -81,6 +94,7 @@ func _physics_process(delta: float) -> void:
 		_last_bind_try_ms = Time.get_ticks_msec()
 		_ensure_ack_bound()
 	_poll_heartbeats()
+	_service_gateway_lifecycle()
 	_accum += delta
 	if _accum < 1.0 / EMIT_HZ:
 		return
@@ -114,7 +128,7 @@ func _exit_tree() -> void:
 func get_status() -> int:
 	var stale := _last_heartbeat_ms < 0 \
 		or Time.get_ticks_msec() - _last_heartbeat_ms > HEARTBEAT_TIMEOUT_MS
-	if _gateway_pid <= 0 or stale:
+	if _gateway_pid <= 0 or _gateway_lifecycle != GatewayLifecycle.IDLE or stale:
 		return GatewayStatus.OFFLINE
 	if _heartbeat_recording:
 		return GatewayStatus.RECORDING
@@ -138,32 +152,87 @@ func is_linux_gateway() -> bool:
 	return _gateway_is_linux
 
 
-## Panel-configured PC001 TCP endpoint; applied on the next gateway spawn.
-func set_tcp_endpoint(host: String, port_text: String) -> void:
+## Validate and store the PC001 listener endpoint. Empty fields select the
+## documented defaults; invalid input never mutates the current endpoint.
+func set_tcp_endpoint(host: String, port_text: String) -> bool:
 	var trimmed_host := host.strip_edges()
-	if not trimmed_host.is_empty():
-		tcp_host = trimmed_host
+	if trimmed_host.is_empty():
+		trimmed_host = "0.0.0.0"
+	if trimmed_host.to_lower() != "localhost" and (
+		not trimmed_host.is_valid_ip_address() or ":" in trimmed_host
+	):
+		_last_gateway_error = "ICT host must be an IPv4 listener address or localhost"
+		return false
 	var trimmed_port := port_text.strip_edges()
-	if not trimmed_port.is_empty() and trimmed_port.is_valid_int():
-		tcp_port = clampi(trimmed_port.to_int(), 1, 65535)
+	var parsed_port := 5678
+	if not trimmed_port.is_empty():
+		if not trimmed_port.is_valid_int():
+			_last_gateway_error = "ICT port must be an integer from 1 to 65535"
+			return false
+		parsed_port = trimmed_port.to_int()
+	if parsed_port < 1 or parsed_port > 65535:
+		_last_gateway_error = "ICT port must be an integer from 1 to 65535"
+		return false
+	tcp_host = trimmed_host.to_lower()
+	tcp_port = parsed_port
+	_last_gateway_error = ""
+	return true
 
 
 func is_ict_active() -> bool:
 	return _ict_active
 
 
+func is_ict_requested() -> bool:
+	return _ict_requested
+
+
 func set_ict_connected(enabled: bool) -> void:
-	if enabled:
-		if _gateway_pid <= 0:
-			spawn_gateway()
-		_ict_active = true
-		_send_control(CMD_ICT_START)
-	else:
+	_ict_requested = enabled
+	if not enabled:
 		_ict_active = false
-		_send_control(CMD_ICT_STOP)
+		if _gateway_pid > 0 and _gateway_lifecycle != GatewayLifecycle.STOPPING:
+			_send_control(CMD_ICT_STOP)
+		return
+	_last_gateway_error = ""
+	if _gateway_lifecycle == GatewayLifecycle.FAILED:
+		_begin_gateway_restart()
+		return
+	if _gateway_lifecycle != GatewayLifecycle.IDLE:
+		return
+	if _gateway_pid <= 0 or not OS.is_process_running(_gateway_pid):
+		_gateway_pid = -1
+		spawn_gateway()
+		return
+	if _spawned_tcp_host != tcp_host or _spawned_tcp_port != tcp_port:
+		_begin_gateway_restart()
+		return
+	if is_gateway_online():
+		_activate_ict()
+	else:
+		_gateway_lifecycle = GatewayLifecycle.STARTING
+		_gateway_deadline_ms = Time.get_ticks_msec() + GATEWAY_STARTUP_TIMEOUT_MS
+
+
+func trigger_timed_can() -> bool:
+	if not is_gateway_online():
+		_last_gateway_error = "CAN gateway is offline; timed frame was not started"
+		return false
+	_send_control(CMD_TIMED_CAN_START)
+	return true
 
 
 func respawn_gateway() -> bool:
+	if _gateway_lifecycle == GatewayLifecycle.STOPPING:
+		_restart_after_stop = true
+		return true
+	if _gateway_lifecycle == GatewayLifecycle.FAILED:
+		_begin_gateway_restart()
+		return true
+	if _gateway_pid > 0 and OS.is_process_running(_gateway_pid):
+		_begin_gateway_restart()
+		return true
+	_gateway_pid = -1
 	return spawn_gateway()
 
 
@@ -181,37 +250,32 @@ func _resolve_gateway_command() -> PackedStringArray:
 			exe_dir.path_join(candidate_name),
 		]:
 			if FileAccess.file_exists(candidate):
-				if OS.get_name() == "Windows":
-					return _with_compatibility_args(PackedStringArray([
-						candidate,
-						"--host", remote_host,
-						"--port", str(remote_port),
-						"--ack-port", str(ack_port),
-						"--out", _resolve_output_dir(),
-						"--sink", "tcp",
-						"--tcp-host", tcp_host,
-						"--tcp-port", str(tcp_port),
-						"--model", model_id,
-					]))
-				return _with_compatibility_args(PackedStringArray([
-					candidate,
-					"--host", remote_host,
-					"--port", str(remote_port),
-					"--ack-port", str(ack_port),
-					"--out", _resolve_output_dir(),
-					"--model", model_id,
-				]))
+				var native_argv := PackedStringArray([candidate])
+				native_argv.append_array(_gateway_arguments())
+				return _with_compatibility_args(native_argv)
 	var script := _resolve_gateway_script()
 	if script.is_empty():
 		return PackedStringArray()
-	return _with_compatibility_args(PackedStringArray([
-		python_command, script,
+	var script_argv := PackedStringArray([python_command, script])
+	script_argv.append_array(_gateway_arguments())
+	return _with_compatibility_args(script_argv)
+
+
+func _gateway_arguments() -> PackedStringArray:
+	var argv := PackedStringArray([
 		"--host", remote_host,
 		"--port", str(remote_port),
 		"--ack-port", str(ack_port),
 		"--out", _resolve_output_dir(),
 		"--model", model_id,
-	]))
+	])
+	if OS.get_name() == "Windows":
+		argv.append_array(PackedStringArray([
+			"--sink", "tcp",
+			"--tcp-host", tcp_host,
+			"--tcp-port", str(tcp_port),
+		]))
+	return argv
 
 
 func _with_compatibility_args(argv: PackedStringArray) -> PackedStringArray:
@@ -227,15 +291,101 @@ func _with_compatibility_args(argv: PackedStringArray) -> PackedStringArray:
 
 
 func spawn_gateway() -> bool:
+	_drain_ack_packets()
+	_last_heartbeat_ms = -1
+	_heartbeat_recording = false
 	var argv := _resolve_gateway_command()
 	if argv.is_empty():
-		push_warning("CanTelemetryBridge: no gateway executable/script found")
+		_set_gateway_error("CanTelemetryBridge: no gateway executable/script found")
 		_gateway_pid = -1
 		return false
 	_gateway_pid = OS.create_process(argv[0], argv.slice(1))
 	if _gateway_pid <= 0:
-		push_warning("CanTelemetryBridge: failed to spawn '%s'" % argv[0])
-	return _gateway_pid > 0
+		_set_gateway_error("CanTelemetryBridge: failed to spawn '%s'" % argv[0])
+		return false
+	_spawned_tcp_host = tcp_host
+	_spawned_tcp_port = tcp_port
+	_gateway_lifecycle = GatewayLifecycle.STARTING
+	_gateway_deadline_ms = Time.get_ticks_msec() + GATEWAY_STARTUP_TIMEOUT_MS
+	_last_gateway_error = ""
+	return true
+
+
+func _begin_gateway_restart() -> void:
+	_ict_active = false
+	_restart_after_stop = true
+	_gateway_lifecycle = GatewayLifecycle.STOPPING
+	_gateway_deadline_ms = Time.get_ticks_msec() + GATEWAY_SHUTDOWN_GRACE_MS
+	_forced_kill_sent = false
+	_send_control(CMD_ICT_STOP)
+	_send_control(CMD_SHUTDOWN)
+
+
+func _service_gateway_lifecycle() -> void:
+	var now_ms := Time.get_ticks_msec()
+	if _gateway_lifecycle == GatewayLifecycle.STARTING:
+		if _gateway_pid <= 0 or not OS.is_process_running(_gateway_pid):
+			_gateway_pid = -1
+			_gateway_lifecycle = GatewayLifecycle.IDLE
+			_ict_requested = false
+			_ict_active = false
+			_set_gateway_error("CAN gateway exited before its first heartbeat")
+		elif now_ms >= _gateway_deadline_ms:
+			OS.kill(_gateway_pid)
+			_ict_requested = false
+			_ict_active = false
+			_restart_after_stop = false
+			_forced_kill_sent = true
+			_gateway_lifecycle = GatewayLifecycle.STOPPING
+			_gateway_deadline_ms = now_ms + GATEWAY_KILL_GRACE_MS
+			_set_gateway_error("CAN gateway did not become ready before timeout")
+	elif _gateway_lifecycle == GatewayLifecycle.STOPPING:
+		if _gateway_pid <= 0 or not OS.is_process_running(_gateway_pid):
+			_gateway_pid = -1
+			_gateway_lifecycle = GatewayLifecycle.IDLE
+			_forced_kill_sent = false
+			if _restart_after_stop:
+				_restart_after_stop = false
+				spawn_gateway()
+		elif now_ms >= _gateway_deadline_ms:
+			if not _forced_kill_sent:
+				OS.kill(_gateway_pid)
+				_forced_kill_sent = true
+				_gateway_deadline_ms = now_ms + GATEWAY_KILL_GRACE_MS
+			else:
+				_restart_after_stop = false
+				_gateway_lifecycle = GatewayLifecycle.FAILED
+				_ict_requested = false
+				_ict_active = false
+				_set_gateway_error("CAN gateway process did not stop after termination request")
+
+
+func _activate_ict() -> void:
+	if not _ict_requested or _ict_active:
+		return
+	_ict_active = true
+	_send_control(CMD_ICT_START)
+
+
+func _set_gateway_error(message: String) -> void:
+	_last_gateway_error = message
+	push_warning(message)
+
+
+func get_last_gateway_error() -> String:
+	return _last_gateway_error
+
+
+func get_gateway_pid_for_test() -> int:
+	return _gateway_pid
+
+
+func get_spawned_tcp_endpoint_for_test() -> Dictionary:
+	return {"host": _spawned_tcp_host, "port": _spawned_tcp_port}
+
+
+func get_desired_tcp_endpoint_for_test() -> Dictionary:
+	return {"host": tcp_host, "port": tcp_port}
 
 
 func _resolve_gateway_script() -> String:
@@ -275,9 +425,21 @@ func _poll_heartbeats() -> void:
 			_heartbeat_recording = (packet[5] & 0x01) != 0
 			_gateway_is_linux = (packet[5] & 0x02) != 0
 			_last_heartbeat_ms = Time.get_ticks_msec()
+			if _gateway_lifecycle == GatewayLifecycle.STARTING:
+				_gateway_lifecycle = GatewayLifecycle.IDLE
+				_gateway_deadline_ms = -1
+				_last_gateway_error = ""
+				_activate_ict()
 		elif _read_u32(packet, 0) == SESSION_DONE_MAGIC and packet.size() > 8:
 			var path_bytes := packet.slice(8)
 			_last_segment_path = path_bytes.get_string_from_utf8()
+
+
+func _drain_ack_packets() -> void:
+	if _ack == null or not _ack_bound:
+		return
+	while _ack.get_available_packet_count() > 0:
+		_ack.get_packet()
 
 
 func get_last_segment_path() -> String:

@@ -35,6 +35,7 @@ func _run() -> void:
 		_check_model_confirmation(ui, session)
 		_check_generation_clear(ui, session)
 		_check_gateway_state(ui)
+		_check_can_controls(ui)
 	ProjectSettings.set_setting("simulation/authority_profile", original_profile)
 	root.content_scale_size = original_scale_size
 	root.size = original_window_size
@@ -201,6 +202,28 @@ func _check_gateway_state(ui: MotionOperatorUI) -> void:
 	if not advanced.visible or "Connection: disconnected" not in _visible_label_copy(advanced):
 		_fail("gateway diagnostics were unavailable behind Advanced")
 	advanced_toggle.button_pressed = false
+
+
+func _check_can_controls(ui: MotionOperatorUI) -> void:
+	var timed := ui.get_node_or_null("StatusPanel/Margin/VBox/Tools/TimedCANTrigger") as Button
+	if timed == null or timed.toggle_mode:
+		_fail("timed CAN trigger is not a repeatable non-toggle button")
+	var bridge := root.get_node_or_null("CanTelemetryBridge")
+	if bridge == null:
+		_fail("CAN controls have no bridge autoload")
+		return
+	var before := bridge.get_desired_tcp_endpoint_for_test() as Dictionary
+	var ict := ui.get_node("StatusPanel/Margin/VBox/Tools/ICTConnectToggle") as Button
+	var port := ui.get_node("StatusPanel/Margin/VBox/AdvancedPanel/ICTPort") as LineEdit
+	port.text = "70000"
+	ict.button_pressed = true
+	ui._on_ict_pressed()
+	var after := bridge.get_desired_tcp_endpoint_for_test() as Dictionary
+	if ict.button_pressed or before != after:
+		_fail("invalid ICT endpoint mutated gateway state")
+	var completion := ui.get_node("StatusPanel/Margin/VBox/Completion") as Label
+	if "ICT endpoint invalid" not in completion.text:
+		_fail("invalid ICT endpoint did not produce actionable UI feedback")
 
 
 func _visible_label_copy(node: Node) -> String:

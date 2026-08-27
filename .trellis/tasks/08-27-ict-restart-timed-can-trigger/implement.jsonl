@@ -1,0 +1,6 @@
+{"file":".trellis/spec/backend/can-qml-compatibility.md","reason":"Preserve raw CAN ID, EFF packing, PC001, and QML projection contracts while adding the timed frame."}
+{"file":".trellis/spec/backend/can-gateway-control.md","reason":"Follow the executable CTNC, endpoint supervision, timed burst, and sink fan-out contract established by this task."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Apply deterministic virtual-time tests and child-PID-scoped lifecycle safety."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Keep invalid endpoint and process failures non-mutating and actionable."}
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Keep operator UI as presentation/control and gateway lifecycle ownership in the bridge."}
+{"file":".trellis/tasks/08-27-ict-restart-timed-can-trigger/research/code-evidence.md","reason":"Use the verified source anchors and current lifecycle/output constraints found during planning."}

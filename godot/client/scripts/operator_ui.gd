@@ -56,6 +56,7 @@ var _ignore_quality_toggle := false
 @onready var _can_status_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/CANStatus
 @onready var _can_output_button: Button = $StatusPanel/Margin/VBox/Tools/CANOutputToggle
 @onready var _ict_button: Button = $StatusPanel/Margin/VBox/Tools/ICTConnectToggle
+@onready var _timed_can_button: Button = $StatusPanel/Margin/VBox/Tools/TimedCANTrigger
 @onready var _ict_host_edit: LineEdit = $StatusPanel/Margin/VBox/AdvancedPanel/ICTHost
 @onready var _ict_port_edit: LineEdit = $StatusPanel/Margin/VBox/AdvancedPanel/ICTPort
 
@@ -100,6 +101,7 @@ func _ready() -> void:
 	_test_graphics_button.toggled.connect(_on_test_graphics_toggled)
 	_can_output_button.pressed.connect(_on_can_output_pressed)
 	_ict_button.pressed.connect(_on_ict_pressed)
+	_timed_can_button.pressed.connect(_on_timed_can_pressed)
 	_load_ict_config()
 	_ict_host_edit.text_changed.connect(func(_t: String) -> void: _save_ict_config())
 	_ict_port_edit.text_changed.connect(func(_t: String) -> void: _save_ict_config())
@@ -372,14 +374,27 @@ func _on_ict_pressed() -> void:
 		_ict_button.button_pressed = false
 		return
 	var enable := _ict_button.button_pressed
-	if enable and not bridge.is_gateway_online():
-		push_warning("ICT requires an online gateway")
-		_ict_button.button_pressed = false
-		return
 	if enable:
-		bridge.set_tcp_endpoint(_ict_host_edit.text.strip_edges(), _ict_port_edit.text.strip_edges())
+		if not bridge.set_tcp_endpoint(
+			_ict_host_edit.text.strip_edges(), _ict_port_edit.text.strip_edges()
+		):
+			var error := String(bridge.get_last_gateway_error())
+			_completion_label.text = "ICT endpoint invalid: %s" % error
+			push_warning(_completion_label.text)
+			_ict_button.button_pressed = false
+			return
 	bridge.set_ict_connected(enable)
 	_refresh_can_status()
+
+
+func _on_timed_can_pressed() -> void:
+	var bridge := _can_bridge()
+	if bridge == null or not bridge.trigger_timed_can():
+		var detail := "gateway unavailable" if bridge == null else String(bridge.get_last_gateway_error())
+		_completion_label.text = "Timed CAN frame was not started: %s" % detail
+		push_warning(_completion_label.text)
+		return
+	_completion_label.text = "CAN 0x18FFF100: sending at 50 Hz for 10 seconds."
 
 
 func _load_ict_config() -> void:
@@ -403,24 +418,33 @@ func _refresh_can_status() -> void:
 		_can_output_button.text = "开始记录 CAN"
 		_can_output_button.button_pressed = false
 		_set_ict_button(false, false, false, "CAN 网关不可用")
+		_timed_can_button.disabled = true
 		return
 	var linux_gw: bool = bridge.is_linux_gateway()
 	match int(bridge.get_status()):
 		0:
-			_can_status_label.text = "CAN Gateway: offline"
+			var gateway_error := String(bridge.get_last_gateway_error())
+			_can_status_label.text = "CAN Gateway: offline" if gateway_error.is_empty() \
+				else "CAN Gateway: offline (%s)" % gateway_error
 			_can_output_button.text = "开始记录 CAN（离线，点击重试）"
 			_can_output_button.button_pressed = false
-			_set_ict_button(false, linux_gw, false, "网关离线，连接后重试")
+			_set_ict_button(
+				false, linux_gw, bridge.is_ict_requested(),
+				"网关正在启动或重启" if bridge.is_ict_requested() else "网关离线，连接后重试"
+			)
+			_timed_can_button.disabled = true
 		1:
 			_can_status_label.text = "CAN Gateway: online (idle)"
 			_can_output_button.text = "开始记录 CAN"
 			_can_output_button.button_pressed = false
-			_set_ict_button(true, linux_gw, bridge.is_ict_active(), "")
+			_set_ict_button(true, linux_gw, bridge.is_ict_requested(), "")
+			_timed_can_button.disabled = false
 		2:
 			_can_status_label.text = "CAN Gateway: recording"
 			_can_output_button.text = "停止并保存"
 			_can_output_button.button_pressed = true
-			_set_ict_button(true, linux_gw, bridge.is_ict_active(), "")
+			_set_ict_button(true, linux_gw, bridge.is_ict_requested(), "")
+			_timed_can_button.disabled = false
 
 
 func _set_ict_button(online: bool, linux_gateway: bool, active: bool, disabled_reason: String) -> void:
@@ -433,8 +457,8 @@ func _set_ict_button(online: bool, linux_gateway: bool, active: bool, disabled_r
 				_ict_port_edit.text.strip_edges() if not _ict_port_edit.text.strip_edges().is_empty() else "5678"]
 	)
 	if not usable:
-		_ict_button.text = "连接 ICT（网关离线）"
-		_ict_button.button_pressed = false
+		_ict_button.text = "ICT 正在重连…" if active else "连接 ICT（网关离线）"
+		_ict_button.button_pressed = active
 	elif active:
 		_ict_button.text = "断开 ICT"
 		_ict_button.button_pressed = true
