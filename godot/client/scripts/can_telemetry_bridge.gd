@@ -296,6 +296,7 @@ func _gateway_arguments_for_platform(platform_name: String) -> PackedStringArray
 		"--ack-port", str(ack_port),
 		"--out", _resolve_output_dir(),
 		"--model", model_id,
+		"--mode", "godot-managed",
 	])
 	if platform_name == "Windows":
 		argv.append_array(PackedStringArray([

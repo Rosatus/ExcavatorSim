@@ -21,6 +21,9 @@ headless（测试/CI）不自动 spawn，测试显式调 spawn_gateway()。
 # 单独手动运行 gateway（调试）
 python tools/can_gateway/gateway.py --out output/can_gateway
 
+# Web 后台默认仅监听本机 127.0.0.1:29777；独立启动时可自动打开浏览器
+python tools/can_gateway/gateway.py --open-browser
+
 # 按 QML 只读代码语义投影 SY135 CAN（产品默认配置）
 python tools/can_gateway/gateway.py --model sy135 `
   --compat-profile builtin:qml-sy135-ground-truth `
@@ -34,10 +37,28 @@ python -m unittest discover -s tools/can_gateway/tests   # 协议/编码器金�
 Godot: tests/can_gateway_e2e_test.gd                     # 进程监督+录制全链路
 ```
 
-参数：`--port` `--imu-hz/--slew-hz/--rtk-hz/--travel-hz`、
-`--rtk-byteorder {big,little}`、`--compat-profile PATH|builtin:qml-sy135-ground-truth`、
+参数：`--port`、`--mode {standalone,godot-managed}`、`--web-port`、
+`--open-browser`、`--imu-hz/--slew-hz/--rtk-hz/--travel-hz`、
+`--rtk-byteorder little`、`--dbc-dir DIR`（可重复）、
+`--compat-profile PATH|builtin:qml-sy135-ground-truth`、
 `--qml-calibration PATH`、`--sink {csv,socketcan,vcan,tcp}`（默认 csv）、
 `--interface can0`。`vcan` / `--setup-vcan` 仅保留为开发兼容入口。
+
+## Web CAN 后台
+
+Gateway 启动后访问 `http://127.0.0.1:29777`。Web 服务固定只绑定本机；
+Godot 以 `--mode godot-managed` 拉起时页面只展示运行状态、传输统计和发送日志。
+独立启动（默认 `standalone`）时，Windows 页面可重配本机 PC001 TCP 服务端，
+Linux 页面可在二次确认后重启并复核 `can0`；不同平台不会暴露另一平台的传输控制。
+
+独立模式还可扫描、重载并表格展示 DBC，逐报文编辑信号值、启停并设置
+`1..100 Hz` 的整数发送频率（默认 50 Hz）。点击“开始周期发送”后，启用报文
+经 strict DBC 编码器进入同一 Gateway 发送核心，再由平台对应的 TCP/can0 transport
+发出。页面估算总线负载率并在负载较高时告警，但不会阻止发送。配置持久化时绑定
+DBC 内容 hash；DBC 内容变化后旧值不会静默套用到新布局。
+
+默认扫描随包 `resources/dbc` 与可执行文件相邻的 `dbc/`，额外目录可重复传入
+`--dbc-dir DIR`。随包包含获批的 `can3.sy135c.dbc` 和 `can4.sy135c.dbc`。
 
 ## Linux / SocketCAN（物理 can0 直发）
 
@@ -84,22 +105,20 @@ ExcavatorSim gateway.exe (--sink tcp)          ICT 侧 (LinuxPC)
   [连接 ICT] 在 Windows/Linux 网关下均可用。
 - 手动运行：`gateway.exe --sink tcp --tcp-host 0.0.0.0 --tcp-port 5678`
 - 对端：`python3 -m tools.can_replay bridge --host <本机IP> --port 5678 --interface vcan0`
-- 无客户端接入时帧静默丢弃；断线自动重等连接，未发出的帧重新排队。
+- 未完成 PC001 握手、队列已满或断线时帧会被丢弃并计数；断线自动重等连接，
+  旧会话帧不会重放给新客户端。
 - 批帧 ≤100 帧（MAX_BATCH_FRAMES），握手超时 10s，语义与参考实现一致。
 
 ## 关键约定
 
-- **编码权威 = dev_arch2.0 `GuideSystem/services/can/protocolparser.cpp`**
-  （DBC 与运行时解析存在分歧处一律跟随 parser）。
-- legacy 无 profile 模式维持 **CGI610 全族小端**，金样本测试断言默认编码器可
-  逐字节复现实采帧。`qml-guidance-3d` compatibility profile 单独把 A800
-  ve/vn/vu/v 编成大端，因为只读 QML `ProtocolParser` 对这四个 i16 使用网络序；
-  其余 RTK 帧仍遵循 profile 的小端合同。
-  注意：parser 的 `parseCgi610CarV` 代码结构是大端（`(data[0]<<8)+data[1]`，
-  全族唯一交叉），与 DBC/实采矛盾且两份实采均为零速帧无法仲裁——
-  **若真车回放发现速度异常，优先核查 parser 此函数**。
-  （`docs/can_spin_test_fixed.csv` 与本 gateway 无字节序冲突；
-  判定端序唯一可靠的准则是"移位量是否等于字节地址偏移"。）
+- **RTK A000-A900 与四个 IMU 角度帧的编码权威 = 随包的批准 DBC**。
+  Godot 遥测与 Web 编辑值都调用同一个 hash 绑定的 strict `cantools` codec；
+  它们只保留各自独立的数据来源、权限和调度路径。
+- A800 的 `VelE/VelN/VelU/Vel` 现在和 DBC 一致，固定为小端；QML profile
+  不再保留历史的大端例外。其余 RTK/IMU 帧经 differential tests 保持原字节。
+- Web operator catalog 在启动或显式 reload 时扫描随包 `resources/dbc`、
+  gateway 可执行文件相邻 `dbc/` 及 `--dbc-dir` 的直属 `.dbc` 文件。reload
+  不会替换 Godot 使用的 hash 绑定 protocol catalog。
 - 瑞芬 IMU：slot=count×0.01−180°；count 三连零 = 无效标记 → 编码器钳位 ≥1。
   parser 安装重映射 roll=s1/pitch=−s0/yaw=s2，在 `conventions.MachineState.
   sensor_slots` 反演。

@@ -1,0 +1,9 @@
+{"file":".trellis/spec/backend/authority-and-concurrency.md","reason":"Audit one-owner emission/transport state and non-blocking observers."}
+{"file":".trellis/spec/backend/can-gateway-control.md","reason":"Verify existing Gateway, ICT, timed-frame, PC001, and can0 semantics."}
+{"file":".trellis/spec/backend/can-qml-compatibility.md","reason":"Verify shared RTK/IMU DBC migration, intended A800 endian change, and unaffected frame compatibility."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Verify stable errors for API, DBC, transport, and scheduler failures."}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Verify bounded memory/disk logs and safe downloadable diagnostics."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Run deterministic test and package quality gates."}
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Verify Godot-managed mode selection and UI authority boundaries."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace mutations and status from browser through core to platform transport."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Check shared protocol/operator codec reuse without duplicate RTK/IMU byte authorities."}

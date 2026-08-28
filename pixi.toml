@@ -12,6 +12,7 @@ pinocchio = "*"
 numpy = "*"
 aiohttp = "*"
 jsonschema = "*"
+platformdirs = "*"
 pytest = "*"
 pytest-asyncio = "*"
 ruff = "*"
@@ -19,6 +20,7 @@ mypy = "*"
 
 [feature.compatibility.pypi-dependencies]
 rerun-sdk = "==0.35.0"
+cantools = ">=40,<41"
 
 [feature.compatibility.activation.env]
 PYTHONPATH = "backend/src"
@@ -28,6 +30,10 @@ python = "3.11.*"
 numpy = "*"
 aiohttp = "*"
 jsonschema = "*"
+platformdirs = "*"
+
+[feature.gateway.pypi-dependencies]
+cantools = ">=40,<41"
 
 [feature.gateway.activation.env]
 PYTHONPATH = "backend/src"

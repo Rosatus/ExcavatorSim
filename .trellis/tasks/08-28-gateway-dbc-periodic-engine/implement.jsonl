@@ -1,0 +1,8 @@
+{"file":".trellis/spec/backend/index.md","reason":"Mandatory backend development entry point."}
+{"file":".trellis/spec/backend/authority-and-concurrency.md","reason":"Scheduler and catalog mutations remain under the Gateway core owner."}
+{"file":".trellis/spec/backend/can-gateway-control.md","reason":"Producer fan-out, transport readiness, timed frames, and failure contracts."}
+{"file":".trellis/spec/backend/can-qml-compatibility.md","reason":"Shared RTK/IMU DBC authority, intended A800 endian change, and unaffected byte compatibility."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Stable DBC validation, conflict, scheduler, and transport errors."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Deterministic codec and fake-clock scheduler verification."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"One cached codec implementation for protocol RTK/IMU and operator validation models."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace Web drafts through persistence, scheduler, transport, and logs."}

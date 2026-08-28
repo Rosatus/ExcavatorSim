@@ -320,7 +320,7 @@ class QmlGatewayIntegrationTest(unittest.TestCase):
         with self.assertRaisesRegex(QmlMappingError, "increasing telemetry ticks"):
             mapper.project(make_sample(boom_world_deg=40.0))
 
-    def test_profile_a800_velocity_matches_reference_big_endian_parser(self) -> None:
+    def test_profile_a800_velocity_uses_approved_dbc_little_endian(self) -> None:
         mapper = QmlCanMapper(self.profile)
         scheduler = FrameScheduler({"imu": 100.0, "slew": 100.0, "rtk": 10.0, "travel": 10.0})
         sink = _CollectingSink()
@@ -338,7 +338,7 @@ class QmlGatewayIntegrationTest(unittest.TestCase):
         emit_frames([sink], scheduler, moved, qml_mapper=mapper)
         payload = dict(sink.frames)[RTK_IDS_ORDERED[8]]
         reference_values = tuple(
-            int.from_bytes(payload[index : index + 2], "big", signed=True) * 0.01
+            int.from_bytes(payload[index : index + 2], "little", signed=True) * 0.01
             for index in range(0, 8, 2)
         )
         self.assertEqual(reference_values, (10.0, 0.0, 0.0, 10.0))

@@ -141,9 +141,7 @@ class SlewGoldenTest(unittest.TestCase):
 
 
 class RtkGoldenTest(unittest.TestCase):
-    """Protocol is mixed-endian per parser code; capture CSV and the dev_arch
-    ground-truth e2e fixture agree. Golden asserts that DEFAULT encoders
-    (parser parity) reproduce captured frames byte-for-byte."""
+    """Manual little-endian oracles reproduce the historical capture bytes."""
 
     CASES: ClassVar[dict[str, str]] = {
         "0cfda000": "time",
@@ -437,6 +435,16 @@ class TimedCanBurstTest(unittest.TestCase):
         self.assertFalse(burst.service(TIMED_CAN_DURATION_S, [sink]))
         self.assertFalse(burst.active)
         self.assertEqual(len(sink.frames), 2)
+
+    def test_disarm_discards_schedule_and_never_auto_resumes(self) -> None:
+        burst = TimedCanBurst()
+        sink = _CaptureSink()
+        burst.trigger(0.0)
+        self.assertTrue(burst.service(0.0, [sink]))
+        burst.disarm()
+        self.assertFalse(burst.active)
+        self.assertFalse(burst.service(1.0, [sink]))
+        self.assertEqual(len(sink.frames), 1)
 
 
 class MachineStateSemanticTest(unittest.TestCase):

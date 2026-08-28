@@ -1,0 +1,27 @@
+{
+  "status_keys": [
+    "can_interface",
+    "event_earliest_sequence",
+    "event_sequence",
+    "ict_active",
+    "log_dropped_records",
+    "mode",
+    "pc001_dropped_frames",
+    "pc001_handshake",
+    "pc001_queued_frames",
+    "pc001_sent_frames",
+    "periodic_armed",
+    "platform",
+    "recording",
+    "revision",
+    "tcp_host",
+    "tcp_port",
+    "timed_can_active",
+    "transport_detail",
+    "transport_kind",
+    "transport_state",
+    "web_url"
+  ],
+  "error_keys": ["code", "message", "recoverable", "request_id"],
+  "dbc_root_keys": ["armed", "catalog", "load", "messages", "notices"]
+}

@@ -1,0 +1,7 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Verify managed-mode UI and Godot launch ownership."}
+{"file":".trellis/spec/backend/authority-and-concurrency.md","reason":"Verify UI cannot bypass server/core authority."}
+{"file":".trellis/spec/backend/can-gateway-control.md","reason":"Verify platform controls and existing Gateway lifecycle semantics."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Verify 403/409/validation/transport error rendering and recovery."}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Verify bounded event rendering and safe log downloads."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Run typecheck, tests, production build, packaged browser, and regressions."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Audit complete UI-to-transport flow and packaged asset availability."}

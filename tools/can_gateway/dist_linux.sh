@@ -22,11 +22,27 @@ fi
 version=$("$PY" -c 'import sys; print("%d.%d" % sys.version_info[:2])')
 echo "using python $version ($($PY --version 2>&1))"
 
+if ! command -v npm >/dev/null 2>&1; then
+    echo "error: Node.js/npm is required on the build machine" >&2
+    exit 1
+fi
+(
+    cd "$script_dir/web"
+    npm ci
+    npm run build
+)
+if [ ! -f "$script_dir/resources/web/index.html" ] || \
+   ! compgen -G "$script_dir/resources/web/assets/index-*.js" >/dev/null; then
+    echo "error: Gateway Web production bundle is missing" >&2
+    exit 1
+fi
+
 if command -v uv >/dev/null 2>&1; then
     echo "== building with uv =="
     export UV_PROJECT_ENVIRONMENT="$BUILD_DIR/.venv"
     uv venv --allow-existing "$UV_PROJECT_ENVIRONMENT"
-    uv pip install --python "$UV_PROJECT_ENVIRONMENT/bin/python" pyinstaller
+    uv pip install --python "$UV_PROJECT_ENVIRONMENT/bin/python" \
+        pyinstaller aiohttp 'cantools>=40,<41' platformdirs
     PYEXE="$UV_PROJECT_ENVIRONMENT/bin/python"
 else
     echo "== uv not found, falling back to venv+pip =="
@@ -34,7 +50,8 @@ else
         "$PY" -m venv "$BUILD_DIR/.venv"
     fi
     "$BUILD_DIR/.venv/bin/pip" install --quiet --upgrade pip
-    "$BUILD_DIR/.venv/bin/pip" install --quiet pyinstaller
+    "$BUILD_DIR/.venv/bin/pip" install --quiet \
+        pyinstaller aiohttp 'cantools>=40,<41' platformdirs
     PYEXE="$BUILD_DIR/.venv/bin/python"
 fi
 
@@ -47,6 +64,7 @@ fi
     --specpath "$script_dir" \
     --paths "$script_dir" \
     --add-data "$script_dir/resources:resources" \
+    --collect-all cantools \
     gateway.py
 
 "$PYEXE" -m PyInstaller \
@@ -61,6 +79,8 @@ fi
 
 install -m 0755 "$script_dir/install_can0_helper.sh" "$DIST_DIR/install_can0_helper.sh"
 install -m 0755 "$script_dir/uninstall_can0_helper.sh" "$DIST_DIR/uninstall_can0_helper.sh"
+mkdir -p "$DIST_DIR/dbc"
+install -m 0644 "$script_dir"/resources/dbc/*.dbc "$DIST_DIR/dbc/"
 chmod +x "$DIST_DIR/gateway" "$DIST_DIR/can0-setup-helper"
 rm -rf "$BUILD_DIR"
 

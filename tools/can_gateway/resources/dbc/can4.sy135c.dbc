@@ -1,0 +1,161 @@
+VERSION ""
+
+
+NS_ : 
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	CAT_DEF_
+	CAT_
+	FILTER
+	BA_DEF_DEF_
+	EV_DATA_
+	ENVVAR_DATA_
+	SGTYPE_
+	SGTYPE_VAL_
+	BA_DEF_SGTYPE_
+	BA_SGTYPE_
+	SIG_TYPE_REF_
+	VAL_TABLE_
+	SIG_GROUP_
+	SIG_VALTYPE_
+	SIGTYPE_VALTYPE_
+	BO_TX_BU_
+	BA_DEF_REL_
+	BA_REL_
+	BA_DEF_DEF_REL_
+	BU_SG_REL_
+	BU_EV_REL_
+	BU_BO_REL_
+	SG_MUL_VAL_
+
+BS_:
+
+BU_: P_Box Controller
+
+
+BO_ 2365431808 MSG_0CFDA000: 8 P_Box
+ SG_ GpsTime : 16|32@1+ (0.001,-0.0) [0.0|4294967.295] "秒"  Controller
+ SG_ WeekTime : 0|16@1+ (1,0) [0|65535] "周"  Controller
+
+BO_ 2365432064 MSG_0CFDA100: 8 P_Box
+ SG_ GpsNumSats2 : 56|8@1+ (1,0) [0|255] "-"  Controller
+ SG_ GpsNumSats : 48|8@1+ (1,0) [0|255] "-"  Controller
+ SG_ GpsAge : 32|16@1+ (0.01,-0.0) [0.0|655.35] "-"  Controller
+ SG_ GpsNumSats2Used : 24|8@1+ (1,0) [0|255] "-"  Controller
+ SG_ Satellite_status : 16|8@1+ (1,0) [0|255] "-"  Controller
+ SG_ GpsNumStatsUsed : 8|8@1+ (1,0) [0|255] "-"  Controller
+ SG_ System_state : 0|8@1+ (1,0) [0|255] "-"  Controller
+
+BO_ 2365432320 MSG_0CFDA200: 8 P_Box
+ SG_ Longitude : 0|64@1- (1e-08,-0.0) [-92233720368.54776|92233720368.54776] "°/度"  Controller
+
+BO_ 2365432576 MSG_0CFDA300: 8 P_Box
+ SG_ Latitude : 0|64@1- (1e-08,-0.0) [-92233720368.54776|92233720368.54776] "°/度"  Controller
+
+BO_ 2365432832 MSG_0CFDA400: 8 P_Box
+ SG_ Undulation : 32|32@1- (0.001,-0.0) [-2147483.648|2147483.647] "米"  Controller
+ SG_ Alt : 0|32@1- (0.001,-0.0) [-2147483.648|2147483.647] "米"  Controller
+
+BO_ 2365433088 MSG_0CFDA500: 8 P_Box
+ SG_ Longitude1 : 0|64@1- (1e-08,-0.0) [-92233720368.54776|92233720368.54776] "°/度"  Controller
+
+BO_ 2365433344 MSG_0CFDA600: 8 P_Box
+ SG_ Latitude1 : 0|64@1- (1e-08,-0.0) [-92233720368.54776|92233720368.54776] "°/度"  Controller
+
+BO_ 2365433600 MSG_0CFDA700: 8 P_Box
+ SG_ Alt1 : 0|32@1- (0.001,-0.0) [-2147483.648|2147483.647] "米"  Controller
+
+BO_ 2365433856 MSG_0CFDA800: 8 P_Box
+ SG_ Vel : 48|16@1- (0.01,-0.0) [-327.68|327.67] "m/s"  Controller
+ SG_ VelU : 32|16@1- (0.01,-0.0) [-327.68|327.67] "m/s"  Controller
+ SG_ VelN : 16|16@1- (0.01,-0.0) [-327.68|327.67] "m/s"  Controller
+ SG_ VelE : 0|16@1- (0.01,-0.0) [-327.68|327.67] "m/s"  Controller
+
+BO_ 2365434112 MSG_0CFDA900: 8 P_Box
+ SG_ Heading : 0|16@1+ (0.01,-0.0) [0.0|655.35] "度"  Controller
+
+BO_ 2365434368 MSG_0CFDAA00: 8 P_Box
+ SG_ Stn_ID : 16|16@1+ (1,0) [0|65535] ""  Controller
+ SG_ Hdop : 8|8@1+ (0.1,-0.0) [0.0|25.5] "-"  Controller
+ SG_ Sig_6 : 6|2@1+ (1,0) [0|3] "E/W"  Controller
+ SG_ Sig_4 : 4|2@1+ (1,0) [0|3] "N/S"  Controller
+ SG_ Sig : 2|2@1+ (1,0) [0|3] "E/W"  Controller
+ SG_ _0 : 0|2@1+ (1,0) [0|3] "N/S"  Controller
+
+BO_ 2147506177 MSG_00005801: 8 P_Box
+ SG_ power : 48|8@1+ (1,0) [0|255] "无"  Controller
+ SG_ status : 40|8@1+ (1,0) [0|255] "无"  Controller
+ SG_ protocol : 32|8@1+ (1,0) [0|255] "无"  Controller
+ SG_ freq : 0|32@1+ (1000,0) [0|4294967295000] "hz"  Controller
+
+BO_ 2147506178 MSG_00005802: 8 Controller
+ SG_ Diff_data : 0|64@1+ (1,0) [0|18446744073709551615] "无"  P_Box
+
+BO_ 2331877376 MSG_0AFDA000: 8 P_Box
+ SG_ Baud : 48|16@1+ (1,0) [0|65535] "Symbols/s"  Controller
+
+BO_ 2331878144 MSG_0AFDA300: 8 P_Box
+ SG_ Frec : 48|16@1+ (10,0) [0|655350] "hz"  Controller
+
+
+
+
+CM_ BO_ 2365431808 "channel=can4";
+CM_ SG_ 2365431808 GpsTime "自本周日0:00:00至当前的秒数(格林尼治时间)";
+CM_ SG_ 2365431808 WeekTime "自1980-1-6至当前的星期数(格林尼治时间)";
+CM_ BO_ 2365432064 "channel=can4";
+CM_ SG_ 2365432064 GpsNumSats2 "副天线搜星数";
+CM_ SG_ 2365432064 GpsNumSats "主天线搜星数";
+CM_ SG_ 2365432064 GpsAge "差分延迟";
+CM_ SG_ 2365432064 GpsNumSats2Used "副天线使用卫星数量";
+CM_ SG_ 2365432064 Satellite_status "0不定位不定向 1单点定位定向 2伪距差分定位定向 3-4 RTK稳定解定位定向 5 RTK浮点解定位定向 6单点定位不定向 7伪距差分定位不定向 8 RTK稳定解定位不定向 9 RTK浮点解定位不定向";
+CM_ SG_ 2365432064 GpsNumStatsUsed "主天线使用卫星数量";
+CM_ SG_ 2365432064 System_state "0初始化 1卫导模式 2 RTK模式";
+CM_ BO_ 2365432320 "channel=can4";
+CM_ SG_ 2365432320 Longitude "主天线经度";
+CM_ BO_ 2365432576 "channel=can4";
+CM_ SG_ 2365432576 Latitude "主天线纬度";
+CM_ BO_ 2365432832 "channel=can4";
+CM_ SG_ 2365432832 Undulation "高度异常";
+CM_ SG_ 2365432832 Alt "主天线高度";
+CM_ BO_ 2365433088 "channel=can4";
+CM_ SG_ 2365433088 Longitude1 "副天线经度";
+CM_ BO_ 2365433344 "channel=can4";
+CM_ SG_ 2365433344 Latitude1 "副天线纬度";
+CM_ BO_ 2365433600 "channel=can4";
+CM_ SG_ 2365433600 Alt1 "副天线高度";
+CM_ BO_ 2365433856 "channel=can4";
+CM_ SG_ 2365433856 Vel "载体速度";
+CM_ SG_ 2365433856 VelU "天向速度";
+CM_ SG_ 2365433856 VelN "北向速度";
+CM_ SG_ 2365433856 VelE "东向速度";
+CM_ BO_ 2365434112 "channel=can4";
+CM_ SG_ 2365434112 Heading "航向角";
+CM_ BO_ 2365434368 "channel=can4";
+CM_ SG_ 2365434368 Stn_ID "Stn ID | 差分基站ID 000-1023";
+CM_ SG_ 2365434368 Hdop "水平精度因子";
+CM_ SG_ 2365434368 Sig_6 "副天线经度方向 | 00:E,01:W";
+CM_ SG_ 2365434368 Sig_4 "副天线纬度方向 | 00：N,01:S";
+CM_ SG_ 2365434368 Sig "主天线经度方向 | 00:E,01:W";
+CM_ SG_ 2365434368 _0 "主天线纬度方向0 | 00：N,01:S";
+CM_ BO_ 2147506177 "channel=can4";
+CM_ SG_ 2147506177 power "功率 0-0.5w 1-1w 2-2w";
+CM_ SG_ 2147506177 status "状态 0-发送 1-接收";
+CM_ SG_ 2147506177 protocol "传输协议 1-SOUTH 2-TRANSEOT";
+CM_ SG_ 2147506177 freq "频率如4600500";
+CM_ BO_ 2147506178 "channel=can4";
+CM_ SG_ 2147506178 Diff_data "Diff data | 数据段为差分数据内容";
+CM_ BO_ 2331877376 "channel=can4";
+CM_ SG_ 2331877376 Baud "高位在前低位在后 支持 100/250/500/1000kbps";
+CM_ BO_ 2331878144 "channel=can4";
+CM_ SG_ 2331878144 Frec "支持0.1HZ~10HZ 发送(1~100)";
+
+
+
+
+
+
+

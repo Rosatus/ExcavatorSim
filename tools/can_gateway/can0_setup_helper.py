@@ -13,7 +13,10 @@ def main(argv: list[str] | None = None) -> int:
         print("CAN0_SETUP_FAILED: this helper accepts no arguments", file=sys.stderr)
         return 64
     try:
-        snapshot = configure_can0()
+        # Normal Gateway prepare invokes this helper only for an unready
+        # interface. Direct standalone Web restart intentionally invokes the
+        # same no-argument helper even when ready, so the helper always cycles.
+        snapshot = configure_can0(force=True)
     except Can0SetupError as exc:
         print(f"{exc.code}: {exc}", file=sys.stderr)
         return 1

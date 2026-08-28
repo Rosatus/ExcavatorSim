@@ -46,6 +46,24 @@
   ],
   "user_supplied_assets": [
     {
+      "source_path": "E:/projects/dev_arch2.0_36b5586c/GuideSystem/assets/dbc/can3.sy135c.dbc",
+      "destination_path": "tools/can_gateway/resources/dbc/can3.sy135c.dbc",
+      "byte_size": 8569,
+      "sha256": "c589bcaeda9b58a87e7b0ed920b7fbb55b86942341f4126d44f7f5017a7c4a44",
+      "hash_mode": "raw",
+      "relationship": "project-owner-approved-can-protocol-dbc",
+      "imported_at": "2026-08-28"
+    },
+    {
+      "source_path": "E:/projects/dev_arch2.0_36b5586c/GuideSystem/assets/dbc/can4.sy135c.dbc",
+      "destination_path": "tools/can_gateway/resources/dbc/can4.sy135c.dbc",
+      "byte_size": 5812,
+      "sha256": "cb71e5bec346940e84f1a24e7e3c6d6ef7191545e8f7b1dbba10a241174234f7",
+      "hash_mode": "raw",
+      "relationship": "project-owner-approved-can-protocol-dbc",
+      "imported_at": "2026-08-28"
+    },
+    {
       "source_path": "E:/projects/blender/Excavator/SY135/export/godot/SY135_excavator_godot.glb",
       "destination_path": "godot/client/assets/visual/SY135_excavator_godot.glb",
       "byte_size": 5613436,
@@ -71,7 +89,7 @@
         },
         {
           "path": "godot/client/resources/visual/sy205_visual_manifest.json",
-          "sha256": "e307f0473de1501663d79a1e60adfb48da600270de6963b077c77d45faa08e4c"
+          "sha256": "3a12f793416f0f22dfb4662f65634ce797f0ccdcacbaad1a0eea1d481b3c48a0"
         },
         {
           "path": "assets/model/sy205_glb_derived_v4.params.json",
@@ -79,7 +97,7 @@
         },
         {
           "path": "assets/model/sy205_glb_derived_v4.json",
-          "sha256": "5635f61d7bb6a6c0b2749c26d58d3f3b1677c9126fa96a5f330ab16b3995f1f6"
+          "sha256": "863185699ee794fae4ff0e0a4b45e17332cfa68098483168bade8d5daaaaf314"
         },
         {
           "path": "assets/model/sy205_glb_derived_v4.urdf",
@@ -92,7 +110,7 @@
     },
     {
       "destination_path": "backend/tests/fixtures/frame-parity/baseline.json",
-      "destination_sha256": "4a12625d3d62f49e52f4db65e8a22be9b01ba2dc75a49c27f87036c0d0b5281a",
+      "destination_sha256": "3e4bdbb3abddd059b0512548947f7455088426aec02c3936a047b6a74fd40119",
       "generator": {
         "path": "backend/src/babylon_sim/model.py",
         "sha256": "e6b71dd96e60c1deda7d78e4a126123cfec236e259dc6cf505ab7fa50940b911"
@@ -104,7 +122,7 @@
         },
         {
           "path": "pixi.lock",
-          "sha256": "427084c589505f5f3463791e277c6dea1fadce27cf64b8c15a17a9a4ec3d97e7"
+          "sha256": "d4c4083ca6143dcd9acd40666bca117ed0790e8a8685ec2be0c7ebb32e6a7775"
         }
       ],
       "license": "AGPL-3.0-only",
@@ -113,7 +131,7 @@
     },
     {
       "destination_path": "godot/client/tests/fixtures/sy135_frame_parity_cases.json",
-      "destination_sha256": "9c099db5db72e6006baccd56259e752f7a1bdfd836b9ba83d70be0ad01c13460",
+      "destination_sha256": "5c8bdd9ab649eba8628a1a958a33a9633be070c17e99e37cc159a47981ca60dd",
       "generator": {
         "path": "backend/scripts/generate_frame_parity_fixture.py",
         "sha256": "14558c303d3f1a0f4b73334fd1f8eb4c0ebb7fa93202fd9aaf6de75467ae1059"
@@ -129,7 +147,7 @@
         },
         {
           "path": "pixi.lock",
-          "sha256": "427084c589505f5f3463791e277c6dea1fadce27cf64b8c15a17a9a4ec3d97e7"
+          "sha256": "d4c4083ca6143dcd9acd40666bca117ed0790e8a8685ec2be0c7ebb32e6a7775"
         }
       ],
       "license": "project-owned-source-assets",

@@ -28,6 +28,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/mypy_extensions-1.1.0-pyha770c72_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/packaging-26.2-pyhc364b38_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pathspec-1.1.1-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/platformdirs-4.11.5-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pluggy-1.6.0-pyhf9edf01_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pygments-2.20.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytest-9.1.1-pyhc364b38_2.conda
@@ -116,12 +117,22 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/yarl-1.24.5-py311h3f79411_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/zlib-1.3.2-hfd05255_2.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/zstd-1.5.7-h534d264_6.conda
+      - pypi: https://files.pythonhosted.org/packages/01/b5/68a9054be852e61f31de1be4e8d95802646b93344ce17c2380a1748706fa/crccheck-1.3.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/3f/27/4570e78fc0bf5ea0ca45eb1de3818a23787af9b390c0b0a0033a1b8236f9/diskcache-5.6.3-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/58/34/e4ac153acdbcfba7f48bc73d6586a74c91cc919fcc2e29acbf81be329d1f/python_can-4.6.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/63/c6/4bad1b18d132a50b27e1365e1ab163616f7a5bb56d330f66f9d1d9d4f9d4/pillow-12.3.0-cp311-cp311-win_amd64.whl
+      - pypi: https://files.pythonhosted.org/packages/7d/cc/812fe3ae07a1917bb4cfb6dec5f6fc6e8825d65b4e77cd25bc52cd59230f/textparser-0.26.2-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/83/88/16b7231ba49861b6f75fc309b11012ede4d6b0a9c90969d9e0db8d991aeb/wrapt-1.17.3-cp311-cp311-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/9a/7a/d3d24f7ac1022faa539f70aa8aa7b2e382366d2141bfe8775d46b3a7b797/rerun_sdk-0.35.0-cp310-abi3-win_amd64.whl
+      - pypi: https://files.pythonhosted.org/packages/c1/41/629e70c4cb32c1ddb88de970cd174bbb43d8241c8e07bdffc62a8280297c/argparse_addons-0.12.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/cb/5e/9b3d25a45c55333f853279c2d110a48764601e34e50ba537c99851ecea07/bitstruct-8.23.0-cp311-cp311-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/f1/e2/738071e95c5ddad7b3dfc12f569ffa992db89d7d7b4a95258fd184191249/pyarrow-25.0.0-cp311-cp311-win_amd64.whl
+      - pypi: https://files.pythonhosted.org/packages/f5/4c/46355057aaf5e6e0d900c031d2af95c61ca901753ec45778cc7bd7cdbb0d/cantools-40.7.1-py3-none-any.whl
   gateway:
     channels:
     - url: https://conda.anaconda.org/conda-forge/
+    indexes:
+    - https://pypi.org/simple
     packages:
       win-64:
       - conda: https://conda.anaconda.org/conda-forge/noarch/aiohappyeyeballs-2.7.1-pyhd8ed1ab_0.conda
@@ -131,6 +142,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/idna-3.19-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/jsonschema-4.26.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/jsonschema-specifications-2025.9.1-pyhcf101f3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/platformdirs-4.11.5-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/python_abi-3.11-8_cp311.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/referencing-0.37.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/typing_extensions-4.16.0-pyhcf101f3_0.conda
@@ -166,6 +178,15 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/vc14_runtime-14.51.36247-habf1de7_41.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/vcomp14-14.51.36247-habf1de7_41.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/yarl-1.24.5-py311h3f79411_0.conda
+      - pypi: https://files.pythonhosted.org/packages/01/b5/68a9054be852e61f31de1be4e8d95802646b93344ce17c2380a1748706fa/crccheck-1.3.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/3f/27/4570e78fc0bf5ea0ca45eb1de3818a23787af9b390c0b0a0033a1b8236f9/diskcache-5.6.3-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/58/34/e4ac153acdbcfba7f48bc73d6586a74c91cc919fcc2e29acbf81be329d1f/python_can-4.6.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/7d/cc/812fe3ae07a1917bb4cfb6dec5f6fc6e8825d65b4e77cd25bc52cd59230f/textparser-0.26.2-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/83/88/16b7231ba49861b6f75fc309b11012ede4d6b0a9c90969d9e0db8d991aeb/wrapt-1.17.3-cp311-cp311-win_amd64.whl
+      - pypi: https://files.pythonhosted.org/packages/c1/41/629e70c4cb32c1ddb88de970cd174bbb43d8241c8e07bdffc62a8280297c/argparse_addons-0.12.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/cb/5e/9b3d25a45c55333f853279c2d110a48764601e34e50ba537c99851ecea07/bitstruct-8.23.0-cp311-cp311-win_amd64.whl
+      - pypi: https://files.pythonhosted.org/packages/f5/4c/46355057aaf5e6e0d900c031d2af95c61ca901753ec45778cc7bd7cdbb0d/cantools-40.7.1-py3-none-any.whl
 packages:
 - conda: https://conda.anaconda.org/conda-forge/noarch/_python_abi3_support-1.0-hd8ed1ab_3.conda
   sha256: 2a7204314663eeda5dec482a956f0e2eaf289bd5b9953eaaaad0e81aa64638f2
@@ -187,7 +208,7 @@ packages:
   license: PSF-2.0
   license_family: PSF
   purls:
-  - pkg:pypi/aiohappyeyeballs?source=compressed-mapping
+  - pkg:pypi/aiohappyeyeballs?source=hash-mapping
   run_exports: {}
   size: 24690
   timestamp: 1782986823268
@@ -287,7 +308,7 @@ packages:
   license: BSD-3-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/idna?source=compressed-mapping
+  - pkg:pypi/idna?source=hash-mapping
   run_exports: {}
   size: 163869
   timestamp: 1781620148226
@@ -382,6 +403,18 @@ packages:
   run_exports: {}
   size: 56559
   timestamp: 1777271601895
+- conda: https://conda.anaconda.org/conda-forge/noarch/platformdirs-4.11.5-pyhcf101f3_0.conda
+  sha256: 4496a7e0b584a388b3580ab594a4f384696ab7d702282588fd33a7ee38af983c
+  md5: 152ec36401f710145a7db03475594410
+  depends:
+  - python >=3.10
+  - python
+  license: MIT
+  purls:
+  - pkg:pypi/platformdirs?source=compressed-mapping
+  run_exports: {}
+  size: 27461
+  timestamp: 1787881635603
 - conda: https://conda.anaconda.org/conda-forge/noarch/pluggy-1.6.0-pyhf9edf01_1.conda
   sha256: e14aafa63efa0528ca99ba568eaf506eb55a0371d12e6250aaaa61718d2eb62e
   md5: d7585b6550ad04c8c5e21097ada2888e
@@ -425,7 +458,7 @@ packages:
   license: MIT
   license_family: MIT
   purls:
-  - pkg:pypi/pytest?source=compressed-mapping
+  - pkg:pypi/pytest?source=hash-mapping
   run_exports: {}
   size: 306724
   timestamp: 1782127176429
@@ -1511,7 +1544,7 @@ packages:
   license: MIT
   license_family: MIT
   purls:
-  - pkg:pypi/mypy?source=compressed-mapping
+  - pkg:pypi/mypy?source=hash-mapping
   run_exports: {}
   size: 10751508
   timestamp: 1783986268244
@@ -1734,7 +1767,7 @@ packages:
   license: MIT
   license_family: MIT
   purls:
-  - pkg:pypi/librt?source=compressed-mapping
+  - pkg:pypi/librt?source=hash-mapping
   run_exports: {}
   size: 113299
   timestamp: 1783529497931
@@ -1820,7 +1853,8 @@ packages:
   - vc14_runtime >=14.44.35208
   license: BSD-3-Clause
   license_family: BSD
-  purls: []
+  purls:
+  - pkg:pypi/scipy?source=hash-mapping
   run_exports: {}
   size: 15241561
   timestamp: 1779876161272
@@ -2089,6 +2123,48 @@ packages:
     - zstd >=1.5.7,<1.6.0a0
   size: 388453
   timestamp: 1764777142545
+- pypi: https://files.pythonhosted.org/packages/01/b5/68a9054be852e61f31de1be4e8d95802646b93344ce17c2380a1748706fa/crccheck-1.3.1-py3-none-any.whl
+  name: crccheck
+  version: 1.3.1
+  sha256: 1680c9a7bb1ca4bec45fa19b8ca64319f10d2ce4eb8b0d25d51cb99a20ca0108
+- pypi: https://files.pythonhosted.org/packages/3f/27/4570e78fc0bf5ea0ca45eb1de3818a23787af9b390c0b0a0033a1b8236f9/diskcache-5.6.3-py3-none-any.whl
+  name: diskcache
+  version: 5.6.3
+  sha256: 5e31b2d5fbad117cc363ebaf6b689474db18a1f6438bc82358b024abd4c2ca19
+  requires_python: '>=3'
+- pypi: https://files.pythonhosted.org/packages/58/34/e4ac153acdbcfba7f48bc73d6586a74c91cc919fcc2e29acbf81be329d1f/python_can-4.6.1-py3-none-any.whl
+  name: python-can
+  version: 4.6.1
+  sha256: 17f95255868a95108dcfcb90565a684dad32d5a3ebb35afd14f739e18c84ff6c
+  requires_dist:
+  - wrapt~=1.10
+  - packaging>=23.1
+  - typing-extensions>=3.10.0.0
+  - pywin32>=305 ; platform_python_implementation == 'CPython' and sys_platform == 'win32' and extra == 'pywin32'
+  - pyserial>=3.0 ; extra == 'seeedstudio'
+  - pyserial~=3.0 ; extra == 'serial'
+  - filelock ; extra == 'neovi'
+  - python-ics>=2.12 ; extra == 'neovi'
+  - canalystii>=0.1.0 ; extra == 'canalystii'
+  - cantact>=0.0.7 ; extra == 'cantact'
+  - python-can-cvector ; extra == 'cvector'
+  - gs-usb>=0.2.1 ; extra == 'gs-usb'
+  - nixnet>=0.3.2 ; extra == 'nixnet'
+  - uptime~=3.0.1 ; extra == 'pcan'
+  - python-can-remote ; extra == 'remote'
+  - python-can-sontheim>=0.1.2 ; extra == 'sontheim'
+  - python-can-canine>=0.2.2 ; extra == 'canine'
+  - zlgcan ; extra == 'zlgcan'
+  - python-can-candle>=1.2.2 ; extra == 'candle'
+  - windows-curses ; platform_python_implementation == 'CPython' and sys_platform == 'win32' and extra == 'viewer'
+  - asammdf>=6.0.0 ; extra == 'mf4'
+  - msgpack~=1.1.0 ; extra == 'multicast'
+  requires_python: '>=3.9'
+- pypi: https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl
+  name: packaging
+  version: '26.3'
+  sha256: d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c
+  requires_python: '>=3.9'
 - pypi: https://files.pythonhosted.org/packages/63/c6/4bad1b18d132a50b27e1365e1ab163616f7a5bb56d330f66f9d1d9d4f9d4/pillow-12.3.0-cp311-cp311-win_amd64.whl
   name: pillow
   version: 12.3.0
@@ -2120,6 +2196,28 @@ packages:
   - trove-classifiers>=2024.10.12 ; extra == 'tests'
   - defusedxml ; extra == 'xmp'
   requires_python: '>=3.10'
+- pypi: https://files.pythonhosted.org/packages/7d/cc/812fe3ae07a1917bb4cfb6dec5f6fc6e8825d65b4e77cd25bc52cd59230f/textparser-0.26.2-py3-none-any.whl
+  name: textparser
+  version: 0.26.2
+  sha256: e14ec4fd58d3515d897196a71f4ccf8d354f5c5c6b87910571b4d250de073c4b
+  requires_dist:
+  - lark-parser ; extra == 'examples'
+  - pyparsing ; extra == 'examples'
+  - parsita ; extra == 'examples'
+  - funcparserlib ; extra == 'examples'
+  - parsy ; extra == 'examples'
+  - parsimonious ; extra == 'examples'
+  - textx ; extra == 'examples'
+  - mypy>=2.1 ; extra == 'test'
+  - ruff>=0.15.16 ; extra == 'test'
+  - pytest>=9.0 ; extra == 'test'
+  - coverage>=7.14 ; extra == 'test'
+  requires_python: '>=3.10'
+- pypi: https://files.pythonhosted.org/packages/83/88/16b7231ba49861b6f75fc309b11012ede4d6b0a9c90969d9e0db8d991aeb/wrapt-1.17.3-cp311-cp311-win_amd64.whl
+  name: wrapt
+  version: 1.17.3
+  sha256: 0b1831115c97f0663cb77aa27d381237e73ad4f721391a9bfb2fe8bc25fa6e77
+  requires_python: '>=3.8'
 - pypi: https://files.pythonhosted.org/packages/9a/7a/d3d24f7ac1022faa539f70aa8aa7b2e382366d2141bfe8775d46b3a7b797/rerun_sdk-0.35.0-cp310-abi3-win_amd64.whl
   name: rerun-sdk
   version: 0.35.0
@@ -2161,8 +2259,36 @@ packages:
   - opentelemetry-sdk ; extra == 'tracing'
   - opentelemetry-exporter-otlp-proto-grpc ; extra == 'tracing'
   requires_python: '>=3.10'
+- pypi: https://files.pythonhosted.org/packages/c1/41/629e70c4cb32c1ddb88de970cd174bbb43d8241c8e07bdffc62a8280297c/argparse_addons-0.12.0-py3-none-any.whl
+  name: argparse-addons
+  version: 0.12.0
+  sha256: 48b70ecd719054fcb0d7e6f25a1fecc13607aac61d446e83f47d211b4ead0d61
+  requires_python: '>=3.6'
+- pypi: https://files.pythonhosted.org/packages/cb/5e/9b3d25a45c55333f853279c2d110a48764601e34e50ba537c99851ecea07/bitstruct-8.23.0-cp311-cp311-win_amd64.whl
+  name: bitstruct
+  version: 8.23.0
+  sha256: e4766c3e768a2a65e47537de549ba0fa92b9dad290d9c4c1c112bc09444a9da6
+  requires_python: '>=3.9'
 - pypi: https://files.pythonhosted.org/packages/f1/e2/738071e95c5ddad7b3dfc12f569ffa992db89d7d7b4a95258fd184191249/pyarrow-25.0.0-cp311-cp311-win_amd64.whl
   name: pyarrow
   version: 25.0.0
   sha256: 161649d60a7a46c613a19fd795763ea8a88c36ba997dd99d9bc66e6794ee36e8
   requires_python: '>=3.10'
+- pypi: https://files.pythonhosted.org/packages/f5/4c/46355057aaf5e6e0d900c031d2af95c61ca901753ec45778cc7bd7cdbb0d/cantools-40.7.1-py3-none-any.whl
+  name: cantools
+  version: 40.7.1
+  sha256: a68159cce229581f77aad0b906938682f29ecc9164248c997af80f1d49c073c9
+  requires_dist:
+  - bitstruct>=8.16.1
+  - python-can>=4.6.0
+  - textparser>=0.21.1
+  - diskcache
+  - argparse-addons
+  - crccheck
+  - mypy ; extra == 'dev'
+  - pipx ; extra == 'dev'
+  - ruff ; extra == 'dev'
+  - tox ; extra == 'dev'
+  - matplotlib ; extra == 'plot'
+  - windows-curses ; platform_python_implementation == 'CPython' and sys_platform == 'win32' and extra == 'windows-all'
+  requires_python: '>=3.9'

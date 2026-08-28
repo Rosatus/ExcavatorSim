@@ -175,7 +175,7 @@
   "calibration": {
     "status": "godot_import_and_controlled_poses_validated",
     "authority_fixture": "godot/client/tests/fixtures/sy135_frame_parity_cases.json",
-    "authority_fixture_sha256": "9c099db5db72e6006baccd56259e752f7a1bdfd836b9ba83d70be0ad01c13460",
+    "authority_fixture_sha256": "bb034a1540a68e892cd016f3b60e13729de1c66c0373cecf2a22f49915d20005",
     "matrix_semantics": "Python row arrays encode right-handed T_world_frame; Godot conversion is adapter-owned",
     "asset_root_scale": [1.0, 1.0, 1.0],
     "rest_transforms_godot": {

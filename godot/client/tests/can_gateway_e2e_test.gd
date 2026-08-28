@@ -54,6 +54,10 @@ func _run() -> void:
 		"_gateway_arguments_for_platform", "Linux"
 	)
 	_check(
+		linux_arguments.has("--mode") and linux_arguments.has("godot-managed"),
+		"gateway command selects explicit Godot-managed mode"
+	)
+	_check(
 		linux_arguments.has("--sink") and linux_arguments.has("socketcan")
 		and linux_arguments.has("--interface") and linux_arguments.has("can0"),
 		"Linux gateway command selects physical SocketCAN can0"

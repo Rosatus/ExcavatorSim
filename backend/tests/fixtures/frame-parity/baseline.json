@@ -5,7 +5,7 @@
   "source_urdf_sha256": "5707f454624fadd5630fcbfd66893b4edf7e8c5b97c84e65e06bf9f8fa46c02c",
   "source_model_path": "backend/src/babylon_sim/model.py",
   "source_model_sha256": "e6b71dd96e60c1deda7d78e4a126123cfec236e259dc6cf505ab7fa50940b911",
-  "source_pixi_lock_sha256": "427084c589505f5f3463791e277c6dea1fadce27cf64b8c15a17a9a4ec3d97e7",
+  "source_pixi_lock_sha256": "d4c4083ca6143dcd9acd40666bca117ed0790e8a8685ec2be0c7ebb32e6a7775",
   "pinocchio_version": "4.1.0",
   "matrix_semantics": "row arrays encoding right-handed T_world_frame",
   "poses": {

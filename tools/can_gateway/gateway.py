@@ -8,14 +8,18 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import ipaddress
 import math
+import select
 import socket
 import struct
 import sys
 import time
+import webbrowser
+from collections.abc import Callable
 from pathlib import Path
 
-from can0_setup import CAN_INTERFACE, Can0SetupError, prepare_can0
+from can0_setup import CAN_INTERFACE, Can0SetupError, prepare_can0, restart_can0
 from control_protocol import (
     CMD_ICT_START,
     CMD_ICT_STOP,
@@ -46,13 +50,27 @@ from conventions import (
     parse_packet,
 )
 from csv_writer import CanapeCsvWriter
+from dbc_engine import (
+    DbcCodec,
+    OperatorDbcRuntime,
+    encode_godot_imu,
+    encode_godot_rtk,
+    load_protocol_codec,
+)
 from encoders.dxg_slew import encode_slew_frame
-from encoders.ruifen_imu import RUFINEN_IDS, encode_ruifen_frame
-from encoders.sinan_rtk import build_rtk_frames
+from encoders.ruifen_imu import RUFINEN_IDS
 from encoders.travel_pilot import encode_travel_frame
+from gateway_runtime import (
+    RUNTIME_MODES,
+    GatewayCommand,
+    GatewayConfigStore,
+    GatewayRuntimeCore,
+    GatewayRuntimeError,
+)
+from gateway_web import DEFAULT_WEB_PORT, GatewayWebServer
 from pc001_sink import TcpPc001Sink
 from qml_compat import QmlCanMapper, QmlMappingError, QmlRtkState
-from qml_profile import QmlProfileError, load_qml_profile
+from qml_profile import QmlProfileError, load_qml_profile, resource_root
 from sinks import CsvFrameSink, FrameSink, SocketCanSink
 from vcan_setup import VcanSetupError, ensure_vcan_interface
 
@@ -64,6 +82,14 @@ TIMED_CAN_PAYLOAD = bytes.fromhex("01 00 00 00 00 00 00 00")
 TIMED_CAN_PERIOD_S = 1.0 / 50.0
 TIMED_CAN_DURATION_S = 10.0
 TIMED_CAN_FRAME_COUNT = 500
+_PROTOCOL_CODEC: DbcCodec | None = None
+
+
+def protocol_codec() -> DbcCodec:
+    global _PROTOCOL_CODEC
+    if _PROTOCOL_CODEC is None:
+        _PROTOCOL_CODEC = load_protocol_codec(resource_root() / "dbc")
+    return _PROTOCOL_CODEC
 
 
 class FrameScheduler:
@@ -103,12 +129,22 @@ class TimedCanBurst:
         self._end_s = now_s + TIMED_CAN_DURATION_S
         self._emitted = 0
 
+    def disarm(self) -> None:
+        """Stop the active burst without preserving a resumable due time."""
+        self._next_due_s = None
+        self._end_s = None
+
     def timeout_s(self, now_s: float, maximum_s: float = RECEIVE_POLL_LIMIT_S) -> float:
         if self._next_due_s is None:
             return maximum_s
         return max(0.0, min(maximum_s, self._next_due_s - now_s))
 
-    def service(self, now_s: float, sinks: list[FrameSink]) -> bool:
+    def service(
+        self,
+        now_s: float,
+        sinks: list[FrameSink],
+        observer: Callable[[int, bytes], None] | None = None,
+    ) -> bool:
         due_s = self._next_due_s
         end_s = self._end_s
         if end_s is not None and now_s >= end_s:
@@ -119,6 +155,8 @@ class TimedCanBurst:
             return False
         for sink in sinks:
             sink.append(TIMED_CAN_ID, TIMED_CAN_PAYLOAD)
+        if observer is not None:
+            observer(TIMED_CAN_ID, TIMED_CAN_PAYLOAD)
         self._emitted += 1
         if self._emitted >= TIMED_CAN_FRAME_COUNT:
             self._next_due_s = None
@@ -142,21 +180,64 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
     out_path = Path(args.out)
     out_path.mkdir(parents=True, exist_ok=True)
 
+    try:
+        protocol = protocol_codec()
+        adjacent_root = (
+            Path(sys.executable).resolve().parent / "dbc"
+            if getattr(sys, "frozen", False)
+            else Path(__file__).resolve().parent / "dbc"
+        )
+        operator_roots = [resource_root() / "dbc"]
+        if getattr(sys, "frozen", False) or adjacent_root.is_dir():
+            operator_roots.append(adjacent_root)
+        operator_roots.extend(Path(path) for path in getattr(args, "dbc_dir", []))
+        operator_dbc = OperatorDbcRuntime(
+            operator_roots
+        )
+    except GatewayRuntimeError as exc:
+        print(f"Gateway DBC startup failed ({exc.code}): {exc}", file=sys.stderr)
+        return 1
+
+    platform_name = "windows" if sys.platform == "win32" else "linux"
+    core = GatewayRuntimeCore(
+        mode=args.mode,
+        platform=platform_name,
+        transport_kind=args.sink,
+        tcp_host=args.tcp_host,
+        tcp_port=args.tcp_port,
+        can_interface=args.interface,
+    )
+    core.publish_dbc_snapshot(operator_dbc.snapshot())
     ict_sink: FrameSink | None = None
     if args.sink == "vcan":
         ict_sink = _open_vcan(args.interface)
         if ict_sink is None:
+            core.close()
             return 1
     elif args.sink == "tcp":
         try:
             ict_sink = TcpPc001Sink(args.tcp_host, args.tcp_port)
         except RuntimeError as exc:
             print(str(exc), file=sys.stderr)
+            core.close()
+            return 1
+    elif args.sink == "socketcan" and args.mode == "standalone":
+        ict_sink, result_code, detail = _open_can0(args.interface)
+        if ict_sink is None:
+            print(f"standalone can0 startup failed ({result_code}): {detail}", file=sys.stderr)
+            core.close()
             return 1
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((args.host, args.port))
-    sock.settimeout(RECEIVE_POLL_LIMIT_S)
+    try:
+        sock.bind((args.host, args.port))
+    except OSError as exc:
+        print(f"cannot bind Gateway UDP {args.host}:{args.port}: {exc}", file=sys.stderr)
+        if ict_sink is not None:
+            ict_sink.close()
+        core.close()
+        return 1
+    sock.setblocking(False)
     # Windows: ICMP port-unreachable (e.g. heartbeat before Godot binds the
     # ack port) surfaces as ConnectionResetError on the next recvfrom.
     with contextlib.suppress(AttributeError, OSError):
@@ -169,7 +250,39 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
     active_ict_seq: int | None = None
     last_ict_result: tuple[int, bytes] | None = None
     socketcan_guard_until_s = 0.0
-    platform_linux = hasattr(socket, "AF_CAN")
+    last_pc001_handshake = False
+    platform_linux = platform_name == "linux"
+    initial_transport_state = "ready" if ict_sink is not None else "stopped"
+    core.publish(
+        transport_state=initial_transport_state,
+        transport_detail=ict_sink.peer_name() if ict_sink is not None else "",
+        ict_active=args.mode == "standalone" and ict_sink is not None,
+    )
+    core.emit_event(
+        "gateway_started",
+        "runtime",
+        mode=args.mode,
+        platform=platform_name,
+        transport=args.sink,
+    )
+
+    web_server = GatewayWebServer(
+        core,
+        port=args.web_port,
+        static_root=resource_root() / "web",
+    )
+    try:
+        web_server.start()
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        if ict_sink is not None:
+            ict_sink.close()
+        sock.close()
+        core.close()
+        return 1
+    print(f"Gateway Web console: {web_server.url}")
+    if args.open_browser and args.mode == "standalone":
+        webbrowser.open(web_server.url)
     print(f"gateway listening on {args.host}:{args.port} (out={out_path}, sink={args.sink})")
 
     def active_sinks() -> list[FrameSink]:
@@ -177,11 +290,57 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
         if recording and writer is not None:
             sinks.append(CsvFrameSink(writer))
         if ict_sink is not None and (
-            not isinstance(ict_sink, SocketCanSink)
-            or time.monotonic() >= socketcan_guard_until_s
+            not isinstance(ict_sink, SocketCanSink) or time.monotonic() >= socketcan_guard_until_s
         ):
             sinks.append(ict_sink)
         return sinks
+
+    def observe_transmission(source: str) -> Callable[[int, bytes], None]:
+        def observe(can_id: int, payload: bytes) -> None:
+            recording_ready = recording and writer is not None
+            transport_ready = ict_sink is not None
+            error = ""
+            if isinstance(ict_sink, TcpPc001Sink):
+                transport_ready = ict_sink.is_handshake_connected()
+                if not transport_ready:
+                    error = "PC001 handshake is not connected"
+            elif isinstance(ict_sink, SocketCanSink) and ict_sink.last_send_error is not None:
+                transport_ready = False
+                error = str(ict_sink.last_send_error)
+            success = recording_ready or transport_ready
+            if not success and not error:
+                error = "no active frame sink"
+            core.record_transmission(
+                source=source,
+                can_id=can_id,
+                payload=payload,
+                success=success,
+                error=error,
+            )
+
+        return observe
+
+    observe_godot = observe_transmission("godot")
+    observe_timed = observe_transmission("timed")
+    observe_web = observe_transmission("web")
+
+    def transport_ready() -> bool:
+        if isinstance(ict_sink, TcpPc001Sink):
+            return ict_sink.is_handshake_connected()
+        return isinstance(ict_sink, SocketCanSink) and ict_sink.last_send_error is None
+
+    def publish_operator_dbc(*, mutate_revision: bool = False) -> None:
+        core.publish_dbc_snapshot(operator_dbc.snapshot())
+        core.publish(periodic_armed=operator_dbc.armed, mutate_revision=mutate_revision)
+
+    def send_operator_frame(_key: str, can_id: int, payload: bytes) -> None:
+        if not transport_ready():
+            operator_dbc.stop()
+            publish_operator_dbc()
+            return
+        assert ict_sink is not None
+        ict_sink.append(can_id, payload)
+        observe_web(can_id, payload)
 
     def send_ict_result(request_seq: int, result_code: int, detail: str = "") -> None:
         nonlocal last_ict_result
@@ -198,15 +357,202 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
         print(detail, file=sys.stderr)
         ict_sink.close()
         ict_sink = None
+        timed_can.disarm()
+        operator_dbc.stop()
+        publish_operator_dbc()
         if active_ict_seq is not None:
             send_ict_result(active_ict_seq, ICT_ERR_SEND, detail)
         active_ict_seq = None
 
+    def refresh_runtime_status() -> None:
+        nonlocal last_pc001_handshake
+        pc001 = ict_sink.status_snapshot() if isinstance(ict_sink, TcpPc001Sink) else None
+        handshake_connected = pc001.handshake_connected if pc001 is not None else False
+        if handshake_connected != last_pc001_handshake:
+            core.emit_event(
+                "pc001_connected" if handshake_connected else "pc001_disconnected",
+                "transport",
+            )
+            last_pc001_handshake = handshake_connected
+            if not handshake_connected and operator_dbc.armed:
+                operator_dbc.stop()
+                publish_operator_dbc()
+        core.publish(
+            recording=recording,
+            timed_can_active=timed_can.active,
+            ict_active=active_ict_seq is not None
+            or (args.mode == "standalone" and ict_sink is not None),
+            pc001_handshake=handshake_connected,
+            pc001_queued_frames=pc001.queued_frames if pc001 is not None else 0,
+            pc001_sent_frames=pc001.sent_frames if pc001 is not None else 0,
+            pc001_dropped_frames=pc001.dropped_frames if pc001 is not None else 0,
+        )
+
+    def validate_tcp_host(value: object) -> str:
+        if not isinstance(value, str):
+            raise GatewayRuntimeError("tcp_host_invalid", "TCP host must be a string")
+        normalized = value.strip() or "0.0.0.0"
+        if normalized != "localhost":
+            try:
+                ipaddress.IPv4Address(normalized)
+            except ipaddress.AddressValueError as exc:
+                raise GatewayRuntimeError(
+                    "tcp_host_invalid", "TCP host must be IPv4 or localhost"
+                ) from exc
+        return normalized
+
+    def handle_runtime_command(command: GatewayCommand) -> None:
+        nonlocal ict_sink, active_ict_seq, socketcan_guard_until_s
+        try:
+            core.require_revision(command)
+            if command.kind == "tcp_rebind":
+                host = validate_tcp_host(command.payload.get("host"))
+                port = command.payload.get("port")
+                if not isinstance(port, int) or isinstance(port, bool) or not 1 <= port <= 65_535:
+                    raise GatewayRuntimeError(
+                        "tcp_port_invalid", "TCP port must be an integer in 1..65535"
+                    )
+                timed_can.disarm()
+                operator_dbc.stop()
+                publish_operator_dbc()
+                core.publish(
+                    transport_state="reconfiguring",
+                    transport_detail=f"rebinding TCP {host}:{port}",
+                    periodic_armed=False,
+                    ict_active=False,
+                )
+                if ict_sink is not None:
+                    ict_sink.close()
+                    ict_sink = None
+                active_ict_seq = None
+                try:
+                    replacement = TcpPc001Sink(host, port)
+                except RuntimeError as exc:
+                    core.publish(transport_state="error", transport_detail=str(exc))
+                    core.emit_event(
+                        "transport_error", "web", code="tcp_bind_failed", detail=str(exc)
+                    )
+                    raise GatewayRuntimeError("tcp_bind_failed", str(exc), status=409) from exc
+                try:
+                    core.config.save_tcp_endpoint(host, port)
+                except OSError as exc:
+                    replacement.close()
+                    core.publish(
+                        transport_state="error",
+                        transport_detail=f"TCP endpoint persistence failed: {exc}",
+                    )
+                    raise GatewayRuntimeError(
+                        "config_write_failed", "TCP endpoint could not be persisted", status=500
+                    ) from exc
+                ict_sink = replacement
+                status = core.publish(
+                    mutate_revision=True,
+                    transport_kind="tcp",
+                    transport_state="ready",
+                    transport_detail=replacement.peer_name(),
+                    tcp_host=host,
+                    tcp_port=port,
+                )
+                core.emit_event(
+                    "transport_reconfigured", "web", transport="tcp", host=host, port=port
+                )
+                core.complete(command, {"status": status.to_dict()})
+                return
+            if command.kind == "can0_restart":
+                timed_can.disarm()
+                operator_dbc.stop()
+                publish_operator_dbc()
+                core.publish(
+                    transport_state="reconfiguring",
+                    transport_detail="restarting fixed can0 contract",
+                    periodic_armed=False,
+                    ict_active=False,
+                )
+                if ict_sink is not None:
+                    ict_sink.close()
+                    ict_sink = None
+                active_ict_seq = None
+                try:
+                    restart_can0()
+                    replacement = SocketCanSink(CAN_INTERFACE)
+                except (Can0SetupError, RuntimeError) as exc:
+                    code = (
+                        exc.code.lower() if isinstance(exc, Can0SetupError) else "can0_bind_failed"
+                    )
+                    detail = f"{exc.code}: {exc}" if isinstance(exc, Can0SetupError) else str(exc)
+                    core.publish(transport_state="error", transport_detail=detail)
+                    core.emit_event("transport_error", "web", code=code, detail=detail)
+                    raise GatewayRuntimeError(code, detail, status=409) from exc
+                ict_sink = replacement
+                socketcan_guard_until_s = time.monotonic() + RECEIVE_POLL_LIMIT_S
+                status = core.publish(
+                    mutate_revision=True,
+                    transport_kind="socketcan",
+                    transport_state="ready",
+                    transport_detail=replacement.peer_name(),
+                )
+                core.emit_event(
+                    "transport_reconfigured", "web", transport="socketcan", interface=CAN_INTERFACE
+                )
+                core.complete(command, {"status": status.to_dict()})
+                return
+            if command.kind == "dbc_message_update":
+                updated = operator_dbc.update_message(
+                    str(command.payload.get("message_key", "")),
+                    values=command.payload.get("values"),
+                    enabled=command.payload.get("enabled"),
+                    frequency_hz=command.payload.get("frequency_hz"),
+                )
+                publish_operator_dbc(mutate_revision=True)
+                core.emit_event(
+                    "dbc_message_updated",
+                    "web",
+                    message_key=command.payload.get("message_key", ""),
+                )
+                core.complete(command, {"message": updated, "status": core.snapshot().to_dict()})
+                return
+            if command.kind == "dbc_start":
+                operator_dbc.start(transport_ready=transport_ready())
+                publish_operator_dbc(mutate_revision=True)
+                core.emit_event("dbc_started", "web")
+                core.complete(command, {"status": core.snapshot().to_dict()})
+                return
+            if command.kind == "dbc_stop":
+                operator_dbc.stop()
+                publish_operator_dbc(mutate_revision=True)
+                core.emit_event("dbc_stopped", "web")
+                core.complete(command, {"status": core.snapshot().to_dict()})
+                return
+            if command.kind == "dbc_reload":
+                operator_dbc.stop()
+                operator_dbc.reload()
+                publish_operator_dbc(mutate_revision=True)
+                core.emit_event("dbc_reloaded", "web")
+                core.complete(
+                    command,
+                    {"dbc": core.dbc_snapshot(), "status": core.snapshot().to_dict()},
+                )
+                return
+            raise GatewayRuntimeError(
+                "command_unknown", f"unknown Gateway command {command.kind!r}"
+            )
+        except GatewayRuntimeError as exc:
+            core.fail(command, exc)
+
+    def drain_runtime_commands() -> None:
+        core.consume_wakeup()
+        for command in core.take_commands():
+            handle_runtime_command(command)
+
     try:
         while True:
+            drain_runtime_commands()
             monotonic_s = time.monotonic()
-            timed_can.service(monotonic_s, active_sinks())
+            timed_can.service(monotonic_s, active_sinks(), observe_timed)
+            operator_dbc.scheduler.service(send_operator_frame, monotonic_s)
             retire_failed_socketcan()
+            core.flush_transmission_aggregates(monotonic_s)
+            refresh_runtime_status()
             now_s = time.time()
             if now_s - last_heartbeat_s >= HEARTBEAT_INTERVAL_S:
                 ict_handshake = (
@@ -222,7 +568,21 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                     ack_addr,
                 )
                 last_heartbeat_s = now_s
-            sock.settimeout(timed_can.timeout_s(time.monotonic()))
+            timeout_s = min(
+                timed_can.timeout_s(time.monotonic()), operator_dbc.scheduler.timeout_s()
+            )
+            try:
+                readable, _writable, _exceptional = select.select(
+                    [sock, core.wakeup_reader], [], [], timeout_s
+                )
+            except (OSError, ValueError):
+                if core.wakeup_reader.fileno() < 0:
+                    break
+                raise
+            if core.wakeup_reader in readable:
+                drain_runtime_commands()
+            if sock not in readable:
+                continue
             try:
                 data, _addr = sock.recvfrom(4096)
             except (BlockingIOError, TimeoutError, ConnectionResetError):
@@ -238,6 +598,8 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                         writer = CanapeCsvWriter(csv_path)
                         print(f"recording -> {csv_path}")
                     recording = True
+                    core.publish(recording=True)
+                    core.emit_event("recording_started", "godot", path=str(writer.path))
                 elif cmd == CMD_RECORD_STOP:
                     recording = False
                     if writer is not None:
@@ -246,6 +608,8 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                         print(f"segment saved: {writer.path}")
                         writer = None
                     print("recording stopped")
+                    core.publish(recording=False)
+                    core.emit_event("recording_stopped", "godot")
                 elif cmd == CMD_ICT_START:
                     if last_ict_result is not None and last_ict_result[0] == request_seq:
                         sock.sendto(last_ict_result[1], ack_addr)
@@ -259,9 +623,7 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                                 # Give a timeout-triggered STOP, queued while the
                                 # privileged helper was running, one receive turn
                                 # before the first physical CAN frame can escape.
-                                socketcan_guard_until_s = (
-                                    time.monotonic() + RECEIVE_POLL_LIMIT_S
-                                )
+                                socketcan_guard_until_s = time.monotonic() + RECEIVE_POLL_LIMIT_S
                         elif args.sink == "vcan":
                             ict_sink = _open_vcan(args.interface)
                         elif args.sink == "csv":
@@ -274,20 +636,43 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                         result_code = ICT_ERR_INTERNAL
                         result_detail = "ICT transport did not open"
                     send_ict_result(request_seq, result_code, result_detail)
+                    core.publish(
+                        transport_state="ready" if ict_sink is not None else "error",
+                        transport_detail=ict_sink.peer_name()
+                        if ict_sink is not None
+                        else result_detail,
+                        ict_active=ict_sink is not None,
+                    )
+                    core.emit_event(
+                        "ict_result",
+                        "godot",
+                        request_seq=request_seq,
+                        result_code=result_code,
+                        detail=result_detail,
+                    )
                 elif cmd == CMD_ICT_STOP:
+                    timed_can.disarm()
+                    operator_dbc.stop()
+                    publish_operator_dbc()
                     if ict_sink is not None and args.sink in ("vcan", "socketcan"):
                         # TCP stays listening across ICT stop; SocketCAN closes.
                         ict_sink.close()
                         ict_sink = None
                     active_ict_seq = None
                     print("ICT disconnected")
+                    core.publish(ict_active=False, periodic_armed=False)
+                    core.emit_event("ict_stopped", "godot")
                 elif cmd == CMD_SHUTDOWN:
+                    operator_dbc.stop()
+                    publish_operator_dbc()
                     print("shutdown requested")
                     break
                 elif cmd == CMD_TIMED_CAN_START:
                     timed_can.trigger(time.monotonic())
-                    timed_can.service(time.monotonic(), active_sinks())
+                    timed_can.service(time.monotonic(), active_sinks(), observe_timed)
                     print("timed CAN burst started: 0x18FFF100 at 50 Hz for 10 s")
+                    core.publish(timed_can_active=True)
+                    core.emit_event("timed_can_started", "godot", can_id="0x18FFF100")
                 continue
 
             sample = parse_packet(data)
@@ -304,6 +689,8 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                         args.rtk_byteorder,
                         args.model,
                         qml_mapper,
+                        observe_godot,
+                        protocol,
                     )
                     retire_failed_socketcan()
                 except QmlMappingError as exc:
@@ -317,12 +704,15 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
     finally:
         rows = writer.row_count if writer is not None else 0
         path = writer._path if writer is not None else "(no session)"
+        web_server.close()
         if writer is not None:
             writer.close()
         if ict_sink is not None:
             ict_sink.close()
         print(f"closed {path} ({rows} frames)")
         sock.close()
+        core.emit_event("gateway_stopped", "runtime", rows=rows)
+        core.close()
     return 0
 
 
@@ -374,7 +764,10 @@ def emit_frames(
     rtk_byteorder: str = "little",
     model: str = DEFAULT_MODEL,
     qml_mapper: QmlCanMapper | None = None,
+    observer: Callable[[int, bytes], None] | None = None,
+    dbc_codec: DbcCodec | None = None,
 ) -> None:
+    codec = dbc_codec or protocol_codec()
     state = MachineState(sample, model=model)
     projection = qml_mapper.project(sample) if qml_mapper is not None else None
     tick = float(sample.tick_ms)
@@ -387,7 +780,8 @@ def emit_frames(
             else:
                 roll, pitch, yaw = projection.imu_rpy_deg[link]
             slots = state.sensor_slots(roll, pitch, yaw)
-            pending.append((RUFINEN_IDS[link], encode_ruifen_frame(slots)))
+            can_id = RUFINEN_IDS[link]
+            pending.append((can_id, encode_godot_imu(codec, can_id, slots)))
 
     if scheduler.due("slew", tick):
         pending.append((0x18FFF000, encode_slew_frame(state.slew_degrees())))
@@ -399,13 +793,10 @@ def emit_frames(
     if scheduler.due("rtk", tick):
         rtk_state = state if projection is None else QmlRtkState(projection)
         satellite_status = 0 if projection is None else projection.satellite_status
-        for can_id, payload in build_rtk_frames(
+        for can_id, payload in encode_godot_rtk(
+            codec,
             rtk_state,
-            rtk_byteorder,
             satellite_status=satellite_status,
-            # ProtocolParser::parseCgi610A800 reads each i16 as network order.
-            # Keep legacy behavior unchanged; QML profile uses the real parser.
-            velocity_byteorder="big" if projection is not None else None,
         ).items():
             pending.append((can_id, payload))
 
@@ -414,6 +805,8 @@ def emit_frames(
     for can_id, payload in pending:
         for sink in sinks:
             sink.append(can_id, payload)
+        if observer is not None:
+            observer(can_id, payload)
 
     if scheduler.due("imu", tick):
         scheduler.advance("imu", tick)
@@ -429,13 +822,31 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=29764)
+    parser.add_argument("--mode", choices=RUNTIME_MODES, default="standalone")
+    parser.add_argument("--web-port", type=int, default=DEFAULT_WEB_PORT)
+    parser.add_argument(
+        "--open-browser",
+        action="store_true",
+        help="open the loopback Web console after standalone startup",
+    )
     parser.add_argument("--out", default="output/can_gateway")
     parser.add_argument("--imu-hz", type=float, default=100.0)
     parser.add_argument("--slew-hz", type=float, default=100.0)
     parser.add_argument("--rtk-hz", type=float, default=10.0)
     parser.add_argument("--travel-hz", type=float, default=10.0)
     parser.add_argument("--max-rows", type=int, default=0, help="stop after N rows (smoke)")
-    parser.add_argument("--rtk-byteorder", choices=("big", "little"), default="little")
+    parser.add_argument(
+        "--rtk-byteorder",
+        choices=("little",),
+        default="little",
+        help="deprecated compatibility option; approved DBC byte order is fixed to little",
+    )
+    parser.add_argument(
+        "--dbc-dir",
+        action="append",
+        default=[],
+        help="additional direct-child DBC directory (repeatable; startup/reload scan only)",
+    )
     parser.add_argument(
         "--model",
         choices=tuple(IMU_MOUNT_COMPENSATION_DEG),
@@ -456,8 +867,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--sink",
         choices=("csv", "socketcan", "vcan", "tcp"),
-        default="csv",
-        help="frame output: csv segments, physical SocketCAN, legacy vcan, or PC001 TCP",
+        default=None,
+        help="frame output override; standalone defaults to Windows TCP or Linux can0",
     )
     parser.add_argument(
         "--interface", default="can0", help="SocketCAN interface (physical ICT is fixed to can0)"
@@ -475,6 +886,21 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--smoke", action="store_true", help="self-inject synthetic packets")
     args = parser.parse_args(argv)
+
+    if not 1 <= args.web_port <= 65_535:
+        parser.error("--web-port must be in 1..65535")
+    if args.sink is None:
+        args.sink = "tcp" if sys.platform == "win32" else "socketcan"
+    if (
+        args.mode == "standalone"
+        and sys.platform == "win32"
+        and args.sink == "tcp"
+        and args.tcp_host == "0.0.0.0"
+        and args.tcp_port == 5678
+    ):
+        args.tcp_host, args.tcp_port = GatewayConfigStore().load_tcp_endpoint(
+            args.tcp_host, args.tcp_port
+        )
 
     if args.setup_vcan:
         try:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import socket
 import struct
 import sys
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -151,6 +152,10 @@ class TcpPc001SinkTest(unittest.TestCase):
     def test_no_client_append_is_safe(self) -> None:
         self.sink.append(0x456, b"\x02" * 8)
         self.assertIn("waiting", self.sink.peer_name())
+        status = self.sink.status_snapshot()
+        self.assertEqual(status.queued_frames, 0)
+        self.assertEqual(status.dropped_no_client, 1)
+        self.assertEqual(status.dropped_frames, 1)
 
     def test_large_burst_split_into_batches(self) -> None:
         client = _Client(self.port)
@@ -174,7 +179,7 @@ class TcpPc001SinkTest(unittest.TestCase):
         finally:
             client.close()
 
-    def test_reconnect_recovers_and_drains_pending(self) -> None:
+    def test_reconnect_does_not_replay_disconnected_frames(self) -> None:
         first = _Client(self.port)
         for _ in range(50):
             if "connected" in self.sink.peer_name():
@@ -182,19 +187,87 @@ class TcpPc001SinkTest(unittest.TestCase):
             time.sleep(0.02)
         first.close()
         self.assertTrue(self.wait_handshake_state(False))
-        # Queue only after the disconnect is observed. A successful TCP send
-        # cannot prove whether the peer read the bytes, so "send then close"
-        # is not a deterministic requeue contract.
         self.sink.append(0x111, b"\x03" * 8)
+        self.assertEqual(self.sink.status_snapshot().dropped_no_client, 1)
 
         second = _Client(self.port)
         try:
+            self.assertTrue(self.wait_handshake_state(True))
+            second.sock.settimeout(0.2)
+            with self.assertRaises(socket.timeout):
+                second.recv_batch()
+            self.sink.append(0x112, b"\x04" * 8)
             second.sock.settimeout(5)
             count, frames = second.recv_batch()
             self.assertEqual(count, 1)
-            self.assertEqual(frames[0][0], 0x111)
+            self.assertEqual(frames[0][0], 0x112)
         finally:
             second.close()
+
+    def test_status_counts_sent_frames(self) -> None:
+        client = _Client(self.port)
+        try:
+            self.assertTrue(self.wait_handshake_state(True))
+            self.sink.append(0x321, b"\x05" * 8)
+            count, _frames = client.recv_batch()
+            self.assertEqual(count, 1)
+            deadline = time.time() + 1.0
+            while self.sink.status_snapshot().sent_frames != 1 and time.time() < deadline:
+                time.sleep(0.01)
+            status = self.sink.status_snapshot()
+            self.assertEqual(status.sent_frames, 1)
+            self.assertEqual(status.queued_frames, 0)
+            self.assertEqual(status.dropped_frames, 0)
+        finally:
+            client.close()
+
+    def test_queue_is_bounded_and_only_service_thread_writes_batches(self) -> None:
+        self.sink.close()
+        entered = threading.Event()
+        release = threading.Event()
+        send_threads: list[str] = []
+
+        class ControlledSink(TcpPc001Sink):
+            def _take_batch(self, client):
+                entered.set()
+                release.wait(timeout=2.0)
+                return super()._take_batch(client)
+
+            def _send_batch(self, client, batch):
+                send_threads.append(threading.current_thread().name)
+                return super()._send_batch(client, batch)
+
+        self.sink = ControlledSink("127.0.0.1", self.port, queue_capacity=8)
+        client = _Client(self.port)
+        try:
+            self.assertTrue(self.wait_handshake_state(True))
+            self.assertTrue(entered.wait(timeout=1.0))
+            producers = [
+                threading.Thread(
+                    target=self.sink.append,
+                    args=(0x200 + index, bytes([index]) * 8),
+                    name=f"producer-{index}",
+                )
+                for index in range(16)
+            ]
+            for producer in producers:
+                producer.start()
+            for producer in producers:
+                producer.join(timeout=1.0)
+            status = self.sink.status_snapshot()
+            self.assertEqual(status.queued_frames, 8)
+            self.assertEqual(status.dropped_queue_full, 8)
+            release.set()
+            count, frames = client.recv_batch()
+            self.assertEqual(count, 8)
+            self.assertEqual(len({can_id for can_id, _payload in frames}), 8)
+            deadline = time.time() + 1.0
+            while not send_threads and time.time() < deadline:
+                time.sleep(0.01)
+            self.assertEqual(send_threads, ["pc001-service"])
+        finally:
+            release.set()
+            client.close()
 
     def test_close_idempotent(self) -> None:
         self.sink.close()

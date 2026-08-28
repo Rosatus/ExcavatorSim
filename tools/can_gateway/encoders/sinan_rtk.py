@@ -1,15 +1,15 @@
 """Sinan CGI610 RTK frame family encoders (0x0CFDA000..A900).
 
-Byte layouts default to the historical gateway product decision: the whole
-family is LITTLE-endian, including velocity. QML compatibility mode overrides
-only A800 velocity to BIG-endian because the immutable ProtocolParser reads its
-four i16 fields in network order:
+These manual encoders remain as differential-test oracles. Production Godot
+telemetry uses the approved hash-bound DBC codec. The authoritative family is
+LITTLE-endian throughout, including A800 velocity:
 
 - LITTLE-endian: GPS week, GPS time-of-week ms, gps age,
   lon/lat int64 (1e8), altitude int32 (mm), heading u16 (1e-2 deg),
   velocity ve/vn/vu/v as 4 x i16 (1e-2 m/s)
 
-Encoders and decoders accept explicit byte order for cross-checks.
+Encoders and decoders retain explicit byte order only for historical fixture
+cross-checks.
 """
 
 from __future__ import annotations

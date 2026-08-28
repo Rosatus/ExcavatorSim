@@ -1,6 +1,6 @@
 {
   "source_fixture": "backend/tests/fixtures/frame-parity/baseline.json",
-  "source_fixture_sha256": "49c66a79f3e7a335ad68fe16b125e1522c61f6633f1d217d9ce17fc80f4965de",
+  "source_fixture_sha256": "3e4bdbb3abddd059b0512548947f7455088426aec02c3936a047b6a74fd40119",
   "matrix_semantics": "row arrays encoding right-handed T_world_frame",
   "poses": {
     "zero": {

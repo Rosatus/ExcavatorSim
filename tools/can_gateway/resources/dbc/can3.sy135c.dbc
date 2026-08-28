@@ -1,0 +1,185 @@
+VERSION ""
+
+
+NS_ : 
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	CAT_DEF_
+	CAT_
+	FILTER
+	BA_DEF_DEF_
+	EV_DATA_
+	ENVVAR_DATA_
+	SGTYPE_
+	SGTYPE_VAL_
+	BA_DEF_SGTYPE_
+	BA_SGTYPE_
+	SIG_TYPE_REF_
+	VAL_TABLE_
+	SIG_GROUP_
+	SIG_VALTYPE_
+	SIGTYPE_VALTYPE_
+	BO_TX_BU_
+	BA_DEF_REL_
+	BA_REL_
+	BA_DEF_DEF_REL_
+	BU_SG_REL_
+	BU_EV_REL_
+	BU_BO_REL_
+	SG_MUL_VAL_
+
+BS_:
+
+BU_: IMU_BODY P_Box IMU_BOOM IMU_ARM IMU_BUCKET
+
+
+BO_ 2566863360 MSG_18FF3A00: 8 IMU_BODY
+ SG_ reversed_56 : 56|8@1+ (1,0) [0|255] ""  P_Box
+ SG_ reversed : 48|8@1+ (1,-75) [-75|180] "℃/摄氏度"  P_Box
+ SG_ Yaw_Angle : 32|16@1+ (0.01,-180.0) [-180.0|475.35] "°/度"  P_Box
+ SG_ Roll_Angle : 16|16@1+ (0.01,-180.0) [-180.0|475.35] "°/度"  P_Box
+ SG_ Pitch_Angle : 0|16@1+ (0.01,-180.0) [-180.0|475.35] "°/度"  P_Box
+
+BO_ 2566859264 MSG_18FF2A00: 8 IMU_BODY
+ SG_ reversed : 56|8@1+ (1,0) [0|255] ""  P_Box
+ SG_ Acc_Z : 32|16@1+ (0.001,-32.0) [-32.0|33.535] "g/重力加速度"  P_Box
+ SG_ Acc_Y : 16|16@1+ (0.001,-32.0) [-32.0|33.535] "g/重力加速度"  P_Box
+ SG_ Acc_X : 0|16@1+ (0.001,-32.0) [-32.0|33.535] "g/重力加速度"  P_Box
+
+BO_ 2566855168 MSG_18FF1A00: 8 IMU_BODY
+ SG_ reversed : 56|8@1+ (1,0) [0|255] ""  P_Box
+ SG_ Gyro_Z : 32|16@1+ (0.01,-320.0) [-320.0|335.35] "度/秒 °/S"  P_Box
+ SG_ Gyro_Y : 16|16@1+ (0.01,-320.0) [-320.0|335.35] "度/秒 °/S"  P_Box
+ SG_ Gyro_X : 0|16@1+ (0.01,-320.0) [-320.0|335.35] "度/秒 °/S"  P_Box
+
+BO_ 2566863616 MSG_18FF3B00: 8 IMU_BOOM
+ SG_ reversed_56 : 56|8@1+ (1,0) [0|255] ""  P_Box
+ SG_ reversed : 48|8@1+ (1,-75) [-75|180] "℃/摄氏度"  P_Box
+ SG_ Yaw_Angle : 32|16@1+ (0.01,-180.0) [-180.0|475.35] "°/度"  P_Box
+ SG_ Roll_Angle : 16|16@1+ (0.01,-180.0) [-180.0|475.35] "°/度"  P_Box
+ SG_ Pitch_Angle : 0|16@1+ (0.01,-180.0) [-180.0|475.35] "°/度"  P_Box
+
+BO_ 2566859520 MSG_18FF2B00: 8 IMU_BOOM
+ SG_ reversed : 56|8@1+ (1,0) [0|255] ""  P_Box
+ SG_ Acc_Z : 32|16@1+ (0.001,-32.0) [-32.0|33.535] "g/重力加速度"  P_Box
+ SG_ Acc_Y : 16|16@1+ (0.001,-32.0) [-32.0|33.535] "g/重力加速度"  P_Box
+ SG_ Acc_X : 0|16@1+ (0.001,-32.0) [-32.0|33.535] "g/重力加速度"  P_Box
+
+BO_ 2566855424 MSG_18FF1B00: 8 IMU_BOOM
+ SG_ reversed : 56|8@1+ (1,0) [0|255] ""  P_Box
+ SG_ Gyro_Z : 32|16@1+ (0.01,-320.0) [-320.0|335.35] "度/秒 °/S"  P_Box
+ SG_ Gyro_Y : 16|16@1+ (0.01,-320.0) [-320.0|335.35] "度/秒 °/S"  P_Box
+ SG_ Gyro_X : 0|16@1+ (0.01,-320.0) [-320.0|335.35] "度/秒 °/S"  P_Box
+
+BO_ 2566863872 MSG_18FF3C00: 8 IMU_ARM
+ SG_ reversed_56 : 56|8@1+ (1,0) [0|255] ""  P_Box
+ SG_ reversed : 48|8@1+ (1,-75) [-75|180] "℃/摄氏度"  P_Box
+ SG_ Yaw_Angle : 32|16@1+ (0.01,-180.0) [-180.0|475.35] "°/度"  P_Box
+ SG_ Roll_Angle : 16|16@1+ (0.01,-180.0) [-180.0|475.35] "°/度"  P_Box
+ SG_ Pitch_Angle : 0|16@1+ (0.01,-180.0) [-180.0|475.35] "°/度"  P_Box
+
+BO_ 2566859776 MSG_18FF2C00: 8 IMU_ARM
+ SG_ reversed : 56|8@1+ (1,0) [0|255] ""  P_Box
+ SG_ Acc_Z : 32|16@1+ (0.001,-32.0) [-32.0|33.535] "g/重力加速度"  P_Box
+ SG_ Acc_Y : 16|16@1+ (0.001,-32.0) [-32.0|33.535] "g/重力加速度"  P_Box
+ SG_ Acc_X : 0|16@1+ (0.001,-32.0) [-32.0|33.535] "g/重力加速度"  P_Box
+
+BO_ 2566855680 MSG_18FF1C00: 8 IMU_ARM
+ SG_ reversed : 56|8@1+ (1,0) [0|255] ""  P_Box
+ SG_ Gyro_Z : 32|16@1+ (0.01,-320.0) [-320.0|335.35] "度/秒 °/S"  P_Box
+ SG_ Gyro_Y : 16|16@1+ (0.01,-320.0) [-320.0|335.35] "度/秒 °/S"  P_Box
+ SG_ Gyro_X : 0|16@1+ (0.01,-320.0) [-320.0|335.35] "度/秒 °/S"  P_Box
+
+BO_ 2566864128 MSG_18FF3D00: 8 IMU_BUCKET
+ SG_ reversed_56 : 56|8@1+ (1,0) [0|255] ""  P_Box
+ SG_ reversed : 48|8@1+ (1,-75) [-75|180] "℃/摄氏度"  P_Box
+ SG_ Yaw_Angle : 32|16@1+ (0.01,-180.0) [-180.0|475.35] "°/度"  P_Box
+ SG_ Roll_Angle : 16|16@1+ (0.01,-180.0) [-180.0|475.35] "°/度"  P_Box
+ SG_ Pitch_Angle : 0|16@1+ (0.01,-180.0) [-180.0|475.35] "°/度"  P_Box
+
+BO_ 2566860032 MSG_18FF2D00: 8 IMU_BUCKET
+ SG_ reversed : 56|8@1+ (1,0) [0|255] ""  P_Box
+ SG_ Acc_Z : 32|16@1+ (0.001,-32.0) [-32.0|33.535] "g/重力加速度"  P_Box
+ SG_ Acc_Y : 16|16@1+ (0.001,-32.0) [-32.0|33.535] "g/重力加速度"  P_Box
+ SG_ Acc_X : 0|16@1+ (0.001,-32.0) [-32.0|33.535] "g/重力加速度"  P_Box
+
+BO_ 2566855936 MSG_18FF1D00: 8 IMU_BUCKET
+ SG_ reversed : 56|8@1+ (1,0) [0|255] ""  P_Box
+ SG_ Gyro_Z : 32|16@1+ (0.01,-320.0) [-320.0|335.35] "度/秒 °/S"  P_Box
+ SG_ Gyro_Y : 16|16@1+ (0.01,-320.0) [-320.0|335.35] "度/秒 °/S"  P_Box
+ SG_ Gyro_X : 0|16@1+ (0.01,-320.0) [-320.0|335.35] "度/秒 °/S"  P_Box
+
+
+
+
+CM_ BO_ 2566863360 "channel=can3";
+CM_ SG_ 2566863360 reversed_56 "状态标志位（Flag）预留 b1b0=00：角度帧；b3b2=00：自检成功 / 双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
+CM_ SG_ 2566863360 reversed "温度值预留";
+CM_ SG_ 2566863360 Yaw_Angle "Z 轴（YAW 方位角）";
+CM_ SG_ 2566863360 Roll_Angle "X 轴（ROLL 横滚角）";
+CM_ SG_ 2566863360 Pitch_Angle "Y 轴（PITCH 俯仰角）";
+CM_ BO_ 2566859264 "channel=can3";
+CM_ SG_ 2566859264 reversed "b1b0=00：加速度帧；b3b2=00：自检成功 /，双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
+CM_ SG_ 2566859264 Acc_Z "Z轴加速度大小";
+CM_ SG_ 2566859264 Acc_Y "Y轴加速度大小";
+CM_ SG_ 2566859264 Acc_X "X 轴加速度大小";
+CM_ BO_ 2566855168 "channel=can3";
+CM_ SG_ 2566855168 reversed "b1b0=00：陀螺帧；b3b2=00：自检成功 /，双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
+CM_ SG_ 2566855168 Gyro_Z "Z轴陀螺大小";
+CM_ SG_ 2566855168 Gyro_Y "Y轴陀螺大小";
+CM_ SG_ 2566855168 Gyro_X "X 轴陀螺大小";
+CM_ BO_ 2566863616 "channel=can3";
+CM_ SG_ 2566863616 reversed_56 "状态标志位（Flag）预留 b1b0=00：角度帧；b3b2=00：自检成功 / 双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
+CM_ SG_ 2566863616 Yaw_Angle "Z 轴（YAW 方位角）";
+CM_ SG_ 2566863616 Roll_Angle "X 轴（ROLL 横滚角）";
+CM_ SG_ 2566863616 Pitch_Angle "Y 轴（PITCH 俯仰角）";
+CM_ BO_ 2566859520 "channel=can3";
+CM_ SG_ 2566859520 reversed "b1b0=00：加速度帧；b3b2=00：自检成功 /，双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
+CM_ SG_ 2566859520 Acc_Z "Z轴加速度大小";
+CM_ SG_ 2566859520 Acc_Y "Y轴加速度大小";
+CM_ SG_ 2566859520 Acc_X "X 轴加速度大小";
+CM_ BO_ 2566855424 "channel=can3";
+CM_ SG_ 2566855424 reversed "b1b0=00：陀螺帧；b3b2=00：自检成功 /，双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
+CM_ SG_ 2566855424 Gyro_Z "Z轴陀螺大小";
+CM_ SG_ 2566855424 Gyro_Y "Y轴陀螺大小";
+CM_ SG_ 2566855424 Gyro_X "X 轴陀螺大小";
+CM_ BO_ 2566863872 "channel=can3";
+CM_ SG_ 2566863872 reversed_56 "状态标志位（Flag）预留 b1b0=00：角度帧；b3b2=00：自检成功 / 双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
+CM_ SG_ 2566863872 Yaw_Angle "Z 轴（YAW 方位角）";
+CM_ SG_ 2566863872 Roll_Angle "X 轴（ROLL 横滚角）";
+CM_ SG_ 2566863872 Pitch_Angle "Y 轴（PITCH 俯仰角）";
+CM_ BO_ 2566859776 "channel=can3";
+CM_ SG_ 2566859776 reversed "b1b0=00：加速度帧；b3b2=00：自检成功 /，双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
+CM_ SG_ 2566859776 Acc_Z "Z轴加速度大小";
+CM_ SG_ 2566859776 Acc_Y "Y轴加速度大小";
+CM_ SG_ 2566859776 Acc_X "X 轴加速度大小";
+CM_ BO_ 2566855680 "channel=can3";
+CM_ SG_ 2566855680 reversed "b1b0=00：陀螺帧；b3b2=00：自检成功 /，双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
+CM_ SG_ 2566855680 Gyro_Z "Z轴陀螺大小";
+CM_ SG_ 2566855680 Gyro_Y "Y轴陀螺大小";
+CM_ SG_ 2566855680 Gyro_X "X 轴陀螺大小";
+CM_ BO_ 2566864128 "channel=can3";
+CM_ SG_ 2566864128 reversed_56 "状态标志位（Flag）预留 b1b0=00：角度帧；b3b2=00：自检成功 / 双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
+CM_ SG_ 2566864128 Yaw_Angle "Z 轴（YAW 方位角）";
+CM_ SG_ 2566864128 Roll_Angle "X 轴（ROLL 横滚角）";
+CM_ SG_ 2566864128 Pitch_Angle "Y 轴（PITCH 俯仰角）";
+CM_ BO_ 2566860032 "channel=can3";
+CM_ SG_ 2566860032 reversed "b1b0=00：加速度帧；b3b2=00：自检成功 /，双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
+CM_ SG_ 2566860032 Acc_Z "Z轴加速度大小";
+CM_ SG_ 2566860032 Acc_Y "Y轴加速度大小";
+CM_ SG_ 2566860032 Acc_X "X 轴加速度大小";
+CM_ BO_ 2566855936 "channel=can3";
+CM_ SG_ 2566855936 reversed "b1b0=00：陀螺帧；b3b2=00：自检成功 /，双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
+CM_ SG_ 2566855936 Gyro_Z "Z轴陀螺大小";
+CM_ SG_ 2566855936 Gyro_Y "Y轴陀螺大小";
+CM_ SG_ 2566855936 Gyro_X "X 轴陀螺大小";
+
+
+
+
+
+
+

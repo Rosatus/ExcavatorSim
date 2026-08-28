@@ -1,0 +1,9 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend development entry point for Web and Godot integration."}
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Managed process ownership and Godot launch constraints."}
+{"file":".trellis/spec/backend/authority-and-concurrency.md","reason":"UI/API must respect immutable snapshots and core-owned mutations."}
+{"file":".trellis/spec/backend/can-gateway-control.md","reason":"Present transport and scheduler state without changing Gateway semantics."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Render stable API, validation, and transport failures correctly."}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Bounded aggregate log rendering and safe downloads."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Frontend contract, build, package, and cross-layer quality gates."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace UI actions/status through API, core, resources, and packages."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse typed DTO and validation semantics across Python and React."}

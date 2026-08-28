@@ -35,8 +35,9 @@ def pack_can_frame(can_id: int, payload: bytes) -> bytes:
     if can_id & ~(CAN_EFF_FLAG | CAN_EFF_MASK):
         raise ValueError(f"unsupported CAN ID flags: 0x{can_id:X}")
     packed_id = raw_id | CAN_EFF_FLAG if flagged or raw_id > CAN_SFF_MASK else raw_id
-    data = payload.ljust(CAN_FRAME_DLC, b"\x00")[:CAN_FRAME_DLC]
-    return CAN_FRAME_STRUCT.pack(packed_id, CAN_FRAME_DLC, 0, 0, 0, data)
+    dlc = min(len(payload), CAN_FRAME_DLC)
+    data = payload[:dlc].ljust(CAN_FRAME_DLC, b"\x00")
+    return CAN_FRAME_STRUCT.pack(packed_id, dlc, 0, 0, 0, data)
 
 
 class CsvFrameSink:

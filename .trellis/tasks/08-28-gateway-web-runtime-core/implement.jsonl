@@ -1,0 +1,8 @@
+{"file":".trellis/spec/backend/index.md","reason":"Mandatory backend development entry point."}
+{"file":".trellis/spec/backend/authority-and-concurrency.md","reason":"Core owner, command queue, immutable snapshot, writer, and observer boundaries."}
+{"file":".trellis/spec/backend/can-gateway-control.md","reason":"Gateway, PC001, ICT, can0, timed-frame, and lifecycle contracts."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Typed API/transport errors and boundary serialization."}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Bounded asynchronous persistent and operator-facing logs."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Deterministic concurrency and transport regression tests."}
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Godot-spawned process and managed-mode lifecycle ownership."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace browser commands through core state and platform transport."}

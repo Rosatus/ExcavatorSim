@@ -22,6 +22,7 @@ from can0_setup import (  # noqa: E402
     configure_can0,
     inspect_can0,
     prepare_can0,
+    restart_can0,
 )
 from can0_setup_helper import main as helper_main  # noqa: E402
 
@@ -134,6 +135,15 @@ class Can0ConfigureTest(unittest.TestCase):
             ],
         )
         self.assertFalse(any("add" in call for call in runner.calls))
+
+    def test_force_cycles_an_already_ready_interface(self) -> None:
+        runner = SequenceRunner([link_json(), link_json()])
+        snapshot = configure_can0(runner=runner, lock_path=None, force=True)
+        self.assertTrue(snapshot.ready)
+        ip_path = runner.calls[0][0]
+        mutations = [call for call in runner.calls if call[0:2] == (ip_path, "link")]
+        self.assertEqual(mutations[0], (ip_path, "link", "set", "can0", "down"))
+        self.assertEqual(mutations[-1], (ip_path, "link", "set", "can0", "up"))
 
     def test_failure_preserves_original_down_state(self) -> None:
         ip_path = str(IP_PATH_CANDIDATES[0])
@@ -252,6 +262,19 @@ class GatewayPreparationTest(unittest.TestCase):
             with self.assertRaises(Can0SetupError) as ctx:
                 prepare_can0(runner=runner, helper_path=helper, which=lambda _: "sudo")
         self.assertEqual(ctx.exception.code, "CAN0_SETUP_FAILED")
+
+    def test_explicit_restart_invokes_helper_even_when_ready(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            helper = Path(tmp) / "helper"
+            helper.write_bytes(b"ELF")
+            runner = SequenceRunner([link_json(), link_json()])
+            snapshot = restart_can0(
+                runner=runner,
+                helper_path=helper,
+                which=lambda name: "/usr/bin/sudo" if name == "sudo" else None,
+            )
+        self.assertTrue(snapshot.ready)
+        self.assertIn(("/usr/bin/sudo", "-n", str(helper)), runner.calls)
 
     def test_helper_rejects_arguments(self) -> None:
         self.assertEqual(helper_main(["can1"]), 64)

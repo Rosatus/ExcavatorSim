@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "generated_from": "pixi.lock",
-  "pixi_lock_sha256": "427084c589505f5f3463791e277c6dea1fadce27cf64b8c15a17a9a4ec3d97e7",
+  "pixi_lock_sha256": "d4c4083ca6143dcd9acd40666bca117ed0790e8a8685ec2be0c7ebb32e6a7775",
   "packages": [
     {
       "name": "_python_abi3_support",
@@ -64,6 +64,18 @@
       "url": "https://conda.anaconda.org/conda-forge/win-64/ampl-asl-1.0.0-he0c23c2_2.conda"
     },
     {
+      "name": "argparse_addons",
+      "version": "0.12.0",
+      "build": null,
+      "kind": "pypi",
+      "source": "https://pypi.org/simple",
+      "license": null,
+      "license_family": null,
+      "is_explicit": false,
+      "sha256": "48b70ecd719054fcb0d7e6f25a1fecc13607aac61d446e83f47d211b4ead0d61",
+      "url": "https://files.pythonhosted.org/packages/c1/41/629e70c4cb32c1ddb88de970cd174bbb43d8241c8e07bdffc62a8280297c/argparse_addons-0.12.0-py3-none-any.whl"
+    },
+    {
       "name": "assimp",
       "version": "6.0.5",
       "build": "hd1184bf_1",
@@ -112,6 +124,18 @@
       "url": "https://conda.anaconda.org/conda-forge/noarch/backports.asyncio.runner-1.2.0-pyh5ded981_2.conda"
     },
     {
+      "name": "bitstruct",
+      "version": "8.23.0",
+      "build": null,
+      "kind": "pypi",
+      "source": "https://pypi.org/simple",
+      "license": null,
+      "license_family": null,
+      "is_explicit": false,
+      "sha256": "e4766c3e768a2a65e47537de549ba0fa92b9dad290d9c4c1c112bc09444a9da6",
+      "url": "https://files.pythonhosted.org/packages/cb/5e/9b3d25a45c55333f853279c2d110a48764601e34e50ba537c99851ecea07/bitstruct-8.23.0-cp311-cp311-win_amd64.whl"
+    },
+    {
       "name": "bzip2",
       "version": "1.0.8",
       "build": "h0ad9c76_9",
@@ -134,6 +158,18 @@
       "is_explicit": false,
       "sha256": "95e8e74062a5fe5f870ac8c90302b6e89945165fdaed7810606e84ddee6aac12",
       "url": "https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.7.22-h4c7d964_0.conda"
+    },
+    {
+      "name": "cantools",
+      "version": "40.7.1",
+      "build": null,
+      "kind": "pypi",
+      "source": "https://pypi.org/simple",
+      "license": null,
+      "license_family": null,
+      "is_explicit": true,
+      "sha256": "a68159cce229581f77aad0b906938682f29ecc9164248c997af80f1d49c073c9",
+      "url": "https://files.pythonhosted.org/packages/f5/4c/46355057aaf5e6e0d900c031d2af95c61ca901753ec45778cc7bd7cdbb0d/cantools-40.7.1-py3-none-any.whl"
     },
     {
       "name": "casadi",
@@ -206,6 +242,30 @@
       "is_explicit": false,
       "sha256": "cfe29a7e71ab4553b9715ee4b6788824853ade58b8661ff3363acb3e762046a5",
       "url": "https://conda.anaconda.org/conda-forge/noarch/cpython-3.11.15-py311hd8ed1ab_1.conda"
+    },
+    {
+      "name": "crccheck",
+      "version": "1.3.1",
+      "build": null,
+      "kind": "pypi",
+      "source": "https://pypi.org/simple",
+      "license": null,
+      "license_family": null,
+      "is_explicit": false,
+      "sha256": "1680c9a7bb1ca4bec45fa19b8ca64319f10d2ce4eb8b0d25d51cb99a20ca0108",
+      "url": "https://files.pythonhosted.org/packages/01/b5/68a9054be852e61f31de1be4e8d95802646b93344ce17c2380a1748706fa/crccheck-1.3.1-py3-none-any.whl"
+    },
+    {
+      "name": "diskcache",
+      "version": "5.6.3",
+      "build": null,
+      "kind": "pypi",
+      "source": "https://pypi.org/simple",
+      "license": null,
+      "license_family": null,
+      "is_explicit": false,
+      "sha256": "5e31b2d5fbad117cc363ebaf6b689474db18a1f6438bc82358b024abd4c2ca19",
+      "url": "https://files.pythonhosted.org/packages/3f/27/4570e78fc0bf5ea0ca45eb1de3818a23787af9b390c0b0a0033a1b8236f9/diskcache-5.6.3-py3-none-any.whl"
     },
     {
       "name": "dlfcn-win32",
@@ -856,6 +916,18 @@
       "url": "https://conda.anaconda.org/conda-forge/win-64/pinocchio-python-4.1.0-py311h82fd2a6_1.conda"
     },
     {
+      "name": "platformdirs",
+      "version": "4.11.5",
+      "build": "pyhcf101f3_0",
+      "kind": "conda",
+      "source": "https://conda.anaconda.org/conda-forge",
+      "license": "MIT",
+      "license_family": null,
+      "is_explicit": true,
+      "sha256": "4496a7e0b584a388b3580ab594a4f384696ab7d702282588fd33a7ee38af983c",
+      "url": "https://conda.anaconda.org/conda-forge/noarch/platformdirs-4.11.5-pyhcf101f3_0.conda"
+    },
+    {
       "name": "pluggy",
       "version": "1.6.0",
       "build": "pyhf9edf01_1",
@@ -988,6 +1060,18 @@
       "url": "https://conda.anaconda.org/conda-forge/noarch/python_abi-3.11-8_cp311.conda"
     },
     {
+      "name": "python_can",
+      "version": "4.6.1",
+      "build": null,
+      "kind": "pypi",
+      "source": "https://pypi.org/simple",
+      "license": null,
+      "license_family": null,
+      "is_explicit": false,
+      "sha256": "17f95255868a95108dcfcb90565a684dad32d5a3ebb35afd14f739e18c84ff6c",
+      "url": "https://files.pythonhosted.org/packages/58/34/e4ac153acdbcfba7f48bc73d6586a74c91cc919fcc2e29acbf81be329d1f/python_can-4.6.1-py3-none-any.whl"
+    },
+    {
       "name": "qhull",
       "version": "2020.2",
       "build": "hc790b64_5",
@@ -1094,6 +1178,18 @@
       "is_explicit": false,
       "sha256": "8a4053839b8e997a5965e2dff7d6cf3c77be62d82c0e48c8a04a5ed2d2e73035",
       "url": "https://conda.anaconda.org/conda-forge/win-64/tbb-2023.0.0-hd3d4ead_2.conda"
+    },
+    {
+      "name": "textparser",
+      "version": "0.26.2",
+      "build": null,
+      "kind": "pypi",
+      "source": "https://pypi.org/simple",
+      "license": null,
+      "license_family": null,
+      "is_explicit": false,
+      "sha256": "e14ec4fd58d3515d897196a71f4ccf8d354f5c5c6b87910571b4d250de073c4b",
+      "url": "https://files.pythonhosted.org/packages/7d/cc/812fe3ae07a1917bb4cfb6dec5f6fc6e8825d65b4e77cd25bc52cd59230f/textparser-0.26.2-py3-none-any.whl"
     },
     {
       "name": "tinyxml2",
@@ -1238,6 +1334,18 @@
       "is_explicit": false,
       "sha256": "6de6c2cf008fc2dce61060b583f2d8494c83883106952b201381b6b0505f03d7",
       "url": "https://conda.anaconda.org/conda-forge/win-64/vs2015_runtime-14.51.36231-h84cd919_39.conda"
+    },
+    {
+      "name": "wrapt",
+      "version": "1.17.3",
+      "build": null,
+      "kind": "pypi",
+      "source": "https://pypi.org/simple",
+      "license": null,
+      "license_family": null,
+      "is_explicit": false,
+      "sha256": "0b1831115c97f0663cb77aa27d381237e73ad4f721391a9bfb2fe8bc25fa6e77",
+      "url": "https://files.pythonhosted.org/packages/83/88/16b7231ba49861b6f75fc309b11012ede4d6b0a9c90969d9e0db8d991aeb/wrapt-1.17.3-cp311-cp311-win_amd64.whl"
     },
     {
       "name": "yaml",

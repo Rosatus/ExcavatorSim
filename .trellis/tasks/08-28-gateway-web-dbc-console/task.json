@@ -1,0 +1,30 @@
+{
+  "id": "gateway-web-dbc-console",
+  "name": "gateway-web-dbc-console",
+  "title": "Gateway Web console and DBC frame sender",
+  "description": "",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "rosatus",
+  "assignee": "rosatus",
+  "createdAt": "2026-08-28",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "08-28-gateway-web-runtime-core",
+    "08-28-gateway-dbc-periodic-engine",
+    "08-28-gateway-react-console-packaging"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

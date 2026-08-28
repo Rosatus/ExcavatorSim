@@ -1,0 +1,11 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend entry point and mandatory development checks for Gateway changes."}
+{"file":".trellis/spec/backend/authority-and-concurrency.md","reason":"Single-owner command, snapshot, log, scheduler, and transport authority."}
+{"file":".trellis/spec/backend/can-gateway-control.md","reason":"Gateway lifecycle, ICT, transport, timed-frame, PC001, and regression contracts."}
+{"file":".trellis/spec/backend/can-qml-compatibility.md","reason":"CAN ID, payload, EFF, A800, and Godot compatibility boundaries."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Stable API/transport error serialization and boundary handling."}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Bounded operational logging and safe diagnostic requirements."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Deterministic unit, integration, and packaging verification expectations."}
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend entry point for the React console and Godot launch integration."}
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Godot ownership and spawned Gateway lifecycle constraints."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"API, Web UI, Gateway core, transport, and packaged asset data-flow review."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Shared DTO, codec, validation, and error constants without divergent paths."}

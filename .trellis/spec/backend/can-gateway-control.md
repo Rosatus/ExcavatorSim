@@ -237,3 +237,94 @@ Correct: inspect fixed can0 -> fixed `sudo -n` helper only if needed -> post-che
 Wrong: `SocketCanSink(vcan0)` -> create/enable missing vcan0
 Correct: create/enable development vcan0 -> `SocketCanSink(vcan0)`
 ```
+
+## Scenario: Local Web DBC console and shared encoding authority
+
+### 1. Scope / Trigger
+
+Use this contract when changing the Gateway Web API/UI, DBC discovery or persisted
+operator values, periodic scheduling, Godot-to-CAN projection, or packaged Gateway assets.
+
+### 2. Signatures
+
+```text
+gateway.py --mode {standalone,godot-managed} --web-port PORT [--open-browser]
+           [--dbc-dir DIR ...]
+GET  /api/v1/status | /api/v1/dbc | /api/v1/events?after=SEQ
+PUT  /api/v1/dbc/messages/{message_key}
+POST /api/v1/dbc/{start,stop,reload}
+PUT  /api/v1/transport/tcp
+POST /api/v1/transport/can0/restart
+```
+
+### 3. Contracts
+
+- Web binds only `127.0.0.1`; default port is `29777`. `godot-managed` exposes status,
+  statistics, events, and log downloads but rejects all mutation with HTTP 403.
+- `standalone` exposes only the host platform transport: Windows TCP rebind or Linux
+  confirmed can0 restart. Every mutation includes `expected_revision` and a bounded
+  `request_id`; only the Gateway owner loop performs transport or scheduler mutation.
+- DBC discovery scans bundled `resources/dbc`, frozen-executable-adjacent `dbc`, and each
+  explicit `--dbc-dir` non-recursively. Files are content-hash deduplicated and parse
+  failures are isolated as notices instead of dropping the entire catalog.
+- Each message has independent `enabled`, strict signal values, and integer `frequency_hz`
+  in `1..100` (default 50). The scheduler skips missed slots rather than catch-up bursting.
+- Godot telemetry and Web operator values are distinct sources but both pass through the
+  hash-bound strict DBC codec before the shared Gateway send core. A800 velocity signals
+  follow the approved DBC little-endian layout. DBC reload never changes the protocol
+  catalog already bound to Godot telemetry.
+- Estimated CAN load is informational: high load emits a visible warning but never blocks
+  sending. Non-8-byte DBC messages preserve their real DLC at every sink boundary.
+- Operator configuration is atomically persisted against DBC content/message identity;
+  changed or absent layouts cannot silently inherit stale values.
+- Production Web assets are built from `tools/can_gateway/web` into
+  `resources/web`; packaged artifacts include those assets plus both approved DBC files.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Non-local browser origin opens event WebSocket | `403 origin_forbidden` |
+| Mutation in `godot-managed` | `403 managed_mode_read_only` |
+| Windows requests can0 or Linux requests TCP | `409 capability_unavailable` |
+| Missing/old revision | `revision_invalid` or revision conflict; no mutation |
+| Frequency is bool, non-integer, `<1`, or `>100` | reject; preserve previous config |
+| Signal is unknown, non-finite, out of range, or cannot encode strictly | reject whole message update |
+| can0 restart omits `confirm=true` | `confirmation_required` |
+| One DBC is malformed or duplicates another content hash | keep healthy files; report notice |
+| Owner loop misses periodic deadlines | emit at most one current slot; skip backlog |
+
+### 5. Good / Base / Bad Cases
+
+- Good: Web edits one A800 signal, enables 20 Hz, and the resulting little-endian frame
+  uses the same codec/send core as Godot telemetry.
+- Base: Gateway is Godot-managed; the browser continues showing transport state and live
+  logs while all controls remain absent/read-only.
+- Bad: let the Web thread replace sinks directly, keep a second handwritten A800 codec,
+  reuse persisted values after a DBC hash change, or pad a short DBC frame's wire DLC to 8.
+
+### 6. Tests Required
+
+- API contract tests cover local-origin events, typed errors, revision conflicts, mode and
+  platform capability gates, TCP rebind, confirmed can0 restart, and static SPA fallback.
+- DBC tests cover deterministic discovery/deduplication, parse isolation, strict encode,
+  hash-bound persistence, reload isolation, per-message rates, no catch-up, and load math.
+- Differential tests compare every Godot-mapped RTK/IMU frame against cantools, including
+  A800 little endian and a process-level PC001 wire assertion with the real DLC.
+- Frontend tests cover managed read-only state, platform-specific controls, confirmation,
+  contract/error rendering, live-event sequence gaps, and 1..100 Hz integer inputs.
+- Packaging smoke starts the frozen Windows binary, loads `/`, `/api/v1/status`, Web assets,
+  and adjacent DBCs; Linux packaging validates Web/DBC inclusion and helper preservation.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: Godot encoder -> sink, Web DBC encoder -> separate sink path
+Correct: Godot values or Web values -> shared strict DBC codec -> Gateway send core -> TCP/can0
+
+Wrong: aiohttp thread mutates the live TCP/can0 sink
+Correct: HTTP validates -> bounded command queue -> single owner loop mutates runtime state
+
+Wrong: load warning disables Start
+Correct: estimate and warn; keep operator control available
+```

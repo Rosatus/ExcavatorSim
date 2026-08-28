@@ -207,6 +207,7 @@ def configure_can0(
     *,
     runner: CommandRunner = subprocess.run,
     lock_path: Path | None = CAN0_LOCK_PATH,
+    force: bool = False,
 ) -> CanInterfaceSnapshot:
     """Apply the fixed can0 contract. Intended to run only in the root helper."""
 
@@ -217,7 +218,7 @@ def configure_can0(
                 "CAN0_MISSING",
                 "can0 does not exist; connect the USB-CAN adapter and load its driver",
             )
-        if snapshot.ready:
+        if snapshot.ready and not force:
             return snapshot
         if snapshot.kind != "can":
             raise Can0SetupError(
@@ -289,6 +290,53 @@ def prepare_can0(
         )
     if snapshot.ready:
         return snapshot
+    if not helper_path.is_file():
+        raise Can0SetupError(
+            "CAN0_HELPER_MISSING",
+            "can0 setup helper is not installed; run install_can0_helper.sh as administrator",
+        )
+    sudo_path = which("sudo")
+    if sudo_path is None:
+        raise Can0SetupError("CAN0_PRIVILEGE", "sudo is unavailable; install the can0 helper first")
+    result = _completed(runner, [sudo_path, "-n", str(helper_path)])
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()
+        lowered = detail.lower()
+        if "can0_missing" in lowered:
+            code = "CAN0_MISSING"
+        elif "password" in lowered or "sudoers" in lowered or "not allowed" in lowered:
+            code = "CAN0_PRIVILEGE"
+        else:
+            code = "CAN0_SETUP_FAILED"
+        raise Can0SetupError(code, detail or f"can0 helper exited {result.returncode}")
+    verified = inspect_can0(runner=runner)
+    if not verified.ready:
+        raise Can0SetupError(
+            "CAN0_NOT_READY",
+            "can0 is still not ready: " + ", ".join(verified.readiness_issues()),
+        )
+    return verified
+
+
+def restart_can0(
+    *,
+    runner: CommandRunner = subprocess.run,
+    helper_path: Path = CAN0_HELPER_PATH,
+    which: Callable[[str], str | None] = _fixed_sudo_path,
+) -> CanInterfaceSnapshot:
+    """Force the installed fixed helper transaction, then verify can0."""
+
+    snapshot = inspect_can0(runner=runner)
+    if not snapshot.exists:
+        raise Can0SetupError(
+            "CAN0_MISSING",
+            "can0 does not exist; connect the USB-CAN adapter and load its driver",
+        )
+    if snapshot.kind != "can":
+        raise Can0SetupError(
+            "CAN0_WRONG_KIND",
+            f"can0 is {snapshot.kind or 'unknown'}, not a driver-created CAN interface",
+        )
     if not helper_path.is_file():
         raise Can0SetupError(
             "CAN0_HELPER_MISSING",

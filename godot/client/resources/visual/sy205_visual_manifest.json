@@ -213,7 +213,7 @@
   "calibration": {
     "status": "imported_rest_pose_captured_frame_parity_pending",
     "authority_fixture": "backend/tests/fixtures/frame-parity/baseline.json",
-    "authority_fixture_sha256": "49c66a79f3e7a335ad68fe16b125e1522c61f6633f1d217d9ce17fc80f4965de",
+    "authority_fixture_sha256": "3e4bdbb3abddd059b0512548947f7455088426aec02c3936a047b6a74fd40119",
     "matrix_semantics": "Python row arrays encode right-handed T_world_frame; Godot conversion is adapter-owned",
     "asset_root_scale": [1.0, 1.0, 1.0],
     "rest_transforms_godot": {

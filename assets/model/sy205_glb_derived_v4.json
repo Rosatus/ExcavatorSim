@@ -160,7 +160,7 @@
       "byte_size": 9325,
       "evidence_level": "validated",
       "path": "godot/client/resources/visual/sy205_visual_manifest.json",
-      "sha256": "e307f0473de1501663d79a1e60adfb48da600270de6963b077c77d45faa08e4c"
+      "sha256": "3a12f793416f0f22dfb4662f65634ce797f0ccdcacbaad1a0eea1d481b3c48a0"
     }
   },
   "joints": [
@@ -881,7 +881,7 @@
       "byte_size": 23728,
       "hash_basis": "canonical JSON with this sha256 field replaced by 64 zeroes",
       "path": "assets/model/sy205_glb_derived_v4.json",
-      "sha256": "66c341b314a28baf23d39fdcceeb7350170e4f43fc88282e21a38712557008c7"
+      "sha256": "dec1303494ba9c30c35711e7e3c010feb32024a758e33570ffb1e9e1c2793b5d"
     },
     "reference_urdf": {
       "byte_size": 5281,
