@@ -67,6 +67,11 @@ Linux 游戏启动参数自动选择 `--sink socketcan --interface can0`。点�
 `restart-ms=100`、`txqueuelen=1000` 且状态可用时直接绑定；否则通过受限
 helper 自动配置并复核。CAN 帧构造和 CSV 录制不受此流程影响。
 
+root helper 使用 `/run/excavatorsim/can0.lock` 串行化完整配置事务。运行时目录
+必须是 `root:root 0700`，锁文件必须是 `root:root 0600` 的单链接普通文件；
+不安全的既有目录、文件或符号链接会在任何 `ip link set` 前以稳定的
+`CAN0_SETUP_FAILED` 拒绝，不会被 helper 自动删除或修复。
+
 ```bash
 # WSL/Linux 出包（gateway + 固定 can0 helper + 安装脚本）
 cd tools/can_gateway && ./dist_linux.sh        # 优先 uv，缺 uv 时回退 venv+pip

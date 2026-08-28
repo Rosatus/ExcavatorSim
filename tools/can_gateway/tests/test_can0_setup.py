@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 import json
+import os
+import stat
 import sys
 import tempfile
+import threading
 import unittest
+from contextlib import redirect_stderr
+from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -16,15 +21,23 @@ if str(TOOLS_DIR) not in sys.path:
 
 from can0_setup import (  # noqa: E402
     CAN0_HELPER_PATH,
+    CAN0_LOCK_PATH,
     IP_PATH_CANDIDATES,
     MINIMAL_COMMAND_ENV,
+    Can0LockOps,
     Can0SetupError,
+    _exclusive_setup_lock,
+    _validate_lock_directory,
+    _validate_lock_file,
+    _validate_runtime_root,
     configure_can0,
     inspect_can0,
     prepare_can0,
     restart_can0,
 )
 from can0_setup_helper import main as helper_main  # noqa: E402
+
+TEST_LOCK_PATH = Path("C:/run/excavatorsim/can0.lock")
 
 
 def link_json(
@@ -71,6 +84,53 @@ class SequenceRunner:
         if key in self.failures:
             return SimpleNamespace(returncode=1, stdout="", stderr=self.failures[key])
         return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+
+def fake_stat(mode: int, *, uid: int = 0, nlink: int = 1) -> SimpleNamespace:
+    return SimpleNamespace(st_mode=mode, st_uid=uid, st_nlink=nlink)
+
+
+def make_lock_ops(
+    *,
+    runtime_metadata: SimpleNamespace | None = None,
+    directory_metadata: SimpleNamespace | None = None,
+    lock_metadata: SimpleNamespace | None = None,
+    fail_phase: str | None = None,
+) -> Can0LockOps:
+    metadata = {
+        10: runtime_metadata or fake_stat(stat.S_IFDIR | 0o755),
+        11: directory_metadata or fake_stat(stat.S_IFDIR | 0o700),
+        12: lock_metadata or fake_stat(stat.S_IFREG | 0o600),
+    }
+    open_fds = iter((10, 11, 12))
+
+    def open_fd(*args, **kwargs):
+        fd = next(open_fds)
+        if fail_phase == f"open_{fd}":
+            raise PermissionError("attacker-controlled open detail")
+        return fd
+
+    def mkdir(*args, **kwargs):
+        if fail_phase == "mkdir":
+            raise PermissionError("attacker-controlled mkdir detail")
+
+    def fstat(fd):
+        if fail_phase == f"fstat_{fd}":
+            raise OSError("attacker-controlled stat detail")
+        return metadata[fd]
+
+    def flock(fd, operation):
+        if fail_phase == "flock":
+            raise PermissionError("attacker-controlled flock detail")
+
+    return Can0LockOps(
+        open_fd=open_fd,
+        mkdir=mkdir,
+        fstat=fstat,
+        flock=flock,
+        close_fd=lambda fd: None,
+        lock_ex=1,
+    )
 
 
 class Can0InspectionTest(unittest.TestCase):
@@ -203,16 +263,194 @@ class Can0ConfigureTest(unittest.TestCase):
 
     def test_configure_uses_the_requested_exclusive_lock(self) -> None:
         runner = SequenceRunner([link_json()])
-        lock_path = Path("/run/lock/test-can0.lock")
+        lock_path = Path("/run/test-can0/can0.lock")
         with patch("can0_setup._exclusive_setup_lock") as setup_lock:
             configure_can0(runner=runner, lock_path=lock_path)
-        setup_lock.assert_called_once_with(lock_path)
+        setup_lock.assert_called_once_with(lock_path, lock_ops=None)
 
     def test_wrong_kind_is_rejected_without_mutation(self) -> None:
         runner = SequenceRunner([link_json(kind="vcan")])
         with self.assertRaisesRegex(Can0SetupError, "not a driver-created CAN"):
             configure_can0(runner=runner, lock_path=None)
         self.assertEqual(len(runner.calls), 1)
+
+
+class Can0SecureLockTest(unittest.TestCase):
+    def test_fixed_lock_is_inside_root_only_runtime_directory(self) -> None:
+        self.assertEqual(CAN0_LOCK_PATH, Path("/run/excavatorsim/can0.lock"))
+
+    def test_safe_metadata_is_accepted(self) -> None:
+        _validate_runtime_root(fake_stat(stat.S_IFDIR | 0o755))
+        _validate_lock_directory(fake_stat(stat.S_IFDIR | 0o700))
+        _validate_lock_file(fake_stat(stat.S_IFREG | 0o600))
+
+    def test_unsafe_runtime_metadata_is_rejected(self) -> None:
+        cases = (
+            fake_stat(stat.S_IFREG | 0o755),
+            fake_stat(stat.S_IFDIR | 0o755, uid=1000),
+            fake_stat(stat.S_IFDIR | 0o777),
+        )
+        for metadata in cases:
+            with self.subTest(metadata=metadata), self.assertRaises(Can0SetupError) as ctx:
+                _validate_runtime_root(metadata)
+            self.assertEqual(ctx.exception.code, "CAN0_SETUP_FAILED")
+
+    def test_wrong_directory_owner_or_mode_is_rejected(self) -> None:
+        cases = (
+            fake_stat(stat.S_IFDIR | 0o700, uid=1000),
+            fake_stat(stat.S_IFDIR | 0o750),
+            fake_stat(stat.S_IFREG | 0o700),
+        )
+        for metadata in cases:
+            with self.subTest(metadata=metadata), self.assertRaises(Can0SetupError) as ctx:
+                _validate_lock_directory(metadata)
+            self.assertEqual(ctx.exception.code, "CAN0_SETUP_FAILED")
+
+    def test_preoccupied_or_unsafe_lock_object_is_rejected(self) -> None:
+        cases = (
+            fake_stat(stat.S_IFREG | 0o600, uid=1000),
+            fake_stat(stat.S_IFREG | 0o660),
+            fake_stat(stat.S_IFIFO | 0o600),
+            fake_stat(stat.S_IFREG | 0o600, nlink=2),
+        )
+        for metadata in cases:
+            runner = SequenceRunner([])
+            with self.subTest(metadata=metadata), self.assertRaises(Can0SetupError) as ctx:
+                configure_can0(
+                    runner=runner,
+                    lock_path=TEST_LOCK_PATH,
+                    lock_ops=make_lock_ops(lock_metadata=metadata),
+                )
+            self.assertEqual(ctx.exception.code, "CAN0_SETUP_FAILED")
+            self.assertEqual(runner.calls, [])
+
+    def test_lock_syscall_failures_are_stable_and_sanitized(self) -> None:
+        for phase in (
+            "open_10",
+            "fstat_10",
+            "mkdir",
+            "open_11",
+            "fstat_11",
+            "open_12",
+            "fstat_12",
+            "flock",
+        ):
+            runner = SequenceRunner([])
+            with self.subTest(phase=phase), self.assertRaises(Can0SetupError) as ctx:
+                configure_can0(
+                    runner=runner,
+                    lock_path=TEST_LOCK_PATH,
+                    lock_ops=make_lock_ops(fail_phase=phase),
+                )
+            self.assertEqual(ctx.exception.code, "CAN0_SETUP_FAILED")
+            self.assertNotIn("attacker-controlled", str(ctx.exception))
+            self.assertEqual(runner.calls, [])
+
+    def test_injected_lock_serializes_complete_transactions(self) -> None:
+        mutex = threading.Lock()
+        fd_lock = threading.Lock()
+        next_fd = 20
+        roles: dict[int, str] = {}
+
+        def open_fd(path, flags, mode=0o777, *, dir_fd=None):
+            nonlocal next_fd
+            with fd_lock:
+                fd = next_fd
+                next_fd += 1
+                if str(path) == "can0.lock":
+                    roles[fd] = "lock"
+                elif str(path) == "excavatorsim":
+                    roles[fd] = "child"
+                else:
+                    roles[fd] = "runtime"
+                return fd
+
+        def fstat(fd):
+            role = roles[fd]
+            if role == "lock":
+                return fake_stat(stat.S_IFREG | 0o600)
+            return fake_stat(stat.S_IFDIR | (0o700 if role == "child" else 0o755))
+
+        def flock(fd, operation):
+            mutex.acquire()
+
+        def close_fd(fd):
+            if roles[fd] == "lock":
+                mutex.release()
+
+        ops = Can0LockOps(open_fd, lambda *a, **k: None, fstat, flock, close_fd, 1)
+        first_entered = threading.Event()
+        allow_first_exit = threading.Event()
+        second_entered = threading.Event()
+        entry_count = 0
+        entry_guard = threading.Lock()
+
+        def runner(command, **kwargs):
+            nonlocal entry_count
+            with entry_guard:
+                entry_count += 1
+                current = entry_count
+            if current == 1:
+                first_entered.set()
+                self.assertTrue(allow_first_exit.wait(2.0))
+            else:
+                second_entered.set()
+            return SimpleNamespace(returncode=0, stdout=link_json(), stderr="")
+
+        failures: list[BaseException] = []
+
+        def run_configure():
+            try:
+                configure_can0(runner=runner, lock_path=TEST_LOCK_PATH, lock_ops=ops)
+            except BaseException as exc:  # pragma: no cover - surfaced by assertion below
+                failures.append(exc)
+
+        first = threading.Thread(target=run_configure)
+        second = threading.Thread(target=run_configure)
+        first.start()
+        self.assertTrue(first_entered.wait(2.0))
+        second.start()
+        self.assertFalse(second_entered.wait(0.1))
+        allow_first_exit.set()
+        first.join(2.0)
+        second.join(2.0)
+        self.assertTrue(second_entered.is_set())
+        self.assertFalse(first.is_alive())
+        self.assertFalse(second.is_alive())
+        self.assertEqual(failures, [])
+
+    @unittest.skipUnless(
+        os.name == "posix" and hasattr(os, "geteuid") and os.geteuid() == 0,
+        "root Linux only",
+    )
+    def test_real_flock_blocks_a_second_holder(self) -> None:
+        with tempfile.TemporaryDirectory(dir="/run") as tmp:
+            runtime_dir = Path(tmp)
+            runtime_dir.chmod(0o700)
+            lock_path = runtime_dir / "excavatorsim" / "can0.lock"
+            first_entered = threading.Event()
+            release_first = threading.Event()
+            second_entered = threading.Event()
+
+            def hold_first():
+                with _exclusive_setup_lock(lock_path):
+                    first_entered.set()
+                    release_first.wait(2.0)
+
+            def hold_second():
+                with _exclusive_setup_lock(lock_path):
+                    second_entered.set()
+
+            first = threading.Thread(target=hold_first)
+            second = threading.Thread(target=hold_second)
+            first.start()
+            self.assertTrue(first_entered.wait(2.0))
+            second.start()
+            self.assertFalse(second_entered.wait(0.1))
+            release_first.set()
+            first.join(2.0)
+            second.join(2.0)
+            self.assertTrue(second_entered.is_set())
 
 
 class GatewayPreparationTest(unittest.TestCase):
@@ -278,6 +516,15 @@ class GatewayPreparationTest(unittest.TestCase):
 
     def test_helper_rejects_arguments(self) -> None:
         self.assertEqual(helper_main(["can1"]), 64)
+
+    def test_helper_lock_failure_is_one_stable_line_without_traceback(self) -> None:
+        stderr = StringIO()
+        error = Can0SetupError("CAN0_SETUP_FAILED", "can0 lock object unavailable")
+        with patch("can0_setup_helper.configure_can0", side_effect=error), redirect_stderr(stderr):
+            self.assertEqual(helper_main([]), 1)
+        output = stderr.getvalue()
+        self.assertEqual(output, "CAN0_SETUP_FAILED: can0 lock object unavailable\n")
+        self.assertNotIn("Traceback", output)
 
 
 if __name__ == "__main__":

@@ -86,8 +86,14 @@ TCP server currently stores a client accepted after `who` / `PC001`.
 - An unready/unverifiable can0 invokes exactly
   `sudo -n /usr/local/libexec/excavatorsim/can0-setup-helper`. The installed
   root helper accepts no arguments and runs down → bitrate/restart → queue → up
-  → post-check under an exclusive lock. Its `ip` executable and subprocess
-  environment come from fixed system allowlists, not caller `PATH`.
+  → post-check under an exclusive lock. The complete transaction is serialized
+  by `/run/excavatorsim/can0.lock`: its directory is root-owned mode `0700`,
+  and the persistent lock is a root-owned mode `0600` regular inode with one
+  link. The helper uses fd-relative no-follow opens, validates metadata after
+  open, rejects unsafe existing objects before mutation, and maps every lock
+  failure to sanitized `CAN0_SETUP_FAILED` output without a traceback. Its `ip`
+  executable and subprocess environment come from fixed system allowlists, not
+  caller `PATH`.
 - Godot treats ICT_START as connecting until a matching CTNR success arrives.
   Matching failure, terminal send failure, or timeout clears requested/active
   state; timeout also queues ICT_STOP so a helper that finishes late cannot

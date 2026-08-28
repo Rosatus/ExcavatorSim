@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
+import stat
 import subprocess
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
@@ -14,7 +16,7 @@ CAN_BITRATE = 250_000
 CAN_RESTART_MS = 100
 CAN_TX_QUEUE_LEN = 1_000
 CAN0_HELPER_PATH = Path("/usr/local/libexec/excavatorsim/can0-setup-helper")
-CAN0_LOCK_PATH = Path("/run/lock/excavatorsim-can0.lock")
+CAN0_LOCK_PATH = Path("/run/excavatorsim/can0.lock")
 IP_PATH_CANDIDATES = tuple(
     Path(path) for path in ("/usr/sbin/ip", "/usr/bin/ip", "/sbin/ip", "/bin/ip")
 )
@@ -25,6 +27,18 @@ MINIMAL_COMMAND_ENV = {
 }
 
 CommandRunner = Callable[..., subprocess.CompletedProcess[str]]
+
+
+@dataclass(frozen=True)
+class Can0LockOps:
+    """Injectable Linux syscall boundary for secure helper locking."""
+
+    open_fd: Callable[..., int]
+    mkdir: Callable[..., None]
+    fstat: Callable[[int], os.stat_result]
+    flock: Callable[[int, int], None]
+    close_fd: Callable[[int], None]
+    lock_ex: int
 
 
 class Can0SetupError(RuntimeError):
@@ -186,32 +200,143 @@ def _run_checked(runner: CommandRunner, command: list[str]) -> None:
     )
 
 
-@contextlib.contextmanager
-def _exclusive_setup_lock(lock_path: Path | None) -> Iterator[None]:
-    if lock_path is None:
-        yield
-        return
+def _linux_lock_ops() -> Can0LockOps:
     try:
         import fcntl
     except ImportError as exc:  # pragma: no cover - helper is Linux-only
         raise Can0SetupError("CAN0_SETUP_FAILED", "can0 setup locking requires Linux") from exc
-    with lock_path.open("a+", encoding="utf-8") as handle:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+    return Can0LockOps(
+        open_fd=os.open,
+        mkdir=os.mkdir,
+        fstat=os.fstat,
+        flock=fcntl.flock,
+        close_fd=os.close,
+        lock_ex=fcntl.LOCK_EX,
+    )
+
+
+def _validate_runtime_root(metadata: os.stat_result) -> None:
+    if (
+        not stat.S_ISDIR(metadata.st_mode)
+        or metadata.st_uid != 0
+        or stat.S_IMODE(metadata.st_mode) & 0o022
+    ):
+        raise Can0SetupError("CAN0_SETUP_FAILED", "unsafe can0 lock runtime")
+
+
+def _validate_lock_directory(metadata: os.stat_result) -> None:
+    if (
+        not stat.S_ISDIR(metadata.st_mode)
+        or metadata.st_uid != 0
+        or stat.S_IMODE(metadata.st_mode) != 0o700
+    ):
+        raise Can0SetupError("CAN0_SETUP_FAILED", "unsafe can0 lock directory")
+
+
+def _validate_lock_file(metadata: os.stat_result) -> None:
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_uid != 0
+        or stat.S_IMODE(metadata.st_mode) != 0o600
+        or metadata.st_nlink != 1
+    ):
+        raise Can0SetupError("CAN0_SETUP_FAILED", "unsafe can0 lock object")
+
+
+def _lock_open_flags(*names: str) -> int:
+    flags = 0
+    for name in names:
+        flags |= int(getattr(os, name, 0))
+    return flags
+
+
+def _close_lock_fd(ops: Can0LockOps, fd: int | None) -> None:
+    if fd is not None:
+        with contextlib.suppress(OSError):
+            ops.close_fd(fd)
+
+
+@contextlib.contextmanager
+def _exclusive_setup_lock(
+    lock_path: Path | None,
+    *,
+    lock_ops: Can0LockOps | None = None,
+) -> Iterator[None]:
+    if lock_path is None:
+        yield
+        return
+    if (
+        not lock_path.is_absolute()
+        or not lock_path.name
+        or not lock_path.parent.name
+        or lock_path.parent.parent == lock_path.parent
+    ):
+        raise Can0SetupError("CAN0_SETUP_FAILED", "invalid can0 lock location")
+
+    ops = lock_ops or _linux_lock_ops()
+    runtime_fd: int | None = None
+    directory_fd: int | None = None
+    lock_fd: int | None = None
+    try:
         try:
-            yield
-        finally:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            runtime_fd = ops.open_fd(
+                str(lock_path.parent.parent),
+                _lock_open_flags("O_RDONLY", "O_DIRECTORY", "O_NOFOLLOW", "O_CLOEXEC"),
+            )
+            _validate_runtime_root(ops.fstat(runtime_fd))
+        except Can0SetupError:
+            raise
+        except OSError as exc:
+            raise Can0SetupError("CAN0_SETUP_FAILED", "can0 lock runtime unavailable") from exc
+
+        try:
+            with contextlib.suppress(FileExistsError):
+                ops.mkdir(lock_path.parent.name, mode=0o700, dir_fd=runtime_fd)
+            directory_fd = ops.open_fd(
+                lock_path.parent.name,
+                _lock_open_flags("O_RDONLY", "O_DIRECTORY", "O_NOFOLLOW", "O_CLOEXEC"),
+                dir_fd=runtime_fd,
+            )
+            _validate_lock_directory(ops.fstat(directory_fd))
+        except Can0SetupError:
+            raise
+        except OSError as exc:
+            raise Can0SetupError("CAN0_SETUP_FAILED", "can0 lock directory unavailable") from exc
+
+        try:
+            lock_fd = ops.open_fd(
+                lock_path.name,
+                _lock_open_flags("O_RDWR", "O_CREAT", "O_NOFOLLOW", "O_CLOEXEC"),
+                0o600,
+                dir_fd=directory_fd,
+            )
+            _validate_lock_file(ops.fstat(lock_fd))
+        except Can0SetupError:
+            raise
+        except OSError as exc:
+            raise Can0SetupError("CAN0_SETUP_FAILED", "can0 lock object unavailable") from exc
+
+        try:
+            ops.flock(lock_fd, ops.lock_ex)
+        except OSError as exc:
+            raise Can0SetupError("CAN0_SETUP_FAILED", "cannot acquire can0 setup lock") from exc
+        yield
+    finally:
+        _close_lock_fd(ops, lock_fd)
+        _close_lock_fd(ops, directory_fd)
+        _close_lock_fd(ops, runtime_fd)
 
 
 def configure_can0(
     *,
     runner: CommandRunner = subprocess.run,
     lock_path: Path | None = CAN0_LOCK_PATH,
+    lock_ops: Can0LockOps | None = None,
     force: bool = False,
 ) -> CanInterfaceSnapshot:
     """Apply the fixed can0 contract. Intended to run only in the root helper."""
 
-    with _exclusive_setup_lock(lock_path):
+    with _exclusive_setup_lock(lock_path, lock_ops=lock_ops):
         snapshot = inspect_can0(runner=runner)
         if not snapshot.exists:
             raise Can0SetupError(
