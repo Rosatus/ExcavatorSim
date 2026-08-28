@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 45
+- **Total Sessions**: 46
 - **Last Active**: 2026-08-28
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1713 | Active |
+| `journal-1.md` | ~1747 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 46 | 2026-08-28 | Harden can0 lock and bound SocketCAN latency | `f8f5a67`, `de4fd3f` | `main` |
 | 45 | 2026-08-28 | Gateway Web DBC console | `4d889e3` | `main` |
 | 44 | 2026-08-27 | Correct SY135 QML Neutral Semantics | `cb6cfe1`, `400553c` | `main` |
 | 43 | 2026-08-27 | Unify operator input semantics | `881888c` | `main` |

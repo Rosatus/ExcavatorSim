@@ -1711,3 +1711,37 @@ Implemented the loopback React/Tailwind/shadcn Gateway console, revisioned aioht
 ### Next Steps
 
 - None - task complete
+
+
+## Session 46: Harden can0 lock and bound SocketCAN latency
+
+**Date**: 2026-08-28
+**Task**: Harden can0 lock and bound SocketCAN latency
+**Branch**: `main`
+
+### Summary
+
+Implemented and pushed root-only can0 helper locking plus bounded non-blocking latest-value SocketCAN TX, fair scheduling, timed-generation purge, counters/Web diagnostics, txqueuelen=10, specs and regressions. Gateway 155 tests, Web 5 tests, backend 182 tests, provenance and standalone checks pass. Linux ELF rebuild remains pending because WSL lacks Node/npm and offline uv cache lacks aiohttp; existing dist artifacts were not overwritten.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f8f5a67` | (see git log) |
+| `de4fd3f` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
