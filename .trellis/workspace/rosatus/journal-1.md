@@ -1745,3 +1745,37 @@ Implemented and pushed root-only can0 helper locking plus bounded non-blocking l
 ### Next Steps
 
 - None - task complete
+
+
+## Session 47: Complete Linux can0 hardening packaging
+
+**Date**: 2026-08-28
+**Task**: Complete Linux can0 hardening packaging
+**Branch**: `main`
+
+### Summary
+
+Confirmed WSL Node/npm are available through the interactive zsh/FNM environment, rebuilt and validated the current Linux Gateway and can0 helper ELF distribution with embedded Web/DBC assets, cleaned temporary build outputs, and archived the low-latency child plus parent hardening task.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f8f5a67` | (see git log) |
+| `de4fd3f` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
