@@ -1,0 +1,7 @@
+{"file":".trellis/spec/backend/can-gateway-control.md","reason":"Owns can0 readiness/helper, ICT lifecycle, timed CAN, SocketCAN send, and compatibility contracts."}
+{"file":".trellis/spec/backend/authority-and-concurrency.md","reason":"Keep Gateway owner-loop authority while introducing non-blocking budgeted transport service."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Define stable helper lock errors and recoverable-versus-terminal SocketCAN failures."}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Add bounded aggregate congestion diagnostics without per-frame log spam."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Apply deterministic concurrency, fake-socket, process, packaging, and cross-platform gates."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace helper, owner loop, status DTO, Web diagnostics, CSV, and physical transport end to end."}
+{"file":".trellis/tasks/archive/2026-08/08-28-align-gateway-linux-can0-sending/design.md","reason":"Preserve the established physical can0, fixed-helper, privilege, and ICT result boundaries."}

@@ -1,0 +1,4 @@
+{"file":".trellis/spec/backend/can-gateway-control.md","reason":"Owns the fixed helper, lock, readiness, setup order, diagnostics, and ICT boundary."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Require bounded stable CAN0_SETUP_FAILED conversion without traceback leakage."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Guide injected syscall validation, concurrent exclusion, and packaging tests."}
+{"file":".trellis/tasks/archive/2026-08/08-28-align-gateway-linux-can0-sending/design.md","reason":"Preserve the previously approved fixed-purpose root helper and setup transaction."}

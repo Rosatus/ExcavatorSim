@@ -1,0 +1,6 @@
+{"file":".trellis/spec/backend/can-gateway-control.md","reason":"Verify txqlen 10, nonblocking/coalescing, timed, CSV, EFF, ICT, and PC001 contracts."}
+{"file":".trellis/spec/backend/authority-and-concurrency.md","reason":"Audit bounded service budget, liveness, fairness, and no hidden transport writer."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Verify congestion keeps ICT active and terminal errors still retire/disarm."}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Verify exact statistics and bounded aggregate logs under sustained overload."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Run focused/full tests, Web build, package inspection, and hardware-deferred gates."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Check CSV independence and end-to-end producer/outcome/status propagation."}

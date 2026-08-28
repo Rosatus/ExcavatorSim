@@ -1,0 +1,29 @@
+{
+  "id": "linux-can0-hardening",
+  "name": "linux-can0-hardening",
+  "title": "Harden Linux can0 control and low-latency transmission",
+  "description": "Coordinate a secure root-only can0 helper lock and a bounded, coalescing, non-blocking SocketCAN transmit path without changing CAN bytes or non-Linux transports.",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "rosatus",
+  "assignee": "rosatus",
+  "createdAt": "2026-08-28",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "08-28-can0-helper-secure-lock",
+    "08-28-socketcan-low-latency-tx"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
