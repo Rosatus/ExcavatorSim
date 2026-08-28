@@ -25,6 +25,12 @@ const status: GatewayStatus = {
   pc001_queued_frames: 0,
   pc001_sent_frames: 12,
   pc001_dropped_frames: 0,
+  socketcan_submitted: 0,
+  socketcan_sent: 0,
+  socketcan_congestion_dropped: 0,
+  socketcan_coalesced: 0,
+  socketcan_terminal_errors: 0,
+  socketcan_pending: 0,
   event_sequence: 0,
   event_earliest_sequence: 1,
   log_dropped_records: 0,
@@ -132,10 +138,35 @@ describe("Gateway console capabilities", () => {
   });
 
   it("shows only confirmed can0 restart on Linux", async () => {
-    installFetch({ ...status, platform: "linux", transport_kind: "socketcan" });
+    installFetch({
+      ...status,
+      platform: "linux",
+      transport_kind: "socketcan",
+      socketcan_submitted: 120,
+      socketcan_sent: 100,
+      socketcan_congestion_dropped: 8,
+      socketcan_coalesced: 12,
+      socketcan_pending: 0,
+    });
     render(<App />);
     expect(await screen.findByText("Linux can0")).toBeInTheDocument();
     expect(screen.queryByText("Windows PC001 服务端")).not.toBeInTheDocument();
+    expect(screen.getByText("120 / 100")).toBeInTheDocument();
+    expect(screen.getByText("8 / 12")).toBeInTheDocument();
+    const fetchMock = vi.mocked(fetch);
+    const callsBeforeAggregate = fetchMock.mock.calls.length;
+    MockWebSocket.instances.at(-1)!.emit({
+      type: "event",
+      event: {
+        sequence: 1,
+        timestamp: "2026-08-28T00:00:00",
+        monotonic_s: 1,
+        kind: "socketcan_transmission_aggregate",
+        source: "godot",
+        detail: { family: "imu", sent: 10 },
+      },
+    });
+    await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(callsBeforeAggregate));
     const restart = screen.getByRole("button", { name: /重启 can0/ });
     expect(restart).toBeDisabled();
     await userEvent.click(screen.getByText("我确认停发并重启 can0"));

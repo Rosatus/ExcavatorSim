@@ -7,9 +7,14 @@ interface, including the product's physical can0 transport.
 
 from __future__ import annotations
 
+import contextlib
+import errno
 import socket
 import struct
-from typing import Protocol
+from collections import deque
+from collections.abc import Callable
+from dataclasses import dataclass, replace
+from typing import Literal, Protocol
 
 from csv_writer import CanapeCsvWriter
 
@@ -18,6 +23,48 @@ CAN_FRAME_DLC = 8
 CAN_SFF_MASK = 0x7FF
 CAN_EFF_MASK = 0x1FFFFFFF
 CAN_EFF_FLAG = 0x80000000
+SOCKETCAN_MAX_PENDING_IDS = 128
+SOCKETCAN_SERVICE_BUDGET = 32
+SOCKETCAN_CONGESTION_ERRNOS = frozenset(
+    value for value in (errno.ENOBUFS, errno.EAGAIN, errno.EWOULDBLOCK) if value is not None
+)
+
+SocketCanOutcome = Literal[
+    "submitted",
+    "sent",
+    "congestion_dropped",
+    "coalesced",
+    "terminal_error",
+]
+
+
+@dataclass(frozen=True)
+class SocketCanStats:
+    submitted: int = 0
+    sent: int = 0
+    congestion_dropped: int = 0
+    coalesced: int = 0
+    terminal_error: int = 0
+    pending: int = 0
+
+
+@dataclass(frozen=True)
+class SocketCanDelta:
+    source: str
+    family: str
+    can_id: int
+    payload: bytes
+    outcome: SocketCanOutcome
+    reason: str = ""
+
+
+@dataclass(frozen=True)
+class _PendingSocketCanFrame:
+    source: str
+    family: str
+    can_id: int
+    payload: bytes
+    generation: int | None = None
 
 
 class FrameSink(Protocol):
@@ -62,7 +109,7 @@ class CsvFrameSink:
 
 
 class SocketCanSink:
-    """Send frames to a SocketCAN interface via AF_CAN CAN_RAW."""
+    """Bounded latest-value SocketCAN sender serviced by the Gateway owner loop."""
 
     def __init__(self, interface: str = "can0", *, setup_check: bool = False) -> None:
         # Preparation belongs to the caller. Retain the keyword for source
@@ -75,6 +122,7 @@ class SocketCanSink:
                 f"AF_CAN / CAN_RAW unavailable ({exc}); SocketCAN requires Linux with CAN support"
             ) from exc
         try:
+            self.sock.setblocking(False)
             self.sock.bind((interface,))
         except OSError as exc:
             self.sock.close()
@@ -84,17 +132,170 @@ class SocketCanSink:
             ) from exc
         self.interface = interface
         self.last_send_error: OSError | None = None
+        self._pending: dict[int, _PendingSocketCanFrame] = {}
+        self._family_ids: dict[str, deque[int]] = {}
+        self._family_ring: deque[str] = deque()
+        self._stats = SocketCanStats()
+        self._observer: Callable[[SocketCanDelta], None] | None = None
 
     def peer_name(self) -> str:
         return f"socketcan:{self.interface}"
 
+    @property
+    def stats(self) -> SocketCanStats:
+        return replace(self._stats, pending=len(self._pending))
+
+    def set_outcome_observer(self, observer: Callable[[SocketCanDelta], None] | None) -> None:
+        self._observer = observer
+
     def append(self, can_id: int, payload: bytes) -> None:
+        self.submit(can_id, payload, source="unspecified", family="other")
+
+    def submit(
+        self,
+        can_id: int,
+        payload: bytes,
+        *,
+        source: str,
+        family: str,
+        generation: int | None = None,
+    ) -> None:
         if self.last_send_error is not None:
             return
+        normalized_id = can_id & CAN_EFF_MASK
+        frame = _PendingSocketCanFrame(
+            source=source,
+            family=family,
+            can_id=can_id,
+            payload=bytes(payload),
+            generation=generation,
+        )
+        self._count(frame, "submitted")
+        previous = self._pending.get(normalized_id)
+        if previous is not None:
+            if previous.family != family:
+                self._remove_family_id(previous.family, normalized_id)
+                self._append_family_id(family, normalized_id)
+            self._pending[normalized_id] = frame
+            self._count(previous, "coalesced", reason="newer_value")
+            return
+        if len(self._pending) >= SOCKETCAN_MAX_PENDING_IDS:
+            self._count(frame, "congestion_dropped", reason="capacity")
+            return
+        self._pending[normalized_id] = frame
+        self._append_family_id(family, normalized_id)
+
+    def service(self, maximum: int = SOCKETCAN_SERVICE_BUDGET) -> int:
+        if maximum < 0:
+            raise ValueError("SocketCAN service budget must be non-negative")
+        attempts = 0
+        while attempts < maximum and self._pending and self.last_send_error is None:
+            frame = self._pop_next()
+            if frame is None:
+                break
+            attempts += 1
+            try:
+                self.sock.send(pack_can_frame(frame.can_id, frame.payload))
+            except OSError as exc:
+                if exc.errno in SOCKETCAN_CONGESTION_ERRNOS:
+                    self._count(frame, "congestion_dropped", reason="kernel_congestion")
+                    break
+                self.last_send_error = exc
+                self._count(frame, "terminal_error", reason="send_failed")
+                break
+            self._count(frame, "sent")
+        return attempts
+
+    def purge(
+        self,
+        *,
+        generation: int | None = None,
+        family: str | None = None,
+        reason: str,
+    ) -> int:
+        selected = [
+            normalized_id
+            for normalized_id, frame in self._pending.items()
+            if (generation is None or frame.generation == generation)
+            and (family is None or frame.family == family)
+        ]
+        for normalized_id in selected:
+            frame = self._remove_pending(normalized_id)
+            if frame is not None:
+                self._count(frame, "congestion_dropped", reason=reason)
+        return len(selected)
+
+    def _count(
+        self,
+        frame: _PendingSocketCanFrame,
+        outcome: SocketCanOutcome,
+        *,
+        reason: str = "",
+    ) -> None:
+        self._stats = replace(
+            self._stats,
+            **{outcome: getattr(self._stats, outcome) + 1},
+        )
+        if self._observer is not None:
+            self._observer(
+                SocketCanDelta(
+                    source=frame.source,
+                    family=frame.family,
+                    can_id=frame.can_id,
+                    payload=frame.payload,
+                    outcome=outcome,
+                    reason=reason,
+                )
+            )
+
+    def _append_family_id(self, family: str, normalized_id: int) -> None:
+        family_ids = self._family_ids.get(family)
+        if family_ids is None:
+            family_ids = deque()
+            self._family_ids[family] = family_ids
+            self._family_ring.append(family)
+        family_ids.append(normalized_id)
+
+    def _remove_family_id(self, family: str, normalized_id: int) -> None:
+        family_ids = self._family_ids.get(family)
+        if family_ids is None:
+            return
         try:
-            self.sock.send(pack_can_frame(can_id, payload))
-        except OSError as exc:
-            self.last_send_error = exc
+            family_ids.remove(normalized_id)
+        except ValueError:
+            return
+        if not family_ids:
+            del self._family_ids[family]
+            with contextlib.suppress(ValueError):
+                self._family_ring.remove(family)
+
+    def _remove_pending(self, normalized_id: int) -> _PendingSocketCanFrame | None:
+        frame = self._pending.pop(normalized_id, None)
+        if frame is not None:
+            self._remove_family_id(frame.family, normalized_id)
+        return frame
+
+    def _pop_next(self) -> _PendingSocketCanFrame | None:
+        while self._family_ring:
+            family = self._family_ring[0]
+            self._family_ring.rotate(-1)
+            family_ids = self._family_ids.get(family)
+            if not family_ids:
+                with contextlib.suppress(ValueError):
+                    self._family_ring.remove(family)
+                continue
+            normalized_id = family_ids.popleft()
+            if not family_ids:
+                del self._family_ids[family]
+                with contextlib.suppress(ValueError):
+                    self._family_ring.remove(family)
+            frame = self._pending.pop(normalized_id, None)
+            if frame is not None:
+                return frame
+        return None
 
     def close(self) -> None:
+        self._pending.clear()
+        self._family_ids.clear()
+        self._family_ring.clear()
         self.sock.close()

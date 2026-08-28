@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import struct
 import sys
 import tempfile
@@ -13,7 +14,13 @@ if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
 from csv_writer import CanapeCsvWriter  # noqa: E402
-from sinks import CAN_EFF_FLAG, CsvFrameSink, SocketCanSink, pack_can_frame  # noqa: E402
+from sinks import (  # noqa: E402
+    CAN_EFF_FLAG,
+    SOCKETCAN_MAX_PENDING_IDS,
+    CsvFrameSink,
+    SocketCanSink,
+    pack_can_frame,
+)
 
 
 class PackCanFrameTest(unittest.TestCase):
@@ -71,6 +78,10 @@ class _FakeSocket:
         self.bound = None
         self.sent: list[bytes] = []
         self.closed = False
+        self.blocking = True
+
+    def setblocking(self, blocking):
+        self.blocking = blocking
 
     def bind(self, interface_tuple):
         self.bound = interface_tuple
@@ -109,7 +120,11 @@ class SocketCanSinkTest(unittest.TestCase):
         self._patch_socket(lambda *a, **k: fake)
         sink = SocketCanSink("can0")
         sink.append(0x18FF3A00, b"\x01" * 8)
+        self.assertFalse(fake.blocking)
+        self.assertEqual(sink.stats.pending, 1)
+        sink.service()
         self.assertEqual(struct.unpack("<I", fake.sent[0][:4])[0], CAN_EFF_FLAG | 0x18FF3A00)
+        self.assertEqual(sink.stats.sent, 1)
         sink.close()
 
     def test_af_can_unavailable_message(self):
@@ -132,18 +147,130 @@ class SocketCanSinkTest(unittest.TestCase):
             SocketCanSink("can0")
         self.assertIn("configured for the CAN bus", str(ctx.exception))
 
-    def test_send_failure_is_recorded_without_repacking(self):
+    def test_recoverable_send_failures_drop_without_latching_terminal_error(self):
+        class SendFail(_FakeSocket):
+            def __init__(self, error_number):
+                super().__init__()
+                self.error_number = error_number
+
+            def send(self, data):
+                raise OSError(self.error_number, "congested")
+
+        for error_number in {errno.ENOBUFS, errno.EAGAIN, errno.EWOULDBLOCK}:
+            with self.subTest(error_number=error_number):
+                fake = SendFail(error_number)
+                self._patch_socket(lambda *a, fake=fake, **k: fake)
+                sink = SocketCanSink("can0")
+                sink.append(0x18FFF100, bytes(8))
+                self.assertEqual(sink.service(), 1)
+                self.assertIsNone(sink.last_send_error)
+                self.assertEqual(sink.stats.congestion_dropped, 1)
+                self.assertEqual(sink.stats.pending, 0)
+                sink.close()
+
+    def test_terminal_send_failure_is_latched(self):
         class SendFail(_FakeSocket):
             def send(self, data):
-                raise OSError(105, "No buffer space available")
+                raise OSError(errno.ENETDOWN, "Network is down")
 
         fake = SendFail()
         self._patch_socket(lambda *a, **k: fake)
         sink = SocketCanSink("can0")
         sink.append(0x18FFF100, bytes(8))
-        self.assertIsNotNone(sink.last_send_error)
-        sink.append(0x18FFF100, bytes(8))
+        sink.service()
+        self.assertEqual(sink.last_send_error.errno, errno.ENETDOWN)
+        self.assertEqual(sink.stats.terminal_error, 1)
         sink.close()
+
+    def test_same_id_coalesces_to_latest_payload(self):
+        fake = _FakeSocket()
+        self._patch_socket(lambda *a, **k: fake)
+        outcomes = []
+        sink = SocketCanSink("can0")
+        sink.set_outcome_observer(outcomes.append)
+        sink.submit(0x123, b"old", source="godot", family="imu")
+        sink.submit(0x123, b"new", source="godot", family="imu")
+        self.assertEqual(sink.stats.submitted, 2)
+        self.assertEqual(sink.stats.coalesced, 1)
+        self.assertEqual(sink.stats.pending, 1)
+        sink.service()
+        self.assertEqual(struct.unpack("<IBBBB8s", fake.sent[0])[-1][:3], b"new")
+        self.assertEqual(
+            [item.outcome for item in outcomes], ["submitted", "submitted", "coalesced", "sent"]
+        )
+
+    def test_pending_ids_are_bounded_and_capacity_drop_keeps_existing_values(self):
+        fake = _FakeSocket()
+        self._patch_socket(lambda *a, **k: fake)
+        sink = SocketCanSink("can0")
+        for can_id in range(SOCKETCAN_MAX_PENDING_IDS):
+            sink.submit(can_id, bytes([can_id & 0xFF]), source="web", family="dbc")
+        sink.submit(0x1000, b"overflow", source="web", family="dbc")
+        self.assertEqual(sink.stats.pending, SOCKETCAN_MAX_PENDING_IDS)
+        self.assertEqual(sink.stats.congestion_dropped, 1)
+        self.assertEqual(sink.service(maximum=32), 32)
+        self.assertEqual(len(fake.sent), 32)
+
+    def test_family_round_robin_prevents_low_rate_starvation(self):
+        fake = _FakeSocket()
+        self._patch_socket(lambda *a, **k: fake)
+        sink = SocketCanSink("can0")
+        for can_id in range(10, 20):
+            sink.submit(can_id, bytes([can_id]), source="godot", family="imu")
+        sink.submit(0x200, b"rtk", source="godot", family="rtk")
+        sink.submit(0x201, b"travel", source="godot", family="travel")
+        sink.service(maximum=3)
+        sent_ids = [struct.unpack("<I", frame[:4])[0] for frame in fake.sent]
+        self.assertEqual(sent_ids, [10, 0x200, 0x201])
+
+    def test_replacement_can_migrate_between_families_without_duplicate_slots(self):
+        fake = _FakeSocket()
+        self._patch_socket(lambda *a, **k: fake)
+        sink = SocketCanSink("can0")
+        sink.submit(0x100, b"old", source="godot", family="imu")
+        sink.submit(0x100, b"new", source="web", family="dbc")
+        sink.submit(0x101, b"imu", source="godot", family="imu")
+        self.assertEqual(sink.stats.pending, 2)
+        sink.service(maximum=2)
+        sent_ids = [struct.unpack("<I", frame[:4])[0] for frame in fake.sent]
+        self.assertEqual(sent_ids, [0x100, 0x101])
+        self.assertEqual(struct.unpack("<IBBBB8s", fake.sent[0])[-1][:3], b"new")
+
+    def test_congestion_yields_after_one_syscall_and_csv_remains_complete(self):
+        class CongestedSocket(_FakeSocket):
+            def send(self, data):
+                raise OSError(errno.ENOBUFS, "No buffer space available")
+
+        fake = CongestedSocket()
+        self._patch_socket(lambda *a, **k: fake)
+        socketcan = SocketCanSink("can0")
+        with tempfile.TemporaryDirectory() as tmp:
+            csv = CsvFrameSink(CanapeCsvWriter(Path(tmp) / "out.csv"))
+            for can_id in range(5):
+                payload = bytes([can_id]) * 8
+                csv.append(can_id, payload)
+                socketcan.submit(can_id, payload, source="godot", family="imu")
+            self.assertEqual(socketcan.service(maximum=32), 1)
+            self.assertIsNone(socketcan.last_send_error)
+            self.assertEqual(socketcan.stats.pending, 4)
+            self.assertEqual(csv.row_count, 5)
+            csv.close()
+
+    def test_generation_purge_prevents_late_timed_send(self):
+        fake = _FakeSocket()
+        self._patch_socket(lambda *a, **k: fake)
+        sink = SocketCanSink("can0")
+        sink.submit(
+            0x18FFF100,
+            bytes.fromhex("01 00 00 00 00 00 00 00"),
+            source="timed",
+            family="timed",
+            generation=7,
+        )
+        self.assertEqual(sink.purge(generation=7, reason="deadline"), 1)
+        sink.service()
+        self.assertEqual(fake.sent, [])
+        self.assertEqual(sink.stats.congestion_dropped, 1)
 
 
 if __name__ == "__main__":

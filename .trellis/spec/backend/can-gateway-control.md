@@ -81,7 +81,7 @@ TCP server currently stores a client accepted after `who` / `PC001`.
   prepare the vcan device before binding it.
 - Linux ICT_START first inspects driver-created `can0` through detailed
   iproute2 JSON. Ready means kind CAN, netdev UP, bitrate `250000`,
-  `restart-ms=100`, `txqueuelen=1000`, and a usable controller state. A ready
+  `restart-ms=100`, `txqueuelen=10`, and a usable controller state. A ready
   interface is never cycled; a missing interface is never created.
 - An unready/unverifiable can0 invokes exactly
   `sudo -n /usr/local/libexec/excavatorsim/can0-setup-helper`. The installed
@@ -102,6 +102,13 @@ TCP server currently stores a client accepted after `who` / `PC001`.
   can resend it without another configure/bind operation. SocketCAN is briefly
   guarded after setup so a queued timeout STOP gets a receive turn before any
   physical frame is emitted.
+- SocketCAN is non-blocking and uses a bounded latest-value slot per raw CAN
+  ID with fair family/ID round-robin service. `ENOBUFS`, `EAGAIN`, and
+  `EWOULDBLOCK` drop only the attempted physical occurrence and keep ICT
+  active; other send errors remain terminal. CSV stays immediate and complete.
+  Status exposes monotonic submitted/sent/congestion-dropped/coalesced/terminal
+  totals, while per-source/family/ID diagnostics are aggregated at one-second
+  windows rather than logged per frame.
 - Command 6 only triggers the Python monotonic scheduler. Godot physics and CTN1
   telemetry cadence are not the timed frame clock.
 - A repeat command 6 replaces the current burst with one new 10-second window.
@@ -150,6 +157,10 @@ TCP server currently stores a client accepted after `who` / `PC001`.
 | can0 exists but is down, mismatched, stopped, or unverifiable | Run only the fixed helper transaction; post-verify before bind |
 | can0 is absent | Do not create it; return result 2 with USB-CAN/driver guidance |
 | Helper/sudoers is absent or `sudo -n` is denied | Fail without a prompt; return result 3 with installer guidance |
+| Runtime lock directory/file has wrong owner, unsafe mode/type/link count, or cannot be opened/flocked | Run no mutation; return sanitized `CAN0_SETUP_FAILED` without traceback |
+| SocketCAN send returns `ENOBUFS`, `EAGAIN`, or `EWOULDBLOCK` | Drop the attempted occurrence, increment congestion totals, stop that service turn, and keep ICT active |
+| SocketCAN send returns another `OSError` | Latch one terminal error, purge pending values, stop timed/DBC sending, close ICT, and report result 8 |
+| A timed generation reaches its deadline, is retriggered, or is stopped | Purge that generation's pending physical slot; never send it after the window |
 | Setup/post-check/open/bind/send fails | Return its distinct result code; do not claim active ICT |
 | CTNR sequence is late or mismatched | Ignore it without mutating the current request |
 | CTNR detail is oversized, malformed, or invalid UTF-8 | Ignore the packet |
@@ -162,7 +173,7 @@ TCP server currently stores a client accepted after `who` / `PC001`.
   the unchanged relay performs `who` / `PC001`.
 - Base: reconnect with the same normalized endpoint; PID remains stable and ICT
   start is sent without a restart.
-- Good: can0 already proves `250000 / 100 / 1000 / UP / usable`; Connect ICT
+- Good: can0 already proves `250000 / 100 / 10 / UP / usable`; Connect ICT
   binds it without any privileged call or down/up interruption.
 - Good: can0 is present but mismatched; the fixed installed helper configures
   it, post-verification succeeds, bind completes, and only then CTNR success
@@ -207,8 +218,13 @@ TCP server currently stores a client accepted after `who` / `PC001`.
 - can0 setup unit tests inject command runners and assert ready no-op, missing
   fail-closed behavior, exact mutation order, stopped/mismatched detection,
   post-verification, fixed executable/environment, non-interactive fixed helper
-  invocation, lock behavior, and preservation of the original DOWN state on a
-  failed transaction.
+  invocation, root-only fd-relative lock metadata and syscall failures,
+  transaction-level mutual exclusion, and preservation of the original DOWN
+  state on a failed transaction.
+- SocketCAN tests assert non-blocking setup, one latest slot per raw ID, bounded
+  capacity, family/ID fairness, all recoverable errno aliases, terminal
+  retirement, finite service budgets, aggregate status/events, CSV independence,
+  and generation purge at timed deadline/retrigger/stop.
 - CTNR tests assert exact little-endian fields, 160-byte/strict-UTF-8 bounds,
   sequence matching, duplicate replay, timeout cancellation, and distinct
   missing/helper/setup/not-ready/open/bind/send state transitions.
@@ -239,6 +255,12 @@ Correct: close/reset the test ACK peer, bind the isolated port, then spawn the g
 
 Wrong: Connect ICT -> bind/create can0 or run `sudo ip ...` with runtime parameters -> immediately show connected
 Correct: inspect fixed can0 -> fixed `sudo -n` helper only if needed -> post-check -> bind -> matching CTNR success -> connected
+
+Wrong: open a helper lock directly under a user-writable shared directory, or repair an unsafe inode in place
+Correct: fd-open validated `/run` -> root-only `excavatorsim/` -> no-follow regular singleton lock -> complete transaction
+
+Wrong: blocking `send()` or treating `ENOBUFS` as disconnect -> replay seconds of stale telemetry or drop ICT
+Correct: submit latest value per ID -> fair bounded non-blocking service -> count/drop congestion -> retain ICT
 
 Wrong: `SocketCanSink(vcan0)` -> create/enable missing vcan0
 Correct: create/enable development vcan0 -> `SocketCanSink(vcan0)`

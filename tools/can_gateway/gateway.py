@@ -71,7 +71,7 @@ from gateway_web import DEFAULT_WEB_PORT, GatewayWebServer
 from pc001_sink import TcpPc001Sink
 from qml_compat import QmlCanMapper, QmlMappingError, QmlRtkState
 from qml_profile import QmlProfileError, load_qml_profile, resource_root
-from sinks import CsvFrameSink, FrameSink, SocketCanSink
+from sinks import CsvFrameSink, FrameSink, SocketCanDelta, SocketCanSink
 from vcan_setup import VcanSetupError, ensure_vcan_interface
 
 PACKET_MAGIC = 0x314E5443
@@ -90,6 +90,27 @@ def protocol_codec() -> DbcCodec:
     if _PROTOCOL_CODEC is None:
         _PROTOCOL_CODEC = load_protocol_codec(resource_root() / "dbc")
     return _PROTOCOL_CODEC
+
+
+def append_frame(
+    sink: FrameSink,
+    can_id: int,
+    payload: bytes,
+    *,
+    source: str,
+    family: str,
+    generation: int | None = None,
+) -> None:
+    if isinstance(sink, SocketCanSink):
+        sink.submit(
+            can_id,
+            payload,
+            source=source,
+            family=family,
+            generation=generation,
+        )
+    else:
+        sink.append(can_id, payload)
 
 
 class FrameScheduler:
@@ -115,6 +136,7 @@ class TimedCanBurst:
         self._next_due_s: float | None = None
         self._end_s: float | None = None
         self._emitted = 0
+        self._generation = 0
 
     @property
     def active(self) -> bool:
@@ -124,7 +146,12 @@ class TimedCanBurst:
     def emitted_count(self) -> int:
         return self._emitted
 
+    @property
+    def active_generation(self) -> int | None:
+        return self._generation if self.active else None
+
     def trigger(self, now_s: float) -> None:
+        self._generation += 1
         self._next_due_s = now_s
         self._end_s = now_s + TIMED_CAN_DURATION_S
         self._emitted = 0
@@ -154,7 +181,14 @@ class TimedCanBurst:
         if due_s is None or now_s + 1e-9 < due_s:
             return False
         for sink in sinks:
-            sink.append(TIMED_CAN_ID, TIMED_CAN_PAYLOAD)
+            append_frame(
+                sink,
+                TIMED_CAN_ID,
+                TIMED_CAN_PAYLOAD,
+                source="timed",
+                family="timed",
+                generation=self._generation,
+            )
         if observer is not None:
             observer(TIMED_CAN_ID, TIMED_CAN_PAYLOAD)
         self._emitted += 1
@@ -166,6 +200,44 @@ class TimedCanBurst:
             # at 50 Hz from whichever slot the gateway was able to service.
             self._next_due_s = max(due_s + TIMED_CAN_PERIOD_S, now_s + TIMED_CAN_PERIOD_S)
         return True
+
+
+def _retire_failed_socketcan_sink(
+    sink: FrameSink | None,
+    *,
+    active_ict_seq: int | None,
+    stop_timed: Callable[[str], None],
+    operator_dbc: OperatorDbcRuntime,
+    publish_operator_dbc: Callable[[], None],
+    preserve_totals: Callable[[FrameSink | None], None],
+    send_ict_result: Callable[[int, int, str], None],
+    core: GatewayRuntimeCore,
+) -> bool:
+    if not isinstance(sink, SocketCanSink) or sink.last_send_error is None:
+        return False
+    detail = f"SocketCAN send failed on {sink.interface}: {sink.last_send_error}"
+    print(detail, file=sys.stderr)
+    stop_timed("terminal_error")
+    sink.purge(reason="terminal_error")
+    preserve_totals(sink)
+    sink.close()
+    operator_dbc.stop()
+    publish_operator_dbc()
+    core.publish(
+        transport_state="error",
+        transport_detail=detail,
+        ict_active=False,
+        periodic_armed=False,
+    )
+    core.emit_event(
+        "transport_error",
+        "socketcan",
+        code="socketcan_send_failed",
+        detail=detail,
+    )
+    if active_ict_seq is not None:
+        send_ict_result(active_ict_seq, ICT_ERR_SEND, detail)
+    return True
 
 
 def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int:
@@ -191,9 +263,7 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
         if getattr(sys, "frozen", False) or adjacent_root.is_dir():
             operator_roots.append(adjacent_root)
         operator_roots.extend(Path(path) for path in getattr(args, "dbc_dir", []))
-        operator_dbc = OperatorDbcRuntime(
-            operator_roots
-        )
+        operator_dbc = OperatorDbcRuntime(operator_roots)
     except GatewayRuntimeError as exc:
         print(f"Gateway DBC startup failed ({exc.code}): {exc}", file=sys.stderr)
         return 1
@@ -250,6 +320,13 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
     active_ict_seq: int | None = None
     last_ict_result: tuple[int, bytes] | None = None
     socketcan_guard_until_s = 0.0
+    socketcan_totals = {
+        "submitted": 0,
+        "sent": 0,
+        "congestion_dropped": 0,
+        "coalesced": 0,
+        "terminal_error": 0,
+    }
     last_pc001_handshake = False
     platform_linux = platform_name == "linux"
     initial_transport_state = "ready" if ict_sink is not None else "stopped"
@@ -304,9 +381,10 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                 transport_ready = ict_sink.is_handshake_connected()
                 if not transport_ready:
                     error = "PC001 handshake is not connected"
-            elif isinstance(ict_sink, SocketCanSink) and ict_sink.last_send_error is not None:
-                transport_ready = False
-                error = str(ict_sink.last_send_error)
+            elif isinstance(ict_sink, SocketCanSink):
+                # Physical SocketCAN outcomes are recorded only by the
+                # non-blocking service boundary, never inferred from submit or CSV.
+                return
             success = recording_ready or transport_ready
             if not success and not error:
                 error = "no active frame sink"
@@ -324,6 +402,29 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
     observe_timed = observe_transmission("timed")
     observe_web = observe_transmission("web")
 
+    def record_socketcan_delta(delta: SocketCanDelta) -> None:
+        core.record_socketcan_outcome(
+            source=delta.source,
+            family=delta.family,
+            can_id=delta.can_id,
+            payload=delta.payload,
+            outcome=delta.outcome,
+            reason=delta.reason,
+        )
+
+    def attach_socketcan_observer(candidate: FrameSink | None) -> None:
+        if isinstance(candidate, SocketCanSink):
+            candidate.set_outcome_observer(record_socketcan_delta)
+
+    def preserve_socketcan_totals(candidate: FrameSink | None) -> None:
+        if not isinstance(candidate, SocketCanSink):
+            return
+        snapshot = candidate.stats
+        for name in socketcan_totals:
+            socketcan_totals[name] += getattr(snapshot, name)
+
+    attach_socketcan_observer(ict_sink)
+
     def transport_ready() -> bool:
         if isinstance(ict_sink, TcpPc001Sink):
             return ict_sink.is_handshake_connected()
@@ -339,7 +440,13 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
             publish_operator_dbc()
             return
         assert ict_sink is not None
-        ict_sink.append(can_id, payload)
+        append_frame(
+            ict_sink,
+            can_id,
+            payload,
+            source="web",
+            family="dbc",
+        )
         observe_web(can_id, payload)
 
     def send_ict_result(request_seq: int, result_code: int, detail: str = "") -> None:
@@ -349,24 +456,41 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
         sock.sendto(packet, ack_addr)
         last_ict_result = (request_seq, packet)
 
+    def purge_socketcan_timed(generation: int | None, reason: str) -> None:
+        if generation is not None and isinstance(ict_sink, SocketCanSink):
+            ict_sink.purge(generation=generation, family="timed", reason=reason)
+
+    def stop_timed(reason: str) -> None:
+        generation = timed_can.active_generation
+        timed_can.disarm()
+        purge_socketcan_timed(generation, reason)
+
     def retire_failed_socketcan() -> None:
         nonlocal ict_sink, active_ict_seq
-        if not isinstance(ict_sink, SocketCanSink) or ict_sink.last_send_error is None:
-            return
-        detail = f"SocketCAN send failed on {ict_sink.interface}: {ict_sink.last_send_error}"
-        print(detail, file=sys.stderr)
-        ict_sink.close()
-        ict_sink = None
-        timed_can.disarm()
-        operator_dbc.stop()
-        publish_operator_dbc()
-        if active_ict_seq is not None:
-            send_ict_result(active_ict_seq, ICT_ERR_SEND, detail)
-        active_ict_seq = None
+        retired = _retire_failed_socketcan_sink(
+            ict_sink,
+            active_ict_seq=active_ict_seq,
+            stop_timed=stop_timed,
+            operator_dbc=operator_dbc,
+            publish_operator_dbc=publish_operator_dbc,
+            preserve_totals=preserve_socketcan_totals,
+            send_ict_result=send_ict_result,
+            core=core,
+        )
+        if retired:
+            ict_sink = None
+            active_ict_seq = None
 
     def refresh_runtime_status() -> None:
         nonlocal last_pc001_handshake
         pc001 = ict_sink.status_snapshot() if isinstance(ict_sink, TcpPc001Sink) else None
+        socketcan = ict_sink.stats if isinstance(ict_sink, SocketCanSink) else None
+
+        def socketcan_value(name: str) -> int:
+            return socketcan_totals[name] + (
+                getattr(socketcan, name) if socketcan is not None else 0
+            )
+
         handshake_connected = pc001.handshake_connected if pc001 is not None else False
         if handshake_connected != last_pc001_handshake:
             core.emit_event(
@@ -386,6 +510,12 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
             pc001_queued_frames=pc001.queued_frames if pc001 is not None else 0,
             pc001_sent_frames=pc001.sent_frames if pc001 is not None else 0,
             pc001_dropped_frames=pc001.dropped_frames if pc001 is not None else 0,
+            socketcan_submitted=socketcan_value("submitted"),
+            socketcan_sent=socketcan_value("sent"),
+            socketcan_congestion_dropped=socketcan_value("congestion_dropped"),
+            socketcan_coalesced=socketcan_value("coalesced"),
+            socketcan_terminal_errors=socketcan_value("terminal_error"),
+            socketcan_pending=socketcan.pending if socketcan is not None else 0,
         )
 
     def validate_tcp_host(value: object) -> str:
@@ -412,7 +542,7 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                     raise GatewayRuntimeError(
                         "tcp_port_invalid", "TCP port must be an integer in 1..65535"
                     )
-                timed_can.disarm()
+                stop_timed("transport_reconfigure")
                 operator_dbc.stop()
                 publish_operator_dbc()
                 core.publish(
@@ -422,6 +552,9 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                     ict_active=False,
                 )
                 if ict_sink is not None:
+                    if isinstance(ict_sink, SocketCanSink):
+                        ict_sink.purge(reason="transport_reconfigure")
+                        preserve_socketcan_totals(ict_sink)
                     ict_sink.close()
                     ict_sink = None
                 active_ict_seq = None
@@ -459,7 +592,7 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                 core.complete(command, {"status": status.to_dict()})
                 return
             if command.kind == "can0_restart":
-                timed_can.disarm()
+                stop_timed("transport_reconfigure")
                 operator_dbc.stop()
                 publish_operator_dbc()
                 core.publish(
@@ -469,6 +602,9 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                     ict_active=False,
                 )
                 if ict_sink is not None:
+                    if isinstance(ict_sink, SocketCanSink):
+                        ict_sink.purge(reason="transport_reconfigure")
+                        preserve_socketcan_totals(ict_sink)
                     ict_sink.close()
                     ict_sink = None
                 active_ict_seq = None
@@ -484,6 +620,7 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                     core.emit_event("transport_error", "web", code=code, detail=detail)
                     raise GatewayRuntimeError(code, detail, status=409) from exc
                 ict_sink = replacement
+                attach_socketcan_observer(ict_sink)
                 socketcan_guard_until_s = time.monotonic() + RECEIVE_POLL_LIMIT_S
                 status = core.publish(
                     mutate_revision=True,
@@ -548,8 +685,15 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
         while True:
             drain_runtime_commands()
             monotonic_s = time.monotonic()
-            timed_can.service(monotonic_s, active_sinks(), observe_timed)
+            timed_generation = timed_can.active_generation
+            timed_emitted = timed_can.service(monotonic_s, active_sinks(), observe_timed)
+            if timed_generation is not None and not timed_can.active and not timed_emitted:
+                purge_socketcan_timed(timed_generation, "deadline")
             operator_dbc.scheduler.service(send_operator_frame, monotonic_s)
+            if isinstance(ict_sink, SocketCanSink) and monotonic_s >= socketcan_guard_until_s:
+                ict_sink.service()
+            if timed_generation is not None and not timed_can.active and timed_emitted:
+                purge_socketcan_timed(timed_generation, "completed")
             retire_failed_socketcan()
             core.flush_transmission_aggregates(monotonic_s)
             refresh_runtime_status()
@@ -620,12 +764,14 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                         if args.sink == "socketcan":
                             ict_sink, result_code, result_detail = _open_can0(args.interface)
                             if ict_sink is not None:
+                                attach_socketcan_observer(ict_sink)
                                 # Give a timeout-triggered STOP, queued while the
                                 # privileged helper was running, one receive turn
                                 # before the first physical CAN frame can escape.
                                 socketcan_guard_until_s = time.monotonic() + RECEIVE_POLL_LIMIT_S
                         elif args.sink == "vcan":
                             ict_sink = _open_vcan(args.interface)
+                            attach_socketcan_observer(ict_sink)
                         elif args.sink == "csv":
                             result_code = ICT_ERR_UNSUPPORTED_TRANSPORT
                             result_detail = "gateway was started without an ICT transport"
@@ -651,11 +797,14 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                         detail=result_detail,
                     )
                 elif cmd == CMD_ICT_STOP:
-                    timed_can.disarm()
+                    stop_timed("ict_stop")
                     operator_dbc.stop()
                     publish_operator_dbc()
                     if ict_sink is not None and args.sink in ("vcan", "socketcan"):
                         # TCP stays listening across ICT stop; SocketCAN closes.
+                        if isinstance(ict_sink, SocketCanSink):
+                            ict_sink.purge(reason="ict_stop")
+                            preserve_socketcan_totals(ict_sink)
                         ict_sink.close()
                         ict_sink = None
                     active_ict_seq = None
@@ -663,11 +812,13 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                     core.publish(ict_active=False, periodic_armed=False)
                     core.emit_event("ict_stopped", "godot")
                 elif cmd == CMD_SHUTDOWN:
+                    stop_timed("shutdown")
                     operator_dbc.stop()
                     publish_operator_dbc()
                     print("shutdown requested")
                     break
                 elif cmd == CMD_TIMED_CAN_START:
+                    stop_timed("retrigger")
                     timed_can.trigger(time.monotonic())
                     timed_can.service(time.monotonic(), active_sinks(), observe_timed)
                     print("timed CAN burst started: 0x18FFF100 at 50 Hz for 10 s")
@@ -704,10 +855,14 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
     finally:
         rows = writer.row_count if writer is not None else 0
         path = writer._path if writer is not None else "(no session)"
+        stop_timed("shutdown")
         web_server.close()
         if writer is not None:
             writer.close()
         if ict_sink is not None:
+            if isinstance(ict_sink, SocketCanSink):
+                ict_sink.purge(reason="shutdown")
+                preserve_socketcan_totals(ict_sink)
             ict_sink.close()
         print(f"closed {path} ({rows} frames)")
         sock.close()
@@ -771,7 +926,7 @@ def emit_frames(
     state = MachineState(sample, model=model)
     projection = qml_mapper.project(sample) if qml_mapper is not None else None
     tick = float(sample.tick_ms)
-    pending: list[tuple[int, bytes]] = []
+    pending: list[tuple[str, int, bytes]] = []
 
     if scheduler.due("imu", tick):
         for link in ("body", "boom", "arm", "bucket"):
@@ -781,14 +936,14 @@ def emit_frames(
                 roll, pitch, yaw = projection.imu_rpy_deg[link]
             slots = state.sensor_slots(roll, pitch, yaw)
             can_id = RUFINEN_IDS[link]
-            pending.append((can_id, encode_godot_imu(codec, can_id, slots)))
+            pending.append(("imu", can_id, encode_godot_imu(codec, can_id, slots)))
 
     if scheduler.due("slew", tick):
-        pending.append((0x18FFF000, encode_slew_frame(state.slew_degrees())))
+        pending.append(("slew", 0x18FFF000, encode_slew_frame(state.slew_degrees())))
 
     if scheduler.due("travel", tick):
         left, right = state.travel_pressures()
-        pending.append((0x256, encode_travel_frame(left, right)))
+        pending.append(("travel", 0x256, encode_travel_frame(left, right)))
 
     if scheduler.due("rtk", tick):
         rtk_state = state if projection is None else QmlRtkState(projection)
@@ -798,13 +953,19 @@ def emit_frames(
             rtk_state,
             satellite_status=satellite_status,
         ).items():
-            pending.append((can_id, payload))
+            pending.append(("rtk", can_id, payload))
 
     # Finish all profile math and encoding before exposing any frame. A bad
     # telemetry sample must never produce a partial CAN family.
-    for can_id, payload in pending:
+    for family, can_id, payload in pending:
         for sink in sinks:
-            sink.append(can_id, payload)
+            append_frame(
+                sink,
+                can_id,
+                payload,
+                source="godot",
+                family=family,
+            )
         if observer is not None:
             observer(can_id, payload)
 
@@ -1008,6 +1169,8 @@ def run_with_injection(
                     args.model,
                     qml_mapper,
                 )
+                if isinstance(ict_sink, SocketCanSink):
+                    ict_sink.service()
             except QmlMappingError as exc:
                 print(f"QML mapping rejected smoke sample: {exc}", file=sys.stderr)
                 continue
@@ -1015,6 +1178,8 @@ def run_with_injection(
     finally:
         writer.close()
         if ict_sink is not None:
+            if isinstance(ict_sink, SocketCanSink):
+                ict_sink.purge(reason="shutdown")
             ict_sink.close()
         sock.close()
         print(f"smoke wrote {writer.row_count} frames -> {csv_path}")

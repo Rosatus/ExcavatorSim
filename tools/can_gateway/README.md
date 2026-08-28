@@ -64,8 +64,12 @@ DBC 内容 hash；DBC 内容变化后旧值不会静默套用到新布局。
 
 Linux 游戏启动参数自动选择 `--sink socketcan --interface can0`。点击
 **连接 ICT** 后，Gateway 检查物理 `can0`：已满足 250 kbit/s、
-`restart-ms=100`、`txqueuelen=1000` 且状态可用时直接绑定；否则通过受限
+`restart-ms=100`、`txqueuelen=10` 且状态可用时直接绑定；否则通过受限
 helper 自动配置并复核。CAN 帧构造和 CSV 录制不受此流程影响。
+
+物理发送采用非阻塞、按 CAN ID 合并的有界 latest-value 队列。USB-CAN
+拥塞时允许丢弃已过时的物理遥测帧并保持 ICT 在线；CSV 仍记录全部逻辑帧。
+Web 状态页会显示 submitted、sent、拥塞丢弃、合并与终端错误统计。
 
 root helper 使用 `/run/excavatorsim/can0.lock` 串行化完整配置事务。运行时目录
 必须是 `root:root 0700`，锁文件必须是 `root:root 0600` 的单链接普通文件；

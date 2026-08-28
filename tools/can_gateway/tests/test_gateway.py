@@ -9,7 +9,7 @@ import sys
 import unittest
 from pathlib import Path
 from typing import ClassVar
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 TOOLS_DIR = Path(__file__).resolve().parents[1]
 if str(TOOLS_DIR) not in sys.path:
@@ -445,6 +445,51 @@ class TimedCanBurstTest(unittest.TestCase):
         self.assertFalse(burst.active)
         self.assertFalse(burst.service(1.0, [sink]))
         self.assertEqual(len(sink.frames), 1)
+
+    def test_terminal_socketcan_failure_retires_transport_and_schedulers(self) -> None:
+        sink = gateway.SocketCanSink.__new__(gateway.SocketCanSink)
+        sink.interface = "can0"
+        sink.last_send_error = OSError(100, "Network is down")
+        sink.purge = Mock()
+        sink.close = Mock()
+        timed = TimedCanBurst()
+        timed.trigger(1.0)
+        stop_reasons: list[str] = []
+
+        def stop_timed(reason: str) -> None:
+            stop_reasons.append(reason)
+            timed.disarm()
+
+        operator_dbc = Mock()
+        publish_operator_dbc = Mock()
+        preserve_totals = Mock()
+        send_ict_result = Mock()
+        core = Mock()
+        with patch("builtins.print"):
+            retired = gateway._retire_failed_socketcan_sink(
+                sink,
+                active_ict_seq=42,
+                stop_timed=stop_timed,
+                operator_dbc=operator_dbc,
+                publish_operator_dbc=publish_operator_dbc,
+                preserve_totals=preserve_totals,
+                send_ict_result=send_ict_result,
+                core=core,
+            )
+
+        self.assertTrue(retired)
+        self.assertFalse(timed.active)
+        self.assertEqual(stop_reasons, ["terminal_error"])
+        sink.purge.assert_called_once_with(reason="terminal_error")
+        sink.close.assert_called_once_with()
+        operator_dbc.stop.assert_called_once_with()
+        publish_operator_dbc.assert_called_once_with()
+        preserve_totals.assert_called_once_with(sink)
+        send_ict_result.assert_called_once()
+        self.assertEqual(send_ict_result.call_args.args[:2], (42, gateway.ICT_ERR_SEND))
+        core.publish.assert_called_once()
+        self.assertEqual(core.publish.call_args.kwargs["transport_state"], "error")
+        core.emit_event.assert_called_once()
 
 
 class MachineStateSemanticTest(unittest.TestCase):

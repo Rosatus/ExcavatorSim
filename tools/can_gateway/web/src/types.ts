@@ -19,6 +19,12 @@ export interface GatewayStatus {
   pc001_queued_frames: number;
   pc001_sent_frames: number;
   pc001_dropped_frames: number;
+  socketcan_submitted: number;
+  socketcan_sent: number;
+  socketcan_congestion_dropped: number;
+  socketcan_coalesced: number;
+  socketcan_terminal_errors: number;
+  socketcan_pending: number;
   event_sequence: number;
   event_earliest_sequence: number;
   log_dropped_records: number;

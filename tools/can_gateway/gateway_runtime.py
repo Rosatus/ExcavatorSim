@@ -66,6 +66,12 @@ class GatewayStatus:
     pc001_queued_frames: int
     pc001_sent_frames: int
     pc001_dropped_frames: int
+    socketcan_submitted: int
+    socketcan_sent: int
+    socketcan_congestion_dropped: int
+    socketcan_coalesced: int
+    socketcan_terminal_errors: int
+    socketcan_pending: int
     event_sequence: int
     event_earliest_sequence: int
     log_dropped_records: int
@@ -313,12 +319,19 @@ class GatewayRuntimeCore:
             pc001_queued_frames=0,
             pc001_sent_frames=0,
             pc001_dropped_frames=0,
+            socketcan_submitted=0,
+            socketcan_sent=0,
+            socketcan_congestion_dropped=0,
+            socketcan_coalesced=0,
+            socketcan_terminal_errors=0,
+            socketcan_pending=0,
             event_sequence=0,
             event_earliest_sequence=1,
             log_dropped_records=0,
         )
         self._aggregate_lock = threading.Lock()
         self._aggregates: dict[tuple[str, int], dict[str, Any]] = {}
+        self._socketcan_aggregates: dict[tuple[str, str, int], dict[str, Any]] = {}
         self._aggregate_window_s = time.monotonic()
         self._closed = False
         self._dbc_snapshot_lock = threading.Lock()
@@ -403,6 +416,47 @@ class GatewayRuntimeCore:
             if error:
                 aggregate["latest_error"] = error
 
+    def record_socketcan_outcome(
+        self,
+        *,
+        source: str,
+        family: str,
+        can_id: int,
+        payload: bytes,
+        outcome: str,
+        reason: str = "",
+    ) -> None:
+        if outcome not in {
+            "submitted",
+            "sent",
+            "congestion_dropped",
+            "coalesced",
+            "terminal_error",
+        }:
+            raise ValueError(f"unknown SocketCAN outcome: {outcome}")
+        key = (source, family, can_id)
+        with self._aggregate_lock:
+            aggregate = self._socketcan_aggregates.setdefault(
+                key,
+                {
+                    "family": family,
+                    "can_id": f"0x{can_id:X}",
+                    "last_dlc": len(payload),
+                    "last_payload": payload.hex().upper(),
+                    "submitted": 0,
+                    "sent": 0,
+                    "congestion_dropped": 0,
+                    "coalesced": 0,
+                    "terminal_error": 0,
+                    "latest_reason": "",
+                },
+            )
+            aggregate[outcome] += 1
+            aggregate["last_dlc"] = len(payload)
+            aggregate["last_payload"] = payload.hex().upper()
+            if reason:
+                aggregate["latest_reason"] = reason
+
     def flush_transmission_aggregates(self, now_s: float | None = None) -> None:
         current = time.monotonic() if now_s is None else now_s
         with self._aggregate_lock:
@@ -410,11 +464,21 @@ class GatewayRuntimeCore:
                 return
             aggregates = self._aggregates
             self._aggregates = {}
+            socketcan_aggregates = self._socketcan_aggregates
+            self._socketcan_aggregates = {}
             window_start = self._aggregate_window_s
             self._aggregate_window_s = current
         for (source, _can_id), detail in sorted(aggregates.items()):
             self.emit_event(
                 "transmission_aggregate",
+                source,
+                window_start_monotonic_s=window_start,
+                window_end_monotonic_s=current,
+                **detail,
+            )
+        for (source, _family, _can_id), detail in sorted(socketcan_aggregates.items()):
+            self.emit_event(
+                "socketcan_transmission_aggregate",
                 source,
                 window_start_monotonic_s=window_start,
                 window_end_monotonic_s=current,

@@ -129,6 +129,28 @@ class GatewayRuntimeCoreTest(unittest.TestCase):
         self.assertEqual(events[0].detail["attempted"], 10)
         self.assertEqual(events[0].detail["succeeded"], 10)
 
+    def test_socketcan_outcomes_are_aggregated_by_source_family_and_id(self) -> None:
+        for outcome in ("submitted", "submitted", "coalesced", "sent"):
+            self.core.record_socketcan_outcome(
+                source="godot",
+                family="imu",
+                can_id=0x18FF3A00,
+                payload=b"\x02" * 8,
+                outcome=outcome,
+                reason="newer_value" if outcome == "coalesced" else "",
+            )
+        self.core.flush_transmission_aggregates(time.monotonic() + 1.1)
+        events, _gap = self.events.events_after(0)
+        self.assertEqual(len(events), 1)
+        event = events[0]
+        self.assertEqual(event.kind, "socketcan_transmission_aggregate")
+        self.assertEqual(event.source, "godot")
+        self.assertEqual(event.detail["family"], "imu")
+        self.assertEqual(event.detail["can_id"], "0x18FF3A00")
+        self.assertEqual(event.detail["submitted"], 2)
+        self.assertEqual(event.detail["coalesced"], 1)
+        self.assertEqual(event.detail["sent"], 1)
+
 
 class GatewayConfigStoreTest(unittest.TestCase):
     def test_atomic_roundtrip_and_invalid_fallback(self) -> None:
@@ -137,9 +159,7 @@ class GatewayConfigStoreTest(unittest.TestCase):
             store = GatewayConfigStore(path)
             self.assertEqual(store.load_tcp_endpoint("0.0.0.0", 5678), ("0.0.0.0", 5678))
             store.save_tcp_endpoint("127.0.0.1", 6123)
-            self.assertEqual(
-                store.load_tcp_endpoint("0.0.0.0", 5678), ("127.0.0.1", 6123)
-            )
+            self.assertEqual(store.load_tcp_endpoint("0.0.0.0", 5678), ("127.0.0.1", 6123))
             path.write_text('{"schema_version":1,"tcp":{"port":"bad"}}', encoding="utf-8")
             self.assertEqual(store.load_tcp_endpoint("0.0.0.0", 5678), ("0.0.0.0", 5678))
 

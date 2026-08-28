@@ -14,7 +14,7 @@ from pathlib import Path
 CAN_INTERFACE = "can0"
 CAN_BITRATE = 250_000
 CAN_RESTART_MS = 100
-CAN_TX_QUEUE_LEN = 1_000
+CAN_TX_QUEUE_LEN = 10
 CAN0_HELPER_PATH = Path("/usr/local/libexec/excavatorsim/can0-setup-helper")
 CAN0_LOCK_PATH = Path("/run/excavatorsim/can0.lock")
 IP_PATH_CANDIDATES = tuple(

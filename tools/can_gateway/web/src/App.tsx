@@ -69,6 +69,7 @@ function Header({ status, online }: { status: GatewayStatus; online: boolean }) 
 function StatusGrid({ status }: { status: GatewayStatus }) {
   const transportReady = status.transport_state === "ready";
   const handshakeReady = status.transport_kind !== "tcp" || status.pc001_handshake;
+  const socketcan = status.transport_kind === "socketcan" || status.transport_kind === "vcan";
   return (
     <Card>
       <CardHeader>
@@ -85,8 +86,15 @@ function StatusGrid({ status }: { status: GatewayStatus }) {
         <StatusItem label="周期发送" value={status.periodic_armed ? "运行中" : "已停止"} ok={status.periodic_armed} />
         <StatusItem label="ICT" value={status.ict_active ? "已连接" : "未连接"} ok={status.ict_active} />
         <StatusItem label="Godot 遥测" value={status.recording ? "录制中" : "未录制"} ok={!status.recording || status.ict_active} />
-        <StatusItem label="PC001 队列" value={`${status.pc001_queued_frames} 帧`} />
-        <StatusItem label="已发送 / 丢弃" value={`${status.pc001_sent_frames} / ${status.pc001_dropped_frames}`} ok={status.pc001_dropped_frames === 0} />
+        {socketcan ? <>
+          <StatusItem label="SocketCAN 待发送" value={`${status.socketcan_pending} 帧`} />
+          <StatusItem label="提交 / 已发送" value={`${status.socketcan_submitted} / ${status.socketcan_sent}`} />
+          <StatusItem label="拥塞丢弃 / 合并" value={`${status.socketcan_congestion_dropped} / ${status.socketcan_coalesced}`} ok={status.socketcan_congestion_dropped === 0} />
+          <StatusItem label="终端错误" value={`${status.socketcan_terminal_errors} 次`} ok={status.socketcan_terminal_errors === 0} />
+        </> : <>
+          <StatusItem label="PC001 队列" value={`${status.pc001_queued_frames} 帧`} />
+          <StatusItem label="已发送 / 丢弃" value={`${status.pc001_sent_frames} / ${status.pc001_dropped_frames}`} ok={status.pc001_dropped_frames === 0} />
+        </>}
         <StatusItem label="日志丢弃" value={`${status.log_dropped_records} 条`} ok={status.log_dropped_records === 0} />
       </CardContent>
     </Card>
@@ -124,7 +132,7 @@ function TransportControl({ status, mutate, busy }: { status: GatewayStatus; mut
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><Router className="h-4 w-4 text-cyan-300" /> Linux can0</CardTitle>
-        <CardDescription>固定执行 down → 250 kbit/s / restart-ms=100 → txqueuelen=1000 → up → 复核。</CardDescription>
+        <CardDescription>固定执行 down → 250 kbit/s / restart-ms=100 → txqueuelen=10 → up → 复核。</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <Switch checked={confirm} onChange={setConfirm} label="我确认停发并重启 can0" />
@@ -326,7 +334,7 @@ export default function App() {
         } else if (data.event && data.event.sequence > lastSequence.current) {
           lastSequence.current = data.event.sequence;
           setEvents((current) => [...current, data.event!].slice(-MAX_VISIBLE_EVENTS));
-          if (["transport_reconfigured", "transport_error", "dbc_started", "dbc_stopped", "dbc_reloaded", "dbc_message_updated", "pc001_connected", "pc001_disconnected"].includes(data.event.kind)) void refresh();
+          if (["transport_reconfigured", "transport_error", "dbc_started", "dbc_stopped", "dbc_reloaded", "dbc_message_updated", "pc001_connected", "pc001_disconnected", "socketcan_transmission_aggregate"].includes(data.event.kind)) void refresh();
         }
       };
       socket.onclose = () => {

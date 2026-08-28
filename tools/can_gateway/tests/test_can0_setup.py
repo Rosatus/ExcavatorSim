@@ -45,7 +45,7 @@ def link_json(
     up: bool = True,
     bitrate: int = 250_000,
     restart_ms: int = 100,
-    txqlen: int = 1_000,
+    txqlen: int = 10,
     state: str = "ERROR-ACTIVE",
     kind: str = "can",
 ) -> str:
@@ -190,7 +190,7 @@ class Can0ConfigureTest(unittest.TestCase):
                     "restart-ms",
                     "100",
                 ),
-                (ip_path, "link", "set", "can0", "txqueuelen", "1000"),
+                (ip_path, "link", "set", "can0", "txqueuelen", "10"),
                 (ip_path, "link", "set", "can0", "up"),
             ],
         )
