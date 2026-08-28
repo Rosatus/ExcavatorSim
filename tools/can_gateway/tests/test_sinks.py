@@ -107,7 +107,7 @@ class SocketCanSinkTest(unittest.TestCase):
     def test_append_sends_packed_frame(self):
         fake = _FakeSocket()
         self._patch_socket(lambda *a, **k: fake)
-        sink = SocketCanSink("vcan0", setup_check=False)
+        sink = SocketCanSink("can0")
         sink.append(0x18FF3A00, b"\x01" * 8)
         self.assertEqual(struct.unpack("<I", fake.sent[0][:4])[0], CAN_EFF_FLAG | 0x18FF3A00)
         sink.close()
@@ -119,7 +119,7 @@ class SocketCanSinkTest(unittest.TestCase):
 
         self._patch_socket(SocketFail)
         with self.assertRaises(RuntimeError) as ctx:
-            SocketCanSink("vcan0", setup_check=False)
+            SocketCanSink("can0")
         self.assertIn("AF_CAN", str(ctx.exception))
 
     def test_bind_failure_guidance(self):
@@ -129,8 +129,21 @@ class SocketCanSinkTest(unittest.TestCase):
 
         self._patch_socket(lambda *a, **k: BindFail())
         with self.assertRaises(RuntimeError) as ctx:
-            SocketCanSink("vcan99", setup_check=False)
-        self.assertIn("--setup-vcan", str(ctx.exception))
+            SocketCanSink("can0")
+        self.assertIn("configured for the CAN bus", str(ctx.exception))
+
+    def test_send_failure_is_recorded_without_repacking(self):
+        class SendFail(_FakeSocket):
+            def send(self, data):
+                raise OSError(105, "No buffer space available")
+
+        fake = SendFail()
+        self._patch_socket(lambda *a, **k: fake)
+        sink = SocketCanSink("can0")
+        sink.append(0x18FFF100, bytes(8))
+        self.assertIsNotNone(sink.last_send_error)
+        sink.append(0x18FFF100, bytes(8))
+        sink.close()
 
 
 if __name__ == "__main__":

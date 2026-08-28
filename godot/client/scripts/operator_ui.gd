@@ -441,36 +441,45 @@ func _refresh_can_status() -> void:
 			_can_output_button.text = "开始记录 CAN（离线，点击重试）"
 			_can_output_button.button_pressed = false
 			_set_ict_button(
-				false, linux_gw, bridge.is_ict_requested(),
+				false, linux_gw, bridge.is_ict_active(),
 				"网关正在启动或重启" if bridge.is_ict_requested() else "网关离线，连接后重试"
 			)
 			_timed_can_button.disabled = true
 		1:
-			_can_status_label.text = "CAN Gateway: online (idle)"
+			var idle_error := String(bridge.get_last_gateway_error())
+			_can_status_label.text = "CAN Gateway: online (idle)" if idle_error.is_empty() \
+				else "CAN Gateway: online — %s" % idle_error
 			_can_output_button.text = "开始记录 CAN"
 			_can_output_button.button_pressed = false
-			_set_ict_button(true, linux_gw, bridge.is_ict_requested(), "")
+			_set_ict_button(true, linux_gw, bridge.is_ict_active(), "")
 			_timed_can_button.disabled = false
 		2:
 			_can_status_label.text = "CAN Gateway: recording"
 			_can_output_button.text = "停止并保存"
 			_can_output_button.button_pressed = true
-			_set_ict_button(true, linux_gw, bridge.is_ict_requested(), "")
+			_set_ict_button(true, linux_gw, bridge.is_ict_active(), "")
 			_timed_can_button.disabled = false
 
 
 func _set_ict_button(online: bool, linux_gateway: bool, active: bool, disabled_reason: String) -> void:
 	var usable := online
+	var bridge := _can_bridge()
+	var connecting: bool = bridge != null and bridge.has_method("is_ict_connecting") \
+		and bridge.is_ict_connecting()
 	_ict_button.disabled = not usable
 	_ict_button.tooltip_text = disabled_reason if not usable else (
-		"Linux 网关：vcan 直发" if linux_gateway
+		"Linux 网关：自动准备并直发物理 can0" if linux_gateway
 		else "Windows 网关：PC001 TCP %s:%s（对端用 socket_client_to_vcan 桥接）"
 			% [_ict_host_edit.text.strip_edges() if not _ict_host_edit.text.strip_edges().is_empty() else "0.0.0.0",
 				_ict_port_edit.text.strip_edges() if not _ict_port_edit.text.strip_edges().is_empty() else "5678"]
 	)
 	if not usable:
-		_ict_button.text = "ICT 正在重连…" if active else "连接 ICT（网关离线）"
-		_ict_button.button_pressed = active
+		_ict_button.text = "ICT 正在重连…" if connecting else "连接 ICT（网关离线）"
+		_ict_button.button_pressed = connecting
+	elif connecting:
+		_ict_button.text = "ICT 正在连接…"
+		_ict_button.button_pressed = true
+		_ict_button.disabled = true
 	elif active:
 		_ict_button.text = "断开 ICT"
 		_ict_button.button_pressed = true
@@ -488,7 +497,7 @@ func _set_ict_handshake_indicator(state: String) -> void:
 		"not_applicable":
 			_ict_handshake_lamp.self_modulate = Color("b8c0c8")
 			_ict_handshake_label.text = "直连"
-			_ict_handshake_label.tooltip_text = "Linux/vcan 直连，无需 PC001 TCP 握手"
+			_ict_handshake_label.tooltip_text = "Linux/can0 直连，无需 PC001 TCP 握手"
 		"waiting":
 			_ict_handshake_lamp.self_modulate = Color("ef5350")
 			_ict_handshake_label.text = "待握手"

@@ -50,6 +50,14 @@ func _run() -> void:
 		and gateway_command.has("builtin:qml-sy135-ground-truth"),
 		"gateway command carries the QML compatibility profile"
 	)
+	var linux_arguments: PackedStringArray = bridge.call(
+		"_gateway_arguments_for_platform", "Linux"
+	)
+	_check(
+		linux_arguments.has("--sink") and linux_arguments.has("socketcan")
+		and linux_arguments.has("--interface") and linux_arguments.has("can0"),
+		"Linux gateway command selects physical SocketCAN can0"
+	)
 	if OS.get_name() == "Windows":
 		_check(gateway_command.has("--sink") and gateway_command.has("tcp")
 			and gateway_command.has("--tcp-port") and gateway_command.has(str(TEST_ICT_PORT)),
@@ -134,7 +142,10 @@ func _run() -> void:
 	_check(bridge.is_ict_active() == false, "ICT stop no-op when inactive")
 	var original_pid := int(bridge.get_gateway_pid_for_test())
 	bridge.set_ict_connected(true)
-	_check(bridge.is_ict_active() == true, "ICT connect marks active state")
+	_check(not bridge.is_ict_active() and bridge.is_ict_connecting(),
+		"ICT connect remains pending until Gateway result")
+	_check(await _wait_ict_active(bridge, true),
+		"matching Gateway result marks ICT active")
 	bridge.set_ict_connected(false)
 	_check(bridge.set_tcp_endpoint("127.0.0.1", str(TEST_ICT_PORT)),
 		"same ICT endpoint remains valid")
@@ -354,3 +365,11 @@ func _wait_ict_handshake(bridge: Node, expected: bool) -> bool:
 			return true
 		await create_timer(0.1).timeout
 	return bridge.is_ict_handshake_connected() == expected
+
+
+func _wait_ict_active(bridge: Node, expected: bool) -> bool:
+	for i in 40:
+		if bridge.is_ict_active() == expected:
+			return true
+		await create_timer(0.1).timeout
+	return bridge.is_ict_active() == expected

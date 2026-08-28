@@ -1,6 +1,6 @@
 # CAN Gateway Control And ICT Lifecycle
 
-## Scenario: Endpoint-aware ICT supervision and timed CAN bursts
+## Scenario: Endpoint-aware ICT supervision, physical can0, and timed CAN bursts
 
 ### 1. Scope / Trigger
 
@@ -20,8 +20,25 @@ command 4 = ICT_START
 command 5 = ICT_STOP
 command 6 = TIMED_CAN_START
 
+CTNR v1 = little-endian <u32 magic, u8 version, u8 command, u32 request_seq,
+                        u16 result_code, u16 detail_len> + UTF-8 detail
+magic = 0x43544E52, command = ICT_START, detail_len <= 160 bytes
+
+result 0 = success
+result 1 = unsupported ICT transport
+result 2 = can0 missing
+result 3 = helper/authorization unavailable
+result 4 = privileged setup failed
+result 5 = can0 post-check not ready
+result 6 = AF_CAN socket open failed
+result 7 = SocketCAN bind failed
+result 8 = terminal SocketCAN send failed
+result 9 = internal ICT failure
+
 CanTelemetryBridge.set_tcp_endpoint(host: String, port_text: String) -> bool
 CanTelemetryBridge.set_ict_connected(enabled: bool) -> void
+CanTelemetryBridge.is_ict_connecting() -> bool
+CanTelemetryBridge.is_ict_active() -> bool
 CanTelemetryBridge.trigger_timed_can() -> bool
 CanTelemetryBridge.is_ict_handshake_connected() -> bool
 CanTelemetryBridge.ict_link_status_changed(handshake_connected: bool, platform_linux: bool)
@@ -30,6 +47,9 @@ build_heartbeat(tick_ms: int, recording: bool, platform_linux: bool = false,
                 ict_handshake: bool = false) -> bytes
 TimedCanBurst.trigger(now_s: float) -> None
 TimedCanBurst.service(now_s: float, sinks: list[FrameSink]) -> bool
+
+prepare_can0() -> CanInterfaceSnapshot
+configure_can0() -> CanInterfaceSnapshot
 ```
 
 Command 6 starts raw CAN ID `0x18FFF100`, DLC 8, payload
@@ -38,7 +58,7 @@ Command 6 starts raw CAN ID `0x18FFF100`, DLC 8, payload
 
 The CTNK heartbeat remains the 16-byte little-endian v1 packet
 `<u32 magic, u8 version, u8 flags, u16 reserved, u64 tick_ms>`. Flag `0x01`
-means recording, `0x02` means Linux/vcan, and additive `0x04` means that the
+means recording, `0x02` means Linux, and additive `0x04` means that the
 TCP server currently stores a client accepted after `who` / `PC001`.
 
 ### 3. Contracts
@@ -56,6 +76,26 @@ TCP server currently stores a client accepted after `who` / `PC001`.
   `OS.create_process`; never scan or kill by process name or port.
 - Windows native and Python-development launch paths share the same gateway
   argument builder and include `--sink tcp --tcp-host HOST --tcp-port PORT`.
+- Linux product launch paths use `--sink socketcan --interface can0`. The
+  retained `--sink vcan` path is development-only compatibility and must
+  prepare the vcan device before binding it.
+- Linux ICT_START first inspects driver-created `can0` through detailed
+  iproute2 JSON. Ready means kind CAN, netdev UP, bitrate `250000`,
+  `restart-ms=100`, `txqueuelen=1000`, and a usable controller state. A ready
+  interface is never cycled; a missing interface is never created.
+- An unready/unverifiable can0 invokes exactly
+  `sudo -n /usr/local/libexec/excavatorsim/can0-setup-helper`. The installed
+  root helper accepts no arguments and runs down → bitrate/restart → queue → up
+  → post-check under an exclusive lock. Its `ip` executable and subprocess
+  environment come from fixed system allowlists, not caller `PATH`.
+- Godot treats ICT_START as connecting until a matching CTNR success arrives.
+  Matching failure, terminal send failure, or timeout clears requested/active
+  state; timeout also queues ICT_STOP so a helper that finishes late cannot
+  silently activate physical sending. Late/mismatched CTNR packets are ignored.
+- Gateway caches the last sequence-correlated ICT result so a duplicate start
+  can resend it without another configure/bind operation. SocketCAN is briefly
+  guarded after setup so a queued timeout STOP gets a receive turn before any
+  physical frame is emitted.
 - Command 6 only triggers the Python monotonic scheduler. Godot physics and CTN1
   telemetry cadence are not the timed frame clock.
 - A repeat command 6 replaces the current burst with one new 10-second window.
@@ -77,7 +117,7 @@ TCP server currently stores a client accepted after `who` / `PC001`.
 - Godot keeps `_ict_handshake_connected` separate from forwarding intent and
   activation. Turning forwarding off does not clear a still-live physical
   socket, while spawn/restart and heartbeat expiry clear the projected state.
-  Windows renders red/green from this projection; Linux/vcan renders neutral
+  Windows renders red/green from this projection; Linux direct CAN renders neutral
   not-applicable rather than claiming a PC001 handshake.
 
 ### 4. Validation & Error Matrix
@@ -99,7 +139,15 @@ TCP server currently stores a client accepted after `who` / `PC001`.
 | Valid PC001 socket remains while forwarding is off | Heartbeat `0x04` set; indicator stays green |
 | PC001 EOF/reset is detected | Clear current client; next heartbeat clears `0x04` |
 | Gateway restart or heartbeat expiry | Godot clears handshake projection immediately; replacement must handshake again |
-| Linux/vcan gateway | Heartbeat `0x02` set and `0x04` clear; UI renders neutral N/A |
+| Linux gateway | Heartbeat `0x02` set and `0x04` clear; UI renders neutral N/A |
+| can0 exists and exactly matches the fixed contract | Skip helper/down-up; bind directly; return matching CTNR success |
+| can0 exists but is down, mismatched, stopped, or unverifiable | Run only the fixed helper transaction; post-verify before bind |
+| can0 is absent | Do not create it; return result 2 with USB-CAN/driver guidance |
+| Helper/sudoers is absent or `sudo -n` is denied | Fail without a prompt; return result 3 with installer guidance |
+| Setup/post-check/open/bind/send fails | Return its distinct result code; do not claim active ICT |
+| CTNR sequence is late or mismatched | Ignore it without mutating the current request |
+| CTNR detail is oversized, malformed, or invalid UTF-8 | Ignore the packet |
+| Godot waits past the ICT result deadline | Send ICT_STOP, clear pending/requested state, and expose timeout |
 
 ### 5. Good / Base / Bad Cases
 
@@ -108,12 +156,22 @@ TCP server currently stores a client accepted after `who` / `PC001`.
   the unchanged relay performs `who` / `PC001`.
 - Base: reconnect with the same normalized endpoint; PID remains stable and ICT
   start is sent without a restart.
+- Good: can0 already proves `250000 / 100 / 1000 / UP / usable`; Connect ICT
+  binds it without any privileged call or down/up interruption.
+- Good: can0 is present but mismatched; the fixed installed helper configures
+  it, post-verification succeeds, bind completes, and only then CTNR success
+  makes the UI connected.
+- Base: setup exceeds the Godot result deadline; Godot queues STOP and a later
+  helper completion is retired before physical forwarding starts.
+- Bad: treat existence or UP alone as readiness, construct can0 virtually,
+  authorize a parameterized root command, prompt for sudo, or mark the UI
+  connected before a matching CTNR success.
 - Good: recording and ICT are both available; command 6 feeds both sinks with
   identical raw frame data while PC001 adds only the EFF transport flag.
 - Good: a PC001 client handshakes, forwarding is toggled off, and the lamp stays
   green until that physical socket disconnects.
 - Base: gateway is online without a PC001 client; controls remain usable and
-  the Windows lamp stays red/waiting. Linux/vcan shows neutral direct mode.
+  the Windows lamp stays red/waiting. Linux direct CAN shows neutral mode.
 - Bad: call `spawn_gateway()` over a live listener, accept an old heartbeat as
   proof of the replacement, drive the 50 Hz burst from Godot physics packets,
   emit all missed slots in one catch-up burst, or use ICT request/active state
@@ -140,6 +198,17 @@ TCP server currently stores a client accepted after `who` / `PC001`.
 - Protocol/sink unit tests assert exact 16-byte v1 size, additive `0x04`, legacy
   parser results, bad-handshake rejection, disconnect/close clearing and later
   reconnection.
+- can0 setup unit tests inject command runners and assert ready no-op, missing
+  fail-closed behavior, exact mutation order, stopped/mismatched detection,
+  post-verification, fixed executable/environment, non-interactive fixed helper
+  invocation, lock behavior, and preservation of the original DOWN state on a
+  failed transaction.
+- CTNR tests assert exact little-endian fields, 160-byte/strict-UTF-8 bounds,
+  sequence matching, duplicate replay, timeout cancellation, and distinct
+  missing/helper/setup/not-ready/open/bind/send state transitions.
+- Linux distribution validation asserts both `gateway` and
+  `can0-setup-helper` are ELF executables, installer/uninstaller scripts are
+  present, staged sudoers passes `visudo -cf`, and the helper accepts no args.
 - Packaged executable: start recording, send command 6 without CTN1 telemetry,
   observe repeated `0x18FFF100` CSV rows, verify physical handshake flag set /
   clear, then stop and shut down.
@@ -161,4 +230,10 @@ Correct: accepted PC001 socket -> CTNK flag 0x04 -> Godot physical-handshake sta
 
 Wrong: headless E2E changes ack_port after autoload binding and assumes the socket moved
 Correct: close/reset the test ACK peer, bind the isolated port, then spawn the gateway
+
+Wrong: Connect ICT -> bind/create can0 or run `sudo ip ...` with runtime parameters -> immediately show connected
+Correct: inspect fixed can0 -> fixed `sudo -n` helper only if needed -> post-check -> bind -> matching CTNR success -> connected
+
+Wrong: `SocketCanSink(vcan0)` -> create/enable missing vcan0
+Correct: create/enable development vcan0 -> `SocketCanSink(vcan0)`
 ```

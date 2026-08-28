@@ -11,6 +11,7 @@ $tests = @(
     "equipment_command_mapper_test.gd",
     "control_input_hud_test.gd",
     "ict_status_indicator_test.gd",
+    "can_gateway_ict_result_test.gd",
     # operator_ui_test.gd / motion_client_test.gd: pre-existing failures
     # (model-switch & zero-pose-linkage; both fail on clean baseline too).
     "camera_workflow_test.gd",

@@ -14,6 +14,7 @@ const TELEMETRY_MAGIC := 0x314E5443  # "CTN1"
 const CONTROL_MAGIC := 0x43544E43  # "CTNC"
 const HEARTBEAT_MAGIC := 0x43544E4B  # "CTNK"
 const SESSION_DONE_MAGIC := 0x43544E44  # "CTND"
+const ICT_RESULT_MAGIC := 0x43544E52  # "CTNR"
 const PROTOCOL_VERSION := 1
 const CMD_RECORD_START := 1
 const CMD_RECORD_STOP := 2
@@ -28,6 +29,7 @@ const HEARTBEAT_TIMEOUT_MS := 2500
 const GATEWAY_SHUTDOWN_GRACE_MS := 1500
 const GATEWAY_KILL_GRACE_MS := 1000
 const GATEWAY_STARTUP_TIMEOUT_MS := 5000
+const ICT_RESULT_TIMEOUT_MS := 5000
 
 enum GatewayStatus { OFFLINE, ONLINE, RECORDING }
 enum GatewayLifecycle { IDLE, STARTING, STOPPING, FAILED }
@@ -60,6 +62,9 @@ var _gateway_is_linux := false
 var _ict_handshake_connected := false
 var _ict_active := false
 var _ict_requested := false
+var _ict_pending_seq := -1
+var _ict_active_seq := -1
+var _ict_result_deadline_ms := -1
 ## PC001 TCP endpoint for Windows ICT (injected into gateway spawn argv).
 var tcp_host := "0.0.0.0"
 var tcp_port := 5678
@@ -102,6 +107,7 @@ func _physics_process(delta: float) -> void:
 	_poll_heartbeats()
 	_service_gateway_lifecycle()
 	_expire_ict_handshake_if_stale()
+	_expire_ict_result_if_stale()
 	_accum += delta
 	if _accum < 1.0 / EMIT_HZ:
 		return
@@ -198,10 +204,17 @@ func is_ict_requested() -> bool:
 	return _ict_requested
 
 
+func is_ict_connecting() -> bool:
+	return _ict_requested and not _ict_active and _ict_pending_seq >= 0
+
+
 func set_ict_connected(enabled: bool) -> void:
 	_ict_requested = enabled
 	if not enabled:
 		_ict_active = false
+		_ict_pending_seq = -1
+		_ict_active_seq = -1
+		_ict_result_deadline_ms = -1
 		if _gateway_pid > 0 and _gateway_lifecycle != GatewayLifecycle.STOPPING:
 			_send_control(CMD_ICT_STOP)
 		return
@@ -273,6 +286,10 @@ func _resolve_gateway_command() -> PackedStringArray:
 
 
 func _gateway_arguments() -> PackedStringArray:
+	return _gateway_arguments_for_platform(OS.get_name())
+
+
+func _gateway_arguments_for_platform(platform_name: String) -> PackedStringArray:
 	var argv := PackedStringArray([
 		"--host", remote_host,
 		"--port", str(remote_port),
@@ -280,11 +297,16 @@ func _gateway_arguments() -> PackedStringArray:
 		"--out", _resolve_output_dir(),
 		"--model", model_id,
 	])
-	if OS.get_name() == "Windows":
+	if platform_name == "Windows":
 		argv.append_array(PackedStringArray([
 			"--sink", "tcp",
 			"--tcp-host", tcp_host,
 			"--tcp-port", str(tcp_port),
+		]))
+	else:
+		argv.append_array(PackedStringArray([
+			"--sink", "socketcan",
+			"--interface", "can0",
 		]))
 	return argv
 
@@ -325,6 +347,9 @@ func spawn_gateway() -> bool:
 
 func _begin_gateway_restart() -> void:
 	_ict_active = false
+	_ict_pending_seq = -1
+	_ict_active_seq = -1
+	_ict_result_deadline_ms = -1
 	_set_ict_link_state(false, false)
 	_restart_after_stop = true
 	_gateway_lifecycle = GatewayLifecycle.STOPPING
@@ -377,10 +402,74 @@ func _service_gateway_lifecycle() -> void:
 
 
 func _activate_ict() -> void:
-	if not _ict_requested or _ict_active:
+	if not _ict_requested or _ict_active or _ict_pending_seq >= 0:
 		return
-	_ict_active = true
-	_send_control(CMD_ICT_START)
+	_ict_pending_seq = _send_control(CMD_ICT_START)
+	_ict_result_deadline_ms = Time.get_ticks_msec() + ICT_RESULT_TIMEOUT_MS
+	ict_link_status_changed.emit(_ict_handshake_connected, _gateway_is_linux)
+
+
+func _expire_ict_result_if_stale() -> void:
+	if _ict_pending_seq < 0 or Time.get_ticks_msec() < _ict_result_deadline_ms:
+		return
+	# The Gateway can still be blocked in the privileged can0 helper. Queueing
+	# STOP before clearing local state makes a late setup success self-cancel.
+	_send_control(CMD_ICT_STOP)
+	_ict_pending_seq = -1
+	_ict_result_deadline_ms = -1
+	_ict_requested = false
+	_ict_active = false
+	_set_gateway_error("ICT connection timed out before Gateway acknowledged transport readiness")
+	ict_link_status_changed.emit(_ict_handshake_connected, _gateway_is_linux)
+
+
+func _handle_ict_result(packet: PackedByteArray) -> void:
+	if packet.size() < 14 or packet[4] != PROTOCOL_VERSION or packet[5] != CMD_ICT_START:
+		return
+	var request_seq := _read_u32(packet, 6)
+	var result_code := _read_u16(packet, 10)
+	var detail_len := _read_u16(packet, 12)
+	if detail_len > 160 or packet.size() != 14 + detail_len:
+		return
+	var matches_pending := request_seq == _ict_pending_seq
+	var matches_active := request_seq == _ict_active_seq
+	if not matches_pending and not matches_active:
+		return
+	var detail_bytes := packet.slice(14)
+	var detail := detail_bytes.get_string_from_utf8()
+	if detail.to_utf8_buffer() != detail_bytes:
+		return
+	if result_code == 0:
+		if matches_active:
+			return
+		_ict_active = true
+		_ict_active_seq = request_seq
+		_ict_pending_seq = -1
+		_ict_result_deadline_ms = -1
+		_last_gateway_error = ""
+	else:
+		_ict_active = false
+		_ict_requested = false
+		_ict_pending_seq = -1
+		_ict_active_seq = -1
+		_ict_result_deadline_ms = -1
+		_set_gateway_error(_ict_result_message(result_code, detail))
+	ict_link_status_changed.emit(_ict_handshake_connected, _gateway_is_linux)
+
+
+func _ict_result_message(code: int, detail: String) -> String:
+	var category: String = String({
+		1: "Gateway has no ICT transport",
+		2: "can0 is missing; check the USB-CAN adapter and driver",
+		3: "can0 setup helper or sudoers authorization is unavailable",
+		4: "can0 privileged setup failed",
+		5: "can0 did not pass readiness verification",
+		6: "Linux AF_CAN is unavailable",
+		7: "Gateway could not bind can0",
+		8: "SocketCAN frame sending failed",
+		9: "Gateway ICT transport failed internally",
+	}.get(code, "Gateway returned an unknown ICT result"))
+	return category if detail.is_empty() else "%s (%s)" % [category, detail]
 
 
 func _set_gateway_error(message: String) -> void:
@@ -423,6 +512,27 @@ func get_spawned_tcp_endpoint_for_test() -> Dictionary:
 
 func get_desired_tcp_endpoint_for_test() -> Dictionary:
 	return {"host": tcp_host, "port": tcp_port}
+
+
+func set_ict_pending_for_test(request_seq: int) -> void:
+	_ict_requested = true
+	_ict_active = false
+	_ict_pending_seq = request_seq
+	_ict_active_seq = -1
+	_ict_result_deadline_ms = Time.get_ticks_msec() + ICT_RESULT_TIMEOUT_MS
+
+
+func handle_ict_result_for_test(packet: PackedByteArray) -> void:
+	_handle_ict_result(packet)
+
+
+func expire_ict_result_for_test() -> void:
+	_ict_result_deadline_ms = 0
+	_expire_ict_result_if_stale()
+
+
+func get_control_sequence_for_test() -> int:
+	return _control_seq
 
 
 func _resolve_gateway_script() -> String:
@@ -473,6 +583,8 @@ func _poll_heartbeats() -> void:
 		elif packet.size() > 8 and _read_u32(packet, 0) == SESSION_DONE_MAGIC:
 			var path_bytes := packet.slice(8)
 			_last_segment_path = path_bytes.get_string_from_utf8()
+		elif packet.size() >= 14 and _read_u32(packet, 0) == ICT_RESULT_MAGIC:
+			_handle_ict_result(packet)
 
 
 func _drain_ack_packets() -> void:
@@ -490,12 +602,13 @@ func set_last_segment_path(path: String) -> void:
 	_last_segment_path = path
 
 
-func _send_control(cmd: int) -> void:
+func _send_control(cmd: int) -> int:
 	if _udp == null:
 		_udp = PacketPeerUDP.new()
 	_udp.set_dest_address(remote_host, remote_port)
 	_control_seq += 1
 	_udp.put_packet(_build_control_packet(cmd, _control_seq))
+	return _control_seq
 
 
 static func _build_control_packet(cmd: int, seq: int) -> PackedByteArray:
@@ -511,6 +624,10 @@ static func _build_control_packet(cmd: int, seq: int) -> PackedByteArray:
 
 static func _read_u32(data: PackedByteArray, offset: int) -> int:
 	return data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24)
+
+
+static func _read_u16(data: PackedByteArray, offset: int) -> int:
+	return data[offset] | (data[offset + 1] << 8)
 
 
 ## --- telemetry streaming ---

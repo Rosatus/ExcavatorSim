@@ -9,11 +9,13 @@ import sys
 import unittest
 from pathlib import Path
 from typing import ClassVar
+from unittest.mock import patch
 
 TOOLS_DIR = Path(__file__).resolve().parents[1]
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
+import gateway  # noqa: E402
 from control_protocol import (  # noqa: E402
     CMD_ICT_START,
     CMD_ICT_STOP,
@@ -24,12 +26,17 @@ from control_protocol import (  # noqa: E402
     HEARTBEAT_FLAG_ICT_HANDSHAKE,
     HEARTBEAT_FLAG_PLATFORM_LINUX,
     HEARTBEAT_FLAG_RECORDING,
+    ICT_ERR_INTERFACE_MISSING,
+    ICT_OK,
     build_control,
     build_heartbeat,
+    build_ict_result,
     build_session_done,
     parse_control,
+    parse_control_packet,
     parse_heartbeat,
     parse_heartbeat_flags,
+    parse_ict_result,
     parse_session_done,
 )
 from conventions import (  # noqa: E402
@@ -293,6 +300,7 @@ class ControlProtocolTest(unittest.TestCase):
             CMD_TIMED_CAN_START,
         ):
             self.assertEqual(parse_control(build_control(cmd, seq=7)), cmd)
+            self.assertEqual(parse_control_packet(build_control(cmd, seq=7)), (cmd, 7))
 
     def test_control_rejects_garbage(self) -> None:
         self.assertIsNone(parse_control(b"short"))
@@ -334,6 +342,19 @@ class ControlProtocolTest(unittest.TestCase):
         self.assertIsNone(parse_session_done(b"tiny"))
         self.assertIsNone(parse_session_done(bytes(16)))
 
+    def test_ict_result_roundtrip_and_validation(self) -> None:
+        success = build_ict_result(42, ICT_OK)
+        failure = build_ict_result(43, ICT_ERR_INTERFACE_MISSING, "can0 missing")
+        self.assertEqual(parse_ict_result(success), (42, ICT_OK, ""))
+        self.assertEqual(
+            parse_ict_result(failure),
+            (43, ICT_ERR_INTERFACE_MISSING, "can0 missing"),
+        )
+        self.assertIsNone(parse_ict_result(failure[:-1]))
+        self.assertIsNone(parse_ict_result(bytes(14)))
+        with self.assertRaises(ValueError):
+            build_ict_result(1, ICT_OK, "x" * 161)
+
 
 class _CaptureSink:
     def __init__(self) -> None:
@@ -347,6 +368,27 @@ class _CaptureSink:
 
     def peer_name(self) -> str:
         return "capture"
+
+
+class VcanCompatibilityTest(unittest.TestCase):
+    def test_missing_vcan_is_prepared_before_socket_bind(self) -> None:
+        events: list[tuple[str, str]] = []
+
+        def ensure(interface: str) -> None:
+            events.append(("ensure", interface))
+
+        class FakeSocketCanSink:
+            def __init__(self, interface: str, **_kwargs) -> None:
+                events.append(("bind", interface))
+
+        with (
+            patch.object(gateway, "ensure_vcan_interface", side_effect=ensure),
+            patch.object(gateway, "SocketCanSink", FakeSocketCanSink),
+        ):
+            sink = gateway._open_vcan("vcan0")
+
+        self.assertIsNotNone(sink)
+        self.assertEqual(events, [("ensure", "vcan0"), ("bind", "vcan0")])
 
 
 class TimedCanBurstTest(unittest.TestCase):

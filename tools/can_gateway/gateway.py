@@ -15,6 +15,7 @@ import sys
 import time
 from pathlib import Path
 
+from can0_setup import CAN_INTERFACE, Can0SetupError, prepare_can0
 from control_protocol import (
     CMD_ICT_START,
     CMD_ICT_STOP,
@@ -22,9 +23,20 @@ from control_protocol import (
     CMD_RECORD_STOP,
     CMD_SHUTDOWN,
     CMD_TIMED_CAN_START,
+    ICT_ERR_INTERFACE_MISSING,
+    ICT_ERR_INTERFACE_NOT_READY,
+    ICT_ERR_INTERNAL,
+    ICT_ERR_SEND,
+    ICT_ERR_SETUP_FAILED,
+    ICT_ERR_SETUP_PRIVILEGE,
+    ICT_ERR_SOCKET_BIND,
+    ICT_ERR_SOCKET_OPEN,
+    ICT_ERR_UNSUPPORTED_TRANSPORT,
+    ICT_OK,
     build_heartbeat,
+    build_ict_result,
     build_session_done,
-    parse_control,
+    parse_control_packet,
 )
 from conventions import (
     DEFAULT_MODEL,
@@ -154,7 +166,9 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
     writer: CanapeCsvWriter | None = None
     recording = False
     last_heartbeat_s = 0.0
-    ctrl_seq = 0
+    active_ict_seq: int | None = None
+    last_ict_result: tuple[int, bytes] | None = None
+    socketcan_guard_until_s = 0.0
     platform_linux = hasattr(socket, "AF_CAN")
     print(f"gateway listening on {args.host}:{args.port} (out={out_path}, sink={args.sink})")
 
@@ -162,14 +176,37 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
         sinks: list[FrameSink] = []
         if recording and writer is not None:
             sinks.append(CsvFrameSink(writer))
-        if ict_sink is not None:
+        if ict_sink is not None and (
+            not isinstance(ict_sink, SocketCanSink)
+            or time.monotonic() >= socketcan_guard_until_s
+        ):
             sinks.append(ict_sink)
         return sinks
+
+    def send_ict_result(request_seq: int, result_code: int, detail: str = "") -> None:
+        nonlocal last_ict_result
+        bounded_detail = detail.encode("utf-8")[:160].decode("utf-8", errors="ignore")
+        packet = build_ict_result(request_seq, result_code, bounded_detail)
+        sock.sendto(packet, ack_addr)
+        last_ict_result = (request_seq, packet)
+
+    def retire_failed_socketcan() -> None:
+        nonlocal ict_sink, active_ict_seq
+        if not isinstance(ict_sink, SocketCanSink) or ict_sink.last_send_error is None:
+            return
+        detail = f"SocketCAN send failed on {ict_sink.interface}: {ict_sink.last_send_error}"
+        print(detail, file=sys.stderr)
+        ict_sink.close()
+        ict_sink = None
+        if active_ict_seq is not None:
+            send_ict_result(active_ict_seq, ICT_ERR_SEND, detail)
+        active_ict_seq = None
 
     try:
         while True:
             monotonic_s = time.monotonic()
             timed_can.service(monotonic_s, active_sinks())
+            retire_failed_socketcan()
             now_s = time.time()
             if now_s - last_heartbeat_s >= HEARTBEAT_INTERVAL_S:
                 ict_handshake = (
@@ -191,9 +228,9 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
             except (BlockingIOError, TimeoutError, ConnectionResetError):
                 continue
 
-            cmd = parse_control(data)
-            if cmd is not None:
-                ctrl_seq += 1
+            control = parse_control_packet(data)
+            if control is not None:
+                cmd, request_seq = control
                 if cmd == CMD_RECORD_START:
                     if writer is None:
                         stamp = time.strftime("%Y%m%d_%H%M%S")
@@ -210,22 +247,39 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                         writer = None
                     print("recording stopped")
                 elif cmd == CMD_ICT_START:
+                    if last_ict_result is not None and last_ict_result[0] == request_seq:
+                        sock.sendto(last_ict_result[1], ack_addr)
+                        continue
+                    result_code = ICT_OK
+                    result_detail = ""
                     if ict_sink is None:
-                        if args.sink == "vcan":
+                        if args.sink == "socketcan":
+                            ict_sink, result_code, result_detail = _open_can0(args.interface)
+                            if ict_sink is not None:
+                                # Give a timeout-triggered STOP, queued while the
+                                # privileged helper was running, one receive turn
+                                # before the first physical CAN frame can escape.
+                                socketcan_guard_until_s = (
+                                    time.monotonic() + RECEIVE_POLL_LIMIT_S
+                                )
+                        elif args.sink == "vcan":
                             ict_sink = _open_vcan(args.interface)
                         elif args.sink == "csv":
-                            # csv-only mode: ICT was never configured
-                            print(
-                                "ICT unavailable: gateway started without --sink tcp/vcan",
-                                file=sys.stderr,
-                            )
+                            result_code = ICT_ERR_UNSUPPORTED_TRANSPORT
+                            result_detail = "gateway was started without an ICT transport"
                     if ict_sink is not None:
+                        active_ict_seq = request_seq
                         print(f"ICT connected: {ict_sink.peer_name()}")
+                    elif result_code == ICT_OK:
+                        result_code = ICT_ERR_INTERNAL
+                        result_detail = "ICT transport did not open"
+                    send_ict_result(request_seq, result_code, result_detail)
                 elif cmd == CMD_ICT_STOP:
-                    if ict_sink is not None and args.sink == "vcan":
-                        # tcp sink stays listening across ICT stop; only vcan closes
+                    if ict_sink is not None and args.sink in ("vcan", "socketcan"):
+                        # TCP stays listening across ICT stop; SocketCAN closes.
                         ict_sink.close()
                         ict_sink = None
+                    active_ict_seq = None
                     print("ICT disconnected")
                 elif cmd == CMD_SHUTDOWN:
                     print("shutdown requested")
@@ -251,6 +305,7 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                         args.model,
                         qml_mapper,
                     )
+                    retire_failed_socketcan()
                 except QmlMappingError as exc:
                     print(f"QML mapping rejected telemetry sample: {exc}", file=sys.stderr)
                     continue
@@ -273,9 +328,8 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
 
 def _open_vcan(interface: str) -> SocketCanSink | None:
     try:
-        sink = SocketCanSink(interface, setup_check=False)
         ensure_vcan_interface(interface)
-        return sink
+        return SocketCanSink(interface, setup_check=False)
     except (RuntimeError, VcanSetupError) as exc:
         detail = str(exc).strip()
         hint = ""
@@ -286,6 +340,31 @@ def _open_vcan(interface: str) -> SocketCanSink | None:
             )
         print(f"vcan open failed for '{interface}': {detail}{hint}", file=sys.stderr)
         return None
+
+
+def _open_can0(interface: str) -> tuple[SocketCanSink | None, int, str]:
+    if interface != CAN_INTERFACE:
+        return None, ICT_ERR_SETUP_FAILED, f"physical ICT interface must be {CAN_INTERFACE}"
+    try:
+        prepare_can0()
+    except Can0SetupError as exc:
+        code_map = {
+            "CAN0_MISSING": ICT_ERR_INTERFACE_MISSING,
+            "CAN0_HELPER_MISSING": ICT_ERR_SETUP_PRIVILEGE,
+            "CAN0_PRIVILEGE": ICT_ERR_SETUP_PRIVILEGE,
+            "CAN0_NOT_READY": ICT_ERR_INTERFACE_NOT_READY,
+        }
+        result_code = code_map.get(exc.code, ICT_ERR_SETUP_FAILED)
+        detail = f"{exc.code}: {exc}"
+        print(detail, file=sys.stderr)
+        return None, result_code, detail
+    try:
+        return SocketCanSink(interface), ICT_OK, ""
+    except RuntimeError as exc:
+        detail = str(exc).strip()
+        result_code = ICT_ERR_SOCKET_OPEN if "AF_CAN" in detail else ICT_ERR_SOCKET_BIND
+        print(detail, file=sys.stderr)
+        return None, result_code, detail
 
 
 def emit_frames(
@@ -376,12 +455,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ack-port", type=int, default=29765, help="heartbeat destination port")
     parser.add_argument(
         "--sink",
-        choices=("csv", "vcan", "tcp"),
+        choices=("csv", "socketcan", "vcan", "tcp"),
         default="csv",
-        help="frame output: csv segments (default), SocketCAN vcan, or PC001 TCP server",
+        help="frame output: csv segments, physical SocketCAN, legacy vcan, or PC001 TCP",
     )
     parser.add_argument(
-        "--interface", default="vcan0", help="SocketCAN interface for --sink vcan / --setup-vcan"
+        "--interface", default="can0", help="SocketCAN interface (physical ICT is fixed to can0)"
     )
     parser.add_argument(
         "--tcp-host", default="0.0.0.0", help="listen address for --sink tcp (PC001)"
@@ -454,7 +533,12 @@ def run_with_injection(
     out_path.mkdir(parents=True, exist_ok=True)
 
     ict_sink: FrameSink | None = None
-    if args.sink == "vcan":
+    if args.sink == "socketcan":
+        ict_sink, result_code, detail = _open_can0(args.interface)
+        if ict_sink is None:
+            print(f"SocketCAN smoke unavailable ({result_code}): {detail}", file=sys.stderr)
+            return 1
+    elif args.sink == "vcan":
         ict_sink = _open_vcan(args.interface)
         if ict_sink is None:
             return 1

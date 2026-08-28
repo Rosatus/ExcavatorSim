@@ -36,25 +36,35 @@ Godot: tests/can_gateway_e2e_test.gd                     # 进程监督+录制�
 
 参数：`--port` `--imu-hz/--slew-hz/--rtk-hz/--travel-hz`、
 `--rtk-byteorder {big,little}`、`--compat-profile PATH|builtin:qml-sy135-ground-truth`、
-`--qml-calibration PATH`、`--sink {csv,vcan,tcp}`（默认 csv）、
-`--interface vcan0`、`--setup-vcan`。
+`--qml-calibration PATH`、`--sink {csv,socketcan,vcan,tcp}`（默认 csv）、
+`--interface can0`。`vcan` / `--setup-vcan` 仅保留为开发兼容入口。
 
-## Linux / SocketCAN（vcan 直发）
+## Linux / SocketCAN（物理 can0 直发）
 
-`--sink vcan` 将编码帧经 `AF_CAN CAN_RAW` 实时写入 vcan 网卡
-（供 CANape/ICT 测试台消费），与 CSV 录制相互独立。
+Linux 游戏启动参数自动选择 `--sink socketcan --interface can0`。点击
+**连接 ICT** 后，Gateway 检查物理 `can0`：已满足 250 kbit/s、
+`restart-ms=100`、`txqueuelen=1000` 且状态可用时直接绑定；否则通过受限
+helper 自动配置并复核。CAN 帧构造和 CSV 录制不受此流程影响。
 
 ```bash
-# WSL 出包（产物 ELF → dist/can_gateway_linux/gateway）
+# WSL/Linux 出包（gateway + 固定 can0 helper + 安装脚本）
 cd tools/can_gateway && ./dist_linux.sh        # 优先 uv，缺 uv 时回退 venv+pip
 
-# 目标机：准备 vcan 并直发（需 root 或 sudo）
-./gateway --setup-vcan --interface vcan0
-./gateway --sink vcan --interface vcan0        # + 游戏内 [连接 ICT]
+# 目标机安装阶段：管理员只执行一次；默认授权给 sudo 的原始调用用户
+cd dist/can_gateway_linux
+sudo ./install_can0_helper.sh                   # 也可显式追加运行游戏的用户名
+
+# 正常运行无需 root 或手工 setup；游戏内点击 [连接 ICT]
+# 卸载授权（不 down/delete can0，不卸载驱动）
+sudo ./uninstall_can0_helper.sh
 ```
 
-注意：WSL2 默认内核可能无 CONFIG_CAN/VCAN（报 "AF_CAN unavailable"），
-需自编译内核或用真实 Linux。构建机 glibc 需不高于目标机。
+目标机必须已连接 USB-CAN，并由驱动创建 `can0`；helper 不创建设备也不安装
+驱动。运行时只调用固定命令
+`sudo -n /usr/local/libexec/excavatorsim/can0-setup-helper`，不会在后台等待密码。
+缺设备、缺 helper/授权、配置、bind 或 send 失败会回传到游戏 UI。
+
+WSL2 通常没有真实 `can0`，只能用于构建和无硬件测试。构建机 glibc 需不高于目标机。
 
 ## Windows / PC001 TCP（ICT 直连）
 
@@ -117,15 +127,16 @@ ExcavatorSim gateway.exe (--sink tcp)          ICT 侧 (LinuxPC)
 
 ## 文件
 
-- `gateway.py` — 收包循环 + 帧率调度 + 冒烟模式 + sink 分派（CSV/vcan）
+- `gateway.py` — 收包循环 + 帧率调度 + 冒烟模式 + sink 分派（CSV/SocketCAN/TCP）
 - `conventions.py` — 包解析 / 四元数→ZYX 欧拉 / ENU→大地坐标 / 行走语义
 - `qml_profile.py` / `qml_compat.py` — 严格 profile/标定加载与 QML 数学逆投影
 - `resources/` — SHA-256 绑定的 QML profile 与 ground-truth calibration
 - `csv_writer.py` — CANape CSV 方言（UTF-8-sig，被对方 read_can_csv 消费）
 - `sinks.py` — FrameSink 抽象：CsvFrameSink / SocketCanSink（AF_CAN 直发）
+- `can0_setup.py` / `can0_setup_helper.py` — 固定 can0 就绪检查与受限配置事务
 - `pc001_sink.py` — PC001 TCP 服务端 sink（Windows ICT，字节兼容 dev_arch 桥）
-- `vcan_setup.py` — vcan 接口检测/自动创建（移植自 dev_arch can_replay）
-- `dist_linux.sh` — WSL/Linux 打包脚本（uv 优先）→ dist/can_gateway_linux/gateway
+- `vcan_setup.py` — 仅开发兼容的 vcan 接口检测/自动创建
+- `dist_linux.sh` — 打包 Gateway、固定 helper 与安装/卸载脚本
 - `encoders/` — ruifen_imu / dxg_slew / sinan_rtk / travel_pilot
 - `tests/` — 金样本往返（实采 24 行×15 ID）+ 合成扫描 + 语义断言 +
   对方解析器兼容冒烟；`extract_golden.py` 一键重建夹具

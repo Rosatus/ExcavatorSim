@@ -2,7 +2,7 @@
 
 CsvFrameSink wraps the CANape CSV writer (Windows/any platform).
 SocketCanSink writes raw 16-byte can_frame structs to a Linux SocketCAN
-(vcan) interface, mirroring dev_arch2.0 tools/can_replay/vcan_client.py.
+interface, including the product's physical can0 transport.
 """
 
 from __future__ import annotations
@@ -12,7 +12,6 @@ import struct
 from typing import Protocol
 
 from csv_writer import CanapeCsvWriter
-from vcan_setup import VcanSetupError, require_vcan_interface
 
 CAN_FRAME_STRUCT = struct.Struct("<IBBBB8s")
 CAN_FRAME_DLC = 8
@@ -64,7 +63,10 @@ class CsvFrameSink:
 class SocketCanSink:
     """Send frames to a SocketCAN interface via AF_CAN CAN_RAW."""
 
-    def __init__(self, interface: str = "vcan0", *, setup_check: bool = True) -> None:
+    def __init__(self, interface: str = "can0", *, setup_check: bool = False) -> None:
+        # Preparation belongs to the caller. Retain the keyword for source
+        # compatibility without giving this byte-oriented sink setup authority.
+        del setup_check
         try:
             self.sock = socket.socket(socket.AF_CAN, socket.SOCK_RAW, socket.CAN_RAW)
         except (AttributeError, OSError) as exc:
@@ -72,25 +74,26 @@ class SocketCanSink:
                 f"AF_CAN / CAN_RAW unavailable ({exc}); SocketCAN requires Linux with CAN support"
             ) from exc
         try:
-            if setup_check:
-                require_vcan_interface(interface)
             self.sock.bind((interface,))
         except OSError as exc:
             self.sock.close()
             raise RuntimeError(
                 f"cannot bind SocketCAN interface '{interface}': {exc}. "
-                f"Run first: gateway --setup-vcan --interface {interface}"
+                "Check that it exists, is UP, and is configured for the CAN bus"
             ) from exc
-        except VcanSetupError as exc:
-            self.sock.close()
-            raise RuntimeError(str(exc)) from exc
         self.interface = interface
+        self.last_send_error: OSError | None = None
 
     def peer_name(self) -> str:
-        return f"vcan:{self.interface}"
+        return f"socketcan:{self.interface}"
 
     def append(self, can_id: int, payload: bytes) -> None:
-        self.sock.send(pack_can_frame(can_id, payload))
+        if self.last_send_error is not None:
+            return
+        try:
+            self.sock.send(pack_can_frame(can_id, payload))
+        except OSError as exc:
+            self.last_send_error = exc
 
     def close(self) -> None:
         self.sock.close()
