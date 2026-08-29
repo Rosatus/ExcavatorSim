@@ -1852,3 +1852,38 @@ Completed and archived the five-phase Terrain3D restoration program: fixed Forwa
 ### Next Steps
 
 - None - task complete
+
+
+## Session 50: Bucket pass-through performance mode
+
+**Date**: 2026-08-30
+**Task**: Bucket pass-through performance mode
+**Branch**: `main`
+
+### Summary
+
+Implemented and validated a process-local bucket pass-through mode that disables bucket-ground cutting and collision work while clearing payload, preserves normal-mode restoration, and adds alternating paired soak coverage. Archived with the documented normal rendered-frame baseline exception retained; automated functional and fixed-step gates passed.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f17f0f9` | (see git log) |
+| `a21fe55` | (see git log) |
+| `f90e074` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
