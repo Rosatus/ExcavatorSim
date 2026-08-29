@@ -129,12 +129,26 @@ class GatewayStandaloneDbcProcessTest(unittest.TestCase):
                     item for item in dbc["messages"] if item["message"]["frame_id"] == 0x0CFDA800
                 )
                 key = urllib.parse.quote(message["message"]["key"], safe="")
+                preview = request_json(
+                    f"{base}/api/v1/dbc/messages/{key}/preview",
+                    "POST",
+                    {
+                        "expected_revision": status["revision"],
+                        "payload_hex": "7B 00 C7 FF 00 00 87 00",
+                    },
+                )["result"]["preview"]
+                self.assertEqual(preview["payload_hex"], "7B 00 C7 FF 00 00 87 00")
+                self.assertAlmostEqual(preview["values"]["VelE"], 1.23)
+                self.assertEqual(
+                    request_json(f"{base}/api/v1/status")["status"]["revision"],
+                    status["revision"],
+                )
                 updated = request_json(
                     f"{base}/api/v1/dbc/messages/{key}",
                     "PUT",
                     {
                         "expected_revision": status["revision"],
-                        "values": {"VelE": 1.23, "VelN": -0.57, "VelU": 0, "Vel": 1.35},
+                        "payload_hex": "7B 00 C7 FF 00 00 87 00",
                         "enabled": True,
                         "frequency_hz": 50,
                     },

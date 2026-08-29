@@ -431,8 +431,11 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
         return isinstance(ict_sink, SocketCanSink) and ict_sink.last_send_error is None
 
     def publish_operator_dbc(*, mutate_revision: bool = False) -> None:
-        core.publish_dbc_snapshot(operator_dbc.snapshot())
-        core.publish(periodic_armed=operator_dbc.armed, mutate_revision=mutate_revision)
+        core.publish_dbc_snapshot(
+            operator_dbc.snapshot(),
+            periodic_armed=operator_dbc.armed,
+            mutate_revision=mutate_revision,
+        )
 
     def send_operator_frame(_key: str, can_id: int, payload: bytes) -> None:
         if not transport_ready():
@@ -534,7 +537,8 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
     def handle_runtime_command(command: GatewayCommand) -> None:
         nonlocal ict_sink, active_ict_seq, socketcan_guard_until_s
         try:
-            core.require_revision(command)
+            if command.kind != "dbc_message_preview":
+                core.require_revision(command)
             if command.kind == "tcp_rebind":
                 host = validate_tcp_host(command.payload.get("host"))
                 port = command.payload.get("port")
@@ -637,6 +641,7 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                 updated = operator_dbc.update_message(
                     str(command.payload.get("message_key", "")),
                     values=command.payload.get("values"),
+                    payload_hex=command.payload.get("payload_hex"),
                     enabled=command.payload.get("enabled"),
                     frequency_hz=command.payload.get("frequency_hz"),
                 )
@@ -647,6 +652,14 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                     message_key=command.payload.get("message_key", ""),
                 )
                 core.complete(command, {"message": updated, "status": core.snapshot().to_dict()})
+                return
+            if command.kind == "dbc_message_preview":
+                preview = operator_dbc.preview_message(
+                    str(command.payload.get("message_key", "")),
+                    values=command.payload.get("values"),
+                    payload_hex=command.payload.get("payload_hex"),
+                )
+                core.complete(command, {"preview": preview})
                 return
             if command.kind == "dbc_start":
                 operator_dbc.start(transport_ready=transport_ready())

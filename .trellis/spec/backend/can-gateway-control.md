@@ -280,6 +280,7 @@ gateway.py --mode {standalone,godot-managed} --web-port PORT [--open-browser]
            [--dbc-dir DIR ...]
 GET  /api/v1/status | /api/v1/dbc | /api/v1/events?after=SEQ
 PUT  /api/v1/dbc/messages/{message_key}
+POST /api/v1/dbc/messages/{message_key}/preview
 POST /api/v1/dbc/{start,stop,reload}
 PUT  /api/v1/transport/tcp
 POST /api/v1/transport/can0/restart
@@ -292,18 +293,32 @@ POST /api/v1/transport/can0/restart
 - `standalone` exposes only the host platform transport: Windows TCP rebind or Linux
   confirmed can0 restart. Every mutation includes `expected_revision` and a bounded
   `request_id`; only the Gateway owner loop performs transport or scheduler mutation.
+  The pure preview endpoint needs no revision and is owner-serialized without applying
+  mutation revision checks. `GET /api/v1/dbc` returns status and DBC from one atomic
+  publication boundary so the editor cannot combine different revisions.
 - DBC discovery scans bundled `resources/dbc`, frozen-executable-adjacent `dbc`, and each
-  explicit `--dbc-dir` non-recursively. Files are content-hash deduplicated and parse
-  failures are isolated as notices instead of dropping the entire catalog.
-- Each message has independent `enabled`, strict signal values, and integer `frequency_hz`
-  in `1..100` (default 50). The scheduler skips missed slots rather than catch-up bursting.
+  explicit `--dbc-dir` non-recursively. Files are content-hash deduplicated; byte-identical
+  bundled/adjacent copies collapse silently while retaining every source path. Decode each
+  file strictly as UTF-8 (BOM allowed), then strict CP1252 with an encoding-fallback notice;
+  malformed files remain isolated instead of dropping the healthy catalog.
+- Each message has one canonical exact-DLC payload, independent `enabled`, and integer
+  `frequency_hz` in `1..100` (default 50). `PUT` accepts at most one of `values` or
+  `payload_hex`; either edit is converted to the canonical payload atomically. Signal edits
+  preserve bits not modeled by the DBC. An unchanged mux preserves inactive-branch bits;
+  changing its selector clears the complete old/new branch union before writing the active
+  branch, so stale modeled values cannot reappear. `POST .../preview` accepts exactly one edit source,
+  returns normalized values plus spaced uppercase payload, and never changes revision,
+  persistence, scheduler state, or events. The scheduler skips missed slots rather than
+  catch-up bursting.
 - Godot telemetry and Web operator values are distinct sources but both pass through the
   hash-bound strict DBC codec before the shared Gateway send core. A800 velocity signals
   follow the approved DBC little-endian layout. DBC reload never changes the protocol
   catalog already bound to Godot telemetry.
 - Estimated CAN load is informational: high load emits a visible warning but never blocks
   sending. Non-8-byte DBC messages preserve their real DLC at every sink boundary.
-- Operator configuration is atomically persisted against DBC content/message identity;
+- Operator configuration persists compact uppercase `payload_hex` atomically against DBC
+  content/message identity; display signal values are always decoded projections rather
+  than a second stored authority. Schema-1 value records migrate through the bound codec;
   changed or absent layouts cannot silently inherit stale values.
 - Production Web assets are built from `tools/can_gateway/web` into
   `resources/web`; packaged artifacts include those assets plus both approved DBC files.
@@ -318,29 +333,40 @@ POST /api/v1/transport/can0/restart
 | Missing/old revision | `revision_invalid` or revision conflict; no mutation |
 | Frequency is bool, non-integer, `<1`, or `>100` | reject; preserve previous config |
 | Signal is unknown, non-finite, out of range, or cannot encode strictly | reject whole message update |
+| Both/neither `values` and `payload_hex` are supplied to preview | reject with typed edit-source error; no mutation |
+| Raw payload has non-hex syntax or byte count different from message DLC | `dbc_payload_invalid`; preserve prior payload |
 | can0 restart omits `confirm=true` | `confirmation_required` |
-| One DBC is malformed or duplicates another content hash | keep healthy files; report notice |
+| One DBC is malformed | keep healthy files; report notice |
+| Two DBC sources have identical bytes | collapse silently; retain both source paths |
+| UTF-8 decode fails but strict CP1252 succeeds | load file and report `dbc_encoding_fallback` |
 | Owner loop misses periodic deadlines | emit at most one current slot; skip backlog |
 
 ### 5. Good / Base / Bad Cases
 
 - Good: Web edits one A800 signal, enables 20 Hz, and the resulting little-endian frame
   uses the same codec/send core as Godot telemetry.
+- Good: Web enters an exact-DLC raw payload, receives a side-effect-free decoded preview,
+  then explicitly saves; the exact bytes become the send/persistence authority.
 - Base: Gateway is Godot-managed; the browser continues showing transport state and live
   logs while all controls remain absent/read-only.
 - Bad: let the Web thread replace sinks directly, keep a second handwritten A800 codec,
-  reuse persisted values after a DBC hash change, or pad a short DBC frame's wire DLC to 8.
+  persist payload and values as competing authorities, reuse persisted data after a DBC
+  hash change, or pad a short DBC frame's wire DLC to 8.
 
 ### 6. Tests Required
 
 - API contract tests cover local-origin events, typed errors, revision conflicts, mode and
   platform capability gates, TCP rebind, confirmed can0 restart, and static SPA fallback.
 - DBC tests cover deterministic discovery/deduplication, parse isolation, strict encode,
-  hash-bound persistence, reload isolation, per-message rates, no catch-up, and load math.
+  UTF-8/CP1252 behavior, raw payload validation/decode, modeled-bit merge with reserved-bit
+  preservation, mux/endian cases, schema migration, hash-bound payload persistence, reload
+  isolation, per-message rates, no catch-up, and load math.
 - Differential tests compare every Godot-mapped RTK/IMU frame against cantools, including
   A800 little endian and a process-level PC001 wire assertion with the real DLC.
 - Frontend tests cover managed read-only state, platform-specific controls, confirmation,
-  contract/error rendering, live-event sequence gaps, and 1..100 Hz integer inputs.
+  contract/error rendering, live-event sequence gaps, 1..100 Hz integer inputs, payload
+  preview synchronization, invalid/incomplete payload suppression, and explicit-save-only
+  persistence.
 - Packaging smoke starts the frozen Windows binary, loads `/`, `/api/v1/status`, Web assets,
   and adjacent DBCs; Linux packaging validates Web/DBC inclusion and helper preservation.
 
@@ -355,4 +381,10 @@ Correct: HTTP validates -> bounded command queue -> single owner loop mutates ru
 
 Wrong: load warning disables Start
 Correct: estimate and warn; keep operator control available
+
+Wrong: persist values and payload separately, or mutate state on every preview keystroke
+Correct: preview through the codec without side effects -> explicit save -> one canonical payload
+
+Wrong: emit an operator warning for byte-identical bundled and adjacent DBC copies
+Correct: content-hash collapse silently -> expose all source paths on the one catalog entry
 ```

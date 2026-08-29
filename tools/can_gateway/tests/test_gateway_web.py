@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import socket
 import sys
 import tempfile
@@ -67,12 +68,69 @@ class GatewayWebApiTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await denied.json())["error"]["code"], "managed_mode_read_only")
         dbc = await self.client.get("/api/v1/dbc")
         self.assertEqual(dbc.status, 200)
-        self.assertFalse((await dbc.json())["dbc"]["armed"])
-        denied_dbc = await self.client.post(
-            "/api/v1/dbc/start", json={"expected_revision": 0}
-        )
+        combined = await dbc.json()
+        self.assertFalse(combined["dbc"]["armed"])
+        self.assertEqual(combined["status"]["revision"], status["revision"])
+        denied_dbc = await self.client.post("/api/v1/dbc/start", json={"expected_revision": 0})
         self.assertEqual(denied_dbc.status, 403)
         self.assertEqual((await denied_dbc.json())["error"]["code"], "managed_mode_read_only")
+        denied_preview = await self.client.post(
+            "/api/v1/dbc/messages/key/preview",
+            json={"expected_revision": 0, "payload_hex": "00"},
+        )
+        self.assertEqual(denied_preview.status, 403)
+        self.assertEqual((await denied_preview.json())["error"]["code"], "managed_mode_read_only")
+
+    async def test_preview_is_allowlisted_and_submitted_to_the_owner(self) -> None:
+        self.core.mode = "standalone"
+        unknown = await self.client.post(
+            "/api/v1/dbc/messages/key/preview",
+            json={"expected_revision": 0, "payload_hex": "00", "typo": True},
+        )
+        self.assertEqual(unknown.status, 400)
+        self.assertEqual((await unknown.json())["error"]["code"], "request_field_unknown")
+        self.assertEqual(self.core.take_commands(), [])
+
+        async def complete_preview() -> None:
+            while True:
+                commands = self.core.take_commands()
+                if commands:
+                    command = commands[0]
+                    self.assertEqual(command.kind, "dbc_message_preview")
+                    self.assertEqual(command.payload["payload_hex"], "00")
+                    self.core.complete(
+                        command,
+                        {"preview": {"values": {"X": 0.0}, "payload_hex": "00"}},
+                    )
+                    return
+                await asyncio.sleep(0)
+
+        owner = asyncio.create_task(complete_preview())
+        response = await self.client.post(
+            "/api/v1/dbc/messages/key/preview",
+            json={"payload_hex": "00"},
+        )
+        await owner
+        self.assertEqual(response.status, 200)
+        self.assertEqual((await response.json())["result"]["preview"]["payload_hex"], "00")
+        self.assertEqual(self.core.snapshot().revision, 0)
+
+    async def test_dbc_edit_source_types_are_rejected_before_queue(self) -> None:
+        self.core.mode = "standalone"
+        cases = (
+            ({"values": {}, "payload_hex": "00"}, "dbc_edit_source_conflict"),
+            ({"payload_hex": None}, "dbc_payload_invalid"),
+            ({"values": []}, "dbc_values_invalid"),
+        )
+        for body, expected_code in cases:
+            with self.subTest(expected_code=expected_code):
+                response = await self.client.put(
+                    "/api/v1/dbc/messages/key",
+                    json={"expected_revision": 0, **body},
+                )
+                self.assertEqual(response.status, 400)
+                self.assertEqual((await response.json())["error"]["code"], expected_code)
+                self.assertEqual(self.core.take_commands(), [])
 
     async def test_strict_json_and_content_type_are_enforced(self) -> None:
         self.core.mode = "standalone"

@@ -1,0 +1,4 @@
+{"file":".trellis/spec/backend/can-gateway-control.md","reason":"Preserve the local Web DBC console, owner-loop mutation, periodic scheduling, platform transport, and shared encoding authority contracts."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Use stable validation codes and atomic non-mutation semantics for preview, payload parsing, decoding, and persistence failures."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Keep the canonical payload and preview/update DTO consistent across Python codec, owner loop, HTTP API, persistence, and React."}
+{"file":".trellis/tasks/archive/2026-08/08-28-gateway-web-dbc-console/design.md","reason":"Reuse the established DBC catalog, API authority, persistence, React packaging, and Godot/operator separation design."}

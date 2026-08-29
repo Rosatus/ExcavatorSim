@@ -1,4 +1,4 @@
-import type { ApiErrorBody, DbcSnapshot, GatewayStatus } from "./types";
+import type { ApiErrorBody, DbcContentEdit, DbcPreview, DbcSnapshot, GatewayStatus } from "./types";
 import { GatewayApiError } from "./types";
 
 async function decode<T>(response: Response): Promise<T> {
@@ -10,12 +10,13 @@ async function decode<T>(response: Response): Promise<T> {
   return body as T;
 }
 
-async function mutation<T>(path: string, method: "POST" | "PUT", body: object): Promise<T> {
+async function mutation<T>(path: string, method: "POST" | "PUT", body: object, signal?: AbortSignal): Promise<T> {
   return decode<T>(
     await fetch(path, {
       method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      signal,
     }),
   );
 }
@@ -26,6 +27,10 @@ export async function getStatus(): Promise<GatewayStatus> {
 
 export async function getDbc(): Promise<DbcSnapshot> {
   return (await decode<{ dbc: DbcSnapshot }>(await fetch("./api/v1/dbc"))).dbc;
+}
+
+export async function getGatewaySnapshot(): Promise<{ status: GatewayStatus; dbc: DbcSnapshot }> {
+  return decode<{ status: GatewayStatus; dbc: DbcSnapshot }>(await fetch("./api/v1/dbc"));
 }
 
 export async function updateTcp(status: GatewayStatus, host: string, port: number): Promise<void> {
@@ -46,16 +51,30 @@ export async function restartCan0(status: GatewayStatus): Promise<void> {
 export async function updateDbcMessage(
   status: GatewayStatus,
   messageKey: string,
-  values: Record<string, number>,
+  edit: DbcContentEdit,
   enabled: boolean,
   frequencyHz: number,
 ): Promise<void> {
   await mutation(`./api/v1/dbc/messages/${encodeURIComponent(messageKey)}`, "PUT", {
-    values,
+    ...edit,
     enabled,
     frequency_hz: frequencyHz,
     expected_revision: status.revision,
   });
+}
+
+export async function previewDbcMessage(
+  messageKey: string,
+  edit: DbcContentEdit,
+  signal?: AbortSignal,
+): Promise<DbcPreview> {
+  const response = await mutation<{ result: { preview: DbcPreview } }>(
+    `./api/v1/dbc/messages/${encodeURIComponent(messageKey)}/preview`,
+    "POST",
+    edit,
+    signal,
+  );
+  return response.result.preview;
 }
 
 export async function dbcAction(

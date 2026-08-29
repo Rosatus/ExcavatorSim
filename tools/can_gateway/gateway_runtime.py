@@ -14,7 +14,7 @@ from concurrent.futures import Future
 from contextlib import suppress
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from platformdirs import user_config_path, user_log_path
 
@@ -373,15 +373,51 @@ class GatewayRuntimeCore:
             self._status = replace(self._status, revision=revision, **changes)
             return self._status
 
-    def publish_dbc_snapshot(self, snapshot: dict[str, Any]) -> None:
-        """Publish a detached JSON value without exposing owner-loop objects."""
-        detached = json.loads(json.dumps(snapshot, allow_nan=False))
-        with self._dbc_snapshot_lock:
-            self._dbc_snapshot = detached
+    def publish_dbc_snapshot(
+        self,
+        snapshot: dict[str, Any],
+        *,
+        periodic_armed: bool | None = None,
+        mutate_revision: bool = False,
+    ) -> GatewayStatus:
+        """Atomically publish detached DBC and matching runtime revision state."""
+        detached = cast(dict[str, Any], json.loads(json.dumps(snapshot, allow_nan=False)))
+        with self._status_lock:
+            revision = self._status.revision + 1 if mutate_revision else self._status.revision
+            if periodic_armed is None:
+                self._status = replace(self._status, revision=revision)
+            else:
+                self._status = replace(
+                    self._status,
+                    revision=revision,
+                    periodic_armed=periodic_armed,
+                )
+            with self._dbc_snapshot_lock:
+                self._dbc_snapshot = detached
+            return self._status
 
     def dbc_snapshot(self) -> dict[str, Any]:
         with self._dbc_snapshot_lock:
-            return json.loads(json.dumps(self._dbc_snapshot, allow_nan=False))
+            return cast(
+                dict[str, Any],
+                json.loads(json.dumps(self._dbc_snapshot, allow_nan=False)),
+            )
+
+    def web_snapshot(self) -> tuple[GatewayStatus, dict[str, Any]]:
+        """Return status and DBC from one publication boundary."""
+        with self._status_lock:
+            status = replace(
+                self._status,
+                event_sequence=self.events.latest_sequence,
+                event_earliest_sequence=self.events.earliest_sequence,
+                log_dropped_records=self.events.dropped_records,
+            )
+            with self._dbc_snapshot_lock:
+                dbc = cast(
+                    dict[str, Any],
+                    json.loads(json.dumps(self._dbc_snapshot, allow_nan=False)),
+                )
+        return status, dbc
 
     def emit_event(self, kind: str, source: str, **detail: Any) -> GatewayEvent:
         return self.events.append(kind, source, detail)

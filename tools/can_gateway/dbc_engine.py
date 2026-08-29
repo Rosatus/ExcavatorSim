@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import time
 import uuid
 from collections.abc import Callable, Iterable, Mapping
@@ -22,7 +23,7 @@ DEFAULT_FREQUENCY_HZ = 50
 MIN_FREQUENCY_HZ = 1
 MAX_FREQUENCY_HZ = 100
 CAN_BITRATE = 250_000
-DBC_CONFIG_SCHEMA = 1
+DBC_CONFIG_SCHEMA = 2
 PROTOCOL_DBC_HASHES = {
     "can3.sy135c.dbc": "c589bcaeda9b58a87e7b0ed920b7fbb55b86942341f4126d44f7f5017a7c4a44",
     "can4.sy135c.dbc": "cb71e5bec346940e84f1a24e7e3c6d6ef7191545e8f7b1dbba10a241174234f7",
@@ -187,6 +188,23 @@ def _message_definition(message: Any, content_hash: str) -> DbcMessageDefinition
     )
 
 
+def _decode_dbc_text(data: bytes) -> tuple[str, str]:
+    """Decode one DBC without cantools' replacement-character fallback."""
+    try:
+        return data.decode("utf-8-sig", errors="strict"), "utf-8"
+    except UnicodeDecodeError as utf8_error:
+        try:
+            return data.decode("cp1252", errors="strict"), "cp1252"
+        except UnicodeDecodeError as cp1252_error:
+            raise UnicodeDecodeError(
+                "utf-8/cp1252",
+                data,
+                min(utf8_error.start, cp1252_error.start),
+                max(utf8_error.end, cp1252_error.end),
+                "DBC bytes are neither strict UTF-8 nor strict CP1252",
+            ) from cp1252_error
+
+
 class DbcCatalog:
     """Deterministic direct-child discovery with content deduplication."""
 
@@ -206,6 +224,7 @@ class DbcCatalog:
                 normalized_roots.append(resolved)
 
         content_sources: dict[str, list[Path]] = {}
+        content_bytes: dict[str, bytes] = {}
         notices: list[DbcNotice] = []
         for root in normalized_roots:
             if not root.is_dir():
@@ -223,11 +242,13 @@ class DbcCatalog:
             )
             for path in candidates:
                 try:
-                    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+                    raw = path.read_bytes()
+                    digest = hashlib.sha256(raw).hexdigest()
                 except OSError as exc:
                     notices.append(DbcNotice("dbc_read_failed", str(exc), str(path)))
                     continue
                 content_sources.setdefault(digest, []).append(path)
+                content_bytes.setdefault(digest, raw)
 
         files: list[DbcFileDefinition] = []
         natives: dict[str, Any] = {}
@@ -236,7 +257,8 @@ class DbcCatalog:
         ):
             sources = tuple(sorted((str(path) for path in paths), key=os.path.normcase))
             try:
-                database = cantools.database.load_file(str(paths[0]), strict=True)
+                text, encoding = _decode_dbc_text(content_bytes[digest])
+                database = cantools.database.load_string(text, database_format="dbc", strict=True)
                 message_pairs = [
                     (_message_definition(message, digest), message) for message in database.messages
                 ]
@@ -251,11 +273,11 @@ class DbcCatalog:
                 definitions = tuple(pair[0] for pair in message_pairs)
                 natives.update({definition.key: native for definition, native in message_pairs})
                 files.append(DbcFileDefinition(digest, sources, definitions))
-                if len(sources) > 1:
+                if encoding == "cp1252":
                     notices.append(
                         DbcNotice(
-                            "dbc_duplicate_collapsed",
-                            f"exact duplicate collapsed across {len(sources)} sources",
+                            "dbc_encoding_fallback",
+                            "decoded as CP1252 after strict UTF-8 decoding failed",
                             sources[0],
                         )
                     )
@@ -267,7 +289,7 @@ class DbcCatalog:
 
 
 class DbcCodec:
-    """Cached strict physical-value encoder over one immutable catalog snapshot."""
+    """Cached strict encoder/decoder over one immutable catalog snapshot."""
 
     def __init__(self, catalog: DbcCatalog) -> None:
         self.catalog = catalog
@@ -295,9 +317,9 @@ class DbcCodec:
         multiplexers: dict[str, int] = {}
         for signal in native.signals:
             if signal.is_multiplexer:
-                chosen = round(self._default_value(signal))
-                values[signal.name] = float(chosen)
-                multiplexers[signal.name] = chosen
+                default_value = self._default_value(signal)
+                values[signal.name] = default_value
+                multiplexers[signal.name] = self._multiplexer_raw(signal, default_value)
         for signal in native.signals:
             if signal.is_multiplexer:
                 continue
@@ -338,6 +360,115 @@ class DbcCodec:
             raise GatewayRuntimeError("dbc_dlc_mismatch", "DBC encoder returned an invalid DLC")
         return encoded
 
+    def decode(self, message_key: str, payload: bytes) -> dict[str, float]:
+        definition = self._definition(message_key)
+        if len(payload) != definition.length:
+            raise GatewayRuntimeError(
+                "dbc_dlc_mismatch",
+                f"payload must contain exactly {definition.length} bytes",
+            )
+        native = self.catalog.native_messages[message_key]
+        try:
+            decoded = native.decode(
+                payload,
+                decode_choices=False,
+                scaling=True,
+                allow_truncated=False,
+                allow_excess=False,
+            )
+        except (DecodeError, ValueError, TypeError, OverflowError) as exc:
+            raise GatewayRuntimeError("dbc_decode_failed", str(exc)) from exc
+        if not isinstance(decoded, Mapping):
+            raise GatewayRuntimeError("dbc_decode_failed", "DBC decoder returned invalid data")
+        values: dict[str, float] = {}
+        for name, raw_value in decoded.items():
+            try:
+                values[str(name)] = _finite_float(raw_value, field=str(name))
+            except GatewayRuntimeError as exc:
+                raise GatewayRuntimeError("dbc_decode_failed", str(exc)) from exc
+        return values
+
+    def parse_payload_hex(self, message_key: str, payload_hex: Any) -> bytes:
+        definition = self._definition(message_key)
+        if not isinstance(payload_hex, str):
+            raise GatewayRuntimeError("dbc_payload_invalid", "payload_hex must be a string")
+        stripped = payload_hex.strip()
+        if not stripped or "0x" in stripped.lower():
+            raise GatewayRuntimeError(
+                "dbc_payload_invalid", "payload must be hexadecimal bytes without a prefix"
+            )
+        if re.search(r"\s", stripped):
+            tokens = stripped.split()
+            if any(re.fullmatch(r"[0-9A-Fa-f]{2}", token) is None for token in tokens):
+                raise GatewayRuntimeError(
+                    "dbc_payload_invalid", "spaced payload must contain two hex digits per byte"
+                )
+            compact = "".join(tokens)
+        else:
+            compact = stripped
+            if len(compact) % 2 or re.fullmatch(r"[0-9A-Fa-f]+", compact) is None:
+                raise GatewayRuntimeError(
+                    "dbc_payload_invalid", "payload must contain an even number of hex digits"
+                )
+        try:
+            payload = bytes.fromhex(compact)
+        except ValueError as exc:
+            raise GatewayRuntimeError(
+                "dbc_payload_invalid", "payload contains invalid hex"
+            ) from exc
+        if len(payload) != definition.length:
+            raise GatewayRuntimeError(
+                "dbc_dlc_mismatch",
+                f"payload must contain exactly {definition.length} bytes",
+            )
+        return payload
+
+    def merge_values(
+        self,
+        message_key: str,
+        base_payload: bytes,
+        edits: Mapping[str, Any],
+    ) -> tuple[bytes, dict[str, float]]:
+        if not isinstance(edits, Mapping):
+            raise GatewayRuntimeError("dbc_values_invalid", "values must be an object")
+        current = self.decode(message_key, base_payload)
+        combined: dict[str, Any] = {**current, **edits}
+        active = self._active_values(message_key, combined)
+        encoded = self.encode(message_key, active)
+        signal_names = set(active)
+        native = self.catalog.native_messages[message_key]
+        changed_multiplexers = {
+            signal.name
+            for signal in native.signals
+            if signal.is_multiplexer
+            and signal.name in current
+            and signal.name in active
+            and self._multiplexer_raw(signal, current[signal.name])
+            != self._multiplexer_raw(signal, active[signal.name])
+        }
+        if changed_multiplexers:
+            signal_names.update(
+                signal.name
+                for signal in native.signals
+                if signal.multiplexer_signal in changed_multiplexers
+            )
+        mask = self._signal_mask(message_key, signal_names)
+        merged = bytes(
+            (old & (~owned & 0xFF)) | (new & owned)
+            for old, new, owned in zip(base_payload, encoded, mask, strict=True)
+        )
+        return merged, self.decode(message_key, merged)
+
+    def normalize_payload(
+        self, message_key: str, payload_hex: Any
+    ) -> tuple[bytes, dict[str, float]]:
+        payload = self.parse_payload_hex(message_key, payload_hex)
+        return payload, self.decode(message_key, payload)
+
+    @staticmethod
+    def format_payload(payload: bytes) -> str:
+        return " ".join(f"{byte:02X}" for byte in payload)
+
     def encode_frame(
         self, frame_id: int, physical_values: Mapping[str, Any], *, is_extended: bool = True
     ) -> bytes:
@@ -354,6 +485,79 @@ class DbcCodec:
                 "dbc_message_unknown", "DBC message key is not active"
             ) from exc
 
+    def _active_values(self, message_key: str, supplied: Mapping[str, Any]) -> dict[str, float]:
+        definition = self._definition(message_key)
+        native = self.catalog.native_messages[message_key]
+        known = {signal.name: signal for signal in native.signals}
+        unknown = sorted(set(supplied) - set(known))
+        if unknown:
+            raise GatewayRuntimeError(
+                "dbc_signal_unknown", f"{definition.name} has no signal {unknown[0]!r}"
+            )
+        multiplexers: dict[str, int] = {}
+        for signal in native.signals:
+            if not signal.is_multiplexer:
+                continue
+            raw_value = supplied.get(signal.name, self._default_value(signal))
+            value = _finite_float(raw_value, field=signal.name)
+            multiplexers[signal.name] = self._multiplexer_raw(signal, value)
+        active: dict[str, Any] = {}
+        for signal in native.signals:
+            if signal.multiplexer_signal is not None:
+                selected = multiplexers.get(signal.multiplexer_signal)
+                if selected not in (signal.multiplexer_ids or []):
+                    continue
+            active[signal.name] = supplied.get(signal.name, self._default_value(signal))
+        # Reuse encode validation to normalize numeric types and enforce ranges.
+        encoded = self.encode(message_key, active)
+        return self.decode(message_key, encoded)
+
+    def _signal_mask(self, message_key: str, signal_names: set[str]) -> bytes:
+        definition = self._definition(message_key)
+        mask = bytearray(definition.length)
+        for signal in definition.signals:
+            if signal.name not in signal_names:
+                continue
+            bit = signal.start
+            for _ in range(signal.length):
+                byte_index = bit // 8
+                if byte_index < 0 or byte_index >= definition.length:
+                    raise GatewayRuntimeError(
+                        "dbc_signal_layout_invalid", f"{signal.name} lies outside the payload"
+                    )
+                mask[byte_index] |= 1 << (bit % 8)
+                if signal.byte_order == "little_endian":
+                    bit += 1
+                else:
+                    bit = bit + 15 if bit % 8 == 0 else bit - 1
+        return bytes(mask)
+
+    @staticmethod
+    def _multiplexer_raw(signal: Any, physical_value: float) -> int:
+        try:
+            raw_value = signal.scaled_to_raw(physical_value)
+            normalized = _finite_float(
+                signal.raw_to_scaled(raw_value, decode_choices=False),
+                field=signal.name,
+            )
+            raw_number = _finite_float(raw_value, field=signal.name)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise GatewayRuntimeError(
+                "dbc_value_invalid",
+                f"{signal.name} must map to an integer multiplexer selector",
+            ) from exc
+        if not raw_number.is_integer() or not math.isclose(
+            normalized,
+            physical_value,
+            rel_tol=1e-12,
+            abs_tol=1e-12,
+        ):
+            raise GatewayRuntimeError(
+                "dbc_value_invalid",
+                f"{signal.name} must map exactly to an integer multiplexer selector",
+            )
+        return int(raw_number)
+
     @staticmethod
     def _default_value(signal: Any) -> float:
         minimum = float(signal.minimum) if signal.minimum is not None else None
@@ -369,19 +573,23 @@ class DbcCodec:
 
 @dataclass
 class DbcDraft:
-    values: dict[str, float]
+    payload: bytes
     enabled: bool = False
     frequency_hz: int = DEFAULT_FREQUENCY_HZ
     generated_default: bool = True
 
-    def to_dict(self, definition: DbcMessageDefinition, payload: bytes | None) -> dict[str, Any]:
+    def to_dict(
+        self,
+        definition: DbcMessageDefinition,
+        values: Mapping[str, float],
+    ) -> dict[str, Any]:
         return {
             "message": definition.to_dict(),
-            "values": dict(self.values),
+            "values": dict(values),
             "enabled": self.enabled,
             "frequency_hz": self.frequency_hz,
             "generated_default": self.generated_default,
-            "payload_hex": payload.hex().upper() if payload is not None else "",
+            "payload_hex": DbcCodec.format_payload(self.payload),
         }
 
 
@@ -396,7 +604,10 @@ class DbcConfigStore:
             decoded = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             return {}
-        if not isinstance(decoded, dict) or decoded.get("schema_version") != DBC_CONFIG_SCHEMA:
+        if not isinstance(decoded, dict) or decoded.get("schema_version") not in (
+            1,
+            DBC_CONFIG_SCHEMA,
+        ):
             return {}
         return decoded
 
@@ -406,7 +617,7 @@ class DbcConfigStore:
             "schema_version": DBC_CONFIG_SCHEMA,
             "messages": {
                 key: {
-                    "values": draft.values,
+                    "payload_hex": draft.payload.hex().upper(),
                     "enabled": draft.enabled,
                     "frequency_hz": draft.frequency_hz,
                 }
@@ -549,17 +760,17 @@ class OperatorDbcRuntime:
         message_key: str,
         *,
         values: Mapping[str, Any] | None = None,
+        payload_hex: str | None = None,
         enabled: bool | None = None,
         frequency_hz: int | None = None,
     ) -> dict[str, Any]:
         if message_key not in self.drafts:
             raise GatewayRuntimeError("dbc_message_unknown", "DBC message key is not active")
+        if values is not None and payload_hex is not None:
+            raise GatewayRuntimeError(
+                "dbc_edit_source_conflict", "provide values or payload_hex, not both"
+            )
         current = self.drafts[message_key]
-        merged = dict(current.values)
-        if values is not None:
-            if not isinstance(values, Mapping):
-                raise GatewayRuntimeError("dbc_values_invalid", "values must be an object")
-            merged.update(values)
         if enabled is not None and not isinstance(enabled, bool):
             raise GatewayRuntimeError("dbc_enabled_invalid", "enabled must be boolean")
         new_frequency = current.frequency_hz if frequency_hz is None else frequency_hz
@@ -571,7 +782,15 @@ class OperatorDbcRuntime:
             raise GatewayRuntimeError(
                 "dbc_frequency_invalid", "frequency_hz must be 1..100 integer"
             )
-        payload = self.codec.encode(message_key, merged)
+        if values is not None:
+            payload, normalized_values = self.codec.merge_values(
+                message_key, current.payload, values
+            )
+        elif payload_hex is not None:
+            payload, normalized_values = self.codec.normalize_payload(message_key, payload_hex)
+        else:
+            payload = current.payload
+            normalized_values = self.codec.decode(message_key, payload)
         new_enabled = current.enabled if enabled is None else enabled
         if new_enabled:
             definition = self.codec.messages[message_key]
@@ -592,10 +811,14 @@ class OperatorDbcRuntime:
                     status=409,
                 )
         draft = DbcDraft(
-            values={name: float(value) for name, value in merged.items()},
+            payload=payload,
             enabled=new_enabled,
             frequency_hz=new_frequency,
-            generated_default=False if values is not None else current.generated_default,
+            generated_default=(
+                False
+                if values is not None or payload_hex is not None
+                else current.generated_default
+            ),
         )
         definition = self.codec.messages[message_key]
         candidate_drafts = dict(self.drafts)
@@ -618,7 +841,32 @@ class OperatorDbcRuntime:
             if new_enabled
             else None,
         )
-        return draft.to_dict(definition, payload)
+        return draft.to_dict(definition, normalized_values)
+
+    def preview_message(
+        self,
+        message_key: str,
+        *,
+        values: Mapping[str, Any] | None = None,
+        payload_hex: str | None = None,
+    ) -> dict[str, Any]:
+        if message_key not in self.drafts:
+            raise GatewayRuntimeError("dbc_message_unknown", "DBC message key is not active")
+        if (values is None) == (payload_hex is None):
+            raise GatewayRuntimeError(
+                "dbc_edit_source_invalid", "provide exactly one of values or payload_hex"
+            )
+        current = self.drafts[message_key]
+        if values is not None:
+            payload, normalized_values = self.codec.merge_values(
+                message_key, current.payload, values
+            )
+        else:
+            payload, normalized_values = self.codec.normalize_payload(message_key, payload_hex)
+        return {
+            "values": normalized_values,
+            "payload_hex": self.codec.format_payload(payload),
+        }
 
     def start(self, *, transport_ready: bool) -> None:
         if not transport_ready:
@@ -637,10 +885,10 @@ class OperatorDbcRuntime:
         ):
             draft = self.drafts[key]
             try:
-                payload = self.codec.encode(key, draft.values)
+                values = self.codec.decode(key, draft.payload)
             except GatewayRuntimeError:
-                payload = None
-            messages.append(draft.to_dict(definition, payload))
+                values = {}
+            messages.append(draft.to_dict(definition, values))
         return {
             "armed": self.armed,
             "catalog": self.catalog.snapshot.to_dict(),
@@ -655,19 +903,25 @@ class OperatorDbcRuntime:
         if not isinstance(persisted_messages, Mapping):
             persisted_messages = {}
         drafts: dict[str, DbcDraft] = {}
+        schema_version = persisted.get("schema_version") if isinstance(persisted, Mapping) else None
         for key in self.codec.messages:
             defaults = self.codec.generated_defaults(key)
-            draft = DbcDraft(defaults)
+            draft = DbcDraft(payload=self.codec.encode(key, defaults))
             record = persisted_messages.get(key)
             if isinstance(record, Mapping):
                 try:
-                    values = record.get("values", defaults)
-                    if not isinstance(values, Mapping):
-                        raise GatewayRuntimeError(
-                            "dbc_values_invalid", "stored values are not an object"
+                    if schema_version == 1:
+                        values = record.get("values", defaults)
+                        if not isinstance(values, Mapping):
+                            raise GatewayRuntimeError(
+                                "dbc_values_invalid", "stored values are not an object"
+                            )
+                        payload = self.codec.encode(key, values)
+                        self.codec.decode(key, payload)
+                    else:
+                        payload, _values = self.codec.normalize_payload(
+                            key, record.get("payload_hex")
                         )
-                    payload = self.codec.encode(key, values)
-                    del payload
                     frequency = record.get("frequency_hz", DEFAULT_FREQUENCY_HZ)
                     if (
                         not isinstance(frequency, int)
@@ -683,10 +937,10 @@ class OperatorDbcRuntime:
                             "dbc_enabled_invalid", "stored enabled flag is invalid"
                         )
                     draft = DbcDraft(
-                        {name: float(value) for name, value in values.items()},
-                        restored_enabled,
-                        frequency,
-                        False,
+                        payload=payload,
+                        enabled=restored_enabled,
+                        frequency_hz=frequency,
+                        generated_default=False,
                     )
                 except GatewayRuntimeError as exc:
                     self.restore_notices.append(DbcNotice("dbc_restore_ignored", str(exc), key))
@@ -705,7 +959,7 @@ class OperatorDbcRuntime:
                 entries[key] = _ScheduleEntry(
                     definition.frame_id,
                     definition.is_extended,
-                    self.codec.encode(key, draft.values),
+                    draft.payload,
                     draft.frequency_hz,
                 )
         self.drafts = drafts

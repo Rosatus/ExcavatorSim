@@ -73,6 +73,15 @@ export interface DbcMessageDraft {
   payload_hex: string;
 }
 
+export interface DbcPreview {
+  values: Record<string, number>;
+  payload_hex: string;
+}
+
+export type DbcContentEdit =
+  | { values: Record<string, number>; payload_hex?: never }
+  | { payload_hex: string; values?: never };
+
 export interface DbcFile {
   sha256: string;
   sources: string[];

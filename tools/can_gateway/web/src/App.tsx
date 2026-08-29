@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { dbcAction, eventSocketUrl, getDbc, getStatus, restartCan0, updateDbcMessage, updateTcp } from "./api";
+import { dbcAction, eventSocketUrl, getGatewaySnapshot, previewDbcMessage, restartCan0, updateDbcMessage, updateTcp } from "./api";
 import { Badge } from "./components/ui/badge";
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
@@ -178,24 +178,97 @@ function DbcSources({ dbc }: { dbc: DbcSnapshot }) {
   );
 }
 
+function parsePhysicalValues(values: Record<string, string>): Record<string, number> {
+  return Object.fromEntries(Object.entries(values).map(([key, value]) => [key, Number(value)]));
+}
+
+function validatePayloadText(payload: string, length: number): string {
+  const stripped = payload.trim();
+  if (!stripped) return "payload 不能为空。";
+  if (stripped.toLowerCase().includes("0x")) return "不要使用 0x 前缀。";
+  let compact = stripped;
+  if (/\s/.test(stripped)) {
+    const tokens = stripped.split(/\s+/);
+    if (tokens.some((token) => !/^[0-9a-fA-F]{2}$/.test(token))) return "空格分隔格式要求每字节恰好两位十六进制。";
+    compact = tokens.join("");
+  } else if (!/^[0-9a-fA-F]+$/.test(compact) || compact.length % 2 !== 0) {
+    return "payload 必须是偶数位十六进制。";
+  }
+  return compact.length === length * 2 ? "" : `payload 必须恰好包含 ${length} 字节。`;
+}
+
 function MessageEditor({ draft, status, busy, mutate }: { draft: DbcMessageDraft; status: GatewayStatus; busy: boolean; mutate: (action: () => Promise<void>) => void }) {
   const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(Object.entries(draft.values).map(([key, value]) => [key, String(value)])));
+  const [payload, setPayload] = useState(draft.payload_hex);
+  const [editSource, setEditSource] = useState<"values" | "payload">("values");
+  const [previewError, setPreviewError] = useState("");
+  const [previewPending, setPreviewPending] = useState(false);
   const [enabled, setEnabled] = useState(draft.enabled);
   const [frequency, setFrequency] = useState(String(draft.frequency_hz));
-  useEffect(() => {
-    setValues(Object.fromEntries(Object.entries(draft.values).map(([key, value]) => [key, String(value)])));
-    setEnabled(draft.enabled);
-    setFrequency(String(draft.frequency_hz));
-  }, [draft]);
+  const valuesPreviewGeneration = useRef(0);
+  const payloadPreviewGeneration = useRef(0);
+  const payloadNormalization = useRef<string | null>(null);
 
   const parsedFrequency = Number(frequency);
-  const parsedValues = Object.fromEntries(Object.entries(values).map(([key, value]) => [key, Number(value)]));
+  const parsedValues = parsePhysicalValues(values);
   const valuesValid = draft.message.signals.every((signal) => {
     if (!(signal.name in values)) return true;
+    if (values[signal.name].trim() === "") return false;
     const value = parsedValues[signal.name];
     return Number.isFinite(value) && (signal.minimum === null || value >= signal.minimum) && (signal.maximum === null || value <= signal.maximum);
   });
-  const valid = valuesValid && Number.isInteger(parsedFrequency) && parsedFrequency >= 1 && parsedFrequency <= 100;
+  const payloadError = validatePayloadText(payload, draft.message.length);
+  const contentValid = editSource === "values" ? valuesValid : payloadError === "";
+  const valid = contentValid && Number.isInteger(parsedFrequency) && parsedFrequency >= 1 && parsedFrequency <= 100;
+
+  useEffect(() => {
+    const generation = ++valuesPreviewGeneration.current;
+    if (editSource !== "values" || !valuesValid) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setPreviewPending(true);
+      void previewDbcMessage(draft.message.key, { values: parsePhysicalValues(values) }, controller.signal)
+        .then((preview) => {
+          if (generation !== valuesPreviewGeneration.current) return;
+          setPayload(preview.payload_hex);
+          setPreviewError("");
+        })
+        .catch((reason: unknown) => {
+          if (generation === valuesPreviewGeneration.current && !(reason instanceof DOMException && reason.name === "AbortError")) setPreviewError(reason instanceof Error ? reason.message : "无法预览物理值");
+        })
+        .finally(() => { if (generation === valuesPreviewGeneration.current && !controller.signal.aborted) setPreviewPending(false); });
+    }, 250);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [draft.message.key, editSource, values, valuesValid]);
+
+  useEffect(() => {
+    const generation = ++payloadPreviewGeneration.current;
+    if (payloadNormalization.current === payload) {
+      payloadNormalization.current = null;
+      setPreviewPending(false);
+      return;
+    }
+    if (editSource !== "payload" || payloadError) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setPreviewPending(true);
+      void previewDbcMessage(draft.message.key, { payload_hex: payload }, controller.signal)
+        .then((preview) => {
+          if (generation !== payloadPreviewGeneration.current) return;
+          if (preview.payload_hex !== payload) {
+            payloadNormalization.current = preview.payload_hex;
+            setPayload(preview.payload_hex);
+          }
+          setValues(Object.fromEntries(Object.entries(preview.values).map(([key, value]) => [key, String(value)])));
+          setPreviewError("");
+        })
+        .catch((reason: unknown) => {
+          if (generation === payloadPreviewGeneration.current && !(reason instanceof DOMException && reason.name === "AbortError")) setPreviewError(reason instanceof Error ? reason.message : "无法解码 payload");
+        })
+        .finally(() => { if (generation === payloadPreviewGeneration.current && !controller.signal.aborted) setPreviewPending(false); });
+    }, 250);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [draft.message.key, editSource, payload, payloadError]);
 
   return (
     <div className="space-y-4 rounded-lg border border-cyan-500/25 bg-cyan-500/[0.035] p-4">
@@ -212,7 +285,7 @@ function MessageEditor({ draft, status, busy, mutate }: { draft: DbcMessageDraft
               type="number"
               step="any"
               value={values[signal.name]}
-              onChange={(event) => setValues((current) => ({ ...current, [signal.name]: event.target.value }))}
+              onChange={(event) => { setEditSource("values"); setValues((current) => ({ ...current, [signal.name]: event.target.value })); }}
             />
             <span className="mt-1 block">{signal.minimum ?? "−∞"} … {signal.maximum ?? "+∞"} · ×{signal.scale} {signal.offset >= 0 ? "+" : ""}{signal.offset}</span>
           </label>
@@ -220,10 +293,20 @@ function MessageEditor({ draft, status, busy, mutate }: { draft: DbcMessageDraft
       </div>
       <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-end">
         <label className="w-full text-xs text-muted-foreground sm:w-36">频率 (1–100 Hz)<Input className="mt-1" type="number" min={1} max={100} step={1} value={frequency} onChange={(event) => setFrequency(event.target.value)} /></label>
-        <div className="flex-1 rounded-md bg-background/70 p-3 font-mono text-xs"><span className="mr-2 text-muted-foreground">payload</span>{draft.payload_hex || "等待合法值"}</div>
-        <Button disabled={!valid || busy} onClick={() => mutate(() => updateDbcMessage(status, draft.message.key, parsedValues, enabled, parsedFrequency))}><Save className="h-4 w-4" /> 保存报文</Button>
+        <label className="flex-1 text-xs text-muted-foreground">Payload（{draft.message.length} 字节）
+          <Input
+            className="mt-1 font-mono uppercase tracking-wide"
+            value={payload}
+            aria-invalid={editSource === "payload" && Boolean(payloadError || previewError)}
+            aria-describedby="payload-help"
+            onChange={(event) => { setEditSource("payload"); setPayload(event.target.value); }}
+          />
+        </label>
+        <Button disabled={!valid || busy || previewPending || Boolean(previewError)} onClick={() => mutate(() => updateDbcMessage(status, draft.message.key, editSource === "values" ? { values: parsedValues } : { payload_hex: payload }, enabled, parsedFrequency))}><Save className="h-4 w-4" /> 保存报文</Button>
       </div>
-      {!valid && <div className="text-xs text-red-300">物理值必须有限且位于 DBC 范围内；频率只接受 1–100 的整数。</div>}
+      <div id="payload-help" aria-live="polite" className={`text-xs ${payloadError || previewError || !valid ? "text-red-300" : "text-muted-foreground"}`}>
+        {editSource === "payload" && payloadError ? payloadError : previewError || (previewPending ? "正在按 DBC 预览…" : !valid ? "物理值必须有限且位于 DBC 范围内；频率只接受 1–100 的整数。" : "合法输入会实时预览；只有点击保存才会修改周期发送内容。")}
+      </div>
     </div>
   );
 }
@@ -304,15 +387,19 @@ export default function App() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const lastSequence = useRef(0);
+  const refreshGeneration = useRef(0);
 
   const refresh = useCallback(async () => {
+    const generation = ++refreshGeneration.current;
     try {
-      const [nextStatus, nextDbc] = await Promise.all([getStatus(), getDbc()]);
-      setStatus(nextStatus);
-      setDbc(nextDbc);
-      lastSequence.current = Math.max(lastSequence.current, nextStatus.event_sequence);
+      const snapshot = await getGatewaySnapshot();
+      if (generation !== refreshGeneration.current) return;
+      setStatus(snapshot.status);
+      setDbc(snapshot.dbc);
+      lastSequence.current = Math.max(lastSequence.current, snapshot.status.event_sequence);
       setError("");
     } catch (reason) {
+      if (generation !== refreshGeneration.current) return;
       setError(reason instanceof Error ? reason.message : "无法读取 Gateway 状态");
     }
   }, []);

@@ -1,0 +1,4 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Run deterministic focused and full verification without weakening byte-level assertions or generated-asset checks."}
+{"file":".trellis/spec/backend/can-gateway-control.md","reason":"Review all CAN/Web/DBC lifecycle and compatibility invariants, including managed-mode authorization and transport isolation."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Verify every invalid preview/save path is bounded, stable, and leaves authority state unchanged."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Check DTO, persistence schema, API types, React state, and authoritative codec round trips end to end."}

@@ -71,7 +71,7 @@ const dbc: DbcSnapshot = {
     notices: [],
     files: [{ sha256: "abc123", sources: ["resources/dbc/can4.sy135c.dbc"], messages: [message], parse_error: "" }],
   },
-  messages: [{ message, values: { VelE: 0 }, enabled: true, frequency_hz: 50, generated_default: true, payload_hex: "0000000000000000" }],
+  messages: [{ message, values: { VelE: 0 }, enabled: true, frequency_hz: 50, generated_default: true, payload_hex: "00 00 00 00 00 00 00 00" }],
   notices: [],
   load: { bitrate: 250000, estimated_bits_per_second: 8000, percent: 72, level: "yellow", warning: true, caveat: "informational only" },
 };
@@ -91,11 +91,17 @@ function json(value: unknown, statusCode = 200): Response {
   return new Response(JSON.stringify(value), { status: statusCode, headers: { "Content-Type": "application/json" } });
 }
 
-function installFetch(currentStatus: GatewayStatus, mutation?: () => Response) {
+function installFetch(currentStatus: GatewayStatus, mutation?: (url: string, init: RequestInit) => Response) {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    if (init?.method) return mutation?.() ?? json({ request_id: "test", result: { status: currentStatus } });
-    if (url.includes("/dbc")) return json({ dbc });
+    if (init?.method) {
+      if (url.endsWith("/preview")) {
+        const body = JSON.parse(String(init.body)) as { values?: Record<string, number>; payload_hex?: string };
+        return mutation?.(url, init) ?? json({ request_id: "preview", result: { preview: body.payload_hex ? { values: { VelE: 1.23 }, payload_hex: "7B 00 00 00 00 00 00 00" } : { values: body.values ?? {}, payload_hex: "7B 00 00 00 00 00 00 00" } } });
+      }
+      return mutation?.(url, init) ?? json({ request_id: "test", result: { status: currentStatus } });
+    }
+    if (url.includes("/dbc")) return json({ status: currentStatus, dbc });
     return json({ status: currentStatus });
   }));
 }
@@ -135,6 +141,58 @@ describe("Gateway console capabilities", () => {
     fireEvent.change(frequency, { target: { value: "50.5" } });
     expect(screen.getByRole("button", { name: /保存报文/ })).toBeDisabled();
     expect(screen.getByText(/频率只接受 1–100 的整数/)).toBeInTheDocument();
+  });
+
+  it("previews payload into values but commits only after explicit save", async () => {
+    installFetch(status);
+    render(<App />);
+    const payload = await screen.findByLabelText("Payload（8 字节）");
+    const fetchMock = vi.mocked(fetch);
+    const putCountBefore = fetchMock.mock.calls.filter(([, init]) => init?.method === "PUT").length;
+    fireEvent.change(payload, { target: { value: "7b00000000000000" } });
+    await waitFor(() => expect(screen.getByLabelText(/^VelE/)).toHaveValue(1.23));
+    expect(payload).toHaveValue("7B 00 00 00 00 00 00 00");
+    expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("/preview"))).toBe(true);
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "PUT")).toHaveLength(putCountBefore);
+    await userEvent.click(screen.getByRole("button", { name: /保存报文/ }));
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "PUT")).toHaveLength(putCountBefore + 1));
+    const saveCalls = fetchMock.mock.calls.filter(([, init]) => init?.method === "PUT");
+    const saveCall = saveCalls[saveCalls.length - 1]!;
+    expect(JSON.parse(String(saveCall[1]!.body))).toMatchObject({ payload_hex: "7B 00 00 00 00 00 00 00" });
+    expect(JSON.parse(String(saveCall[1]!.body))).not.toHaveProperty("values");
+  });
+
+  it("does not preview or save incomplete payload", async () => {
+    installFetch(status);
+    render(<App />);
+    const payload = await screen.findByLabelText("Payload（8 字节）");
+    const fetchMock = vi.mocked(fetch);
+    const previewsBefore = fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/preview")).length;
+    fireEvent.change(payload, { target: { value: "7B 00" } });
+    expect(await screen.findByText(/恰好包含 8 字节/)).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/preview"))).toHaveLength(previewsBefore);
+    expect(screen.getByRole("button", { name: /保存报文/ })).toBeDisabled();
+  });
+
+  it("preserves unsaved edits across background snapshot refresh", async () => {
+    installFetch(status);
+    render(<App />);
+    const payload = await screen.findByLabelText("Payload（8 字节）");
+    fireEvent.change(payload, { target: { value: "7B 00" } });
+    MockWebSocket.instances.at(-1)!.emit({
+      type: "event",
+      event: {
+        sequence: 1,
+        timestamp: "2026-08-28T00:00:00",
+        monotonic_s: 1,
+        kind: "socketcan_transmission_aggregate",
+        source: "godot",
+        detail: { family: "imu", sent: 10 },
+      },
+    });
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.filter(([input]) => String(input).includes("/dbc")).length).toBeGreaterThan(1));
+    expect(payload).toHaveValue("7B 00");
   });
 
   it("shows only confirmed can0 restart on Linux", async () => {

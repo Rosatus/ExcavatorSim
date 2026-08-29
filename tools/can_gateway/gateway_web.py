@@ -109,10 +109,12 @@ class GatewayWebServer:
             loop.run_until_complete(site.start())
         except BaseException as exc:
             self._startup_error = exc
-            self._ready.set()
-            if self._runner is not None:
-                loop.run_until_complete(self._runner.cleanup())
-            loop.close()
+            try:
+                if self._runner is not None:
+                    loop.run_until_complete(self._runner.cleanup())
+            finally:
+                loop.close()
+                self._ready.set()
             return
         self._ready.set()
         try:
@@ -137,6 +139,7 @@ class GatewayWebServer:
         app.router.add_get("/api/v1/logs/archive", self._archive_logs)
         app.router.add_get("/api/v1/dbc", self._dbc_catalog)
         app.router.add_put("/api/v1/dbc/messages/{message_key}", self._dbc_message)
+        app.router.add_post("/api/v1/dbc/messages/{message_key}/preview", self._dbc_message_preview)
         app.router.add_post("/api/v1/dbc/start", self._dbc_start)
         app.router.add_post("/api/v1/dbc/stop", self._dbc_stop)
         app.router.add_post("/api/v1/dbc/reload", self._dbc_reload)
@@ -222,16 +225,51 @@ class GatewayWebServer:
         )
 
     async def _dbc_catalog(self, _request: web.Request) -> web.Response:
-        return web.json_response({"dbc": self.core.dbc_snapshot()})
+        status, dbc = self.core.web_snapshot()
+        return web.json_response({"status": status.to_dict(), "dbc": dbc})
 
     async def _dbc_message(self, request: web.Request) -> web.Response:
         self._require_standalone()
         body = await _read_json_object(request)
+        self._require_fields(
+            body,
+            {"values", "payload_hex", "enabled", "frequency_hz", "expected_revision", "request_id"},
+        )
+        if "values" in body and "payload_hex" in body:
+            raise GatewayRuntimeError(
+                "dbc_edit_source_conflict", "provide values or payload_hex, not both"
+            )
+        if "values" in body and not isinstance(body["values"], dict):
+            raise GatewayRuntimeError("dbc_values_invalid", "values must be an object")
+        if "payload_hex" in body and not isinstance(body["payload_hex"], str):
+            raise GatewayRuntimeError("dbc_payload_invalid", "payload_hex must be a string")
         payload: dict[str, Any] = {"message_key": request.match_info["message_key"]}
-        for field in ("values", "enabled", "frequency_hz"):
+        for field in ("values", "payload_hex", "enabled", "frequency_hz"):
             if field in body:
                 payload[field] = body[field]
         return await self._submit(request, "dbc_message_update", payload, body)
+
+    async def _dbc_message_preview(self, request: web.Request) -> web.Response:
+        self._require_standalone()
+        body = await _read_json_object(request)
+        self._require_fields(body, {"values", "payload_hex", "expected_revision", "request_id"})
+        has_values = "values" in body
+        has_payload = "payload_hex" in body
+        if has_values == has_payload:
+            raise GatewayRuntimeError(
+                "dbc_edit_source_invalid", "provide exactly one of values or payload_hex"
+            )
+        if has_values and not isinstance(body["values"], dict):
+            raise GatewayRuntimeError("dbc_values_invalid", "values must be an object")
+        if has_payload and not isinstance(body["payload_hex"], str):
+            raise GatewayRuntimeError("dbc_payload_invalid", "payload_hex must be a string")
+        payload: dict[str, Any] = {"message_key": request.match_info["message_key"]}
+        payload["values" if has_values else "payload_hex"] = body[
+            "values" if has_values else "payload_hex"
+        ]
+        return await self._submit(
+            request, "dbc_message_preview", payload, body, require_revision=False
+        )
 
     async def _dbc_start(self, request: web.Request) -> web.Response:
         self._require_standalone()
@@ -290,18 +328,31 @@ class GatewayWebServer:
                 "managed_mode_read_only", "Godot-managed Gateway Web API is read-only", status=403
             )
 
+    @staticmethod
+    def _require_fields(body: dict[str, Any], allowed: set[str]) -> None:
+        unknown = sorted(set(body) - allowed)
+        if unknown:
+            raise GatewayRuntimeError(
+                "request_field_unknown", f"unknown request field {unknown[0]!r}"
+            )
+
     async def _submit(
         self,
         request: web.Request,
         kind: str,
         payload: dict[str, Any],
         body: dict[str, Any],
+        *,
+        require_revision: bool = True,
     ) -> web.Response:
-        revision = body.get("expected_revision")
-        if not isinstance(revision, int) or isinstance(revision, bool) or revision < 0:
-            raise GatewayRuntimeError(
-                "revision_invalid", "expected_revision must be a non-negative integer"
-            )
+        if require_revision:
+            revision = body.get("expected_revision")
+            if not isinstance(revision, int) or isinstance(revision, bool) or revision < 0:
+                raise GatewayRuntimeError(
+                    "revision_invalid", "expected_revision must be a non-negative integer"
+                )
+        else:
+            revision = self.core.snapshot().revision
         request_id = body.get("request_id", request.headers.get("X-Request-ID"))
         if request_id is None:
             request_id = uuid.uuid4().hex
