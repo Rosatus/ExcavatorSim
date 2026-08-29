@@ -11,13 +11,11 @@ of restoring Terrain3D's demo grass, particles, rocks, or green ground style.
 ## Background
 
 - Terrain3D is installed, its editor plugin and GDExtension are enabled, and
-  `Terrain3DAdapter` remains wired into `main.tscn`. It is not the current
-  product presentation path because `TerrainWorld.terrain_backend` defaults to
-  `soil_shader` (`godot/client/scripts/terrain_world.gd:12-14`).
+  `Terrain3DAdapter` remains wired into `main.tscn`. Phase 4 restored it as the
+  default product presentation while preserving `soil_shader` as fallback.
 - Commit `24a1d681eff91274d34be828b37d0036e9e90cbe` made that fallback the default
-  after Terrain3D 1.0.2 rendered black surfaces under Godot 4.7. The standalone
-  matrix still excludes `terrain3d_adapter_test.gd` for that reason
-  (`godot/client/tests/run_standalone_matrix.ps1:33-36`).
+  after Terrain3D 1.0.2 rendered black surfaces under Godot 4.7. The restored
+  standalone matrix now runs the adapter and authority-equivalence regressions.
 - Current logical terrain is `TerrainState` (`stable_heights + loose_depth`).
   Accepted snapshots feed the project-owned `TerrainRenderer` and chunked
   `TerrainCollider`; the selected `SoilInteractionAuthority`/`ActiveSoilPatch`
@@ -82,33 +80,33 @@ of restoring Terrain3D's demo grass, particles, rocks, or green ground style.
 
 ## Acceptance Criteria
 
-- [ ] Normal product startup uses the approved Terrain3D mode and renders a
+- [x] Normal product startup uses the approved Terrain3D mode and renders a
   non-black terrain on the Godot 4.7 Forward+ target.
-- [ ] The rendered ground retains the current procedural brown worksite-soil
+- [x] The rendered ground retains the current procedural brown worksite-soil
   appearance within focused human visual review; Sky3D, shared dressing, soil
   effects, and camera composition remain visually unchanged.
-- [ ] No Terrain3D grass particles, green/grass ground zone, native rock
+- [x] No Terrain3D grass particles, green/grass ground zone, native rock
   dressing, tree layer, or native infinite background appears in the product
   profile.
-- [ ] `TerrainState` bytes/digest, terrain generation/revision, selected soil
+- [x] `TerrainState` bytes/digest, terrain generation/revision, selected soil
   ledger totals, bucket payload, and Jolt truth are identical with native
   presentation enabled versus the fallback for the same command sequence.
-- [ ] Ordinary excavation revisions use incremental Terrain3D patch updates;
+- [x] Ordinary excavation revisions use incremental Terrain3D patch updates;
   reset/generation changes use one full materialization; queued/stale work
   cannot replace a newer surface.
-- [ ] Terrain3D collision remains off by default and all accepted chassis/bucket
+- [x] Terrain3D collision remains off by default and all accepted chassis/bucket
   terrain queries continue to use the identity-matched project collider or the
   authoritative heightfield fallback.
-- [ ] Native unavailable/material failure/map-update failure restores the
+- [x] Native unavailable/material failure/map-update failure restores the
   current fallback renderer without a simulation stop, authority mutation, or
   stale visible surface.
-- [ ] Test Grid hides native presentation and all dressing, shows the current
+- [x] Test Grid hides native presentation and all dressing, shows the current
   authoritative black/white fallback grid, and restores the prior product
   backend afterwards.
-- [ ] `terrain3d_adapter_test.gd`, construction-site, terrain-state/collider,
+- [x] `terrain3d_adapter_test.gd`, construction-site, terrain-state/collider,
   excavation/soil, Jolt, visual, offline/model-switch, release-candidate, full
   standalone, and repository verification gates pass.
-- [ ] A Windows exported-build smoke proves the same non-black material,
+- [x] A Windows exported-build smoke proves the same non-black material,
   deformation update, fallback, and shutdown behavior as the editor build.
 
 ## Out of Scope
