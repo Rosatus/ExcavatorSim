@@ -101,6 +101,15 @@ var _last_support_force := Vector3.ZERO
 var _last_support_torque := Vector3.ZERO
 var _last_applied_support_request_id := ""
 var _support_wrench_apply_count := 0
+var _bucket_ground_mode := BucketGroundInteractionMode.NORMAL
+var _bucket_query_submitted_count := 0
+var _bucket_query_executed_count := 0
+var _bucket_query_bypassed_count := 0
+var _cut_probe_executed_count := 0
+var _cut_probe_bypassed_count := 0
+var _support_queued_count := 0
+var _support_applied_count := 0
+var _support_bypassed_count := 0
 var _retirement_queued := false
 var _hull_terrain_collision_released := false
 var _support_ready_ticks := 0
@@ -303,6 +312,10 @@ func set_bucket_payload(mass_kg: float, center_of_mass_local: Vector3, identity:
 	return true
 
 
+func get_bucket_payload_identity() -> int:
+	return maxi(int(_pending_payload["identity"]), int(_applied_payload["identity"]))
+
+
 func set_external_digging_response_enabled(value: bool) -> void:
 	_external_digging_response_enabled = value
 	if value:
@@ -325,6 +338,38 @@ func _payload_center_in_bucket(center: Vector3) -> bool:
 func stop_motion() -> void:
 	set_commands(0.0, 0.0)
 	set_equipment_commands(Vector4.ZERO)
+
+
+func set_bucket_ground_mode(value: String) -> bool:
+	if not BucketGroundInteractionMode.is_valid(value):
+		return false
+	var entering_passthrough := (
+		BucketGroundInteractionMode.is_passthrough(value)
+		and not BucketGroundInteractionMode.is_passthrough(_bucket_ground_mode)
+	)
+	if entering_passthrough and not _clear_bucket_payload_for_policy_transition():
+		return false
+	_bucket_ground_mode = value
+	if BucketGroundInteractionMode.is_passthrough(value):
+		if not _queued_support_wrench.is_empty():
+			_support_bypassed_count += 1
+		_queued_support_wrench.clear()
+		_applied_support_wrench.clear()
+		_cut_engagement = 0.0
+		_articulation.set_cut_resistance(0.0)
+		_reset_support_response(true)
+		_set_invalid_bucket_query("bucket_ground_interaction_bypassed")
+	_capture_post_step_snapshot()
+	return true
+
+
+func _clear_bucket_payload_for_policy_transition() -> bool:
+	var identity := get_bucket_payload_identity() + 1
+	if not _articulation.set_payload(0.0, Vector3.ZERO, identity):
+		return false
+	_applied_payload = _articulation.payload_snapshot()
+	_pending_payload = _applied_payload.duplicate(true)
+	return true
 
 
 func reset(spawn_global_transform := Transform3D.IDENTITY) -> void:
@@ -462,7 +507,11 @@ func _build_body() -> RigidBody3D:
 
 
 func _update_joint_actuators(delta: float) -> void:
-	_articulation.set_cut_resistance(0.0 if _external_digging_response_enabled else _cut_engagement)
+	_articulation.set_cut_resistance(
+		0.0
+		if _external_digging_response_enabled or _bucket_ground_bypassed()
+		else _cut_engagement
+	)
 	var proposal := _articulation.propose_step(delta, _body.global_transform, enabled)
 	if proposal.is_empty():
 		_quality_flags.append("kinematic_articulation_unavailable")
@@ -473,8 +522,30 @@ func _update_joint_actuators(delta: float) -> void:
 	_support_contact_observed = false
 	var previous_frames := _articulation.accepted_frames()
 	var candidate_frames := proposal.get("frames", {}) as Dictionary
+	if previous_frames.has("bucket_link") and candidate_frames.has("bucket_link"):
+		_bucket_query_submitted_count += 1
+	if _bucket_ground_bypassed():
+		_bucket_motion_sequence += 1
+		_bucket_query_bypassed_count += 1
+		_cut_probe_bypassed_count += 1
+		_support_bypassed_count += 1
+		_cut_engagement = 0.0
+		_queued_support_wrench.clear()
+		_applied_support_wrench.clear()
+		_reset_support_response(true)
+		_set_invalid_bucket_query(
+			"bucket_ground_interaction_bypassed",
+			previous_frames.get("bucket_link", Transform3D.IDENTITY) as Transform3D,
+			candidate_frames.get("bucket_link", Transform3D.IDENTITY) as Transform3D,
+		)
+		_articulation.accept_step(proposal, 1.0)
+		var passthrough_frames := _articulation.accepted_frames()
+		if passthrough_frames.has("bucket_link"):
+			_bucket_query["accepted_bucket_transform"] = passthrough_frames["bucket_link"]
+		return
 	if _terrain_identity_valid and previous_frames.has("bucket_link") and candidate_frames.has("bucket_link"):
 		_bucket_motion_sequence += 1
+		_bucket_query_executed_count += 1
 		_bucket_query = _bucket_sweeper.sweep(
 			get_world_3d(),
 			previous_frames["bucket_link"] as Transform3D,
@@ -490,6 +561,7 @@ func _update_joint_actuators(delta: float) -> void:
 		# disarmed query must not disable the resistance stall while chunks lag.
 		var raw_engagement := 0.0
 		if _terrain_world != null and _terrain_world.terrain_state != null:
+			_cut_probe_executed_count += 1
 			raw_engagement = clampf(
 				_bucket_sweeper.probe_cut_penetration(
 					candidate_frames["bucket_link"] as Transform3D,
@@ -589,6 +661,7 @@ func _capture_post_step_snapshot() -> void:
 		"queued_chassis_wrench": _queued_support_wrench.duplicate(true),
 		"applied_chassis_wrench": _applied_support_wrench.duplicate(true),
 		"support_wrench_apply_count": _support_wrench_apply_count,
+		"bucket_ground_interaction": _bucket_ground_interaction_status(),
 		"left_command": _left_command, "right_command": _right_command,
 		"track_neutral_armed": _track_neutral_armed,
 		"left_effort_n": _left_effort_n, "right_effort_n": _right_effort_n,
@@ -776,12 +849,17 @@ func _queue_support_wrench(previous_frames: Dictionary, candidate_frames: Dictio
 		"classification": "support",
 		"support_contact_ticks": _support_contact_ticks,
 	}
+	_support_queued_count += 1
 	return true
 
 
 func _apply_queued_support_wrench() -> void:
 	_applied_support_wrench.clear()
 	if _queued_support_wrench.is_empty():
+		return
+	if _bucket_ground_bypassed():
+		_support_bypassed_count += 1
+		_queued_support_wrench.clear()
 		return
 	var eligible_tick := int(_queued_support_wrench.get("eligible_apply_tick", -1))
 	var expiry_tick := int(_queued_support_wrench.get("expiry_tick", -1))
@@ -823,6 +901,7 @@ func _apply_queued_support_wrench() -> void:
 	_applied_support_wrench["applied_torque"] = torque
 	_last_applied_support_request_id = request_id
 	_support_wrench_apply_count += 1
+	_support_applied_count += 1
 	_queued_support_wrench.clear()
 
 
@@ -1338,8 +1417,11 @@ func _empty_snapshot() -> Dictionary:
 		"left_effort_n": 0.0,
 		"right_effort_n": 0.0,
 		"bucket_query": {},
+		"cut_engagement": 0.0,
 		"queued_chassis_wrench": {},
 		"applied_chassis_wrench": {},
+		"support_wrench_apply_count": 0,
+		"bucket_ground_interaction": _bucket_ground_interaction_status(),
 		"left_support_load_n": 0.0,
 		"right_support_load_n": 0.0,
 		"posture_error_rad": 0.0,
@@ -1356,6 +1438,24 @@ func _empty_snapshot() -> Dictionary:
 		"contacts": [],
 		"track_support_source_counts": {},
 		"quality_flags": ["authoritative_runtime_unavailable"],
+	}
+
+
+func _bucket_ground_bypassed() -> bool:
+	return BucketGroundInteractionMode.is_passthrough(_bucket_ground_mode)
+
+
+func _bucket_ground_interaction_status() -> Dictionary:
+	return {
+		"mode": _bucket_ground_mode,
+		"query_submitted": _bucket_query_submitted_count,
+		"query_executed": _bucket_query_executed_count,
+		"query_bypassed": _bucket_query_bypassed_count,
+		"cut_probe_executed": _cut_probe_executed_count,
+		"cut_probe_bypassed": _cut_probe_bypassed_count,
+		"support_queued": _support_queued_count,
+		"support_applied": _support_applied_count,
+		"support_bypassed": _support_bypassed_count,
 	}
 
 

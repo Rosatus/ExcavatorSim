@@ -29,7 +29,10 @@ func _run() -> void:
 	var adapter := scene.get_node_or_null("TerrainRoot/Terrain3DAdapter") as Terrain3DAdapter
 	var session := scene.get_node_or_null("ProductSession") as ProductSession
 	var presentation := scene.get_node_or_null("MotionPresentation") as MotionPresentation
-	if world == null or adapter == null or session == null or presentation == null:
+	var chassis := scene.get_node_or_null("ChassisMotionRoot") as TrackedChassisController
+	var excavation := scene.get_node_or_null("TerrainRoot/ExcavationWorld") as ExcavationWorld
+	var effects := scene.get_node_or_null("SoilEffects") as SoilEffects
+	if world == null or adapter == null or session == null or presentation == null or chassis == null or excavation == null or effects == null:
 		_failures.append("product_contract_missing")
 		_finish({})
 		return
@@ -41,6 +44,45 @@ func _run() -> void:
 	_expect(bool(startup.get("native_material_ready", false)), "native_material_not_ready")
 	_expect(not bool(startup.get("native_demo_dressing_active", true)), "demo_dressing_active")
 	_expect(int(startup.get("visible_surface_count", 0)) == 1, "startup_surface_count_invalid")
+
+	var mode_terrain_before := world.terrain_state.surface_snapshot()
+	_expect(session.request_bucket_ground_mode(BucketGroundInteractionMode.PASSTHROUGH), "bucket_passthrough_request_failed")
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var mode_terrain_active := world.terrain_state.surface_snapshot()
+	var mode_chassis := chassis.get_status_snapshot().get("bucket_ground_interaction", {}) as Dictionary
+	var mode_soil := excavation.get_status_snapshot().get("bucket_ground_interaction", {}) as Dictionary
+	var mode_effects := effects.get_effect_snapshot()
+	_expect(String(session.get_status_snapshot().get("bucket_ground_mode", "")) == BucketGroundInteractionMode.PASSTHROUGH, "bucket_passthrough_not_active")
+	_expect(String(mode_chassis.get("mode", "")) == BucketGroundInteractionMode.PASSTHROUGH, "bucket_passthrough_jolt_missing")
+	_expect(String(mode_soil.get("mode", "")) == BucketGroundInteractionMode.PASSTHROUGH, "bucket_passthrough_soil_missing")
+	_expect(String(mode_effects.get("bucket_ground_mode", "")) == BucketGroundInteractionMode.PASSTHROUGH, "bucket_passthrough_effects_missing")
+	_expect(_same_terrain(mode_terrain_before, mode_terrain_active), "bucket_passthrough_entry_mutated_terrain")
+	var query_bypass_before := int(mode_chassis.get("query_bypassed", 0))
+	var soil_bypass_before := int(mode_soil.get("soil_steps_bypassed", 0))
+	var effects_bypass_before := int(mode_effects.get("update_bypassed", 0))
+	for _frame in 5:
+		await get_tree().physics_frame
+	mode_chassis = chassis.get_status_snapshot().get("bucket_ground_interaction", {}) as Dictionary
+	mode_soil = excavation.get_status_snapshot().get("bucket_ground_interaction", {}) as Dictionary
+	mode_effects = effects.get_effect_snapshot()
+	_expect(int(mode_chassis.get("query_bypassed", 0)) > query_bypass_before, "bucket_passthrough_query_not_bypassed")
+	_expect(int(mode_soil.get("soil_steps_bypassed", 0)) > soil_bypass_before, "bucket_passthrough_soil_not_bypassed")
+	_expect(int(mode_effects.get("update_bypassed", 0)) > effects_bypass_before, "bucket_passthrough_effects_not_bypassed")
+	_expect(session.request_bucket_ground_mode(BucketGroundInteractionMode.NORMAL), "bucket_normal_restore_request_failed")
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var mode_terrain_restored := world.terrain_state.surface_snapshot()
+	_expect(String(session.get_status_snapshot().get("bucket_ground_mode", "")) == BucketGroundInteractionMode.NORMAL, "bucket_normal_not_restored")
+	_expect(_same_terrain(mode_terrain_active, mode_terrain_restored), "bucket_passthrough_exit_mutated_terrain")
+	var bucket_ground_checkpoint := {
+		"entry_terrain_unchanged": _same_terrain(mode_terrain_before, mode_terrain_active),
+		"exit_terrain_unchanged": _same_terrain(mode_terrain_active, mode_terrain_restored),
+		"query_bypassed": int(mode_chassis.get("query_bypassed", 0)) - query_bypass_before,
+		"soil_bypassed": int(mode_soil.get("soil_steps_bypassed", 0)) - soil_bypass_before,
+		"effects_bypassed": int(mode_effects.get("update_bypassed", 0)) - effects_bypass_before,
+		"restored_mode": String(session.get_status_snapshot().get("bucket_ground_mode", "")),
+	}
 
 	var initial := world.terrain_state.surface_snapshot()
 	_expect(world.enqueue_brush_for_test(1, Vector2(0.0, 0.0), 1.4, -0.16), "cut_brush_rejected")
@@ -122,6 +164,7 @@ func _run() -> void:
 		"final": final_status,
 		"active_model_id": presentation.get_active_model_id(),
 		"session_generation": session.generation,
+		"bucket_ground": bucket_ground_checkpoint,
 	})
 
 
@@ -148,6 +191,14 @@ func _expect(condition: bool, reason: String) -> void:
 
 func _expect_single_surface(checkpoint: Dictionary, name: String) -> void:
 	_expect(int(checkpoint.get("visible_surface_count", 0)) == 1, "%s_surface_count_invalid" % name)
+
+
+func _same_terrain(before: Dictionary, after: Dictionary) -> bool:
+	return (
+		int(before.get("world_generation", -1)) == int(after.get("world_generation", -2))
+		and int(before.get("terrain_revision", -1)) == int(after.get("terrain_revision", -2))
+		and String(before.get("snapshot_sha256", "")) == String(after.get("snapshot_sha256", "missing"))
+	)
 
 
 func _finish(details: Dictionary) -> void:

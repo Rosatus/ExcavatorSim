@@ -10,6 +10,7 @@ const SOIL_PROXY_ORDER := ["cutting_edge", "opening", "cavity", "shell", "rear_s
 @export var motion_presentation_path := NodePath("../../MotionPresentation")
 @export var motion_client_path := NodePath("../../MotionClient")
 @export var tracked_chassis_controller_path := NodePath("../../ChassisMotionRoot")
+@export var soil_effects_path := NodePath("../../SoilEffects")
 @export var automatic_soil_enabled := true
 @export var debug_manual_controls := false
 @export var hero_clods_enabled := true
@@ -30,6 +31,7 @@ var authority_generation := 0
 var _presentation: MotionPresentation
 var _motion_client: MotionClient
 var _tracked_chassis_controller: TrackedChassisController
+var _soil_effects: SoilEffects
 var _next_command_sequence := 0
 var _last_pose_snapshot: Dictionary = {}
 var _last_interaction := "idle"
@@ -50,6 +52,19 @@ var _active_soil_event_sequence := 0
 var _soil_interaction_authority: SoilInteractionAuthority
 var _soil_lifecycle_tick := -1
 var _soil_authority_modes := SoilAuthorityModeController.new()
+var _bucket_ground_mode := BucketGroundInteractionMode.NORMAL
+var _bucket_ground_transition_count := 0
+var _bucket_ground_bypass_ticks := 0
+var _bucket_ground_execution_ticks := 0
+var _automatic_samples_executed := 0
+var _automatic_samples_bypassed := 0
+var _soil_steps_executed := 0
+var _soil_steps_bypassed := 0
+var _terrain_commits_executed := 0
+var _terrain_commits_bypassed := 0
+var _parcel_steps_executed := 0
+var _parcel_steps_bypassed := 0
+var _last_bucket_ground_transition: Dictionary = {}
 
 
 func _ready() -> void:
@@ -78,6 +93,7 @@ func _initialize() -> void:
 	_create_parcel_pool(contract)
 	_motion_client = get_node_or_null(motion_client_path) as MotionClient
 	_tracked_chassis_controller = get_node_or_null(tracked_chassis_controller_path) as TrackedChassisController
+	_soil_effects = get_node_or_null(soil_effects_path) as SoilEffects
 	if _motion_client != null:
 		if not _motion_client.pose_cleared.is_connected(_on_pose_cleared):
 			_motion_client.pose_cleared.connect(_on_pose_cleared)
@@ -96,9 +112,19 @@ func _initialize() -> void:
 func _physics_process(delta: float) -> void:
 	if soil_state == null or terrain_scheduler == null:
 		return
+	if _bucket_ground_bypassed():
+		_bucket_ground_bypass_ticks += 1
+		_automatic_samples_bypassed += 1
+		_soil_steps_bypassed += 1
+		_terrain_commits_bypassed += 1
+		_parcel_steps_bypassed += 1
+		return
+	_bucket_ground_execution_ticks += 1
 	if automatic_soil_enabled:
+		_automatic_samples_executed += 1
 		_step_automatic_interaction(delta)
 	if _selected_soil_mode() == "active_patch":
+		_soil_steps_executed += 1
 		var active_result := _step_active_soil_patch({}, delta)
 		var active_status := _soil_interaction_authority.get_status_snapshot() if _soil_interaction_authority != null else {}
 		var transaction := active_status.get("last_transaction", {}) as Dictionary
@@ -107,6 +133,7 @@ func _physics_process(delta: float) -> void:
 		if bool(active_result.get("changed", false)):
 			excavation_changed.emit(get_status_snapshot())
 		return
+	_soil_steps_executed += 1
 	var soil_result := soil_state.step_fixed()
 	_last_flow_volume_m3 = float(soil_result.get("cut_volume_m3", 0.0)) + float(soil_result.get("deposit_volume_m3", 0.0))
 	if _parcel_pool != null:
@@ -115,12 +142,14 @@ func _physics_process(delta: float) -> void:
 	_spawn_cut_parcels(soil_result)
 	_step_active_soil_patch(soil_result, delta)
 	if _parcel_pool != null:
+		_parcel_steps_executed += 1
 		_step_parcel_pool(delta)
 	# Force-flush every fixed tick: the analytic dig loop samples TerrainState
 	# as its authority, so cut brushes must land in the same tick they are
 	# queued. Latency batching here starved the invariant (surface yields only
 	# after up to 150 ms), ramping engagement and stalling downward strokes.
 	# Presentation coalescing lives downstream in the dirty-rect patchers.
+	_terrain_commits_executed += 1
 	var commit_result := terrain_scheduler.step_fixed(delta, true)
 	soil_state.reconcile_transfers(
 		commit_result.get("committed_transfer_ids", []),
@@ -137,14 +166,14 @@ func _physics_process(delta: float) -> void:
 
 
 func queue_cut_world(sequence: int, previous_tooth: Vector3, current_tooth: Vector3) -> bool:
-	if soil_state == null or _selected_soil_mode() == "active_patch":
+	if _bucket_ground_bypassed() or soil_state == null or _selected_soil_mode() == "active_patch":
 		return false
 	_next_command_sequence = maxi(_next_command_sequence, sequence + 1)
 	return soil_state.queue_cut(sequence, previous_tooth, current_tooth)
 
 
 func queue_deposit_world(sequence: int, center: Vector3) -> bool:
-	if soil_state == null or _selected_soil_mode() == "active_patch":
+	if _bucket_ground_bypassed() or soil_state == null or _selected_soil_mode() == "active_patch":
 		return false
 	_next_command_sequence = maxi(_next_command_sequence, sequence + 1)
 	return soil_state.queue_deposit(sequence, center)
@@ -153,6 +182,10 @@ func queue_deposit_world(sequence: int, center: Vector3) -> bool:
 func step_fixed_for_test() -> Dictionary:
 	if soil_state == null or terrain_scheduler == null:
 		return {"changed": false, "reason": "unavailable"}
+	if _bucket_ground_bypassed():
+		_soil_steps_bypassed += 1
+		_terrain_commits_bypassed += 1
+		return {"changed": false, "reason": "bucket_ground_interaction_bypassed"}
 	if _selected_soil_mode() == "active_patch":
 		var active_result := _step_active_soil_patch({}, 1.0 / 60.0)
 		var active_status := get_status_snapshot()
@@ -184,7 +217,7 @@ func step_fixed_for_test() -> Dictionary:
 
 
 func request_dig() -> bool:
-	if not debug_manual_controls:
+	if _bucket_ground_bypassed() or not debug_manual_controls:
 		return false
 	var snapshot := _sample_bucket_pose()
 	if not bool(snapshot.get("valid", false)):
@@ -202,7 +235,7 @@ func request_dig() -> bool:
 
 
 func request_deposit() -> bool:
-	if not debug_manual_controls:
+	if _bucket_ground_bypassed() or not debug_manual_controls:
 		return false
 	var snapshot := _sample_bucket_pose()
 	if snapshot.is_empty():
@@ -228,6 +261,35 @@ func set_automatic_soil_enabled(value: bool) -> void:
 		return
 	automatic_soil_enabled = value
 	_clear_local_material("feature_toggle")
+
+
+func can_set_bucket_ground_mode(value: String) -> bool:
+	return BucketGroundInteractionMode.is_valid(value) and _initialized and _soil_effects != null
+
+
+func set_bucket_ground_mode(value: String) -> bool:
+	if not can_set_bucket_ground_mode(value):
+		return false
+	if _bucket_ground_mode == value:
+		return true
+	var previous_mode := _bucket_ground_mode
+	var previous_payload := get_selected_soil_payload_snapshot()
+	var terrain_identity := _terrain_identity_snapshot()
+	_bucket_ground_mode = value
+	_soil_effects.set_bucket_ground_mode(value)
+	_clear_local_material("bucket_ground_mode_transition")
+	_bucket_ground_transition_count += 1
+	_last_bucket_ground_transition = {
+		"from": previous_mode,
+		"to": value,
+		"cleared_payload_mass_kg": float(previous_payload.get("payload_mass_kg", 0.0)),
+		"cleared_bucket_volume_m3": float(previous_payload.get("bucket_volume_m3", 0.0)),
+		"terrain_identity_before": terrain_identity,
+		"terrain_identity_after": _terrain_identity_snapshot(),
+		"material_generation": _material_generation,
+	}
+	print("Bucket-ground mode transition: %s" % JSON.stringify(_last_bucket_ground_transition))
+	return true
 
 
 func set_backend_feedback_enabled(value: bool) -> void:
@@ -318,6 +380,7 @@ func get_status_snapshot() -> Dictionary:
 	var chassis_status := _tracked_chassis_controller.get_status_snapshot() if _tracked_chassis_controller != null else {}
 	status["digging_response"] = chassis_status.get("digging_response", {"configured": false})
 	status["physics_fail_open"] = true
+	status["bucket_ground_interaction"] = _bucket_ground_interaction_status()
 	return status
 
 
@@ -381,6 +444,12 @@ func get_dig_diagnostics() -> Dictionary:
 func step_automatic_snapshot_for_test(snapshot: Dictionary, delta: float = 1.0 / 60.0) -> Dictionary:
 	if soil_state == null or terrain_scheduler == null:
 		return {"changed": false, "reason": "unavailable"}
+	if _bucket_ground_bypassed():
+		_automatic_samples_bypassed += 1
+		_soil_steps_bypassed += 1
+		_terrain_commits_bypassed += 1
+		return {"changed": false, "reason": "bucket_ground_interaction_bypassed"}
+	_automatic_samples_executed += 1
 	_process_bucket_snapshot(snapshot, delta)
 	if _selected_soil_mode() == "active_patch":
 		var active_result := _step_active_soil_patch({}, delta)
@@ -909,6 +978,8 @@ func _ensure_active_soil_patch() -> bool:
 
 
 func _step_active_soil_patch(soil_result: Dictionary, delta: float) -> Dictionary:
+	if _bucket_ground_bypassed():
+		return {"changed": false, "reason": "bucket_ground_interaction_bypassed"}
 	if (
 		not active_soil_patch_prototype_enabled and _selected_soil_mode() not in ["shadow", "active_patch"]
 	):
@@ -1215,6 +1286,37 @@ func _clear_local_material(reason: String) -> void:
 func _selected_soil_mode() -> String:
 	var selected := _soil_authority_modes.selected_mode
 	return selected if selected in SoilAuthorityModeController.MODES else "legacy"
+
+
+func _bucket_ground_bypassed() -> bool:
+	return BucketGroundInteractionMode.is_passthrough(_bucket_ground_mode)
+
+
+func _terrain_identity_snapshot() -> Dictionary:
+	if terrain_world == null or terrain_world.terrain_state == null:
+		return {"world_generation": -1, "revision": -1}
+	return {
+		"world_generation": terrain_world.terrain_state.world_generation,
+		"terrain_revision": terrain_world.terrain_state.terrain_revision,
+	}
+
+
+func _bucket_ground_interaction_status() -> Dictionary:
+	return {
+		"mode": _bucket_ground_mode,
+		"transition_count": _bucket_ground_transition_count,
+		"bypass_ticks": _bucket_ground_bypass_ticks,
+		"execution_ticks": _bucket_ground_execution_ticks,
+		"automatic_samples_executed": _automatic_samples_executed,
+		"automatic_samples_bypassed": _automatic_samples_bypassed,
+		"soil_steps_executed": _soil_steps_executed,
+		"soil_steps_bypassed": _soil_steps_bypassed,
+		"terrain_commits_executed": _terrain_commits_executed,
+		"terrain_commits_bypassed": _terrain_commits_bypassed,
+		"parcel_steps_executed": _parcel_steps_executed,
+		"parcel_steps_bypassed": _parcel_steps_bypassed,
+		"last_transition": _last_bucket_ground_transition.duplicate(true),
+	}
 
 
 func _soil_generation_key(reason: String) -> String:

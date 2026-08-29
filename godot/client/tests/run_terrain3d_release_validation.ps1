@@ -138,6 +138,12 @@ try {
         rollback_restored = ($editor.details.rollback_restored.active_backend -eq $exported.details.rollback_restored.active_backend)
         final_backend = ($editor.details.final.active_backend -eq $exported.details.final.active_backend)
         active_model_id = ($editor.details.active_model_id -eq $exported.details.active_model_id)
+        bucket_ground_mode = ($editor.details.bucket_ground.restored_mode -eq $exported.details.bucket_ground.restored_mode)
+        bucket_ground_entry_immutable = ([bool]$editor.details.bucket_ground.entry_terrain_unchanged -and [bool]$exported.details.bucket_ground.entry_terrain_unchanged)
+        bucket_ground_exit_immutable = ([bool]$editor.details.bucket_ground.exit_terrain_unchanged -and [bool]$exported.details.bucket_ground.exit_terrain_unchanged)
+        bucket_ground_query_bypass = ([int]$editor.details.bucket_ground.query_bypassed -gt 0 -and [int]$exported.details.bucket_ground.query_bypassed -gt 0)
+        bucket_ground_soil_bypass = ([int]$editor.details.bucket_ground.soil_bypassed -gt 0 -and [int]$exported.details.bucket_ground.soil_bypassed -gt 0)
+        bucket_ground_effects_bypass = ([int]$editor.details.bucket_ground.effects_bypassed -gt 0 -and [int]$exported.details.bucket_ground.effects_bypassed -gt 0)
     }
     $logText = @(
         Get-ChildItem -LiteralPath $OutputDir -Filter "*.log" -File |

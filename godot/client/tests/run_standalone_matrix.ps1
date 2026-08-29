@@ -20,6 +20,7 @@ $tests = @(
     "jolt_bucket_query_spike.gd",
     "jolt_chassis_track_test.gd",
     "jolt_articulated_equipment_test.gd",
+    "bucket_passthrough_mode_test.gd",
     "authority_shadow_test.gd",
     "sensor_telemetry_test.gd",
     "can_gateway_e2e_test.gd",

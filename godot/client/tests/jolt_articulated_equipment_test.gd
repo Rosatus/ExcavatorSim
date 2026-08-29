@@ -218,6 +218,43 @@ func _test_model(model_id: String) -> void:
 	runtime._reset_support_response()
 	if runtime._support_contact_ticks != 0 or runtime._support_contact_observed:
 		failures.append("%s support state did not reset after contact loss" % model_id)
+	runtime._queued_support_wrench = {
+		"request_id": "stale-before-bypass",
+		"eligible_apply_tick": runtime._physics_tick + 1,
+	}
+	runtime._applied_support_wrench = {"request_id": "already-applied-before-bypass"}
+	runtime._cut_engagement = 0.75
+	var counters_before_bypass := runtime.get_status_snapshot().get("bucket_ground_interaction", {}) as Dictionary
+	if not runtime.set_bucket_ground_mode(BucketGroundInteractionMode.PASSTHROUGH):
+		failures.append("%s rejected pass-through policy" % model_id)
+	var bypass_entry := runtime.get_status_snapshot()
+	var bypass_payload := bypass_entry.get("payload", {}) as Dictionary
+	if (
+		not runtime._queued_support_wrench.is_empty()
+		or not runtime._applied_support_wrench.is_empty()
+		or float(bypass_entry.get("cut_engagement", -1.0)) != 0.0
+	):
+		failures.append("%s pass-through entry retained stale support or cut response" % model_id)
+	if (
+		not is_zero_approx(float(bypass_payload.get("mass_kg", -1.0)))
+		or int(bypass_payload.get("identity", -1)) <= 42
+		or runtime._pending_payload != runtime._applied_payload
+	):
+		failures.append("%s pass-through entry did not atomically clear Jolt payload state" % model_id)
+	runtime.set_equipment_commands(Vector4(0.0, -1.0, -1.0, -1.0), COMMAND_FRAMES + 2)
+	await physics_frame
+	var bypass_status := runtime.get_status_snapshot()
+	var bypass_counters := bypass_status.get("bucket_ground_interaction", {}) as Dictionary
+	var bypass_query := bypass_status.get("bucket_query", {}) as Dictionary
+	if (
+		String(bypass_counters.get("mode", "")) != BucketGroundInteractionMode.PASSTHROUGH
+		or int(bypass_counters.get("query_bypassed", 0)) <= int(counters_before_bypass.get("query_bypassed", 0))
+		or float(bypass_query.get("accepted_fraction", 0.0)) != 1.0
+		or not (bypass_query.get("contacts", []) as Array).is_empty()
+	):
+		failures.append("%s pass-through tick did not bypass query/support with full motion" % model_id)
+	if not runtime.set_bucket_ground_mode(BucketGroundInteractionMode.NORMAL):
+		failures.append("%s could not restore normal bucket-ground policy" % model_id)
 	runtime.reset(spawn)
 	if int(runtime.get_status_snapshot().get("support_wrench_apply_count", -1)) != 0:
 		failures.append("%s reset retained the support wrench application count" % model_id)

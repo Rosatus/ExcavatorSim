@@ -1483,6 +1483,116 @@ Wrong: positive retraction slowed because contact is still present
 Correct: positive retraction -> escape phase -> rapid unit-scale recovery
 ```
 
+## Scenario: Bucket pass-through performance policy
+
+### 1. Scope / Trigger
+
+Use this contract for a process-local mode that removes bucket/ground physics,
+soil, and effects work while retaining visible terrain and normal chassis/track
+support. It is not a visual-quality, Terrain3D-backend, soil-owner, or simulation
+authority profile.
+
+### 2. Signatures
+
+```text
+ProductSession.request_bucket_ground_mode(mode: String) -> bool
+TrackedChassisController.can_set_bucket_ground_mode(mode: String) -> bool
+TrackedChassisController.set_bucket_ground_mode(mode: String) -> bool
+ExcavationWorld.can_set_bucket_ground_mode(mode: String) -> bool
+ExcavationWorld.set_bucket_ground_mode(mode: String) -> bool
+JoltChassisTrackRuntime.set_bucket_ground_mode(mode: String) -> bool
+SoilEffects.set_bucket_ground_mode(mode: String) -> bool
+
+backend/scripts/jolt_product_soak.py
+  --bucket-ground-mode {normal,bucket_passthrough} [...]
+  --repetitions 1..9
+```
+
+### 3. Contracts
+
+- The only values are `normal` and `bucket_passthrough`; launch default is
+  `normal`, the selection is not persisted, and ProductSession commits a valid
+  requested mode at the next physics tick after all participants preflight.
+- The selected mode survives process-local start/pause/reset/reconnect, model
+  switch, Jolt rebuild, Test Grid, and Terrain3D fallback/recovery.
+- Pass-through still accepts ordinary articulation commands at full accepted
+  fraction, but skips bucket proxy sweep/contact collection, cut probe,
+  articulation terrain clamp, support wrench queue/apply, legacy ground lift,
+  and external digging-response shaping.
+- `TerrainCollider`, track probes, heightfield fallback, hull/chassis collision,
+  traction, stabilization, locomotion, and terrain presentation remain active.
+- Entry and exit use the existing clean local-material boundary: selected
+  payload, active/released material, parcels, pending brushes/transfers, pose,
+  support, feedback, patch/presenter, and effects clear. The separate material
+  generation advances; `TerrainState.world_generation`, `terrain_revision`, and
+  committed surface bytes do not change because of the mode transition.
+- While bypassed, production and test/manual entry points return before soil
+  classification, authority/patch/parcel/settle/commit/feedback/effects work.
+  Suppressed work never replays on exit.
+- Status dictionaries expose the mode plus monotonic submitted/executed/
+  bypassed counters. Logging is transition-bounded, never per-frame.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Unknown mode | Return `false`; keep active mode and expose `invalid_bucket_ground_mode` |
+| Participant not initialized at preflight | Reject the pending transition; UI returns to the real active mode |
+| Unexpected post-preflight setter failure | Close both sides to `normal`, clear transient material, and expose a bounded transition error |
+| Repeated request for active mode | Idempotent success; no new material generation |
+| Enter/exit with payload or pending work | Deliberately clear it; do not fabricate a conservation transaction |
+| Bypassed bucket tick | Synthetic query has full accepted fraction, no contacts, and `bucket_ground_interaction_bypassed` |
+| Reset/model/runtime rebuild while bypassed | Reapply the stored policy before the next runtime physics step |
+
+### 5. Good / Base / Bad Cases
+
+- Good: UI request -> ProductSession fixed-tick preflight -> controller/Jolt and
+  excavation/effects switch -> clean empty material generation -> counters.
+- Base: `normal` -> the existing query, digging response, material, terrain,
+  effects, and release soak behavior is unchanged.
+- Bad: disable `TerrainCollider`, infer the mode from Test Grid, merely hide
+  particles while soil keeps stepping, or retain a queued support wrench.
+
+### 6. Tests Required
+
+- For SY205 and SY135, assert deferred activation, full-motion contact-free
+  synthetic query, zero cut/support response, advancing bypass counters, and a
+  still-enabled terrain collider/track path.
+- Compare pre/post-transition terrain generation, revision, and SHA-256; assert
+  the material generation advances and selected payload becomes zero.
+- Exercise production ticks plus `queue_cut_world`, `queue_deposit_world`,
+  manual dig/deposit, and fixed-step test seams while bypassed.
+- Verify reset and model/runtime rebuild retain the mode, stale support/soil
+  work does not replay, and exiting restores normal behavior.
+- Keep ordinary standalone gates unchanged. Paired soak runs use alternating
+  normal/pass-through cells, three repetitions per model at balanced quality;
+  odd repetitions run `normal -> bucket_passthrough`, even repetitions reverse
+  the order. Preserve `run_ordinal`, `repetition`, one stable trace identity,
+  raw p95 values/counter deltas, and require a lower pass-through median.
+- The rendered soak enables MotionClient explicitly after scene `_ready()`
+  applies ProjectSettings, but ProductSession remains the lifecycle/model owner.
+  Read active-patch dump/spill evidence from accepted authority transactions,
+  not only the legacy batch interaction label.
+- Retry only an external gateway-health startup exception. Never discard and
+  rerun a completed inert/cut-free/payload-free cell: that result may be the
+  evidence for a real lifecycle, track-motion, or pass-through regression.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: performance mode -> disable TerrainCollider -> tracks lose ground support
+Correct: performance mode -> bypass only bucket query/cut/support -> tracks unchanged
+
+Wrong: emission=false -> active soil/patch/parcel/commit work continues invisibly
+Correct: one shared mode -> early-return before soil and effects execution
+
+Wrong: runtime reset -> default query policy for one tick -> stale support replay
+Correct: stored controller policy -> reapply immediately after every Jolt rebuild
+
+Wrong: completed inert soak cell -> rerun -> hide the first failure
+Correct: completed cell -> preserve it; retry only pre-scenario gateway startup failure
+```
+
 ## Scenario: Construction-site Terrain3D presentation
 
 ### 1. Scope / Trigger

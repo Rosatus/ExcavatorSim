@@ -72,6 +72,7 @@ const ICT_CONFIG_PATH := "user://ict_config.cfg"
 @onready var _advanced_button: CheckButton = $StatusPanel/Margin/VBox/Tools/Advanced
 @onready var _mute_audio_button: CheckButton = $StatusPanel/Margin/VBox/Tools/MuteAudio
 @onready var _test_graphics_button: CheckButton = $StatusPanel/Margin/VBox/Tools/TestGraphics
+@onready var _bucket_passthrough_button: CheckButton = $StatusPanel/Margin/VBox/Tools/BucketPassthrough
 @onready var _guide_panel: PanelContainer = $GuidePanel
 @onready var _guide_title_label: Label = $GuidePanel/Margin/VBox/Title
 @onready var _guide_intro_label: Label = $GuidePanel/Margin/VBox/Intro
@@ -101,6 +102,7 @@ func _ready() -> void:
 	_advanced_button.toggled.connect(_on_advanced_toggled)
 	_mute_audio_button.toggled.connect(_on_audio_muted)
 	_test_graphics_button.toggled.connect(_on_test_graphics_toggled)
+	_bucket_passthrough_button.toggled.connect(_on_bucket_passthrough_toggled)
 	_can_output_button.pressed.connect(_on_can_output_pressed)
 	_ict_button.pressed.connect(_on_ict_pressed)
 	_timed_can_button.pressed.connect(_on_timed_can_pressed)
@@ -148,6 +150,7 @@ func _apply_static_copy() -> void:
 	_mute_audio_button.text = UIStrings.BUTTON_MUTE_AUDIO
 	_test_graphics_button.text = UIStrings.BUTTON_TEST_GRAPHICS
 	_test_graphics_button.tooltip_text = "Use an untextured black/white terrain grid and hide site dressing."
+	_bucket_passthrough_button.tooltip_text = "Let the bucket pass through terrain. Entering or leaving clears bucket soil and pending soil work."
 	_guide_title_label.text = UIStrings.GUIDE_TITLE
 	_guide_intro_label.text = UIStrings.GUIDE_INTRO
 	_guide_recovery_label.text = UIStrings.GUIDE_RECOVERY
@@ -180,6 +183,19 @@ func _on_test_graphics_toggled(enabled: bool) -> void:
 		requested = "balanced"
 	if not _visual_quality.apply_profile(requested):
 		_sync_test_graphics_toggle()
+
+
+func _on_bucket_passthrough_toggled(enabled: bool) -> void:
+	if _product_session == null:
+		_sync_bucket_passthrough_toggle()
+		return
+	var requested := (
+		BucketGroundInteractionMode.PASSTHROUGH
+		if enabled
+		else BucketGroundInteractionMode.NORMAL
+	)
+	if not _product_session.request_bucket_ground_mode(requested):
+		_sync_bucket_passthrough_toggle()
 
 
 func _sync_test_graphics_toggle() -> void:
@@ -626,6 +642,7 @@ func _refresh() -> void:
 	if not last_error.is_empty():
 		diagnostics += "   Error: %s" % String(last_error.get("code", "unknown"))
 	diagnostics += "\n%s" % _terrain_diagnostics_text()
+	diagnostics += "\n%s" % _bucket_ground_diagnostics_text(status)
 	_diagnostics_label.text = diagnostics
 	_refresh_can_status()
 	_model_selector.tooltip_text = "%s — switching starts a fresh work session" % UIStrings.model_name(model_id)
@@ -633,6 +650,7 @@ func _refresh() -> void:
 	_refresh_warning(status, lifecycle, connection)
 	_maybe_complete_action(status)
 	_refresh_model_selector()
+	_sync_bucket_passthrough_toggle()
 
 
 func _terrain_diagnostics_text() -> String:
@@ -648,6 +666,46 @@ func _terrain_diagnostics_text() -> String:
 	if not fallback_reason.is_empty():
 		line += "   Fallback: %s" % fallback_reason.replace("\n", " ").left(120)
 	return line
+
+
+func _bucket_ground_diagnostics_text(session_status: Dictionary) -> String:
+	var active := String(session_status.get("bucket_ground_mode", BucketGroundInteractionMode.NORMAL))
+	var requested := String(session_status.get("requested_bucket_ground_mode", active))
+	var pending := bool(session_status.get("bucket_ground_mode_pending", false))
+	var soil_status := (
+		_excavation_world.get_status_snapshot().get("bucket_ground_interaction", {}) as Dictionary
+		if _excavation_world != null
+		else {}
+	)
+	var last_transition := soil_status.get("last_transition", {}) as Dictionary
+	var cleared_text := (
+		"   cleared %.3f m³ / %.1f kg" % [
+			float(last_transition.get("cleared_bucket_volume_m3", 0.0)),
+			float(last_transition.get("cleared_payload_mass_kg", 0.0)),
+		]
+		if not last_transition.is_empty()
+		else ""
+	)
+	return "Bucket ground: %s%s%s   soil exec/bypass: %d/%d" % [
+		active,
+		" -> %s (pending)" % requested if pending else "",
+		cleared_text,
+		int(soil_status.get("soil_steps_executed", 0)),
+		int(soil_status.get("soil_steps_bypassed", 0)),
+	]
+
+
+func _sync_bucket_passthrough_toggle() -> void:
+	if _bucket_passthrough_button == null:
+		return
+	var status := _product_session.get_status_snapshot() if _product_session != null else {}
+	var requested := String(status.get(
+		"requested_bucket_ground_mode",
+		status.get("bucket_ground_mode", BucketGroundInteractionMode.NORMAL),
+	))
+	_bucket_passthrough_button.set_pressed_no_signal(
+		BucketGroundInteractionMode.is_passthrough(requested)
+	)
 
 
 func _refresh_soil() -> void:
@@ -701,6 +759,8 @@ func _refresh_warning(status: Dictionary, lifecycle: String, connection: String)
 		warnings.append(UIStrings.WARNING_GATEWAY)
 	if _current_fill_ratio >= 0.98:
 		warnings.append(UIStrings.WARNING_OVERFLOW)
+	if String(status.get("bucket_ground_mode", BucketGroundInteractionMode.NORMAL)) == BucketGroundInteractionMode.PASSTHROUGH:
+		warnings.append("Bucket-ground interaction bypassed for performance")
 	var last_error := status.get("last_error", {}) as Dictionary
 	if not last_error.is_empty():
 		warnings.append("Recovery needed: %s" % String(last_error.get("message", last_error.get("code", "unknown error"))))

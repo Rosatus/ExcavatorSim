@@ -47,6 +47,7 @@ var _test_input_focus_bypass := false
 var _payload_identity := -1
 var _last_payload_sample: Dictionary = {}
 var _digging_response := DiggingResponseShaper.new()
+var _bucket_ground_mode := BucketGroundInteractionMode.NORMAL
 
 
 func _ready() -> void:
@@ -78,8 +79,8 @@ func _physics_process(delta: float) -> void:
 	locomotion_state.set_commands(left, right)
 	locomotion_state.step_fixed(delta, Callable(self, "_sample_terrain_height"))
 	_base_local_transform = locomotion_state.chassis_transform
-	ground_lift_reaction.enabled = ground_lift_enabled
-	if not ground_lift_enabled:
+	ground_lift_reaction.enabled = ground_lift_enabled and not _bucket_ground_bypassed()
+	if not ground_lift_reaction.enabled:
 		ground_lift_reaction.clear_target()
 	transform = _base_local_transform * ground_lift_reaction.step_fixed(delta)
 
@@ -189,15 +190,15 @@ func clear_equipment_commands_for_test() -> void:
 func step_fixed_for_test(delta: float, height_sampler: Callable) -> bool:
 	var changed := locomotion_state.step_fixed(delta, height_sampler)
 	_base_local_transform = locomotion_state.chassis_transform
-	ground_lift_reaction.enabled = ground_lift_enabled
-	if not ground_lift_enabled:
+	ground_lift_reaction.enabled = ground_lift_enabled and not _bucket_ground_bypassed()
+	if not ground_lift_reaction.enabled:
 		ground_lift_reaction.clear_target()
 	transform = _base_local_transform * ground_lift_reaction.step_fixed(delta)
 	return changed
 
 
 func submit_bucket_support_contact(contact: Dictionary) -> void:
-	if AuthorityProfile.writes_product_pose(authority_profile):
+	if AuthorityProfile.writes_product_pose(authority_profile) or _bucket_ground_bypassed():
 		ground_lift_reaction.reset()
 		return
 	ground_lift_reaction.enabled = ground_lift_enabled
@@ -205,7 +206,7 @@ func submit_bucket_support_contact(contact: Dictionary) -> void:
 
 
 func clear_bucket_support_contact() -> void:
-	if AuthorityProfile.writes_product_pose(authority_profile):
+	if AuthorityProfile.writes_product_pose(authority_profile) or _bucket_ground_bypassed():
 		ground_lift_reaction.reset()
 		return
 	ground_lift_reaction.submit_contact({}, _base_global_transform())
@@ -251,6 +252,7 @@ func get_status_snapshot() -> Dictionary:
 	)
 	status["authority_profile"] = authority_profile
 	status["digging_response"] = _digging_response.get_status_snapshot()
+	status["bucket_ground_mode"] = _bucket_ground_mode
 	return status
 
 
@@ -258,7 +260,33 @@ func set_digging_response_enabled(value: bool) -> void:
 	digging_response_enabled = value
 	_digging_response.set_enabled(value)
 	if _jolt_runtime != null:
-		_jolt_runtime.set_external_digging_response_enabled(value and _digging_response.configured)
+		_jolt_runtime.set_external_digging_response_enabled(
+			value and _digging_response.configured and not _bucket_ground_bypassed()
+		)
+
+
+func can_set_bucket_ground_mode(value: String) -> bool:
+	return BucketGroundInteractionMode.is_valid(value)
+
+
+func set_bucket_ground_mode(value: String) -> bool:
+	if not can_set_bucket_ground_mode(value):
+		return false
+	if _jolt_runtime != null:
+		if not _jolt_runtime.set_bucket_ground_mode(value):
+			return false
+		_payload_identity = maxi(_payload_identity, _jolt_runtime.get_bucket_payload_identity())
+	_bucket_ground_mode = value
+	if _bucket_ground_bypassed():
+		ground_lift_reaction.reset()
+		_digging_response.reset_response("bucket_ground_interaction_bypassed")
+	if _jolt_runtime != null:
+		_jolt_runtime.set_external_digging_response_enabled(
+			digging_response_enabled
+			and _digging_response.configured
+			and not _bucket_ground_bypassed()
+		)
+	return true
 
 
 func _empty_authoritative_status() -> Dictionary:
@@ -284,6 +312,7 @@ func _empty_authoritative_status() -> Dictionary:
 		"terrain_revision": -1,
 		"terrain_identity_valid": false,
 		"contacts": [],
+		"bucket_ground_interaction": _empty_bucket_ground_interaction_status(),
 		"quality_flags": ["authoritative_runtime_unavailable"],
 	}
 
@@ -406,6 +435,7 @@ func _reset_motion() -> void:
 		var descriptor := PhysicsRigDescriptor.load_for_model(active_model_id)
 		var spawn := _authoritative_spawn_transform(descriptor) if descriptor != null else Transform3D.IDENTITY
 		_jolt_runtime.reset(spawn)
+		_jolt_runtime.set_bucket_ground_mode(_bucket_ground_mode)
 		_sync_visual_to_jolt_body()
 	else:
 		transform = Transform3D.IDENTITY
@@ -459,10 +489,16 @@ func _step_authoritative_chassis(delta: float) -> void:
 				else (_motion_client.get_authoritative_input_axes() if _motion_client != null else Vector4.ZERO)
 			)
 		)
-	var soil_status := _excavation_world.get_status_snapshot() if _excavation_world != null else {}
-	var response := _digging_response.step_fixed(delta, equipment_axes, soil_status)
-	var scaled_axes := response.get("scaled_commands", equipment_axes) as Vector4
-	_jolt_runtime.set_external_digging_response_enabled(digging_response_enabled and _digging_response.configured)
+	var scaled_axes := equipment_axes
+	if _bucket_ground_bypassed():
+		_digging_response.reset_response("bucket_ground_interaction_bypassed")
+	else:
+		var soil_status := _excavation_world.get_status_snapshot() if _excavation_world != null else {}
+		var response := _digging_response.step_fixed(delta, equipment_axes, soil_status)
+		scaled_axes = response.get("scaled_commands", equipment_axes) as Vector4
+	_jolt_runtime.set_external_digging_response_enabled(
+		digging_response_enabled and _digging_response.configured and not _bucket_ground_bypassed()
+	)
 	_jolt_runtime.set_equipment_commands(scaled_axes, Engine.get_physics_frames())
 	_submit_authoritative_payload()
 
@@ -507,7 +543,14 @@ func _configure_jolt_runtime(catalog_entry: Dictionary) -> bool:
 		_destroy_jolt_runtime()
 		return false
 	_jolt_runtime.set_enabled(controller_enabled)
-	_jolt_runtime.set_external_digging_response_enabled(digging_response_enabled and _digging_response.configured)
+	if not _jolt_runtime.set_bucket_ground_mode(_bucket_ground_mode):
+		contract_error = "could not apply bucket-ground interaction policy"
+		_destroy_jolt_runtime()
+		return false
+	_payload_identity = maxi(_payload_identity, _jolt_runtime.get_bucket_payload_identity())
+	_jolt_runtime.set_external_digging_response_enabled(
+		digging_response_enabled and _digging_response.configured and not _bucket_ground_bypassed()
+	)
 	_on_jolt_post_step_snapshot(_jolt_runtime.get_post_step_snapshot())
 	return true
 
@@ -651,6 +694,24 @@ func _submit_authoritative_payload() -> void:
 	_payload_identity += 1
 	if _jolt_runtime.set_bucket_payload(sample["mass_kg"], sample["center_of_mass_local"], _payload_identity):
 		_last_payload_sample = sample
+
+
+func _bucket_ground_bypassed() -> bool:
+	return BucketGroundInteractionMode.is_passthrough(_bucket_ground_mode)
+
+
+func _empty_bucket_ground_interaction_status() -> Dictionary:
+	return {
+		"mode": _bucket_ground_mode,
+		"query_submitted": 0,
+		"query_executed": 0,
+		"query_bypassed": 0,
+		"cut_probe_executed": 0,
+		"cut_probe_bypassed": 0,
+		"support_queued": 0,
+		"support_applied": 0,
+		"support_bypassed": 0,
+	}
 
 
 func _vector3(value: Variant) -> Vector3:

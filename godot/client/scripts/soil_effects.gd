@@ -23,6 +23,10 @@ var _active_clod_cap := 32
 var _clod_spawn_accumulator := 0.0
 var _last_visual_snapshot: Dictionary = {}
 var _spawn_sequence := 0
+var _bucket_ground_mode := BucketGroundInteractionMode.NORMAL
+var _update_executed_count := 0
+var _update_bypassed_count := 0
+var _last_clear_reason := ""
 
 
 func _ready() -> void:
@@ -34,6 +38,10 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if BucketGroundInteractionMode.is_passthrough(_bucket_ground_mode):
+		_update_bypassed_count += 1
+		return
+	_update_executed_count += 1
 	if _excavation != null:
 		_last_visual_snapshot = _excavation.get_soil_visual_snapshot()
 		_apply_visual_snapshot(_last_visual_snapshot)
@@ -66,6 +74,18 @@ func set_emission_enabled(value: bool) -> void:
 		_deactivate_clod(clod)
 
 
+func set_bucket_ground_mode(value: String) -> bool:
+	if not BucketGroundInteractionMode.is_valid(value):
+		return false
+	if _bucket_ground_mode == value:
+		return true
+	_bucket_ground_mode = value
+	if BucketGroundInteractionMode.is_passthrough(value):
+		_last_clear_reason = "bucket_ground_interaction_bypassed"
+		clear_for_generation(_generation)
+	return true
+
+
 func clear_for_generation(generation: int) -> void:
 	if generation < _generation:
 		return
@@ -96,6 +116,10 @@ func get_effect_snapshot() -> Dictionary:
 		"fill_visible": _fill_mesh != null and _fill_mesh.visible,
 		"active_clods": _active_clod_count(),
 		"clod_cap": _active_clod_cap,
+		"bucket_ground_mode": _bucket_ground_mode,
+		"update_executed": _update_executed_count,
+		"update_bypassed": _update_bypassed_count,
+		"last_clear_reason": _last_clear_reason,
 	}
 
 
@@ -220,6 +244,8 @@ func _connect_excavation() -> void:
 
 
 func _on_excavation_changed(status: Dictionary) -> void:
+	if BucketGroundInteractionMode.is_passthrough(_bucket_ground_mode):
+		return
 	if _excavation != null:
 		_apply_visual_snapshot(_excavation.get_soil_visual_snapshot())
 	else:
@@ -227,6 +253,8 @@ func _on_excavation_changed(status: Dictionary) -> void:
 
 
 func _apply_visual_snapshot(status: Dictionary) -> void:
+	if BucketGroundInteractionMode.is_passthrough(_bucket_ground_mode):
+		return
 	var generation := int(status.get("material_generation", -1))
 	if generation < _generation:
 		return

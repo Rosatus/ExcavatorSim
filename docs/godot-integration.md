@@ -335,6 +335,23 @@ tolerance. A matching project-collider ray miss may use the logical heightfield;
 a stale, unavailable, or disabled collider identity disarms Jolt track forces
 and bucket evidence until the project collider catches up.
 
+### Bucket pass-through performance mode
+
+The operator Tools row exposes a process-local `Bucket Pass` toggle. It starts
+in `normal` on every launch and commits requests at the next physics tick. In
+`bucket_passthrough`, Jolt still advances the commanded four-axis articulation
+and all track/chassis support, traction, and collision work, but skips bucket
+sweeps, cut probes, articulation clamping, bucket support wrenches, digging
+response shaping, soil authorities/patches/parcels/commits, and dynamic soil
+effects. The terrain collider and Terrain3D presentation remain enabled.
+
+Entering or leaving this mode intentionally clears bucket payload and all
+transient soil work into a new empty material generation. It does not alter
+`TerrainState.world_generation`, terrain revision, or already-committed surface
+bytes. Requested/active state and monotonic executed/bypassed counters are
+available in ProductSession, chassis, excavation, and effects status snapshots;
+the Advanced panel shows the active state and soil counter summary.
+
 Windows release validation is reproducible from the repository root:
 
 ```powershell

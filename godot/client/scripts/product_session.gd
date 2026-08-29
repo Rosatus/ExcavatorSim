@@ -7,6 +7,7 @@ extends Node
 signal lifecycle_changed(lifecycle: String, authority_epoch: String, generation: int)
 signal authority_changed(session_id: String, authority_epoch: String, generation: int)
 signal model_changed(model_id: String)
+signal bucket_ground_mode_changed(mode: String)
 signal status_changed(snapshot: Dictionary)
 
 const LOCAL_SESSION_ID := "godot-local-authority"
@@ -28,11 +29,15 @@ var authority_epoch := ""
 var generation := 0
 var focused := true
 var last_error: Dictionary = {}
+var bucket_ground_mode := BucketGroundInteractionMode.NORMAL
+var requested_bucket_ground_mode := BucketGroundInteractionMode.NORMAL
+var bucket_ground_transition_sequence := 0
 
 var _presentation: MotionPresentation
 var _motion_client: MotionClient
 var _chassis: TrackedChassisController
 var _excavation: ExcavationWorld
+var _bucket_ground_mode_pending := false
 
 
 func _ready() -> void:
@@ -46,6 +51,7 @@ func _ready() -> void:
 
 
 func _physics_process(_delta: float) -> void:
+	_apply_pending_bucket_ground_mode()
 	if lifecycle_input_enabled:
 		if Input.is_action_just_pressed("motion_start"):
 			request_start()
@@ -147,6 +153,18 @@ func get_equipment_input_axes() -> Vector4:
 	return _motion_client.get_authoritative_input_axes()
 
 
+func request_bucket_ground_mode(mode: String) -> bool:
+	if not BucketGroundInteractionMode.is_valid(mode):
+		last_error = {"code": "invalid_bucket_ground_mode", "message": mode}
+		status_changed.emit(get_status_snapshot())
+		return false
+	requested_bucket_ground_mode = mode
+	_bucket_ground_mode_pending = mode != bucket_ground_mode
+	last_error.clear()
+	status_changed.emit(get_status_snapshot())
+	return true
+
+
 func get_status_snapshot() -> Dictionary:
 	return {
 		"authority_profile": String(ProjectSettings.get_setting("simulation/authority_profile", "jolt_authoritative")),
@@ -159,6 +177,10 @@ func get_status_snapshot() -> Dictionary:
 		"active_model_id": active_model_id,
 		"gateway_enabled": gateway_enabled,
 		"gateway_state": "disabled" if not gateway_enabled else "optional",
+		"bucket_ground_mode": bucket_ground_mode,
+		"requested_bucket_ground_mode": requested_bucket_ground_mode,
+		"bucket_ground_mode_pending": _bucket_ground_mode_pending,
+		"bucket_ground_transition_sequence": bucket_ground_transition_sequence,
 		"last_error": last_error,
 	}
 
@@ -186,6 +208,43 @@ func _apply_lifecycle() -> void:
 	_chassis.set_controller_enabled(lifecycle == LIFECYCLE_RUNNING)
 	if lifecycle != LIFECYCLE_RUNNING:
 		_chassis.stop_product_motion()
+
+
+func _apply_pending_bucket_ground_mode() -> void:
+	if not _bucket_ground_mode_pending:
+		return
+	if (
+		_chassis == null
+		or _excavation == null
+		or not _chassis.can_set_bucket_ground_mode(requested_bucket_ground_mode)
+		or not _excavation.can_set_bucket_ground_mode(requested_bucket_ground_mode)
+	):
+		last_error = {
+			"code": "bucket_ground_mode_unavailable",
+			"message": requested_bucket_ground_mode,
+		}
+		requested_bucket_ground_mode = bucket_ground_mode
+		_bucket_ground_mode_pending = false
+		return
+	if (
+		not _chassis.set_bucket_ground_mode(requested_bucket_ground_mode)
+		or not _excavation.set_bucket_ground_mode(requested_bucket_ground_mode)
+	):
+		_chassis.set_bucket_ground_mode(BucketGroundInteractionMode.NORMAL)
+		_excavation.set_bucket_ground_mode(BucketGroundInteractionMode.NORMAL)
+		last_error = {
+			"code": "bucket_ground_mode_transition_failed",
+			"message": requested_bucket_ground_mode,
+		}
+		bucket_ground_mode = BucketGroundInteractionMode.NORMAL
+		requested_bucket_ground_mode = BucketGroundInteractionMode.NORMAL
+		_bucket_ground_mode_pending = false
+		return
+	bucket_ground_mode = requested_bucket_ground_mode
+	bucket_ground_transition_sequence += 1
+	_bucket_ground_mode_pending = false
+	last_error.clear()
+	bucket_ground_mode_changed.emit(bucket_ground_mode)
 
 
 func _emit_transition() -> void:
