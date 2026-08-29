@@ -1812,3 +1812,43 @@ Implemented strict DBC decoding and silent exact deduplication, canonical raw-pa
 ### Next Steps
 
 - None - task complete
+
+
+## Session 49: Restore Terrain3D visual parity and product cutover
+
+**Date**: 2026-08-29
+**Task**: Restore Terrain3D visual parity and product cutover
+**Branch**: `main`
+
+### Summary
+
+Completed and archived the five-phase Terrain3D restoration program: fixed Forward+/D3D12 rendering, preserved approved project-soil visuals, added transactional native/fallback lifecycle, proved SY205/SY135 authority and collider equivalence, cut native Terrain3D over as product default, added Advanced diagnostics, explicit soil_shader rollback, and source/export Windows package parity. Known unrelated Gateway/frontend-dist and Windows pytest-temp baseline issues remain documented; user-owned dirty paths were preserved.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4f85886` | (see git log) |
+| `422a204` | (see git log) |
+| `2166332` | (see git log) |
+| `1fb90f7` | (see git log) |
+| `a26e906` | (see git log) |
+| `59c5b86` | (see git log) |
+| `2b814a9` | (see git log) |
+| `322db50` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

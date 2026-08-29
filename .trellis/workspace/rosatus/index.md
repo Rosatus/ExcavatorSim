@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 48
+- **Total Sessions**: 49
 - **Last Active**: 2026-08-29
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1814 | Active |
+| `journal-1.md` | ~1854 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 49 | 2026-08-29 | Restore Terrain3D visual parity and product cutover | `4f85886`, `422a204`, `2166332`, `1fb90f7`, `a26e906`, `59c5b86`, `2b814a9`, `322db50` | `main` |
 | 48 | 2026-08-29 | Gateway DBC payload editing and distribution | `626b3d9` | `main` |
 | 47 | 2026-08-28 | Complete Linux can0 hardening packaging | `f8f5a67`, `de4fd3f` | `main` |
 | 46 | 2026-08-28 | Harden can0 lock and bound SocketCAN latency | `f8f5a67`, `de4fd3f` | `main` |
