@@ -54,7 +54,11 @@ func _run() -> void:
 	if not (shallow.get("quality_flags", []) as Array).has("bucket_query_shallow_cutting_overlap"):
 		failures.append("shallow stroke reports the benign flag: %s" % str(shallow.get("quality_flags", [])))
 	for record in shallow.get("contacts", []) as Array:
-		if bool((record as Dictionary).get("initial_overlap", false)):
+		var contact := record as Dictionary
+		if String(contact.get("query_source", "")) != "terrain_collider":
+			failures.append("shallow stroke accepts only TerrainCollider query evidence")
+			break
+		if bool(contact.get("initial_overlap", false)):
 			failures.append("shallow stroke must not produce pathological records")
 			break
 	if (shallow.get("contacts", []) as Array).is_empty():

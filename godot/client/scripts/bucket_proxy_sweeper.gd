@@ -282,6 +282,7 @@ func _contact_record(
 		"normal_world": normal.normalized(),
 		"collider_id": collider.get_instance_id() if collider != null else 0,
 		"collider_name": String(collider.name) if collider != null else "terrain",
+		"query_source": "terrain_collider",
 		"initial_overlap": initial_overlap,
 		"quality": "initial_overlap" if initial_overlap else "shape_query",
 	}

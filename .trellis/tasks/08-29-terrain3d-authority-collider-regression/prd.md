@@ -29,17 +29,17 @@ selection and applied snapshot diagnostics.
 
 ## Acceptance Criteria
 
-- [ ] Native and fallback produce byte-identical terrain layers/digest and equal
+- [x] Native and fallback produce byte-identical terrain layers/digest and equal
   terrain identity for the same deterministic command sequence.
-- [ ] Selected soil ledger totals, transaction identities, conservation/invariant
+- [x] Selected soil ledger totals, transaction identities, conservation/invariant
   results, and bucket payload are equal within existing domain tolerances.
-- [ ] Jolt truth, accepted chassis/articulation outcome, track contact provenance,
+- [x] Jolt truth, accepted chassis/articulation outcome, track contact provenance,
   and bucket query/support identity retain their existing contract.
-- [ ] Terrain3D collision remains disabled; no Terrain3D collision object is an
+- [x] Terrain3D collision remains disabled; no Terrain3D collision object is an
   accepted chassis/bucket query source.
-- [ ] Native failure or Test Grid transition changes only presentation and does
+- [x] Native failure or Test Grid transition changes only presentation and does
   not rotate authority/material generation or interrupt fixed-tick behavior.
-- [ ] Both models and full reset/model-switch lifecycle pass the equivalence suite.
+- [x] Both models and full reset/model-switch lifecycle pass the equivalence suite.
 
 ## Out of Scope
 

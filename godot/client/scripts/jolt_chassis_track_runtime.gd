@@ -121,6 +121,7 @@ var _brake_was_active := false
 var _peak_pitch_angle_rad := 0.0
 var _peak_pitch_rate_rad_s := 0.0
 var _last_fixed_delta_s := 1.0 / 60.0
+var _track_support_source_counts: Dictionary = {}
 
 
 func _ready() -> void:
@@ -599,6 +600,7 @@ func _capture_post_step_snapshot() -> void:
 		"left_contact_count": _left_contact_count, "right_contact_count": _right_contact_count,
 		"left_saturated": _left_saturated, "right_saturated": _right_saturated,
 		"grounded": _left_contact_count + _right_contact_count > 0,
+		"track_support_source_counts": _track_support_source_counts.duplicate(true),
 		"terrain_generation": _terrain_identity.x, "terrain_revision": _terrain_identity.y,
 		"terrain_identity_valid": _terrain_identity_valid,
 		"contacts": _contacts.duplicate(true), "quality_flags": _quality_flags.duplicate(),
@@ -629,6 +631,7 @@ func _collect_bucket_query_contacts() -> void:
 			"penetration_m": 0.0,
 			"proxy_role": String(contact.get("proxy_role", "")),
 			"travel_fraction": float(contact.get("travel_fraction", 1.0)),
+			"support_source": String(contact.get("query_source", "unknown")),
 		})
 
 
@@ -981,6 +984,7 @@ func _apply_track_side(local_x: float, command: float, point_count: int, contact
 			"support_force": support_force,
 			"friction_cap": friction_cap,
 			"collider": hit["collider"],
+			"support_source": String(hit.get("support_source", "unknown")),
 		})
 	var average_speed := speed_sum / float(contacts) if contacts > 0 else 0.0
 	var previous_effort := _left_effort_n if side_name == "left" else _right_effort_n
@@ -1018,7 +1022,9 @@ func _apply_track_side(local_x: float, command: float, point_count: int, contact
 		slip_sum += clampf(speed_error / maxf(absf(target_speed), MIN_SPEED_DENOMINATOR), -4.0, 4.0)
 		support_load_sum += support_force
 		normal_sum += normal
-		_contacts.append({"body": "chassis", "other": String((sample["collider"] as Node).name), "point": point, "normal": normal, "impulse_n_s": 0.0, "penetration_m": 0.0, "track_side": side_name})
+		var support_source := String(sample.get("support_source", "unknown"))
+		_track_support_source_counts[support_source] = int(_track_support_source_counts.get(support_source, 0)) + 1
+		_contacts.append({"body": "chassis", "other": String((sample["collider"] as Node).name), "point": point, "normal": normal, "impulse_n_s": 0.0, "penetration_m": 0.0, "track_side": side_name, "support_source": support_source})
 	return {"contact_count": contacts, "speed_m_s": speed_sum / float(contacts) if contacts > 0 else 0.0, "slip_ratio": slip_sum / float(contacts) if contacts > 0 else 0.0, "support_load_n": support_load_sum, "normal_sum": normal_sum, "saturated": saturated}
 
 
@@ -1184,6 +1190,7 @@ func _clear_tick_telemetry() -> void:
 	_right_saturated = false
 	_contacts.clear()
 	_quality_flags.clear()
+	_track_support_source_counts.clear()
 
 
 func _reset_response_telemetry() -> void:
@@ -1347,6 +1354,7 @@ func _empty_snapshot() -> Dictionary:
 		"peak_pitch_angle_rad": 0.0,
 		"peak_pitch_rate_rad_s": 0.0,
 		"contacts": [],
+		"track_support_source_counts": {},
 		"quality_flags": ["authoritative_runtime_unavailable"],
 	}
 

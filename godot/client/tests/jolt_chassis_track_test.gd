@@ -131,6 +131,16 @@ func _test_model(model_id: String) -> void:
 		failures.append("%s did not accept current terrain identity" % model_id)
 	if int(settled["left_contact_count"]) == 0 or int(settled["right_contact_count"]) == 0:
 		failures.append("%s did not settle on both tracks: %s" % [model_id, settled])
+	var support_sources := settled.get("track_support_source_counts", {}) as Dictionary
+	if int(support_sources.get("terrain_collider", 0)) <= 0:
+		failures.append("%s did not attribute settled track support to TerrainCollider: %s" % [model_id, support_sources])
+	for source in support_sources:
+		if String(source) not in ["terrain_collider", "terrain_state_fallback"]:
+			failures.append("%s exposed an unauthorized track support source: %s" % [model_id, source])
+	for contact_value in settled.get("contacts", []):
+		var contact := contact_value as Dictionary
+		if String(contact.get("body", "")) == "chassis" and String(contact.get("support_source", "")) not in ["terrain_collider", "terrain_state_fallback"]:
+			failures.append("%s chassis contact omitted logical terrain provenance: %s" % [model_id, contact])
 	var expected_forward_axis := "+Z" if model_id == "sy205" else "-Z"
 	if String(settled.get("local_forward_axis", "")) != expected_forward_axis:
 		failures.append("%s did not expose its declared vehicle-forward axis" % model_id)

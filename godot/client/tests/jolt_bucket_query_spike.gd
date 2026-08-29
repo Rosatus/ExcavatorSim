@@ -46,8 +46,10 @@ func _run() -> void:
 		failures.append("bucket query omitted contact evidence")
 	else:
 		var contact := contacts[0] as Dictionary
-		if not contact.has_all(["contact_id", "proxy_role", "travel_fraction", "point_world", "normal_world", "collider_id"]):
+		if not contact.has_all(["contact_id", "proxy_role", "travel_fraction", "point_world", "normal_world", "collider_id", "query_source"]):
 			failures.append("bucket query contact omitted required identity or geometry")
+		elif String(contact["query_source"]) != "terrain_collider":
+			failures.append("bucket query accepted a non-authoritative source: %s" % contact["query_source"])
 	if host.get_child_count() != child_count_before:
 		failures.append("query-only sweep created a scene body")
 	var query_durations_usec: Array[int] = []

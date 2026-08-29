@@ -784,6 +784,97 @@ default (`terrain3d/collision_mode=0`); enabling it must not change logical
 excavation or motion behavior. A missing GDExtension, failed map update, or
 failed collision setup keeps `TerrainRenderer`/`TerrainCollider` usable.
 
+#### Physical query provenance contract
+
+##### 1. Scope / Trigger
+
+Apply this contract whenever Terrain3D presentation, Jolt track support, bucket
+shape queries, or their diagnostics change. Native Terrain3D is never product
+physics authority while `terrain3d/collision_mode=0`.
+
+##### 2. Signatures
+
+```text
+Terrain3DAdapter.get_status_snapshot() -> {
+  native_collision_mode_configured: int,
+  native_collision_mode_actual: int,
+  native_collision_layer_actual: int,
+  ...
+}
+JoltChassisTrackRuntime.get_post_step_snapshot() -> {
+  track_support_source_counts: Dictionary[String, int],
+  contacts: Array[Dictionary],
+  ...
+}
+BucketProxySweeper.sweep(...) -> {
+  contacts: Array[{query_source: "terrain_collider", ...}],
+  ...
+}
+```
+
+##### 3. Contracts
+
+- Production native presentation requires configured and actual collision mode
+  `0` and actual native collision layer `0`. `collision_available` remains
+  `false`; Terrain3D rendering success does not imply a physics source.
+- Every accepted track ray records `support_source` as `terrain_collider` when
+  the matching collider answers, or `terrain_state_fallback` when that same
+  identity-valid collider ray misses/is rejected and the logical heightfield
+  supplies the support sample. Per-tick counts are observational diagnostics
+  and never select authority.
+- Every accepted bucket shape-query record carries
+  `query_source="terrain_collider"`. The sweeper still verifies that the hit is
+  a descendant of the configured, identity-matched `TerrainCollider`; collider
+  names, instance IDs, or Terrain3D nodes are not sufficient evidence.
+- Terrain/collider `(world_generation, terrain_revision)` must match before a
+  physics tick or bucket hit is accepted. A matching-collider ray miss may use
+  the logical heightfield for track support; stale, unavailable, or disabled
+  collider identity disarms Jolt track forces and bucket evidence until the
+  project collider catches up.
+
+##### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Native mode/layer reads back nonzero in product mode | Fail authority regression; do not cut over |
+| Track ray hits matching project collider | Record `terrain_collider` |
+| Matching track collider ray misses or is rejected | Use logical heightfield and record `terrain_state_fallback` |
+| Track collider identity is stale/unavailable | Disarm Jolt track forces and report collider unavailable |
+| Bucket hit is not under configured `TerrainCollider` | Ignore it; never publish accepted evidence |
+| Bucket collider identity is stale | Return invalid query with `bucket_query_terrain_identity_mismatch` |
+| Presentation backend changes or fails | Preserve terrain bytes, Jolt accepted outcome, and query sources |
+
+##### 5. Good / Base / Bad Cases
+
+- Good: native visual surface + disabled native collision + matching project
+  collider -> identical terrain/Jolt result with explicit project provenance.
+- Base: matching collider ray misses -> tracks sample `TerrainState`; a stale
+  collider disarms Jolt track/bucket work until it catches up.
+- Bad: accept a Terrain3D collision hit because its node name or layer looks
+  like terrain, or enable native collision to repair a visual issue.
+
+##### 6. Tests Required
+
+- `terrain3d_authority_equivalence_test.gd` runs the same fixed soil and Jolt
+  sequence for SY205/SY135 under native and fallback presentation. It compares
+  stable/loose bytes, digests, ledger/payload, accepted chassis/articulation
+  transforms, reset/Test Grid/failure identities, and actual native mode/layer.
+- `jolt_chassis_track_test.gd` asserts settled support provenance contains only
+  project collider/logical heightfield sources.
+- `jolt_bucket_query_spike.gd` and `bucket_shallow_overlap_test.gd` require
+  `query_source="terrain_collider"` on real accepted contacts and retain stale
+  identity rejection.
+
+##### 7. Wrong vs Correct
+
+```text
+Wrong: visible Terrain3D -> enable its collision -> let Jolt accept whichever terrain body hits first
+Correct: visible Terrain3D with mode/layer 0 -> identity-matched TerrainCollider or logical TerrainState only
+
+Wrong: contact collider_name says "terrain" -> treat it as authoritative
+Correct: configured TerrainCollider ancestry + matching identity -> publish explicit query_source
+```
+
 Test graphics mode deliberately deactivates native Terrain3D presentation while
 retaining its material and latest accepted copied snapshot. `TerrainWorld`
 coordinates the transition; callers must not toggle the two renderers

@@ -239,6 +239,7 @@ func get_status_snapshot() -> Dictionary:
 	var material: Object = _terrain_node.get("material") as Object if _terrain_node != null and is_instance_valid(_terrain_node) else null
 	var assets: Object = _terrain_node.get("assets") as Object if _terrain_node != null and is_instance_valid(_terrain_node) else null
 	var data: Object = _terrain_node.get("data") as Object if _terrain_node != null and is_instance_valid(_terrain_node) else null
+	var collision: Object = _terrain_node.get("collision") as Object if _terrain_node != null and is_instance_valid(_terrain_node) else null
 	var regions: Array = data.call("get_regions_active") as Array if data != null and data.has_method("get_regions_active") else []
 	var mouse_quad := _terrain_node.find_child("MouseQuad", true, false) as MeshInstance3D if _terrain_node != null and is_instance_valid(_terrain_node) else null
 	var shader_override: Resource = material.get("shader_override") as Resource \
@@ -252,6 +253,9 @@ func get_status_snapshot() -> Dictionary:
 		"enabled": enabled,
 		"available": available,
 		"collision_available": collision_available,
+		"native_collision_mode_configured": native_collision_mode,
+		"native_collision_mode_actual": int(collision.get("mode")) if collision != null and _has_property(collision, "mode") else -1,
+		"native_collision_layer_actual": int(collision.get("layer")) if collision != null and _has_property(collision, "layer") else -1,
 		"last_error": last_error,
 		"terrain_class_loaded": ClassDB.class_exists(TERRAIN_CLASS),
 		"queued_epoch": _queued_epoch,
