@@ -49,10 +49,11 @@ observed by the first Phase 1 probe attempt.
 - `soil_interaction_authority_test.gd`
 - `release_candidate_test.gd`
 
-The only open Phase 1 gate is focused human comparison of
-`worksite_native_after.png` and `worksite_fallback_after.png`. Pixel identity is
-not expected because Terrain3D uses clipmap LOD normals and the fallback uses a
-finite ArrayMesh. The probe records `native_fallback_after` for review but does
-not turn that cross-backend pixel distance into an automatic pass threshold;
-the automated gate instead proves both paths independently render brown,
-nonblank, height-varying terrain and respond to the same logical deformation.
+The focused human comparison of `worksite_native_after.png` and
+`worksite_fallback_after.png` was accepted by the user on 2026-08-29. Pixel
+identity is not expected because Terrain3D uses clipmap LOD normals and the
+fallback uses a finite ArrayMesh. The probe records `native_fallback_after` for
+review but does not turn that cross-backend pixel distance into an automatic
+pass threshold; the automated gate instead proves both paths independently
+render brown, nonblank, height-varying terrain and respond to the same logical
+deformation.

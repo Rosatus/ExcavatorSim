@@ -40,7 +40,7 @@ non-black Forward+ exit gate and a documented supported shader/material seam.
   high budgets remain unchanged.
 - [x] Automated checks prove shader identity, dressing exclusions, background
   off, and no mutation of TerrainState/ledger/payload.
-- [ ] Focused human review accepts native/fallback visual parity. Exact pixels
+- [x] Focused human review accepts native/fallback visual parity. Exact pixels
   and identical LOD normals are not required.
 
 ## Out of Scope
