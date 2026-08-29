@@ -1,0 +1,4 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/frontend/client-boundary.md", "reason": "Verify client boundary, one-way authority, collision, visual, and test requirements"}
+{"file": ".trellis/tasks/08-29-restore-terrain3d-visual-parity/research/current-terrain-and-terrain3d.md", "reason": "Check implementation against the researched current state and risk inventory"}
+{"file": ".trellis/tasks/archive/2026-08/08-20-incremental-terrain3d-deformation/prd.md", "reason": "Regression oracle for incremental Terrain3D lifecycle behavior"}

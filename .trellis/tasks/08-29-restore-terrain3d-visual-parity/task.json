@@ -1,0 +1,32 @@
+{
+  "id": "restore-terrain3d-visual-parity",
+  "name": "restore-terrain3d-visual-parity",
+  "title": "Restore Terrain3D while preserving current visuals",
+  "description": "Parent program restoring native Terrain3D as the visible product renderer while preserving current procedural soil visuals, authority, project collision, and fail-open fallback through five ordered child phases.",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "rosatus",
+  "assignee": "rosatus",
+  "createdAt": "2026-08-29",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "08-29-terrain3d-forwardplus-render-spike",
+    "08-29-terrain3d-material-visual-parity",
+    "08-29-terrain3d-snapshot-lifecycle-fallback",
+    "08-29-terrain3d-authority-collider-regression",
+    "08-29-terrain3d-product-cutover-export-validation"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
