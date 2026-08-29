@@ -465,6 +465,56 @@ static func check_status_for_url_with_cli_path(
 	return check_status_details_for_url_with_cli_path(id, url, cli_path, launch_context).get("status", Client.Status.NOT_CONFIGURED)
 
 
+## True when <id>'s stored entry verifies EXACTLY against the launch this
+## editor would have rendered at `from_version` — same ports, exclusions,
+## telemetry flag, command shape; nothing differs but the version pin. This
+## is the post-update auto-repin gate: only such entries are provably "what
+## Configure wrote before the update", so rewriting them to the current
+## version restores the user's own prior intent. Anything else — entries
+## pointing at another editor's ports (the smoke-fixture blast radius that
+## motivated this gate), hand-edits, changed settings — stays untouched for
+## the drift banner's human click. An empty `from_version` (marker written
+## by a pre-gate runner) fails closed.
+##
+## The version-substituted context is safe to resolve and cache:
+## `plugin_version` is part of both the attach-launch resolution
+## (`_resolve_attach_launch_uncached`) and its cache key.
+static func entry_drift_is_version_pin_only(
+	id: String, from_version: String, launch_context: Dictionary = {}
+) -> bool:
+	var pinned_from := from_version.strip_edges()
+	if pinned_from.is_empty():
+		return false
+	## Never shell out from this gate — it runs on the MAIN thread from the
+	## dock's sweep-completion callback (#890 review P2). The cli-descriptor
+	## probe paths run a subprocess with a multi-second timeout (`claude mcp
+	## get` is 6s), which would freeze the editor; those clients fail closed
+	## to the drift banner's click flow, whose fan-out already runs on
+	## worker threads. Every path left after these guards is a bounded
+	## config-file read plus cached launch discovery (worst case one CLI
+	## lookup on a cold CliFinder cache — the same bounded one-shot the
+	## dock's `_reprobe_uv_if_negative` accepts on this thread).
+	var client := ClientRegistry.get_by_id(id)
+	if client == null:
+		return false
+	if client.config_type == "cli":
+		if client.command_shape == Client.CommandShape.NONE:
+			return false
+		if not client.has_json_fallback():
+			return false
+		if _scope_diverges_from_json_fallback(client):
+			return false
+	var context := launch_context if not launch_context.is_empty() else capture_launch_context()
+	var old_context := context.duplicate(true)
+	old_context["plugin_version"] = pinned_from
+	## Same URL under both versions: the URL carries the port, not the
+	## version, so URL-mode entries can never be version-pin-only drift and
+	## correctly fail this check.
+	var url := str(context.get("server_url", http_url()))
+	var status := check_status_for_url_with_cli_path(id, url, "", old_context)
+	return status == Client.Status.CONFIGURED
+
+
 ## Detailed variant used by the dock refresh worker. Returns
 ## `{"status": Status, "error_msg": String}` so the worker can surface
 ## "probe timed out" on the row instead of silently flipping it to
@@ -1450,8 +1500,151 @@ static func get_server_launch_mode() -> String:
 	return "unknown"
 
 
+## Wall-clock budget for the Configure-time pre-warm. Far above
+## `McpCliExec.DEFAULT_TIMEOUT_MS` (8s) on purpose: this call is *expected* to
+## take tens of seconds on a cold cache — downloading and unpacking the tool
+## environment is the entire point — so the usual CLI-registry budget would
+## kill it right when it is doing useful work. Still bounded so a wedged uv
+## can't hold the worker thread forever.
+const PREWARM_TIMEOUT_MS := 180000
+
+
 static func find_uvx() -> String:
 	return CliFinder.find(_uvx_cli_names())
+
+
+## Pre-build the uvx tool environment for `godot-ai==<version>` in the
+## background, so the FIRST spawn of that version is a warm cache hit.
+## Fired when a self-update install starts: post-update the old backend is
+## killed and the new one spawned, and a cold `uvx --from godot-ai==<new>`
+## resolve+install takes seconds — while an attach bridge pinned to the OLD
+## version respawns its already-cached backend near-instantly, winning the
+## port bind race every time (the INCOMPATIBLE dead end after every
+## self-update with a live AI client). Warming the new env while the plugin
+## zip downloads flips that race.
+##
+## `--version` makes the spawned process exit immediately after uv resolves
+## and installs the env. Detached fire-and-forget: a failure only means the
+## post-update spawn pays the cold cost it always used to. Returns the
+## spawned PID, or -1 when skipped (no uvx on this machine — the dev-venv
+## and system tiers have no per-version cache to warm — or no version).
+static func prewarm_server_package(version: String) -> int:
+	var args := prewarm_server_package_argv(version)
+	if args.is_empty():
+		return -1
+	var uvx := find_uvx()
+	if uvx.is_empty():
+		return -1
+	var pid := OS.create_process(uvx, args)
+	if pid > 0:
+		print("MCP | pre-warming godot-ai==%s server package for the post-update restart" % version.strip_edges())
+	return pid
+
+
+## Pure argv builder for the pre-warm spawn, split out so tests can pin the
+## exact command without spawning a process. Empty array when there is no
+## version to pin, or when the version carries characters outside the PEP
+## 440 alphabet — the value can originate from a GitHub release tag, and
+## while OS.create_process argv can't be shell-injected, constraining the
+## pin keeps a hostile tag from smuggling anything into the requirement
+## spec uv parses (#890 review).
+static func prewarm_server_package_argv(version: String) -> Array[String]:
+	var pinned := version.strip_edges()
+	if pinned.is_empty():
+		return []
+	## No `*`: PEP 440 reserves it for prefix-match SPECIFIERS (`==3.2.*`),
+	## not version identifiers — letting it through would turn the exact pin
+	## into a prefix match (#890 CodeRabbit).
+	var re := RegEx.new()
+	if re.compile("^[A-Za-z0-9.+!-]+$") != OK or re.search(pinned) == null:
+		return []
+	return ["--from", "godot-ai==%s" % pinned, "godot-ai", "--version"]
+
+
+## Blocking sibling of `prewarm_server_package`, for the user-initiated
+## Configure flow (#851, and the reconnect timeouts reported alongside it).
+##
+## Why Configure needs its own pre-warm: `prewarm_server_package` only fires
+## on self-update and on server-lifecycle recovery. Neither covers the case
+## that actually bites — the plugin ADOPTS an already-running server (no uvx
+## spawn, so nothing warms the env), the user clicks Configure, and the first
+## client launch is the one that pays for building the whole tool environment.
+## That build is ~67 packages; a warm launch is ~0.1s. Two symptoms fall out
+## of the cold path: a visible terminal window on Windows (#851), and a spawn
+## that overruns the MCP client's default 30s connect timeout, which the user
+## sees as the Godot AI tools silently disappearing.
+##
+## Why blocking, unlike the fire-and-forget server-side pre-warm: Configure is
+## a deliberate click, so the cost is attributable and the dock can show it as
+## progress rather than as an unexplained pause. Runs on the dock's client
+## action worker thread — never the main thread — and `McpCliExec.run` bounds
+## it, so a wedged uv cannot trap the worker.
+##
+## Best-effort by contract. The config file is already written and correct
+## when this runs; a failure here only means the next client launch pays the
+## cold cost it always used to. Callers must NOT downgrade a successful
+## Configure because of this result.
+##
+## Returns the `McpCliExec.run` dict, plus `skipped` (true when there is no
+## uvx tier to warm or no usable version pin).
+static func prewarm_server_package_blocking(
+	version: String,
+	timeout_ms: int = PREWARM_TIMEOUT_MS,
+	cancel_check: Callable = Callable(),
+) -> Dictionary:
+	var args := prewarm_server_package_argv(version)
+	if args.is_empty():
+		return {"skipped": true, "reason": "no version pin"}
+	var uvx := find_uvx()
+	if uvx.is_empty():
+		## dev-venv and system tiers have no per-version cache to warm.
+		return {"skipped": true, "reason": "no uvx"}
+	var result := McpCliExec.run(uvx, args, timeout_ms, true, cancel_check)
+	result["skipped"] = false
+	return result
+
+
+## Decide whether the freshly-written entry has an environment worth warming.
+##
+## Pure and side-effect free, split from the spawn below so tests can pin the
+## decision without building a real uv environment — the same split
+## `prewarm_server_package_argv` uses for the argv (#890).
+##
+## Warms only the `uvx` tier: dev-venv and system launches run an
+## already-installed package and have no per-version environment to build.
+## Resolving the tier here rather than in the dock keeps launcher knowledge in
+## the configurator; the dock stays free of tier branching.
+##
+## Returns `{warm: bool, version: String, reason: String}`.
+static func prewarm_attach_plan(
+	launch_context: Dictionary, discovery_override: Dictionary = {}
+) -> Dictionary:
+	var launch := resolve_attach_launch(launch_context, discovery_override)
+	if not bool(launch.get("ok", false)):
+		return {"warm": false, "version": "", "reason": "launch discovery failed"}
+	var tier := str(launch.get("tier", ""))
+	if tier != "uvx":
+		return {"warm": false, "version": "", "reason": "tier %s has no env to warm" % tier}
+	var version := _pypi_pin_version(str(launch_context.get("plugin_version", "")))
+	if version.is_empty():
+		return {"warm": false, "version": "", "reason": "no version pin"}
+	return {"warm": true, "version": version, "reason": ""}
+
+
+## Warm the environment the freshly-written entry will actually launch.
+## Thin wrapper over `prewarm_attach_plan` + `prewarm_server_package_blocking`.
+static func prewarm_attach_launch(
+	launch_context: Dictionary,
+	timeout_ms: int = PREWARM_TIMEOUT_MS,
+	discovery_override: Dictionary = {},
+	cancel_check: Callable = Callable(),
+) -> Dictionary:
+	var plan := prewarm_attach_plan(launch_context, discovery_override)
+	if not bool(plan.get("warm", false)):
+		return {"skipped": true, "reason": str(plan.get("reason", ""))}
+	return prewarm_server_package_blocking(
+		str(plan.get("version", "")), timeout_ms, cancel_check
+	)
 
 
 static func _uvx_cli_names() -> Array[String]:

@@ -47,7 +47,7 @@ args = [
   "--link-mode",
   "copy",
   "--from",
-  "godot-ai==3.2.0",
+  "godot-ai==3.2.4",
   "godot-ai",
   "attach",
   "--port",
