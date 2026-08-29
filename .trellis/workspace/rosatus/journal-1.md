@@ -1779,3 +1779,36 @@ Confirmed WSL Node/npm are available through the interactive zsh/FNM environment
 ### Next Steps
 
 - None - task complete
+
+
+## Session 48: Gateway DBC payload editing and distribution
+
+**Date**: 2026-08-29
+**Task**: Gateway DBC payload editing and distribution
+**Branch**: `main`
+
+### Summary
+
+Implemented strict DBC decoding and silent exact deduplication, canonical raw-payload drafts with bidirectional signal/payload preview and explicit save, atomic Gateway/Web publication, regression coverage, rebuilt Windows/Linux distributions, and promoted the verified Windows package.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `626b3d9` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
