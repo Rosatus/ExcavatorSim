@@ -31,8 +31,7 @@ $tests = @(
     "tracked_chassis_locomotion_test.gd",
     "bucket_ground_lift_test.gd",
     "construction_site_terrain_test.gd",
-    # terrain3d_adapter_test.gd: fails since the 08-25 soil_shader default
-    # (Terrain3D 1.0.2 renders black under Godot 4.7); revisit with plugin fix.
+    "terrain3d_adapter_test.gd",
     "terrain_state_test.gd",
     # terrain_collider_chunk_test.gd: known-bad on clean baseline (documented 08-25).
     "bucket_shallow_overlap_test.gd",

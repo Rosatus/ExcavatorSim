@@ -620,6 +620,74 @@ pre-tree write may appear accepted and then be overwritten. The production
 adapter keeps `region_size=128`; do not infer supported values from a pre-tree
 readback.
 
+#### Native material resource lifecycle
+
+##### 1. Scope / Trigger
+
+This contract applies whenever `Terrain3DAdapter` creates, retries, or
+reconfigures the native Terrain3D node under Godot 4.7 Forward+/D3D12.
+
+##### 2. Signatures
+
+```text
+Terrain3DAdapter.material_path: String
+Terrain3DAdapter.apply_pending() -> bool
+Terrain3DAdapter.get_status_snapshot() -> Dictionary
+```
+
+##### 3. Contracts
+
+- Load and cache one exact `Terrain3DMaterial` resource before the native node
+  enters the tree. The pre-tree and post-tree assignments must use that same
+  object identity; do not deep-duplicate or replace it after Terrain3D has
+  initialized its rendering resources.
+- Reuse the cached resource while `material_path` is unchanged. A path change
+  must load and validate a new resource before replacing the cached identity.
+- Material setup failure leaves the native node unready and outside the scene
+  tree, preserves the pending snapshot, and keeps the fallback renderer and
+  foundation visible. A later valid material must recover by applying that same
+  pending snapshot without requiring a new terrain revision.
+- `get_status_snapshot()` exposes the requested material path, loaded resource
+  path, native readiness, renderer/method/driver, and stable `last_error`.
+
+##### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Material path cannot be loaded | Return `false`; `last_error="Terrain3D material is unavailable: <path>"`; retain fallback |
+| Loaded object is not accepted by Terrain3D | Return `false`; `last_error="Terrain3D material could not be assigned: <path>"`; retain fallback |
+| Same path is retried | Reuse the cached resource object; do not duplicate or replace it |
+| Missing material is corrected | Configure and enter tree, consume the preserved pending snapshot, clear the error |
+
+##### 5. Good / Base / Bad Cases
+
+- Good: load once -> assign the same object before/after enter-tree -> import
+  maps -> native visible.
+- Base: material unavailable -> stable diagnostic plus visible fallback -> fix
+  path -> retry the same pending snapshot successfully.
+- Bad: deep-duplicate or replace the material after enter-tree; Godot 4.7
+  D3D12 may retain stale/null material RIDs even when some pixels remain visible.
+
+##### 6. Tests Required
+
+- `terrain3d_adapter_test.gd` must assert the stable missing-material error,
+  fallback visibility, same-snapshot recovery, and native material object
+  identity after recovery.
+- The real non-headless Forward+/D3D12 probe must require native visibility,
+  changed nonblack pixels for authored/minimum/MouseQuad-hidden variants, an
+  unchanged authority digest/identity, and no current-run Terrain3D/shader/
+  GDExtension/material/texture-array/map-import errors.
+
+##### 7. Wrong vs Correct
+
+```text
+Wrong: load -> duplicate before add_child -> duplicate again after add_child
+Correct: load once -> cache exact resource -> assign same object across enter-tree
+
+Wrong: missing material -> discard pending revision and require a new snapshot
+Correct: missing material -> fallback + stable error -> fix path -> apply same pending snapshot
+```
+
 Terrain3D can create static collision shapes, while the project-selected Jolt
 backend answers Godot raycasts and contacts. Collision is disabled/fail-open by
 default (`terrain3d/collision_mode=0`); enabling it must not change logical

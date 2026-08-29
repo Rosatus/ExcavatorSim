@@ -1,0 +1,4 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/frontend/client-boundary.md", "reason": "Godot terrain, Terrain3D, Jolt, visual, fallback, and authority contracts"}
+{"file": ".trellis/tasks/08-29-restore-terrain3d-visual-parity/research/current-terrain-and-terrain3d.md", "reason": "Current backend, visual ownership, compatibility evidence, and feasibility findings"}
+{"file": ".trellis/tasks/archive/2026-08/08-12-evaluate-integrate-terrain3d/research/terrain3d-evaluation.md", "reason": "Historical Terrain3D compatibility, renderer, collision, packaging, and fail-open research"}

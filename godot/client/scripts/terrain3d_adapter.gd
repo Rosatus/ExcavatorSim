@@ -27,6 +27,7 @@ const ROCK_NORMAL := "res://assets/terrain/textures/rock023_nrm_rgh.png"
 @export var region_size := 128
 @export var construction_site_enabled := true
 @export var assets_path := ""
+@export_file("*.tres") var material_path := DEMO_MATERIAL
 @export_enum("Disabled:0", "Dynamic Game:1", "Dynamic Editor:2", "Full Game:3", "Full Editor:4") var native_collision_mode := 0
 
 var available := false
@@ -64,6 +65,9 @@ var _dressing_root: Node3D
 var _rock_count := 0
 var _tree_count := 0
 var _test_mode := false
+var _configured_material: Resource
+var _configured_material_path := ""
+var _terrain_ready := false
 
 
 func _ready() -> void:
@@ -80,6 +84,7 @@ func _exit_tree() -> void:
 	if _terrain_node != null and is_instance_valid(_terrain_node):
 		_terrain_node.queue_free()
 	_terrain_node = null
+	_terrain_ready = false
 	available = false
 	collision_available = false
 
@@ -207,6 +212,11 @@ func set_collision_mode(mode: int) -> bool:
 
 
 func get_status_snapshot() -> Dictionary:
+	var material: Object = _terrain_node.get("material") as Object if _terrain_node != null and is_instance_valid(_terrain_node) else null
+	var assets: Object = _terrain_node.get("assets") as Object if _terrain_node != null and is_instance_valid(_terrain_node) else null
+	var data: Object = _terrain_node.get("data") as Object if _terrain_node != null and is_instance_valid(_terrain_node) else null
+	var regions: Array = data.call("get_regions_active") as Array if data != null and data.has_method("get_regions_active") else []
+	var mouse_quad := _terrain_node.find_child("MouseQuad", true, false) as MeshInstance3D if _terrain_node != null and is_instance_valid(_terrain_node) else null
 	return {
 		"enabled": enabled,
 		"available": available,
@@ -229,6 +239,20 @@ func get_status_snapshot() -> Dictionary:
 		"site_extent_m": ConstructionSiteTerrainProfile.SITE_EXTENT_M if construction_site_enabled else 0.0,
 		"material_roles": _site_profile.get_material_roles() if construction_site_enabled else PackedStringArray(),
 		"assets_source": _assets_source,
+		"material_source": material_path,
+		"native_class": _terrain_node.get_class() if _terrain_node != null and is_instance_valid(_terrain_node) else "",
+		"native_version": String(_terrain_node.get("version")) if _terrain_node != null and is_instance_valid(_terrain_node) and _has_property(_terrain_node, "version") else "",
+		"native_material_class": material.get_class() if material != null else "",
+		"native_material_ready": material != null,
+		"native_assets_class": assets.get_class() if assets != null else "",
+		"native_assets_ready": assets != null,
+		"native_region_count": regions.size(),
+		"mouse_quad_present": mouse_quad != null,
+		"mouse_quad_visible": mouse_quad.visible if mouse_quad != null else false,
+		"godot_version": String(Engine.get_version_info().get("string", "unknown")),
+		"rendering_method": _project_rendering_feature(),
+		"rendering_driver": _rendering_server_string("get_current_rendering_driver_name"),
+		"video_adapter": RenderingServer.get_video_adapter_name(),
 		"rock_count": _rock_count,
 		"tree_count": _tree_count,
 		"grass_enabled": not _test_mode and _dressing_root != null and _dressing_root.has_node("Terrain3DParticles"),
@@ -241,36 +265,41 @@ func _apply_pending_deferred() -> void:
 
 
 func _ensure_terrain_node() -> bool:
-	if _terrain_node != null and is_instance_valid(_terrain_node):
+	if _terrain_node != null and is_instance_valid(_terrain_node) and _terrain_ready:
 		return true
-	if not ClassDB.class_exists(TERRAIN_CLASS):
-		_set_error("Terrain3D GDExtension class is unavailable")
+	if _terrain_node == null or not is_instance_valid(_terrain_node):
+		if not ClassDB.class_exists(TERRAIN_CLASS):
+			_set_error("Terrain3D GDExtension class is unavailable")
+			return false
+		var instance: Object = ClassDB.instantiate(TERRAIN_CLASS)
+		if instance == null or not (instance is Node3D):
+			_set_error("Terrain3D could not be instantiated")
+			return false
+		_terrain_node = instance as Node3D
+		_terrain_node.name = "Terrain3DNative"
+		var assets: Variant = load(assets_path) if not assets_path.is_empty() and ResourceLoader.exists(assets_path) else null
+		if assets != null:
+			_assets_source = assets_path
+		elif construction_site_enabled:
+			assets = _site_profile.create_assets()
+			_assets_source = "demo:terrain3d-official" if assets != null else "none"
+		if assets != null:
+			_set_property_if_present(_terrain_node, "assets", assets)
+	if not _configure_material():
 		return false
-	var instance: Object = ClassDB.instantiate(TERRAIN_CLASS)
-	if instance == null or not (instance is Node3D):
-		_set_error("Terrain3D could not be instantiated")
-		return false
-	_terrain_node = instance as Node3D
-	_terrain_node.name = "Terrain3DNative"
-	var assets: Variant = load(assets_path) if not assets_path.is_empty() and ResourceLoader.exists(assets_path) else null
-	if assets != null:
-		_assets_source = assets_path
-	elif construction_site_enabled:
-		assets = _site_profile.create_assets()
-		_assets_source = "demo:terrain3d-official" if assets != null else "none"
-	if assets != null:
-		_set_property_if_present(_terrain_node, "assets", assets)
-	_configure_material()
 	# Terrain3D initializes as soon as it enters the tree. Assets and material
 	# must exist for that first pass, while size settings must follow it because
 	# native initialization restores their defaults.
-	add_child(_terrain_node, true)
+	if not _terrain_node.is_inside_tree():
+		add_child(_terrain_node, true)
 	_set_property_if_present(_terrain_node, "region_size", region_size)
 	_set_property_if_present(_terrain_node, "collision_mask", 1)
 	# Native initialization can reset the material during the first pass;
 	# re-apply after entering the tree so the shipped build keeps its surface.
-	_configure_material()
+	if not _configure_material():
+		return false
 	_ensure_dressing_root()
+	_terrain_ready = true
 	return true
 
 
@@ -514,18 +543,46 @@ func _compute_patch_capability(snapshot: Dictionary, presentation: Dictionary) -
 	_patch_offset = offset if _patch_capable else Vector2i.ZERO
 
 
-func _configure_material() -> void:
+func _configure_material() -> bool:
 	if _terrain_node == null:
-		return
+		return false
 	if construction_site_enabled:
-		var demo_material := _load_demo_material()
-		if demo_material != null:
-			_set_property_if_present(_terrain_node, "material", demo_material)
+		if _configured_material == null or _configured_material_path != material_path:
+			_configured_material = _load_demo_material()
+			_configured_material_path = material_path
+		if _configured_material == null:
+			_set_error("Terrain3D material is unavailable: %s" % material_path)
+			return false
+		# Terrain3D 1.0.2 keeps RenderingServer dependencies on the assigned
+		# material. Replacing it with a freshly duplicated resource immediately
+		# after enter-tree leaves stale/null material RIDs on Godot 4.7 D3D12.
+		# Reuse the exact pre-tree resource and only reassign if native setup
+		# actually cleared or replaced it.
+		if _terrain_node.get("material") != _configured_material:
+			_set_property_if_present(_terrain_node, "material", _configured_material)
+		if _terrain_node.get("material") == null:
+			_set_error("Terrain3D material could not be assigned: %s" % material_path)
+			return false
+	return true
 
 
 func _load_demo_material() -> Resource:
-	var source := load(DEMO_MATERIAL) as Resource
+	var source := load(material_path) as Resource if not material_path.is_empty() and ResourceLoader.exists(material_path) else null
 	return source.duplicate(true) if source != null else null
+
+
+func _rendering_server_string(method_name: StringName) -> String:
+	if not RenderingServer.has_method(method_name):
+		return "unavailable"
+	return String(RenderingServer.call(method_name))
+
+
+func _project_rendering_feature() -> String:
+	var features: PackedStringArray = ProjectSettings.get_setting("application/config/features", PackedStringArray())
+	for feature in features:
+		if feature in ["Forward Plus", "Mobile", "GL Compatibility"]:
+			return feature
+	return "unknown"
 
 
 func _ensure_dressing_root() -> void:

@@ -10,6 +10,8 @@ func _init() -> void:
 func _run() -> void:
 	var result := await _test_snapshot_guards_without_native_backend()
 	if result == 0:
+		result = await _test_material_failure_recovers()
+	if result == 0:
 		result = await _test_scene_adapter_seam()
 	if result == 0:
 		result = await _test_jolt_collision_and_disable()
@@ -47,11 +49,41 @@ func _test_snapshot_guards_without_native_backend() -> int:
 	return 0
 
 
+func _test_material_failure_recovers() -> int:
+	var state := TerrainState.new(91)
+	var adapter := Terrain3DAdapter.new()
+	adapter.material_path = "res://tests/__missing_terrain3d_material__.tres"
+	if not adapter.queue_snapshot(state.surface_snapshot()):
+		return _fail("material recovery snapshot queues")
+	root.add_child(adapter)
+	await process_frame
+	await process_frame
+	if adapter.available or adapter.last_error != "Terrain3D material is unavailable: res://tests/__missing_terrain3d_material__.tres":
+		adapter.queue_free()
+		return _fail("missing material fails with stable bounded diagnostics")
+	adapter.material_path = "res://assets/terrain/terrain3d_demo_material.tres"
+	if not adapter.apply_pending() or not adapter.available:
+		adapter.queue_free()
+		return _fail("same pending snapshot recovers after material becomes available")
+	var native := adapter.get_node_or_null("Terrain3DNative") as Node3D
+	var cached: Resource = adapter.get("_configured_material") as Resource
+	if native == null or not native.is_inside_tree() or cached == null or native.get("material") != cached:
+		adapter.queue_free()
+		return _fail("recovered native node reuses the pre-tree cached material resource")
+	adapter.queue_free()
+	await process_frame
+	return 0
+
+
 func _test_scene_adapter_seam() -> int:
 	var packed := load(MAIN_SCENE) as PackedScene
 	if packed == null:
 		return _fail("main scene loads")
 	var scene := packed.instantiate()
+	var configured_world := scene.get_node_or_null("TerrainRoot/TerrainWorld") as TerrainWorld
+	if configured_world == null:
+		return _fail("main scene exposes TerrainWorld before activation")
+	configured_world.terrain_backend = "terrain3d"
 	root.add_child(scene)
 	await process_frame
 	await process_frame
@@ -187,6 +219,10 @@ func _test_jolt_collision_and_disable() -> int:
 	if packed == null:
 		return _fail("collision smoke scene loads")
 	var scene := packed.instantiate()
+	var configured_world := scene.get_node_or_null("TerrainRoot/TerrainWorld") as TerrainWorld
+	if configured_world == null:
+		return _fail("collision smoke exposes TerrainWorld before activation")
+	configured_world.terrain_backend = "terrain3d"
 	root.add_child(scene)
 	await process_frame
 	var adapter := scene.get_node_or_null("TerrainRoot/Terrain3DAdapter") as Terrain3DAdapter
