@@ -562,6 +562,7 @@ authority. Its public seam is:
 
 ```text
 queue_snapshot(snapshot: Dictionary) -> bool
+queue_full_resync(snapshot: Dictionary) -> bool
 apply_pending() -> bool
 set_collision_mode(mode: int) -> bool
 set_test_mode(value: bool) -> bool
@@ -584,7 +585,8 @@ every snapshot; a rectangle is trustworthy only when its `dirty_revision`
 equals the snapshot's `terrain_revision`. Startup, reset, generation change,
 stale recovery, and explicit resync take the full `build_maps`/`import_images`
 path. Ordinary contiguous revisions (`revision == applied + 1`) patch in place:
-the adapter edits existing region height-map images for the mapped dirty
+the adapter first validates every affected region and height map without any
+writes, then edits existing region height-map images for the mapped dirty
 pixels plus halo, marks those regions edited/modified with refreshed height
 bounds, and calls `Terrain3DData.update_maps(TYPE_HEIGHT, false, false)` so
 only edited regions refresh. Dressing nodes are rebuilt only on the full path.
@@ -596,10 +598,90 @@ native, new native, or fallback. Queued or applying work (patch or full) never
 hides the active native terrain; visibility changes only after a real success
 or a hard failure. A failed patch leaves the previous surface visible,
 schedules a full resync, and retries the same snapshot through the full path;
-a failed full materialization restores the custom renderer and foundation
-ground. While native Terrain3D owns presentation, ordinary patches skip
+a failed full materialization first fully synchronizes the custom renderer from
+the retained latest accepted snapshot and only then commits the visibility
+switch. While native Terrain3D owns presentation, ordinary patches skip
 fallback mesh rebuilds; on native deactivation the fallback catches up in one
 full rebuild from the latest accepted snapshot.
+
+#### Transactional full materialization lifecycle
+
+##### 1. Scope / Trigger
+
+This contract applies to startup, reset, generation/model change, skipped
+revision, material replacement, patch recovery, explicit resync, and Test Grid
+exit. Terrain3D 1.0.2 `import_images()` is not an in-place transactional
+replacement for already-active regions.
+
+##### 2. Signatures
+
+```text
+Terrain3DAdapter.queue_full_resync(snapshot: Dictionary) -> bool
+Terrain3DAdapter.apply_pending() -> bool
+TerrainWorld.set_test_mode(value: bool) -> bool
+TerrainWorld.get_status_snapshot() -> Dictionary
+```
+
+##### 3. Contracts
+
+- `TerrainWorld` owns the deep-copied latest accepted
+  `(terrain_epoch, world_generation, terrain_revision)` and the explicit
+  `configured_backend`, `active_backend`, `presentation_override`, and typed
+  `fallback_reason` state.
+- After an initial native surface exists, a full path creates a hidden staging
+  Terrain3D node, assigns the cached non-null assets/material before enter-tree,
+  imports the complete presentation maps, overlays the exact logical grid via
+  region height maps, and swaps nodes only after all steps succeed.
+- A failed staged import or overlay frees the staging node and preserves the
+  previous native node. `TerrainWorld` synchronizes the retained accepted
+  snapshot into fallback before hiding native.
+- Test Grid first full-synchronizes fallback, then commits the grid override.
+  Exit does not re-show cached native state: it full-resyncs the configured
+  native backend and swaps only on success. Failure leaves synchronized fallback
+  visible without changing the configured backend.
+- `TerrainRenderer` and `Terrain3DAdapter` both gate complete epoch/generation/
+  revision identities; retired lineage and stale work cannot overwrite applied
+  state. Their full/patch/failure counters are diagnostics only.
+
+##### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Same applied identity explicitly resynced | Allow one forced full path; do not reject it as an ordinary duplicate |
+| Patch fails | Preserve native, count failure, retry same copied snapshot once through staging full |
+| Staged import/overlay fails | Discard staging; synchronize fallback; expose typed reason |
+| Fallback synchronization fails | Keep current valid surface; report `fallback_sync_failed`; do not commit visibility |
+| Test Grid enters | Full-sync fallback, apply grid, then hide native |
+| Test Grid exits | Full-sync configured native; failure retains latest fallback |
+
+##### 5. Good / Base / Bad Cases
+
+- Good: contiguous revision -> dirty+halo native patch -> native identity advances.
+- Base: missing native material -> latest fallback becomes active -> same accepted
+  identity succeeds after material repair.
+- Bad: clear live native regions and call `import_images()` in place; a failure
+  destroys the last valid surface and a success may leave stale region samples.
+
+##### 6. Tests Required
+
+- Adapter matrix covers two contiguous patches, skipped revision full, stale and
+  retired rejection, patch failure/full retry, hard full failure/recovery, and
+  full-resync sample equality.
+- World lifecycle coverage asserts fallback applied identity equals latest
+  accepted identity before every hard-failure/Test Grid visibility commit,
+  `visible_surface_count == 1`, and configured backend remains unchanged.
+- Test Grid receives a live terrain revision, exits via one full native resync,
+  and retains fallback when that resync is forced to fail.
+
+##### 7. Wrong vs Correct
+
+```text
+Wrong: clear visible regions -> import_images() -> show fallback only if import fails
+Correct: import hidden staging -> overlay logical grid -> swap on success; otherwise retain old native until fallback is synchronized
+
+Wrong: Test Grid off -> immediately show last cached native node
+Correct: Test Grid off -> full-resync latest accepted snapshot -> commit configured backend
+```
 
 `TerrainCollider` partitions the logical grid into stable chunks under one
 static body. Ordinary revisions build replacement shapes before touching
@@ -649,7 +731,7 @@ Terrain3DAdapter.get_status_snapshot() -> Dictionary
   pending snapshot without requiring a new terrain revision.
 - Test Grid and backend comparison hide the native node without clearing or
   replacing its live material. The fallback renderer owns the black/white grid;
-  leaving test mode reuses the same cached native material object.
+  leaving test mode uses the cached material on a transactional full resync.
 - `get_status_snapshot()` exposes the requested material path, loaded resource
   path, native readiness, renderer/method/driver, and stable `last_error`.
 
@@ -661,7 +743,7 @@ Terrain3DAdapter.get_status_snapshot() -> Dictionary
 | Loaded object is not accepted by Terrain3D | Return `false`; `last_error="Terrain3D material could not be assigned: <path>"`; retain fallback |
 | Same path is retried | Reuse the cached resource object; do not duplicate or replace it |
 | Missing material is corrected | Configure and enter tree, consume the preserved pending snapshot, clear the error |
-| Test Grid enters/exits | Toggle native visibility and fallback material only; never assign native `material=null` |
+| Test Grid enters/exits | Synchronize the target surface before visibility commit; never assign native `material=null` |
 
 ##### 5. Good / Base / Bad Cases
 
@@ -693,7 +775,7 @@ Wrong: missing material -> discard pending revision and require a new snapshot
 Correct: missing material -> fallback + stable error -> fix path -> apply same pending snapshot
 
 Wrong: Test Grid -> native material=null -> later create new RenderingServer RIDs
-Correct: Test Grid -> hide native -> fallback grid -> show cached native material again
+Correct: Test Grid -> synchronized fallback grid -> full-resync native with cached material
 ```
 
 Terrain3D can create static collision shapes, while the project-selected Jolt
@@ -703,9 +785,10 @@ excavation or motion behavior. A missing GDExtension, failed map update, or
 failed collision setup keeps `TerrainRenderer`/`TerrainCollider` usable.
 
 Test graphics mode deliberately deactivates native Terrain3D presentation while
-retaining its material and last accepted copied snapshot. `TerrainWorld`
-exposes the existing fallback mesh, whose `TerrainRenderer.set_test_mode(true)`
-uses a procedural, texture-free black/white one-metre grid. TerrainState and
+retaining its material and latest accepted copied snapshot. `TerrainWorld`
+coordinates the transition; callers must not toggle the two renderers
+independently. The fallback `TerrainRenderer.set_test_mode(true)` uses a
+procedural, texture-free black/white one-metre grid. TerrainState and
 TerrainCollider identities remain untouched.
 
 #### Validation & error matrix

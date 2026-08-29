@@ -10,10 +10,17 @@ const WORKSITE_SOIL_SHADER := "res://assets/terrain/shaders/worksite_soil_fallba
 
 var _pending_snapshot: Dictionary = {}
 var _pending_full := true
+var _latest_queued_epoch := ""
 var _latest_queued_generation := -1
 var _latest_queued_revision := -1
+var _applied_epoch := ""
 var _applied_generation := -1
 var _applied_revision := -1
+var _retired_epochs: Dictionary = {}
+var full_rebuild_count := 0
+var patch_count := 0
+var patch_failure_count := 0
+var full_failure_count := 0
 var _soil_material: ShaderMaterial
 var _test_grid_material: ShaderMaterial
 var _test_mode := false
@@ -32,18 +39,42 @@ func _ready() -> void:
 func queue_snapshot(snapshot: Dictionary) -> bool:
 	if not _is_snapshot_valid(snapshot):
 		return false
+	var epoch := String(snapshot["terrain_epoch"])
+	if _retired_epochs.has(epoch):
+		return false
 	var generation := int(snapshot["world_generation"])
 	var revision := int(snapshot["terrain_revision"])
-	if generation < _latest_queued_generation:
+	if epoch == _latest_queued_epoch and (generation < _latest_queued_generation or \
+			(generation == _latest_queued_generation and revision <= _latest_queued_revision)):
 		return false
-	if generation == _latest_queued_generation and revision <= _latest_queued_revision:
-		return false
-	_pending_snapshot = snapshot.duplicate(true)
-	_pending_snapshot["surface"] = (snapshot["surface"] as PackedFloat32Array).duplicate()
-	_pending_snapshot["surface_bytes"] = (snapshot["surface_bytes"] as PackedByteArray).duplicate()
+	if not _latest_queued_epoch.is_empty() and epoch != _latest_queued_epoch:
+		_retired_epochs[_latest_queued_epoch] = true
+	_pending_snapshot = _copy_snapshot(snapshot)
+	_latest_queued_epoch = epoch
 	_latest_queued_generation = generation
 	_latest_queued_revision = revision
 	_pending_full = _requires_full_rebuild(snapshot)
+	return true
+
+
+func queue_full_resync(snapshot: Dictionary) -> bool:
+	if not _is_snapshot_valid(snapshot):
+		return false
+	var epoch := String(snapshot["terrain_epoch"])
+	var generation := int(snapshot["world_generation"])
+	var revision := int(snapshot["terrain_revision"])
+	if _retired_epochs.has(epoch):
+		return false
+	if epoch == _applied_epoch and (generation < _applied_generation or \
+			(generation == _applied_generation and revision < _applied_revision)):
+		return false
+	if not _latest_queued_epoch.is_empty() and epoch != _latest_queued_epoch:
+		_retired_epochs[_latest_queued_epoch] = true
+	_pending_snapshot = _copy_snapshot(snapshot)
+	_latest_queued_epoch = epoch
+	_latest_queued_generation = generation
+	_latest_queued_revision = revision
+	_pending_full = true
 	return true
 
 
@@ -52,24 +83,33 @@ func apply_pending() -> bool:
 		return false
 	var snapshot := _pending_snapshot
 	_pending_snapshot = {}
+	var epoch := String(snapshot["terrain_epoch"])
 	var generation := int(snapshot["world_generation"])
 	var revision := int(snapshot["terrain_revision"])
-	if generation != _latest_queued_generation or revision != _latest_queued_revision:
+	if epoch != _latest_queued_epoch or generation != _latest_queued_generation or revision != _latest_queued_revision:
 		return false
-	if generation < _applied_generation or (generation == _applied_generation and revision <= _applied_revision):
+	if epoch == _applied_epoch and (generation < _applied_generation or \
+			(generation == _applied_generation and (revision < _applied_revision or \
+				(revision == _applied_revision and not _pending_full)))):
 		return false
 	var applied := false
 	if not _pending_full and _can_patch(snapshot):
 		applied = _apply_patch_mesh(snapshot)
+		if not applied:
+			patch_failure_count += 1
 	if not applied:
 		applied = _apply_full_mesh(snapshot)
 	if not applied:
+		full_failure_count += 1
 		# Roll the queue gate back so the same or any later revision can be
 		# re-queued after a recovery.
-		if _applied_revision >= 0:
+		if not _applied_epoch.is_empty():
+			_retired_epochs.erase(_applied_epoch)
+			_latest_queued_epoch = _applied_epoch
 			_latest_queued_generation = _applied_generation
 			_latest_queued_revision = _applied_revision
 		return false
+	_applied_epoch = epoch
 	_applied_generation = generation
 	_applied_revision = revision
 	return true
@@ -79,10 +119,22 @@ func get_applied_identity() -> Vector2i:
 	return Vector2i(_applied_generation, _applied_revision)
 
 
+func get_applied_epoch() -> String:
+	return _applied_epoch
+
+
 func get_status_snapshot() -> Dictionary:
 	return {
+		"queued_epoch": _latest_queued_epoch,
+		"queued_generation": _latest_queued_generation,
+		"queued_revision": _latest_queued_revision,
+		"applied_epoch": _applied_epoch,
 		"applied_generation": _applied_generation,
 		"applied_revision": _applied_revision,
+		"full_rebuild_count": full_rebuild_count,
+		"patch_count": patch_count,
+		"patch_failure_count": patch_failure_count,
+		"full_failure_count": full_failure_count,
 		"cached_rows": _cached_rows,
 		"cached_columns": _cached_columns,
 		"material_kind": "test_black_white_grid" if _test_mode else ("procedural_worksite_soil" if _soil_material != null else "unavailable"),
@@ -144,6 +196,7 @@ func _apply_full_mesh(snapshot: Dictionary) -> bool:
 	_cached_indices = indices
 	_cached_rows = rows
 	_cached_columns = columns
+	full_rebuild_count += 1
 	return true
 
 
@@ -178,11 +231,16 @@ func _apply_patch_mesh(snapshot: Dictionary) -> bool:
 		for column in range(normal_min_x, normal_max_x + 1):
 			var index := row * columns + column
 			_cached_normals[index] = _normal_at(surface, rows, columns, row, column, spacing)
-	return _publish_surface(_cached_vertices, _cached_normals, _cached_uvs, _cached_indices)
+	if not _publish_surface(_cached_vertices, _cached_normals, _cached_uvs, _cached_indices):
+		return false
+	patch_count += 1
+	return true
 
 
 func _can_patch(snapshot: Dictionary) -> bool:
 	if bool(snapshot.get("full_refresh", true)):
+		return false
+	if String(snapshot["terrain_epoch"]) != _applied_epoch:
 		return false
 	if int(snapshot["world_generation"]) != _applied_generation:
 		return false
@@ -196,6 +254,8 @@ func _can_patch(snapshot: Dictionary) -> bool:
 
 func _requires_full_rebuild(snapshot: Dictionary) -> bool:
 	if bool(snapshot.get("full_refresh", true)):
+		return true
+	if String(snapshot["terrain_epoch"]) != _applied_epoch:
 		return true
 	if int(snapshot["world_generation"]) != _applied_generation:
 		return true
@@ -277,4 +337,11 @@ func _normal_at(surface: PackedFloat32Array, rows: int, columns: int, row: int, 
 
 
 func _is_snapshot_valid(snapshot: Dictionary) -> bool:
-	return snapshot.has_all(["world_generation", "terrain_revision", "rows", "columns", "spacing_m", "origin_xz", "surface", "surface_bytes"])
+	return snapshot.has_all(["terrain_epoch", "world_generation", "terrain_revision", "rows", "columns", "spacing_m", "origin_xz", "surface", "surface_bytes"])
+
+
+func _copy_snapshot(snapshot: Dictionary) -> Dictionary:
+	var copied := snapshot.duplicate(true)
+	copied["surface"] = (snapshot["surface"] as PackedFloat32Array).duplicate()
+	copied["surface_bytes"] = (snapshot["surface_bytes"] as PackedByteArray).duplicate()
+	return copied

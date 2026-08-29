@@ -275,8 +275,19 @@ Terrain3D 1.0.2 performs native setup on enter-tree. The adapter assigns
 non-null assets/material before adding the node, then assigns `region_size=128`
 and collision mask after it enters the tree because native initialization
 restores those scalar defaults. Native activation hides both the custom terrain
-mesh and `FoundationGround`; queued or failed native work restores both fallback
-layers immediately.
+mesh and `FoundationGround`. Ordinary changes patch dirty cells plus halo in
+place. Full refreshes after startup import into a hidden staging Terrain3D node,
+overlay the exact logical grid, and replace the visible native node only after
+success; Terrain3D 1.0.2 `import_images()` is not used as an in-place region
+replacement. On hard failure, `TerrainWorld` fully synchronizes the retained
+latest accepted snapshot into fallback before committing visibility.
+
+`TerrainWorld` separately reports configured backend, active renderer, Test
+Grid override, accepted/queued/applied identities, bounded fallback reason, and
+full/patch/failure counters. Test Grid never changes the configured product
+backend: entry synchronizes fallback before showing the one-metre grid, and exit
+performs a full native resync before Terrain3D is shown again. A failed exit
+keeps the synchronized fallback active.
 
 Terrain3D and the fallback mesh now share the project-owned
 `worksite_soil_common.gdshaderinc` classification for compacted, loose,

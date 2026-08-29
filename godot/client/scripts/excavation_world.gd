@@ -314,7 +314,7 @@ func get_status_snapshot() -> Dictionary:
 	status["terrain_commit"] = terrain_scheduler.get_status_snapshot() if terrain_scheduler != null else {}
 	status["collider_available"] = terrain_collider != null and terrain_collider.available
 	status["collider_enabled"] = terrain_collider != null and terrain_collider.enabled
-	status["terrain3d"] = terrain_world.terrain3d_adapter.get_status_snapshot() if terrain_world != null and terrain_world.terrain3d_adapter != null else {"enabled": false, "available": false}
+	status["terrain3d"] = terrain_world.get_status_snapshot() if terrain_world != null else {"enabled": false, "available": false}
 	var chassis_status := _tracked_chassis_controller.get_status_snapshot() if _tracked_chassis_controller != null else {}
 	status["digging_response"] = chassis_status.get("digging_response", {"configured": false})
 	status["physics_fail_open"] = true

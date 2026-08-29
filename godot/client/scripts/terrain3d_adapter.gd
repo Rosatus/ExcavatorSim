@@ -8,6 +8,7 @@ extends Node3D
 ## If the GDExtension or a map update is unavailable, callers keep using the
 ## custom TerrainRenderer/TerrainCollider path.
 signal backend_changed(active: bool)
+signal materialization_failed(message: String)
 
 const TERRAIN_CLASS := "Terrain3D"
 const REGION_CLASS := "Terrain3DRegion"
@@ -42,6 +43,7 @@ var last_error := ""
 var full_import_count := 0
 var patch_count := 0
 var patch_failure_count := 0
+var full_failure_count := 0
 
 var _terrain_node: Node3D
 var _pending_snapshot: Dictionary = {}
@@ -71,6 +73,7 @@ var _test_mode := false
 var _configured_material: Resource
 var _configured_material_path := ""
 var _terrain_ready := false
+var _patch_preflight_failure_after_regions_for_test := -1
 
 
 func _ready() -> void:
@@ -105,10 +108,7 @@ func queue_snapshot(snapshot: Dictionary) -> bool:
 		return false
 	if not _queued_epoch.is_empty() and epoch != _queued_epoch:
 		_retired_epochs[_queued_epoch] = true
-	_pending_snapshot = {}
-	_pending_snapshot = snapshot.duplicate(true)
-	_pending_snapshot["surface"] = (snapshot["surface"] as PackedFloat32Array).duplicate()
-	_pending_snapshot["surface_bytes"] = (snapshot["surface_bytes"] as PackedByteArray).duplicate()
+	_pending_snapshot = _copy_snapshot(snapshot)
 	_queued_epoch = epoch
 	_queued_generation = generation
 	_queued_revision = revision
@@ -116,6 +116,31 @@ func queue_snapshot(snapshot: Dictionary) -> bool:
 	# No-flicker invariant: the active native surface stays visible while patch
 	# or full work is pending. Visibility only changes after a real success or a
 	# hard failure inside apply_pending().
+	return true
+
+
+## Re-materialize an accepted current snapshot even when its identity matches
+## the queued/applied gate. Presentation overrides and material replacement use
+## this path; stale or retired lineage can never use it to roll native state back.
+func queue_full_resync(snapshot: Dictionary) -> bool:
+	if not _is_snapshot_valid(snapshot):
+		return false
+	var epoch := String(snapshot["terrain_epoch"])
+	var generation := int(snapshot["world_generation"])
+	var revision := int(snapshot["terrain_revision"])
+	if _retired_epochs.has(epoch):
+		return false
+	if epoch == _applied_epoch and (generation < _applied_generation or \
+			(generation == _applied_generation and revision < _applied_revision)):
+		return false
+	if not _queued_epoch.is_empty() and epoch != _queued_epoch:
+		_retired_epochs[_queued_epoch] = true
+	_pending_snapshot = _copy_snapshot(snapshot)
+	_queued_epoch = epoch
+	_queued_generation = generation
+	_queued_revision = revision
+	_pending_full_refresh = true
+	_resync_requested = true
 	return true
 
 
@@ -132,11 +157,15 @@ func apply_pending() -> bool:
 	if epoch != _queued_epoch or generation != _queued_generation or revision != _queued_revision:
 		return false
 	if epoch == _applied_epoch and (generation < _applied_generation or \
-		(generation == _applied_generation and revision <= _applied_revision)):
+		(generation == _applied_generation and (revision < _applied_revision or \
+			(revision == _applied_revision and not _pending_full_refresh)))):
 		_pending_snapshot = {}
 		return false
+	if _configured_material_path != material_path:
+		_pending_full_refresh = true
+		_resync_requested = true
 	if not _ensure_terrain_node():
-		return false
+		return _finish_failed_apply()
 	var applied := false
 	if not _pending_full_refresh and _can_patch(snapshot):
 		applied = _patch_snapshot(snapshot)
@@ -150,14 +179,7 @@ func apply_pending() -> bool:
 	else:
 		applied = _materialize_snapshot(snapshot)
 	if not applied:
-		# Roll the queue gate back to the applied identity so the same or any
-		# later revision can be re-queued after a recovery or resync.
-		if not _applied_epoch.is_empty():
-			_retired_epochs.erase(_applied_epoch)
-			_queued_epoch = _applied_epoch
-			_queued_generation = _applied_generation
-			_queued_revision = _applied_revision
-		return false
+		return _finish_failed_apply()
 	_applied_epoch = epoch
 	_applied_generation = generation
 	_applied_revision = revision
@@ -185,7 +207,6 @@ func is_native_mesh_active() -> bool:
 
 ## Force the native Terrain3D surface off (soil-shader backend). Idempotent.
 func deactivate_native_for_test() -> void:
-	_test_mode = false
 	_set_native_active(false)
 
 
@@ -198,12 +219,9 @@ func set_test_mode(value: bool) -> bool:
 		# native material attached while hidden: clearing it leaves stale/null
 		# RenderingServer RIDs on Godot 4.7 D3D12.
 		_set_native_active(false)
-	elif not _pending_snapshot.is_empty():
-		_configure_material()
-		apply_pending()
-	elif _terrain_node != null and is_instance_valid(_terrain_node) and _applied_generation >= 0:
-		_configure_material()
-		_set_native_active(true)
+	# Exiting Test Grid never re-shows an old surface. TerrainWorld queues a
+	# full resync of its latest accepted snapshot before native presentation is
+	# allowed to become active again.
 	return true
 
 
@@ -211,6 +229,10 @@ func set_collision_mode(mode: int) -> bool:
 	native_collision_mode = clampi(mode, 0, 4)
 	_configure_collision()
 	return collision_available
+
+
+func set_patch_preflight_failure_after_regions_for_test(region_count: int) -> void:
+	_patch_preflight_failure_after_regions_for_test = region_count
 
 
 func get_status_snapshot() -> Dictionary:
@@ -241,6 +263,7 @@ func get_status_snapshot() -> Dictionary:
 		"full_import_count": full_import_count,
 		"patch_count": patch_count,
 		"patch_failure_count": patch_failure_count,
+		"full_failure_count": full_failure_count,
 		"resync_requested": _resync_requested,
 		"patch_capable": _patch_capable,
 		"presentation_rows": _presentation_rows,
@@ -343,15 +366,6 @@ func _materialize_snapshot(snapshot: Dictionary) -> bool:
 	if rows < 2 or columns < 2 or spacing <= 0.0 or surface.size() != rows * columns or bytes.size() != surface.size() * 4:
 		_set_error("Terrain3D snapshot dimensions or bytes are invalid")
 		return false
-	_set_property_if_present(_terrain_node, "vertex_spacing", spacing)
-	var data: Variant = _terrain_node.get("data")
-	if not (data is Object):
-		_set_error("Terrain3D data object is unavailable")
-		return false
-	var data_object := data as Object
-	if not data_object.has_method("import_images"):
-		_set_error("Terrain3D data.import_images is unavailable")
-		return false
 	var height_image := Image.create_from_data(columns, rows, false, Image.FORMAT_RF, bytes)
 	if height_image == null or height_image.is_empty():
 		_set_error("Terrain3D height image could not be created")
@@ -362,23 +376,47 @@ func _materialize_snapshot(snapshot: Dictionary) -> bool:
 		if control_image == null or control_image.is_empty():
 			_set_error("Terrain3D control image could not be created")
 			return false
+	# Full refreshes are transactional after the first applied surface. Import
+	# into a hidden, fully configured Terrain3D node and swap only after it has
+	# active regions. Terrain3DData.import_images does not reliably replace an
+	# existing region set, and clearing the visible node first would destroy the
+	# previous valid surface if import failed.
+	var target := _terrain_node
+	var staged := not _applied_epoch.is_empty() and _terrain_node != null and is_instance_valid(_terrain_node)
+	if staged:
+		target = _create_staging_terrain_node()
+		if target == null:
+			return false
+	_set_property_if_present(target, "vertex_spacing", spacing)
 	var maps: Array = [height_image, control_image, null]
 	# Terrain3D uses world X/Z for import position. The logical digest remains
 	# the original row-major TerrainState bytes, independent of this conversion.
+	var target_data: Variant = target.get("data")
+	if not (target_data is Object):
+		return _fail_staged_materialization(target, "Terrain3D data object is unavailable")
+	var data_object := target_data as Object
+	if not data_object.has_method("import_images"):
+		return _fail_staged_materialization(target, "Terrain3D data.import_images is unavailable")
 	data_object.call("import_images", maps, Vector3(origin.x, 0.0, origin.y), 0.0, 1.0)
 	if data_object.has_method("calc_height_range"):
 		data_object.call("calc_height_range", true)
 	if data_object.has_method("get_regions_active"):
 		var regions: Variant = data_object.call("get_regions_active")
 		if regions is Array and (regions as Array).is_empty():
-			_set_error("Terrain3D imported no active regions")
-			return false
+			return _fail_staged_materialization(target, "Terrain3D imported no active regions")
 	_presentation_rows = rows
 	_presentation_columns = columns
 	_presentation_spacing = spacing
 	_presentation_origin = origin
-	_region_size_verts = int(_terrain_node.get("region_size")) if _has_property(_terrain_node, "region_size") else region_size
+	_region_size_verts = int(target.get("region_size")) if _has_property(target, "region_size") else region_size
 	_compute_patch_capability(snapshot, presentation)
+	if _patch_capable:
+		var logical_overlay := snapshot.duplicate(true)
+		logical_overlay["dirty_rect_with_halo"] = Rect2i(0, 0, int(snapshot["columns"]), int(snapshot["rows"]))
+		if not _patch_snapshot_on(target, logical_overlay, false):
+			return _fail_staged_materialization(target, "Terrain3D logical surface overlay failed")
+	if staged:
+		_commit_staged_terrain_node(target)
 	full_import_count += 1
 	# Dressing is rebuilt only on the full path so ordinary revisions keep the
 	# site dressing nodes stable.
@@ -392,6 +430,8 @@ func _materialize_snapshot(snapshot: Dictionary) -> bool:
 ## must go through build_maps/import_images. Conservative by design: any
 ## missing dirty information means a full materialization.
 func _requires_full_materialization(snapshot: Dictionary) -> bool:
+	if _configured_material_path != material_path:
+		return true
 	if String(snapshot["terrain_epoch"]) != _applied_epoch:
 		return true
 	if int(snapshot["world_generation"]) != _applied_generation:
@@ -424,7 +464,13 @@ func _can_patch(snapshot: Dictionary) -> bool:
 ## only edited regions through Terrain3DData.update_maps(). The previous native
 ## surface stays visible throughout; on failure the caller retries fully.
 func _patch_snapshot(snapshot: Dictionary) -> bool:
-	var data: Variant = _terrain_node.get("data")
+	return _patch_snapshot_on(_terrain_node, snapshot, true)
+
+
+func _patch_snapshot_on(target: Node3D, snapshot: Dictionary, count_patch: bool) -> bool:
+	if target == null or not is_instance_valid(target):
+		return false
+	var data: Variant = target.get("data")
 	if not (data is Object) or not (data as Object).has_method("update_maps") \
 			or not (data as Object).has_method("get_region"):
 		return false
@@ -462,6 +508,19 @@ func _patch_snapshot(snapshot: Dictionary) -> bool:
 		floori((world_max_exclusive.x - 0.01) / region_world),
 		floori((world_max_exclusive.y - 0.01) / region_world)
 	)
+	# Transaction gate: validate every affected live map before writing the first
+	# pixel. Without this preflight, a later missing/corrupt region could leave an
+	# earlier region partially advanced even though the patch reports failure.
+	var checked_regions := 0
+	for region_row in range(region_min.y, region_max.y + 1):
+		for region_column in range(region_min.x, region_max.x + 1):
+			if _patch_preflight_failure_after_regions_for_test >= 0 \
+					and checked_regions >= _patch_preflight_failure_after_regions_for_test:
+				_patch_preflight_failure_after_regions_for_test = -1
+				return false
+			if not _can_patch_region_heights(data_object, Vector2i(region_column, region_row)):
+				return false
+			checked_regions += 1
 	for region_row in range(region_min.y, region_max.y + 1):
 		for region_column in range(region_min.x, region_max.x + 1):
 			if not _patch_region_heights(
@@ -477,9 +536,23 @@ func _patch_snapshot(snapshot: Dictionary) -> bool:
 	data_object.call("update_maps", MAP_TYPE_HEIGHT, false, false)
 	if data_object.has_method("calc_height_range"):
 		data_object.call("calc_height_range", false)
-	patch_count += 1
+	if count_patch:
+		patch_count += 1
 	last_error = ""
 	return true
+
+
+func _can_patch_region_heights(data_object: Object, region_location: Vector2i) -> bool:
+	if not bool(data_object.call("has_region", region_location)):
+		return false
+	var region: Object = data_object.call("get_region", region_location)
+	if region == null or bool(region.get("deleted")):
+		return false
+	var height_map: Image = region.get("height_map")
+	return height_map != null and not height_map.is_empty() \
+		and height_map.get_format() == Image.FORMAT_RF \
+		and height_map.get_width() >= _region_size_verts \
+		and height_map.get_height() >= _region_size_verts
 
 
 ## Writes one region's share of the dirty rectangle into its live height map
@@ -493,16 +566,8 @@ func _patch_region_heights(
 	logical_columns: int,
 	surface: PackedFloat32Array
 ) -> bool:
-	if not bool(data_object.call("has_region", region_location)):
-		return false
 	var region: Object = data_object.call("get_region", region_location)
-	if region == null or bool(region.get("deleted")):
-		return false
 	var height_map: Image = region.get("height_map")
-	if height_map == null or height_map.is_empty() \
-			or height_map.get_format() != Image.FORMAT_RF \
-			or height_map.get_width() < _region_size_verts or height_map.get_height() < _region_size_verts:
-		return false
 	var region_origin_world := Vector2(region_location) * float(_region_size_verts) * _presentation_spacing
 	var written_low := INF
 	var written_high := -INF
@@ -563,6 +628,10 @@ func _compute_patch_capability(snapshot: Dictionary, presentation: Dictionary) -
 func _configure_material() -> bool:
 	if _terrain_node == null:
 		return false
+	return _configure_material_for(_terrain_node)
+
+
+func _configure_material_for(target: Node3D) -> bool:
 	if construction_site_enabled:
 		if _configured_material == null or _configured_material_path != material_path:
 			_configured_material = _load_material()
@@ -575,12 +644,64 @@ func _configure_material() -> bool:
 		# after enter-tree leaves stale/null material RIDs on Godot 4.7 D3D12.
 		# Reuse the exact pre-tree resource and only reassign if native setup
 		# actually cleared or replaced it.
-		if _terrain_node.get("material") != _configured_material:
-			_set_property_if_present(_terrain_node, "material", _configured_material)
-		if _terrain_node.get("material") == null:
+		if target.get("material") != _configured_material:
+			_set_property_if_present(target, "material", _configured_material)
+		if target.get("material") == null:
 			_set_error("Terrain3D material could not be assigned: %s" % material_path)
 			return false
 	return true
+
+
+func _create_staging_terrain_node() -> Node3D:
+	if not ClassDB.class_exists(TERRAIN_CLASS):
+		_set_error("Terrain3D GDExtension class is unavailable")
+		return null
+	var instance: Object = ClassDB.instantiate(TERRAIN_CLASS)
+	if instance == null or not (instance is Node3D):
+		_set_error("Terrain3D could not be instantiated")
+		return null
+	var target := instance as Node3D
+	target.name = "Terrain3DStaging"
+	var assets: Variant = load(assets_path) if not assets_path.is_empty() and ResourceLoader.exists(assets_path) else null
+	if assets != null:
+		_assets_source = assets_path
+	elif construction_site_enabled:
+		assets = _site_profile.create_assets()
+		_assets_source = ConstructionSiteTerrainProfile.INITIALIZATION_ASSETS_PATH if assets != null else "none"
+	if assets != null:
+		_set_property_if_present(target, "assets", assets)
+	if not _configure_material_for(target):
+		target.free()
+		return null
+	add_child(target, true)
+	target.visible = false
+	_set_property_if_present(target, "region_size", region_size)
+	_set_property_if_present(target, "collision_mask", 1)
+	if not _configure_material_for(target):
+		target.queue_free()
+		return null
+	return target
+
+
+func _commit_staged_terrain_node(target: Node3D) -> void:
+	var previous := _terrain_node
+	if previous != null and is_instance_valid(previous):
+		previous.name = "Terrain3DRetired"
+		previous.visible = false
+		previous.queue_free()
+	_terrain_node = target
+	_terrain_node.name = "Terrain3DNative"
+	_terrain_ready = true
+
+
+func _fail_staged_materialization(target: Node3D, message: String) -> bool:
+	_set_error(message)
+	if target != null and is_instance_valid(target):
+		if target == _terrain_node and _applied_epoch.is_empty():
+			_terrain_node = null
+			_terrain_ready = false
+		target.queue_free()
+	return false
 
 
 func _load_material() -> Resource:
@@ -749,7 +870,27 @@ func _set_native_active(active: bool) -> void:
 
 func _set_error(message: String) -> void:
 	last_error = message
-	_set_native_active(false)
+
+
+func _finish_failed_apply() -> bool:
+	full_failure_count += 1
+	# Roll the queue gate back to the applied identity so the same or any later
+	# revision can be re-queued after recovery. The previous native surface stays
+	# visible until TerrainWorld has fully synchronized the fallback.
+	if not _applied_epoch.is_empty():
+		_retired_epochs.erase(_applied_epoch)
+		_queued_epoch = _applied_epoch
+		_queued_generation = _applied_generation
+		_queued_revision = _applied_revision
+	materialization_failed.emit(last_error if not last_error.is_empty() else "Terrain3D materialization failed")
+	return false
+
+
+func _copy_snapshot(snapshot: Dictionary) -> Dictionary:
+	var copied := snapshot.duplicate(true)
+	copied["surface"] = (snapshot["surface"] as PackedFloat32Array).duplicate()
+	copied["surface_bytes"] = (snapshot["surface_bytes"] as PackedByteArray).duplicate()
+	return copied
 
 
 func _set_property_if_present(object: Object, property_name: String, value: Variant) -> void:

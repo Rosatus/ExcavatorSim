@@ -42,7 +42,7 @@ $tests = @(
     "analytic_dig_test.gd",
     "soil_parcel_test.gd",
     "excavation_gameplay_test.gd",
-    # visual_pass_test.gd: fails on clean baseline (ground-material diagnostics, 08-25).
+    "visual_pass_test.gd",
     "visual_evidence_capture_test.gd",
     "release_candidate_test.gd"
     # offline_product_test.gd: fails on clean baseline (08-25 ground/model changes).

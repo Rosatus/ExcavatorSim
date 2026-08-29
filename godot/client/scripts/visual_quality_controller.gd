@@ -55,15 +55,13 @@ func apply_profile(profile_name: String) -> bool:
 		_applied = false
 		last_error = "feedback_profile_failed"
 		return false
-	var terrain_renderer := get_node_or_null("../TerrainRoot/TerrainWorld/TerrainMesh")
-	if terrain_renderer != null and terrain_renderer.has_method("set_test_mode") and not bool(terrain_renderer.call("set_test_mode", test_ground)):
+	# TerrainWorld coordinates fallback synchronization and the native visibility
+	# commit. Driving its two renderers independently can expose a stale or empty
+	# surface between Test Grid transitions.
+	var terrain_world := get_node_or_null("../TerrainRoot/TerrainWorld")
+	if terrain_world != null and terrain_world.has_method("set_test_mode") and not bool(terrain_world.call("set_test_mode", test_ground)):
 		_applied = false
-		last_error = "terrain_renderer_profile_failed"
-		return false
-	var terrain3d_adapter := get_node_or_null("../TerrainRoot/Terrain3DAdapter")
-	if terrain3d_adapter != null and terrain3d_adapter.has_method("set_test_mode") and not bool(terrain3d_adapter.call("set_test_mode", test_ground)):
-		_applied = false
-		last_error = "terrain3d_profile_failed"
+		last_error = "terrain_presentation_profile_failed"
 		return false
 	Engine.max_fps = target_fps
 	_applied = true
