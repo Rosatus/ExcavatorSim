@@ -13,7 +13,9 @@ const TERRAIN_CLASS := "Terrain3D"
 const REGION_CLASS := "Terrain3DRegion"
 ## Terrain3DRegion.MapType.TYPE_HEIGHT (0): real-value height map.
 const MAP_TYPE_HEIGHT := 0
-const DEMO_MATERIAL := "res://assets/terrain/terrain3d_demo_material.tres"
+const TERRAIN3D_INITIALIZATION_ASSETS := "res://assets/terrain/terrain3d_demo_assets.tres"
+const WORKSITE_MATERIAL := "res://assets/terrain/terrain3d_worksite_material.tres"
+const WORKSITE_SHADER := "res://assets/terrain/shaders/worksite_soil_terrain3d.gdshader"
 const DEMO_PARTICLES := "res://addons/terrain_3d/extras/particle_example/Terrain3DParticles.tscn"
 const ROCK_SCENES := [
 	"res://demo/assets/models/RockA.glb",
@@ -26,8 +28,9 @@ const ROCK_NORMAL := "res://assets/terrain/textures/rock023_nrm_rgh.png"
 @export var enabled := true
 @export var region_size := 128
 @export var construction_site_enabled := true
-@export var assets_path := ""
-@export_file("*.tres") var material_path := DEMO_MATERIAL
+@export var native_demo_dressing_enabled := false
+@export_file("*.tres") var assets_path := TERRAIN3D_INITIALIZATION_ASSETS
+@export_file("*.tres") var material_path := WORKSITE_MATERIAL
 @export_enum("Disabled:0", "Dynamic Game:1", "Dynamic Editor:2", "Full Game:3", "Full Editor:4") var native_collision_mode := 0
 
 var available := false
@@ -191,10 +194,9 @@ func set_test_mode(value: bool) -> bool:
 		return true
 	_test_mode = value
 	if _test_mode:
-		# Product decision: test-grid look = Terrain3D's own black/white
-		# checkerboard, achieved by dropping its material entirely.
-		if _terrain_node != null and is_instance_valid(_terrain_node):
-			_set_property_if_present(_terrain_node, "material", null)
+		# Test Grid is owned by the fallback TerrainRenderer. Keep the cached
+		# native material attached while hidden: clearing it leaves stale/null
+		# RenderingServer RIDs on Godot 4.7 D3D12.
 		_set_native_active(false)
 	elif not _pending_snapshot.is_empty():
 		_configure_material()
@@ -217,6 +219,13 @@ func get_status_snapshot() -> Dictionary:
 	var data: Object = _terrain_node.get("data") as Object if _terrain_node != null and is_instance_valid(_terrain_node) else null
 	var regions: Array = data.call("get_regions_active") as Array if data != null and data.has_method("get_regions_active") else []
 	var mouse_quad := _terrain_node.find_child("MouseQuad", true, false) as MeshInstance3D if _terrain_node != null and is_instance_valid(_terrain_node) else null
+	var shader_override: Resource = material.get("shader_override") as Resource \
+		if material != null and _has_property(material, "shader_override") else null
+	var uses_project_soil_override := shader_override != null and shader_override.resource_path == WORKSITE_SHADER
+	var world_background := int(material.get("world_background")) \
+		if material != null and _has_property(material, "world_background") else -1
+	var grass_active := available and native_demo_dressing_enabled and not _test_mode \
+		and _dressing_root != null and _dressing_root.has_node("Terrain3DParticles")
 	return {
 		"enabled": enabled,
 		"available": available,
@@ -240,6 +249,13 @@ func get_status_snapshot() -> Dictionary:
 		"material_roles": _site_profile.get_material_roles() if construction_site_enabled else PackedStringArray(),
 		"assets_source": _assets_source,
 		"material_source": material_path,
+		"material_identity": "project_procedural_worksite_soil" if material_path == WORKSITE_MATERIAL and uses_project_soil_override else "custom",
+		"shader_override_enabled": bool(material.get("shader_override_enabled")) if material != null and _has_property(material, "shader_override_enabled") else false,
+		"shader_override_source": shader_override.resource_path if shader_override != null else "",
+		"demo_texture_sampling_enabled": not uses_project_soil_override,
+		"world_background_enabled": world_background > 0,
+		"native_demo_dressing_enabled": native_demo_dressing_enabled,
+		"native_demo_dressing_active": available and not _test_mode and native_demo_dressing_enabled and (_rock_count > 0 or grass_active),
 		"native_class": _terrain_node.get_class() if _terrain_node != null and is_instance_valid(_terrain_node) else "",
 		"native_version": String(_terrain_node.get("version")) if _terrain_node != null and is_instance_valid(_terrain_node) and _has_property(_terrain_node, "version") else "",
 		"native_material_class": material.get_class() if material != null else "",
@@ -255,7 +271,8 @@ func get_status_snapshot() -> Dictionary:
 		"video_adapter": RenderingServer.get_video_adapter_name(),
 		"rock_count": _rock_count,
 		"tree_count": _tree_count,
-		"grass_enabled": not _test_mode and _dressing_root != null and _dressing_root.has_node("Terrain3DParticles"),
+		"grass_enabled": grass_active,
+		"foliage_enabled": false,
 		"test_mode": _test_mode,
 	}
 
@@ -282,7 +299,7 @@ func _ensure_terrain_node() -> bool:
 			_assets_source = assets_path
 		elif construction_site_enabled:
 			assets = _site_profile.create_assets()
-			_assets_source = "demo:terrain3d-official" if assets != null else "none"
+			_assets_source = ConstructionSiteTerrainProfile.INITIALIZATION_ASSETS_PATH if assets != null else "none"
 		if assets != null:
 			_set_property_if_present(_terrain_node, "assets", assets)
 	if not _configure_material():
@@ -548,7 +565,7 @@ func _configure_material() -> bool:
 		return false
 	if construction_site_enabled:
 		if _configured_material == null or _configured_material_path != material_path:
-			_configured_material = _load_demo_material()
+			_configured_material = _load_material()
 			_configured_material_path = material_path
 		if _configured_material == null:
 			_set_error("Terrain3D material is unavailable: %s" % material_path)
@@ -566,7 +583,7 @@ func _configure_material() -> bool:
 	return true
 
 
-func _load_demo_material() -> Resource:
+func _load_material() -> Resource:
 	var source := load(material_path) as Resource if not material_path.is_empty() and ResourceLoader.exists(material_path) else null
 	return source.duplicate(true) if source != null else null
 
@@ -597,10 +614,13 @@ func _update_dressing(presentation: Dictionary) -> void:
 	_ensure_dressing_root()
 	for child in _dressing_root.get_children():
 		child.free()
+	_rock_count = 0
+	_tree_count = 0
+	if not native_demo_dressing_enabled:
+		return
 	var dressing := _site_profile.build_dressing(presentation)
 	var rocks: Array = dressing.get("rocks", [])
 	_rock_count = rocks.size()
-	_tree_count = 0
 	if not rocks.is_empty():
 		_add_rock_layers(rocks)
 	_add_demo_particles()
@@ -720,9 +740,9 @@ func _set_native_active(active: bool) -> void:
 	if _terrain_node != null and is_instance_valid(_terrain_node):
 		_terrain_node.visible = active
 	if _dressing_root != null and is_instance_valid(_dressing_root):
-		_dressing_root.visible = active and not _test_mode
+		_dressing_root.visible = active and not _test_mode and native_demo_dressing_enabled
 		for particle_value in _dressing_root.find_children("*", "GPUParticles3D", true, false):
-			(particle_value as GPUParticles3D).emitting = active and not _test_mode
+			(particle_value as GPUParticles3D).emitting = active and not _test_mode and native_demo_dressing_enabled
 	if changed:
 		backend_changed.emit(active)
 

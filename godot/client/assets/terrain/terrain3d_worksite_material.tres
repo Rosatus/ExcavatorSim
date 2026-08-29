@@ -1,0 +1,11 @@
+[gd_resource type="Terrain3DMaterial" load_steps=2 format=3]
+
+[ext_resource type="Shader" path="res://assets/terrain/shaders/worksite_soil_terrain3d.gdshader" id="1_worksite"]
+
+[resource]
+_shader_parameters = {
+&"flat_terrain_normals": false
+}
+world_background = 0
+shader_override_enabled = true
+shader_override = ExtResource("1_worksite")

@@ -30,15 +30,15 @@ non-black Forward+ exit gate and a documented supported shader/material seam.
 
 ## Acceptance Criteria
 
-- [ ] Native Terrain3D renders the same recognizable compacted/loose/damp brown
+- [x] Native Terrain3D renders the same recognizable compacted/loose/damp brown
   worksite-soil language as fallback under the same camera/daylight checkpoint.
-- [ ] Terrain deformation changes native shading consistently with current
+- [x] Terrain deformation changes native shading consistently with current
   height/slope/disturbed behavior.
-- [ ] No native grass particles, green ground region, rock/tree/foliage layer,
+- [x] No native grass particles, green ground region, rock/tree/foliage layer,
   or infinite Terrain3D background appears.
-- [ ] Sky3D horizon, shared site cues, soil effects, camera, UI, and low/balanced/
+- [x] Sky3D horizon, shared site cues, soil effects, camera, UI, and low/balanced/
   high budgets remain unchanged.
-- [ ] Automated checks prove shader identity, dressing exclusions, background
+- [x] Automated checks prove shader identity, dressing exclusions, background
   off, and no mutation of TerrainState/ledger/payload.
 - [ ] Focused human review accepts native/fallback visual parity. Exact pixels
   and identical LOD normals are not required.

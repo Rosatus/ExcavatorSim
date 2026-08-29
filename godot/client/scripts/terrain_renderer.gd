@@ -6,6 +6,8 @@ extends MeshInstance3D
 ## Vertex/index arrays are cached so ordinary revisions update only the dirty
 ## vertices plus a one-cell normal halo and replace just the derived surface
 ## resource, instead of recomputing the whole grid.
+const WORKSITE_SOIL_SHADER := "res://assets/terrain/shaders/worksite_soil_fallback.gdshader"
+
 var _pending_snapshot: Dictionary = {}
 var _pending_full := true
 var _latest_queued_generation := -1
@@ -84,6 +86,7 @@ func get_status_snapshot() -> Dictionary:
 		"cached_rows": _cached_rows,
 		"cached_columns": _cached_columns,
 		"material_kind": "test_black_white_grid" if _test_mode else ("procedural_worksite_soil" if _soil_material != null else "unavailable"),
+		"shader_source": _soil_material.shader.resource_path if _soil_material != null and _soil_material.shader != null else "",
 		"test_mode": _test_mode,
 	}
 
@@ -227,55 +230,9 @@ func _publish_surface(
 func _ensure_soil_material() -> void:
 	if _soil_material != null:
 		return
-	var shader := Shader.new()
-	shader.code = """
-shader_type spatial;
-render_mode diffuse_burley, specular_schlick_ggx;
-
-varying vec3 site_world_position;
-varying vec3 site_normal;
-
-float site_hash(vec2 p) {
-	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-}
-
-float site_noise(vec2 p) {
-	vec2 cell = floor(p);
-	vec2 f = fract(p);
-	f = f * f * (3.0 - 2.0 * f);
-	float a = site_hash(cell);
-	float b = site_hash(cell + vec2(1.0, 0.0));
-	float c = site_hash(cell + vec2(0.0, 1.0));
-	float d = site_hash(cell + vec2(1.0, 1.0));
-	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-}
-
-void vertex() {
-	site_world_position = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	site_normal = normalize(NORMAL);
-}
-
-void fragment() {
-	vec2 xz = site_world_position.xz;
-	float macro = site_noise(xz * 0.13) * 0.65 + site_noise(xz * 0.72) * 0.35;
-	float disturbed = smoothstep(0.012, 0.22, abs(site_world_position.y));
-	float slope = clamp(1.0 - site_normal.y, 0.0, 1.0);
-	float damp_low = 1.0 - smoothstep(0.0, 7.5, distance(xz, vec2(7.0, 7.0)));
-	float track_lane = 1.0 - smoothstep(0.36, 1.15, abs(abs(xz.x) - 1.15));
-	vec3 compacted = vec3(0.31, 0.245, 0.185);
-	vec3 loose = vec3(0.49, 0.345, 0.225);
-	vec3 damp = vec3(0.205, 0.19, 0.16);
-	vec3 soil = mix(compacted, loose, max(disturbed, slope * 0.42));
-	soil = mix(soil, compacted * 0.88, track_lane * (1.0 - disturbed) * 0.42);
-	soil = mix(soil, damp, damp_low * 0.62);
-	float view_distance = distance(CAMERA_POSITION_WORLD, site_world_position);
-	float breakup = mix(0.88 + macro * 0.24, 0.94 + macro * 0.12, smoothstep(14.0, 42.0, view_distance));
-	ALBEDO = soil * breakup;
-	ROUGHNESS = mix(0.98, 0.82, damp_low * 0.45);
-	METALLIC = 0.0;
-	SPECULAR = mix(0.18, 0.34, damp_low);
-}
-"""
+	var shader := load(WORKSITE_SOIL_SHADER) as Shader
+	if shader == null:
+		return
 	_soil_material = ShaderMaterial.new()
 	_soil_material.shader = shader
 

@@ -14,6 +14,8 @@ func _run() -> void:
 	if result == 0:
 		result = _test_effect_budget()
 	if result == 0:
+		result = await _test_default_soil_shader_scene()
+	if result == 0:
 		result = await _test_scene_visual_nodes()
 	if result == 0:
 		print("Realistic visual contracts passed.")
@@ -63,11 +65,52 @@ func _test_effect_budget() -> int:
 	return 0
 
 
+func _test_default_soil_shader_scene() -> int:
+	var packed := load(MAIN_SCENE) as PackedScene
+	if packed == null:
+		return _fail("default backend scene loads")
+	var scene := packed.instantiate()
+	root.add_child(scene)
+	await process_frame
+	await process_frame
+	var terrain_world := scene.get_node_or_null("TerrainRoot/TerrainWorld") as TerrainWorld
+	var terrain_renderer := scene.get_node_or_null("TerrainRoot/TerrainWorld/TerrainMesh") as TerrainRenderer
+	var terrain_adapter := scene.get_node_or_null("TerrainRoot/Terrain3DAdapter") as Terrain3DAdapter
+	if terrain_world == null or terrain_renderer == null or terrain_adapter == null:
+		scene.queue_free()
+		return _fail("default backend exposes terrain seams")
+	var before := terrain_world.terrain_state.surface_snapshot()
+	await process_frame
+	await process_frame
+	var after := terrain_world.terrain_state.surface_snapshot()
+	if terrain_world.terrain_backend != "soil_shader" or not terrain_renderer.visible \
+			or terrain_adapter.is_native_mesh_active():
+		scene.queue_free()
+		return _fail("main scene enters tree on the soil_shader fallback product default")
+	if String(terrain_renderer.get_status_snapshot().get("shader_source", "")) \
+			!= "res://assets/terrain/shaders/worksite_soil_fallback.gdshader":
+		scene.queue_free()
+		return _fail("default product backend uses the shared procedural soil shader")
+	if before["surface_bytes"] != after["surface_bytes"] \
+			or before["terrain_revision"] != after["terrain_revision"]:
+		scene.queue_free()
+		return _fail("default presentation startup does not mutate TerrainState")
+	scene.queue_free()
+	await process_frame
+	return 0
+
+
 func _test_scene_visual_nodes() -> int:
 	var packed := load(MAIN_SCENE) as PackedScene
 	if packed == null:
 		return _fail("main scene loads")
 	var scene := packed.instantiate()
+	var configured_world := scene.get_node_or_null("TerrainRoot/TerrainWorld") as TerrainWorld
+	if configured_world == null:
+		return _fail("main scene exposes TerrainWorld before visual activation")
+	# This contract exercises native/test/fallback presentation transitions.
+	# Product default remains soil_shader and is asserted by the real probe.
+	configured_world.terrain_backend = "terrain3d"
 	root.add_child(scene)
 	await process_frame
 	var visual_environment := scene.get_node_or_null("VisualEnvironment") as VisualEnvironment
@@ -82,6 +125,12 @@ func _test_scene_visual_nodes() -> int:
 	var terrain_adapter := scene.get_node_or_null("TerrainRoot/Terrain3DAdapter") as Terrain3DAdapter
 	if terrain_renderer == null or terrain_adapter == null or terrain_renderer.get_status_snapshot().get("material_kind", "") != "procedural_worksite_soil":
 		return _fail("fallback terrain retains the procedural worksite material identity")
+	var native_terrain := scene.get_node_or_null("TerrainRoot/Terrain3DAdapter/Terrain3DNative") as Terrain3D
+	var native_material_before: Terrain3DMaterial = native_terrain.material if native_terrain != null else null
+	if native_material_before == null:
+		return _fail("native visual fixture starts with the cached worksite material")
+	if String(terrain_renderer.get_status_snapshot().get("shader_source", "")) != "res://assets/terrain/shaders/worksite_soil_fallback.gdshader":
+		return _fail("fallback terrain loads the project shader backed by the shared soil include")
 	if scene.get_node_or_null("OperatorUI/SkyAttribution") != null:
 		return _fail("running client keeps third-party attribution out of the simulation viewport")
 	var sky := scene.get_node_or_null("WorldEnvironment") as Sky3D
@@ -112,6 +161,8 @@ func _test_scene_visual_nodes() -> int:
 	var terrain3d_status := terrain_adapter.get_status_snapshot()
 	if int(test_site["visible_cues"]) != 0 or bool(terrain3d_status["available"]) or not bool(terrain3d_status["test_mode"]):
 		return _fail("test quality disables native terrain and all site dressing")
+	if not bool(terrain3d_status["native_material_ready"]) or native_terrain.material != native_material_before:
+		return _fail("test quality hides native terrain without clearing its live material")
 	if not terrain_renderer.visible or String(terrain_renderer.get_status_snapshot()["material_kind"]) != "test_black_white_grid":
 		return _fail("test quality exposes the untextured black/white fallback grid")
 	var test_effects := scene_effects.get_effect_snapshot()
@@ -126,6 +177,11 @@ func _test_scene_visual_nodes() -> int:
 	var restored_effects := scene_effects.get_effect_snapshot()
 	if not bool(restored_adapter["available"]) or bool(restored_adapter["test_mode"]) or terrain_renderer.visible:
 		return _fail("leaving test quality restores native Terrain3D presentation")
+	if native_terrain.material != native_material_before \
+			or int(restored_adapter["rock_count"]) != 0 \
+			or bool(restored_adapter["grass_enabled"]) \
+			or bool(restored_adapter["native_demo_dressing_active"]):
+		return _fail("quality changes preserve the cached material and demo-dressing exclusions")
 	if String(terrain_renderer.get_status_snapshot()["material_kind"]) != "procedural_worksite_soil" or int(restored_effects["budget"]) != 1800 or not bool(restored_effects["enabled"]):
 		return _fail("leaving test quality restores normal terrain material and effects budget")
 	if not quality.apply_profile("high") or not sky.clouds_enabled or not sky.fog_enabled or not sky.sun.shadow_enabled:

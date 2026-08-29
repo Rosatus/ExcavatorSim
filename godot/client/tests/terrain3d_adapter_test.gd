@@ -61,7 +61,7 @@ func _test_material_failure_recovers() -> int:
 	if adapter.available or adapter.last_error != "Terrain3D material is unavailable: res://tests/__missing_terrain3d_material__.tres":
 		adapter.queue_free()
 		return _fail("missing material fails with stable bounded diagnostics")
-	adapter.material_path = "res://assets/terrain/terrain3d_demo_material.tres"
+	adapter.material_path = Terrain3DAdapter.WORKSITE_MATERIAL
 	if not adapter.apply_pending() or not adapter.available:
 		adapter.queue_free()
 		return _fail("same pending snapshot recovers after material becomes available")
@@ -101,15 +101,36 @@ func _test_scene_adapter_seam() -> int:
 		scene.queue_free()
 		return _fail("adapter reports generation-gated status")
 	var status := adapter.get_status_snapshot()
-	if String(status["assets_source"]) != "demo:terrain3d-official":
+	if String(status["assets_source"]) != Terrain3DAdapter.TERRAIN3D_INITIALIZATION_ASSETS:
 		scene.queue_free()
-		return _fail("adapter uses the official Terrain3D demo assets")
+		return _fail("adapter declares the retained Terrain3D initialization assets")
 	if int(status["presentation_rows"]) != 129 or int(status["presentation_columns"]) != 129:
 		scene.queue_free()
 		return _fail("adapter materializes the medium construction-site grid")
-	if int(status["rock_count"]) != 18 or int(status["tree_count"]) != 0 or not bool(status["grass_enabled"]):
+	if int(status["rock_count"]) != 0 or int(status["tree_count"]) != 0 \
+			or bool(status["grass_enabled"]) or bool(status["foliage_enabled"]):
 		scene.queue_free()
-		return _fail("adapter reports official demo rocks and grass")
+		return _fail("production native terrain excludes demo rocks, grass, trees, and foliage")
+	if bool(status["native_demo_dressing_enabled"]) or bool(status["native_demo_dressing_active"]):
+		scene.queue_free()
+		return _fail("native demo dressing is explicitly disabled by default")
+	if String(status["material_identity"]) != "project_procedural_worksite_soil" \
+			or not bool(status["shader_override_enabled"]) \
+			or String(status["shader_override_source"]) != "res://assets/terrain/shaders/worksite_soil_terrain3d.gdshader" \
+			or bool(status["demo_texture_sampling_enabled"]):
+		scene.queue_free()
+		return _fail("native terrain reports the project-owned procedural shader override")
+	if bool(status["world_background_enabled"]):
+		scene.queue_free()
+		return _fail("native Terrain3D background remains disabled")
+	var worksite_shader := load(Terrain3DAdapter.WORKSITE_SHADER) as Shader
+	var shader_code := worksite_shader.code if worksite_shader != null else ""
+	if shader_code.is_empty() \
+			or not shader_code.contains("worksite_soil_common.gdshaderinc") \
+			or shader_code.contains("_texture_array_albedo") \
+			or shader_code.contains("_texture_array_normal"):
+		scene.queue_free()
+		return _fail("native procedural shader statically excludes demo texture-array sampling")
 	var native_terrain := scene.get_node_or_null("TerrainRoot/Terrain3DAdapter/Terrain3DNative") as Terrain3D
 	if native_terrain == null or native_terrain.assets == null or native_terrain.material == null:
 		scene.queue_free()
@@ -190,16 +211,9 @@ func _test_scene_adapter_seam() -> int:
 	if dressing == null:
 		scene.queue_free()
 		return _fail("adapter owns a disposable construction-site dressing layer")
-	for layer_name in ["Rocks1", "Rocks2", "Rocks3"]:
-		var layer := dressing.get_node_or_null(layer_name) as MultiMeshInstance3D
-		if layer == null or layer.multimesh == null:
-			scene.queue_free()
-			return _fail("site dressing uses three bounded scanned-rock MultiMesh layers")
-	var particles := dressing.get_node_or_null("Terrain3DParticles")
-	var process_material := particles.get("process_material") as ShaderMaterial if particles != null else null
-	if process_material == null or float(process_material.get_shader_parameter("exclusion_radius")) != 12.0:
+	if dressing.get_child_count() != 0 or dressing.get_node_or_null("Terrain3DParticles") != null:
 		scene.queue_free()
-		return _fail("official demo grass excludes the central flat work pad")
+		return _fail("production native dressing stays empty across reset")
 	if dressing.find_children("*", "CollisionObject3D", true, false).size() != 0:
 		scene.queue_free()
 		return _fail("site dressing does not add physics authority")

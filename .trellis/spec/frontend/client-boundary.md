@@ -647,6 +647,9 @@ Terrain3DAdapter.get_status_snapshot() -> Dictionary
   tree, preserves the pending snapshot, and keeps the fallback renderer and
   foundation visible. A later valid material must recover by applying that same
   pending snapshot without requiring a new terrain revision.
+- Test Grid and backend comparison hide the native node without clearing or
+  replacing its live material. The fallback renderer owns the black/white grid;
+  leaving test mode reuses the same cached native material object.
 - `get_status_snapshot()` exposes the requested material path, loaded resource
   path, native readiness, renderer/method/driver, and stable `last_error`.
 
@@ -658,6 +661,7 @@ Terrain3DAdapter.get_status_snapshot() -> Dictionary
 | Loaded object is not accepted by Terrain3D | Return `false`; `last_error="Terrain3D material could not be assigned: <path>"`; retain fallback |
 | Same path is retried | Reuse the cached resource object; do not duplicate or replace it |
 | Missing material is corrected | Configure and enter tree, consume the preserved pending snapshot, clear the error |
+| Test Grid enters/exits | Toggle native visibility and fallback material only; never assign native `material=null` |
 
 ##### 5. Good / Base / Bad Cases
 
@@ -674,9 +678,10 @@ Terrain3DAdapter.get_status_snapshot() -> Dictionary
   fallback visibility, same-snapshot recovery, and native material object
   identity after recovery.
 - The real non-headless Forward+/D3D12 probe must require native visibility,
-  changed nonblack pixels for authored/minimum/MouseQuad-hidden variants, an
-  unchanged authority digest/identity, and no current-run Terrain3D/shader/
-  GDExtension/material/texture-array/map-import errors.
+  brown/nonblack pixels for native and fallback variants, visible deformation
+  in both derivatives, unchanged post-deformation authority identity during
+  capture toggles, and no current-run Terrain3D/shader/GDExtension/material/
+  texture-array/map-import errors.
 
 ##### 7. Wrong vs Correct
 
@@ -686,6 +691,9 @@ Correct: load once -> cache exact resource -> assign same object across enter-tr
 
 Wrong: missing material -> discard pending revision and require a new snapshot
 Correct: missing material -> fallback + stable error -> fix path -> apply same pending snapshot
+
+Wrong: Test Grid -> native material=null -> later create new RenderingServer RIDs
+Correct: Test Grid -> hide native -> fallback grid -> show cached native material again
 ```
 
 Terrain3D can create static collision shapes, while the project-selected Jolt
@@ -694,12 +702,11 @@ default (`terrain3d/collision_mode=0`); enabling it must not change logical
 excavation or motion behavior. A missing GDExtension, failed map update, or
 failed collision setup keeps `TerrainRenderer`/`TerrainCollider` usable.
 
-Test graphics mode deliberately deactivates native Terrain3D presentation,
-stops its grass emitter, and hides its rock dressing while retaining its last
-accepted copied snapshot. `TerrainWorld` exposes the existing fallback mesh,
-whose `TerrainRenderer.set_test_mode(true)` uses a procedural, texture-free
-black/white one-metre grid. TerrainState and TerrainCollider identities remain
-untouched.
+Test graphics mode deliberately deactivates native Terrain3D presentation while
+retaining its material and last accepted copied snapshot. `TerrainWorld`
+exposes the existing fallback mesh, whose `TerrainRenderer.set_test_mode(true)`
+uses a procedural, texture-free black/white one-metre grid. TerrainState and
+TerrainCollider identities remain untouched.
 
 #### Validation & error matrix
 
@@ -1255,20 +1262,31 @@ into Terrain3D.
   `TerrainState.surface`.
 - Presentation-only height shaping may occur outside the logical rectangle and
   must never be written back to `TerrainState` or `BucketSoilState`.
-- Temporary control-map IDs match official demo assets: 0 cliff/bare ground and
-  1 grass. The central logical patch and access path use ID 0.
-- The adapter may load a minimal extracted copy of the official demo
-  `Terrain3DMaterial`/texture assets and reuse RockA/B/C meshes plus its particle
-  scene as an explicitly reviewed temporary visual baseline; demo height data is
-  never logical input.
+- Every control-map cell uses material ID 0. The map remains present for
+  Terrain3D hole semantics, but no product region selects a demo ground or grass
+  texture role.
+- `worksite_soil_common.gdshaderinc` is the single source for compacted,
+  disturbed/loose, slope, damp-center, track-lane, macro-distance, roughness,
+  and specular calculations. Fallback and native shaders supply only their
+  geometry/normal/camera inputs.
+- Native Terrain3D uses the complete 1.0.2 minimum clipmap/geomorph/height/hole/
+  normal seam plus the shared PBR include through a project-owned
+  `Terrain3DMaterial.shader_override`. Two official texture slots remain loaded
+  only because Terrain3D 1.0.2 requires initialized assets; the override does not
+  sample them.
+- Native demo dressing is an explicit adapter opt-in and defaults false. Product
+  runs create no Terrain3D rocks, grass particles, trees, or foliage, and keep
+  world background off. Shared code-native `ConstructionSiteDressing` remains.
 - `godot-terrain-state-v3-construction-site` initializes one 64 m authoritative
   surface: a level central 20 m work pad plus deterministic outer grades/spoil.
   The visible construction map and `TerrainCollider` derive the same complete
   footprint; presentation-only ground beyond the support grid is forbidden.
   Stable/loose edits and reset semantics remain unchanged after initialization.
-- Site dressing is bounded to 18 official rocks outside the logical rectangle;
-  official grass particles use a 12 m central exclusion radius. Dressing adds
-  no collision objects.
+- The optional diagnostic/demo dressing seam is bounded to 18 official rocks
+  outside the logical rectangle and grass particles with a 12 m central
+  exclusion radius. It is created only when
+  `native_demo_dressing_enabled=true`; product default creates neither. The
+  optional layer adds no collision objects.
 
 ### 4. Validation & Error Matrix
 
@@ -1278,12 +1296,13 @@ into Terrain3D.
 | Terrain3D asset classes unavailable | Return no native assets; retain custom renderer |
 | Logical grid point sampled in presentation | Height is bit-for-bit equal to the logical surface value |
 | Point outside logical rectangle | May receive deterministic presentation shaping/materials only |
-| Official demo visual resource unavailable | Adapter stays fail-open and keeps the custom renderer |
+| Shared include, native override, or initialization assets unavailable | Adapter stays fail-open and keeps the custom renderer |
 | Native Terrain3D backend inactive | Hide the dressing layer with the native terrain |
 
 ### 5. Good/Base/Bad Cases
 
-- Good: accepted snapshot → exact central patch + derived spoil piles/track/grass.
+- Good: accepted snapshot -> exact central patch + shared project worksite cues
+  + project procedural native/fallback soil.
 - Base: native backend unavailable → unchanged custom renderer/collider path.
 - Bad: editor painting or Terrain3D height queries update logical terrain or
   bucket inventory.
@@ -1291,10 +1310,14 @@ into Terrain3D.
 ### 6. Tests Required
 
 - `construction_site_terrain_test.gd` asserts 64 m dimensions, exact logical
-  patch parity, demo material IDs, demo assets, and bounded dressing.
-- `terrain3d_adapter_test.gd` asserts the project-owned asset source,
-  presentation dimensions, dressing layers, snapshot guards, fallback, and
-  Jolt collision seam.
+  patch parity, one procedural material role/ID, initialized native assets, and
+  deterministic shared worksite layout.
+- `terrain3d_adapter_test.gd` asserts the project material/override identity,
+  default-off native demo dressing/background/texture sampling, presentation
+  dimensions, snapshot guards, fallback, and Jolt collision seam.
+- `visual_pass_test.gd` asserts fallback shader identity, Test Grid material
+  retention/restore, unchanged Sky3D/shared cues/effects/camera/UI budgets, and
+  native demo dressing exclusions across quality profiles.
 - The full standalone matrix must keep terrain/excavation/release-candidate
   contracts green.
 
@@ -1599,8 +1622,10 @@ TerrainRenderer.get_status_snapshot() -> Dictionary
   `procedural_worksite_soil` material for compacted, disturbed/loose, damp, and
   macro-distance variation. Shader classifications are visual and cannot enter
   soil material accounting.
-- Terrain3D retains only already-provenanced official demo ground/rock/grass
-  assets. Demo height, navigation, UI, and gameplay remain excluded.
+- Terrain3D uses the project procedural-soil shader override and creates no
+  native demo rocks/grass/trees/foliage. Provenanced demo texture slots are
+  retained only as unsampled Terrain3D 1.0.2 initialization inputs. Demo height,
+  navigation, UI, and gameplay remain excluded.
 - Sky3D remains fixed at 10:30 with one warm daytime sun, deterministic
   atmosphere, bounded SSAO/contact shadow tuning, and no dynamic time/weather.
 

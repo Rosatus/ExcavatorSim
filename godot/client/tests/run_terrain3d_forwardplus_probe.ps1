@@ -18,7 +18,7 @@ if (-not (Test-Path -LiteralPath $GodotExe -PathType Leaf)) {
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
     $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
     $repoRoot = (Resolve-Path (Join-Path $sourceProject "..\..")).Path
-    $OutputDir = Join-Path $repoRoot "output\terrain3d_phase0\$stamp"
+    $OutputDir = Join-Path $repoRoot "output\terrain3d_phase1\$stamp"
 }
 $OutputDir = [IO.Path]::GetFullPath($OutputDir)
 New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
@@ -97,7 +97,7 @@ try {
         ForEach-Object { $_.Value.Trim() } |
         Sort-Object -Unique
     $summary = [ordered]@{
-        schema_version = "terrain3d-forwardplus-run-v1"
+        schema_version = "terrain3d-forwardplus-run-v2"
         passed = ($probeExit -eq 0 -and [bool]$evidence.passed -and $fatalPatterns.Count -eq 0)
         probe_exit_code = $probeExit
         evidence_path = $evidencePath

@@ -8,10 +8,12 @@ extends RefCounted
 ## central work pad remains the primary excavation/dressing exclusion zone.
 
 const SITE_EXTENT_M := 64.0
-const DEMO_ASSETS_PATH := "res://assets/terrain/terrain3d_demo_assets.tres"
+## Terrain3D 1.0.2 requires initialized texture slots even when the project
+## shader override does not sample them. These retained resources are bootstrap
+## inputs only; product color/classification comes from worksite_soil_common.
+const INITIALIZATION_ASSETS_PATH := "res://assets/terrain/terrain3d_demo_assets.tres"
 
-const MATERIAL_BARE_GROUND := 0
-const MATERIAL_GRASS := 1
+const MATERIAL_WORKSITE_SOIL := 0
 
 
 func build_maps(snapshot: Dictionary) -> Dictionary:
@@ -79,13 +81,12 @@ func build_maps(snapshot: Dictionary) -> Dictionary:
 
 
 func create_assets() -> Object:
-	return load(DEMO_ASSETS_PATH) if ResourceLoader.exists(DEMO_ASSETS_PATH) else null
+	return load(INITIALIZATION_ASSETS_PATH) if ResourceLoader.exists(INITIALIZATION_ASSETS_PATH) else null
 
 
 func get_material_roles() -> PackedStringArray:
 	return PackedStringArray([
-		"Terrain3D Demo Cliff / Bare Ground",
-		"Terrain3D Demo Grass",
+		"Project Procedural Worksite Soil",
 	])
 
 
@@ -184,14 +185,11 @@ func _presentation_height(
 	return logical_height + TerrainState.construction_site_baseline_height(position) * context_weight
 
 
-func _control_code(position: Vector2, logical_origin: Vector2, logical_max: Vector2) -> int:
-	if position.x >= logical_origin.x and position.x <= logical_max.x \
-		and position.y >= logical_origin.y and position.y <= logical_max.y:
-		return _encode_control(MATERIAL_BARE_GROUND, MATERIAL_BARE_GROUND, 0.0)
-	var haul_distance := _distance_to_segment(position, Vector2(8.0, 4.0), Vector2(31.0, 20.0))
-	if haul_distance < 3.2:
-		return _encode_control(MATERIAL_BARE_GROUND, MATERIAL_BARE_GROUND, 0.0)
-	return _encode_control(MATERIAL_GRASS, MATERIAL_GRASS, 0.0)
+func _control_code(_position: Vector2, _logical_origin: Vector2, _logical_max: Vector2) -> int:
+	# The project-owned shader classifies compacted/loose/damp soil directly
+	# from world height and normal. Terrain3D still requires a control map for
+	# holes, but production presentation no longer selects demo texture zones.
+	return _encode_control(MATERIAL_WORKSITE_SOIL, MATERIAL_WORKSITE_SOIL, 0.0)
 
 
 func _sample_bilinear(surface: PackedFloat32Array, rows: int, columns: int, spacing: float, origin: Vector2, position: Vector2) -> float:

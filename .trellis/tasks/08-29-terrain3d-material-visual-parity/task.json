@@ -3,7 +3,7 @@
   "name": "terrain3d-material-visual-parity",
   "title": "Terrain3D procedural soil visual parity",
   "description": "Phase 1: port the current procedural worksite-soil look into a Terrain3D-compatible material override while excluding native grass, green zones, rocks, and background.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

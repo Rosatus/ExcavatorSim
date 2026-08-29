@@ -11,8 +11,7 @@ const WIDTH := 960
 const HEIGHT := 540
 const WARMUP_FRAMES := 180
 const VARIANT_FRAMES := 45
-const AUTHORED_MATERIAL := "res://assets/terrain/terrain3d_demo_material.tres"
-const MINIMUM_SHADER := "res://addons/terrain_3d/extras/shaders/minimum.gdshader"
+const WORKSITE_MATERIAL := "res://assets/terrain/terrain3d_worksite_material.tres"
 
 var _output_dir := ""
 
@@ -32,7 +31,7 @@ func _run() -> void:
 		quit(2)
 		return
 	root.size = Vector2i(WIDTH, HEIGHT)
-	var rig := _build_rig(AUTHORED_MATERIAL)
+	var rig := _build_rig(WORKSITE_MATERIAL)
 	root.add_child(rig["scene"])
 	var adapter := rig["adapter"] as Terrain3DAdapter
 	var world := rig["world"] as TerrainWorld
@@ -46,61 +45,114 @@ func _run() -> void:
 	for _frame in VARIANT_FRAMES:
 		await process_frame
 	var status := adapter.get_status_snapshot()
+	var fallback_visible_during_native := fallback.visible
+	var foundation_visible_during_native := foundation.visible
 	var native := adapter.get_node_or_null("Terrain3DNative") as Node3D
 	var dressing := adapter.get_node_or_null("ConstructionSiteDressing") as Node3D
 	if dressing != null:
 		dressing.visible = false
 	var frames := {}
-	frames["authored"] = await _capture("authored")
+	frames["worksite_native_before"] = await _capture("worksite_native_before")
 	var mouse_quad := native.find_child("MouseQuad", true, false) as MeshInstance3D if native != null else null
 	if mouse_quad != null:
 		mouse_quad.visible = false
 		for _frame in VARIANT_FRAMES:
 			await process_frame
-	frames["mouse_quad_hidden"] = await _capture("mouse_quad_hidden")
-	var authored_material: Object = native.get("material") as Object if native != null else null
-	if authored_material != null and authored_material.has_method("set_shader_override") and authored_material.has_method("enable_shader_override"):
-		var minimum_shader := load(MINIMUM_SHADER) as Shader
-		if minimum_shader != null:
-			authored_material.call("set_shader_override", minimum_shader)
-			authored_material.call("enable_shader_override", true)
-			if authored_material.has_method("update"):
-				authored_material.call("update")
-			for _frame in VARIANT_FRAMES:
-				await process_frame
-			frames["minimum_override"] = await _capture("minimum_override")
-	if native != null:
-		native.visible = false
+	frames["worksite_mouse_quad_hidden"] = await _capture("worksite_mouse_quad_hidden")
+	adapter.deactivate_native_for_test()
 	for _frame in VARIANT_FRAMES:
 		await process_frame
-	var absent := await _capture("native_absent")
+	frames["worksite_fallback_before"] = await _capture("worksite_fallback_before")
+	var fallback_before_visible := fallback.visible and foundation.visible
+	_reactivate_native(adapter)
+	for _frame in VARIANT_FRAMES:
+		await process_frame
+	var state := world.terrain_state
+	if not state.enqueue_brush(state.next_brush_sequence(), Vector2.ZERO, 1.35, 0.16) \
+			or not state.step_fixed() or not world.rebuild_mesh():
+		push_error("Terrain3D probe could not apply the deformation fixture")
+		rig["scene"].queue_free()
+		quit(1)
+		return
+	for _frame in VARIANT_FRAMES:
+		await process_frame
+	frames["worksite_native_after"] = await _capture("worksite_native_after")
+	var authority_after_deformation := _authority_fingerprint_from_rig(world)
+	adapter.deactivate_native_for_test()
+	for _frame in VARIANT_FRAMES:
+		await process_frame
+	frames["worksite_fallback_after"] = await _capture("worksite_fallback_after")
+	var fallback_after_visible := fallback.visible and foundation.visible
+	fallback.visible = false
+	foundation.visible = false
+	for _frame in VARIANT_FRAMES:
+		await process_frame
+	var absent := await _capture("terrain_absent")
 	var variants := {}
 	for variant_name in frames:
-		variants[variant_name] = _compare_native_to_absent(frames[variant_name], absent)
+		variants[variant_name] = _compare_surface_to_absent(frames[variant_name], absent)
+	var native_deformation := _compare_frames(
+		frames["worksite_mouse_quad_hidden"],
+		frames["worksite_native_after"]
+	)
+	var fallback_deformation := _compare_frames(
+		frames["worksite_fallback_before"],
+		frames["worksite_fallback_after"]
+	)
+	var native_fallback_after := _compare_frames(
+		frames["worksite_native_after"],
+		frames["worksite_fallback_after"]
+	)
 	var logical_snapshot: Dictionary = world.terrain_state.surface_snapshot()
 	var height_range := _surface_range(logical_snapshot["surface"] as PackedFloat32Array)
-	var authority_after := _authority_fingerprint_from_rig(world)
+	var authority_after_capture := _authority_fingerprint_from_rig(world)
 	var failure := await _run_deliberate_material_failure()
-	var authored_pass := bool((variants.get("authored", {}) as Dictionary).get("pass", false))
-	var hidden_pass := bool((variants.get("mouse_quad_hidden", {}) as Dictionary).get("pass", false))
-	var minimum_pass := bool((variants.get("minimum_override", {}) as Dictionary).get("pass", false))
+	var native_before_pass := bool((variants.get("worksite_native_before", {}) as Dictionary).get("pass", false))
+	var native_after_pass := bool((variants.get("worksite_native_after", {}) as Dictionary).get("pass", false))
+	var fallback_before_pass := bool((variants.get("worksite_fallback_before", {}) as Dictionary).get("pass", false))
+	var fallback_after_pass := bool((variants.get("worksite_fallback_after", {}) as Dictionary).get("pass", false))
 	var target_renderer := String(status.get("rendering_method", "")) == "Forward Plus" and String(status.get("rendering_driver", "")) == "d3d12"
+	var material_contract := String(status.get("material_identity", "")) == "project_procedural_worksite_soil" \
+		and bool(status.get("shader_override_enabled", false)) \
+		and String(status.get("shader_override_source", "")) == "res://assets/terrain/shaders/worksite_soil_terrain3d.gdshader" \
+		and not bool(status.get("demo_texture_sampling_enabled", true)) \
+		and not bool(status.get("world_background_enabled", true))
+	var dressing_contract := not bool(status.get("native_demo_dressing_enabled", true)) \
+		and int(status.get("rock_count", -1)) == 0 \
+		and int(status.get("tree_count", -1)) == 0 \
+		and not bool(status.get("grass_enabled", true)) \
+		and not bool(status.get("foliage_enabled", true))
+	var deformation_contract := authority_before != authority_after_deformation \
+		and authority_after_deformation == authority_after_capture \
+		and float(native_deformation.get("changed_ratio", 0.0)) >= 0.0001 \
+		and float(fallback_deformation.get("changed_ratio", 0.0)) >= 0.0001
+	var project_contract := _project_contract()
 	var evidence := {
-		"schema_version": "terrain3d-forwardplus-probe-v1",
-		"passed": authored_pass and hidden_pass and minimum_pass and target_renderer and failure.get("passed", false) and authority_before == authority_after,
+		"schema_version": "terrain3d-forwardplus-probe-v2",
+		"passed": native_before_pass and native_after_pass and fallback_before_pass and fallback_after_pass \
+			and target_renderer and material_contract and dressing_contract and deformation_contract \
+			and fallback_before_visible and fallback_after_visible and bool(project_contract.get("passed", false)) \
+			and failure.get("passed", false),
 		"target_renderer": target_renderer,
-		"authored_pass": authored_pass,
-		"mouse_quad_hidden_pass": hidden_pass,
-		"minimum_override_pass": minimum_pass,
+		"material_contract": material_contract,
+		"dressing_contract": dressing_contract,
+		"deformation_contract": deformation_contract,
+		"project_contract": project_contract,
 		"status": status,
-		"fallback_visible_during_native": fallback.visible,
-		"foundation_visible_during_native": foundation.visible,
+		"fallback_visible_during_native": fallback_visible_during_native,
+		"foundation_visible_during_native": foundation_visible_during_native,
+		"fallback_before_visible": fallback_before_visible,
+		"fallback_after_visible": fallback_after_visible,
 		"logical_height_min": height_range.x,
 		"logical_height_max": height_range.y,
 		"logical_height_range": height_range.y - height_range.x,
 		"authority_before": authority_before,
-		"authority_after": authority_after,
+		"authority_after_deformation": authority_after_deformation,
+		"authority_after_capture": authority_after_capture,
 		"variants": variants,
+		"native_deformation": native_deformation,
+		"fallback_deformation": fallback_deformation,
+		"native_fallback_after": native_fallback_after,
 		"deliberate_failure": failure,
 	}
 	_write_json("evidence.json", evidence)
@@ -175,7 +227,7 @@ func _capture(label: String) -> Image:
 	return image
 
 
-func _compare_native_to_absent(native_image: Image, absent_image: Image) -> Dictionary:
+func _compare_surface_to_absent(native_image: Image, absent_image: Image) -> Dictionary:
 	if native_image == null or absent_image == null or native_image.get_size() != absent_image.get_size():
 		return {"pass": false, "reason": "image_size_mismatch"}
 	var samples := 0
@@ -184,6 +236,7 @@ func _compare_native_to_absent(native_image: Image, absent_image: Image) -> Dict
 	var luma_min := INF
 	var luma_max := -INF
 	var luma_sum := 0.0
+	var brown := 0
 	for y in range(0, native_image.get_height(), 3):
 		for x in range(0, native_image.get_width(), 3):
 			samples += 1
@@ -199,19 +252,73 @@ func _compare_native_to_absent(native_image: Image, absent_image: Image) -> Dict
 			luma_sum += luma
 			if luma >= 0.025:
 				nonblack += 1
+			if native_color.r > native_color.g * 1.03 and native_color.g > native_color.b * 1.03:
+				brown += 1
 	var changed_ratio := float(changed) / float(maxi(samples, 1))
 	var nonblack_ratio := float(nonblack) / float(maxi(changed, 1))
+	var brown_ratio := float(brown) / float(maxi(changed, 1))
 	var luma_range := luma_max - luma_min if changed > 0 else 0.0
 	return {
-		"pass": changed_ratio >= 0.08 and nonblack_ratio >= 0.80 and luma_range >= 0.025,
+		"pass": changed_ratio >= 0.08 and nonblack_ratio >= 0.80 and brown_ratio >= 0.45 and luma_range >= 0.025,
 		"sample_count": samples,
 		"changed_count": changed,
 		"changed_ratio": changed_ratio,
 		"nonblack_ratio": nonblack_ratio,
+		"brown_ratio": brown_ratio,
 		"luma_min": luma_min if changed > 0 else 0.0,
 		"luma_max": luma_max if changed > 0 else 0.0,
 		"luma_mean": luma_sum / float(maxi(changed, 1)),
 		"luma_range": luma_range,
+	}
+
+
+func _compare_frames(first: Image, second: Image) -> Dictionary:
+	if first == null or second == null or first.get_size() != second.get_size():
+		return {"changed_ratio": 0.0, "mean_rgb_distance": 0.0, "reason": "image_size_mismatch"}
+	var samples := 0
+	var changed := 0
+	var distance_sum := 0.0
+	for y in range(0, first.get_height(), 3):
+		for x in range(0, first.get_width(), 3):
+			samples += 1
+			var first_color := first.get_pixel(x, y)
+			var second_color := second.get_pixel(x, y)
+			var distance := absf(first_color.r - second_color.r) \
+				+ absf(first_color.g - second_color.g) \
+				+ absf(first_color.b - second_color.b)
+			distance_sum += distance
+			if distance >= 0.025:
+				changed += 1
+	return {
+		"sample_count": samples,
+		"changed_count": changed,
+		"changed_ratio": float(changed) / float(maxi(samples, 1)),
+		"mean_rgb_distance": distance_sum / float(maxi(samples, 1)),
+	}
+
+
+func _reactivate_native(adapter: Terrain3DAdapter) -> void:
+	adapter.set_test_mode(true)
+	adapter.set_test_mode(false)
+
+
+func _project_contract() -> Dictionary:
+	var packed := load("res://scenes/main.tscn") as PackedScene
+	var scene := packed.instantiate() if packed != null else null
+	var terrain_world := scene.get_node_or_null("TerrainRoot/TerrainWorld") as TerrainWorld if scene != null else null
+	var backend := terrain_world.terrain_backend if terrain_world != null else ""
+	if scene != null:
+		scene.free()
+	var features: PackedStringArray = ProjectSettings.get_setting("application/config/features", PackedStringArray())
+	var driver := String(ProjectSettings.get_setting("rendering/rendering_device/driver.windows", ""))
+	var main_scene := String(ProjectSettings.get_setting("application/run/main_scene", ""))
+	return {
+		"passed": main_scene.ends_with("scenes/main.tscn") and features.has("Forward Plus") \
+			and driver == "d3d12" and backend == "soil_shader",
+		"main_scene": main_scene,
+		"features": features,
+		"windows_driver": driver,
+		"main_terrain_backend": backend,
 	}
 
 

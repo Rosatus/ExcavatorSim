@@ -229,8 +229,9 @@ remain unchanged, and disabling the toggle restores the prior product profile.
 
 Terrain3D's optional infinite world background is disabled in this composition;
 its generated cliff shell would otherwise cover the Sky3D horizon. The bounded
-64 m site terrain, official surface assets, rocks, grass, and logical excavation
-contracts remain unchanged.
+64 m site terrain and logical excavation contracts remain unchanged. Native
+demo rocks, grass particles, trees, and foliage are disabled; shared project
+worksite cues remain independent siblings.
 
 The camera workflow also provides a model-specific cab first-person preset on
 key 5. It follows `upper_structure_link` directly and applies reversible,
@@ -277,23 +278,24 @@ restores those scalar defaults. Native activation hides both the custom terrain
 mesh and `FoundationGround`; queued or failed native work restores both fallback
 layers immediately.
 
-The current temporary Terrain3D visual baseline intentionally reuses a minimal
-production extraction of the official Terrain3D demo assets and material
-configuration. A project-owned
-`ConstructionSiteTerrainProfile` still builds the 64 m × 64 m derived
-height/control map around the accepted 20 m logical patch, but its two material
-IDs select the demo cliff/bare-ground and grass slots. The adapter loads the
-extracted demo `Terrain3DMaterial`, including projection, dual scaling, macro
-variation, auto-shader, and world-background parameters.
+Terrain3D and the fallback mesh now share the project-owned
+`worksite_soil_common.gdshaderinc` classification for compacted, loose,
+slope-disturbed, damp, track-lane, macro-distance, roughness, and specular
+response. `ConstructionSiteTerrainProfile` builds the same 64 m × 64 m derived
+height/control map, but every control cell selects one procedural-soil role.
+The native shader override retains Terrain3D 1.0.2's complete clipmap,
+geomorph, height, hole, and normal seam and does not sample demo ground/grass
+textures. Two provenanced texture slots remain loaded only because Terrain3D
+1.0.2 requires initialized assets before enter-tree.
 
 `TerrainState` algorithm `godot-terrain-state-v3-construction-site` covers the
 complete 64 m visible site at 0.5 m spacing. Its central 20 m work pad is a true
 zero-height plane while the deterministic outer grades and spoil contours are
 part of the same authoritative heightfield, so rendered ground, Jolt support,
 and excavation sampling cannot diverge when the machine leaves the spawn area.
-Official RockA/B/C meshes are placed outside that patch through bounded
-`MultiMeshInstance3D` layers. The official grass particle scene is retained
-outside a 12 m central exclusion radius. Demo height maps are never imported as
+Native RockA/B/C layers and Terrain3D grass particles are default-off; the
+separate code-native `ConstructionSiteDressing` preserves project worksite
+context and quality budgets. Demo height maps are never imported as
 logical state, and these presentation objects add no collision authority.
 
 When enabled, Terrain3D may generate static collision shapes. In default and
