@@ -59,9 +59,13 @@ function Invoke-Godot {
         -FilePath $GodotExe `
         -ArgumentList $Arguments `
         -NoNewWindow `
-        -Wait `
         -PassThru
-    return $process.ExitCode
+    $process.WaitForExit()
+    $process.Refresh()
+    if (-not $process.HasExited) {
+        throw "Godot process did not expose a terminal exit state"
+    }
+    return [int]$process.ExitCode
 }
 
 $exitCode = Invoke-Godot -Arguments @("--headless", "--path", $projectDir, "--editor", "--quit")

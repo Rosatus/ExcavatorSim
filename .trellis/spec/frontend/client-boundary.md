@@ -557,8 +557,9 @@ Correct: physics rig declares local_forward_axis=+Z -> Jolt derives forward and 
 
 ### Terrain3D derived-backend contract
 
-`Terrain3DAdapter` is an optional presentation/collision backend, not a second
-authority. Its public seam is:
+`Terrain3DAdapter` is the product-default presentation backend, not a second
+authority. `soil_shader` remains an explicit and automatic synchronized
+fallback. Its public seam is:
 
 ```text
 queue_snapshot(snapshot: Dictionary) -> bool
@@ -576,6 +577,77 @@ older `(epoch, generation, revision)` work, and only marks `available=true`
 after the accepted height map is materialized. `TerrainState.surface_bytes` and
 its digest remain the parity oracle; Terrain3D's internal maps never replace
 them.
+
+#### Product cutover and Windows export contract
+
+##### 1. Scope / Trigger
+
+Apply this contract whenever the default terrain backend, product diagnostics,
+Godot export preset, Terrain3D/Sky3D packaging, or release validation changes.
+
+##### 2. Signatures
+
+```text
+TerrainWorld.terrain_backend: "terrain3d" | "soil_shader" = "terrain3d"
+TerrainWorld.get_status_snapshot() -> Dictionary
+tests/run_terrain3d_release_validation.ps1 [-GodotExe <path>] [-OutputDir <path>]
+```
+
+##### 3. Contracts
+
+- Main-scene startup configures `terrain3d`; `soil_shader` remains a supported
+  explicit rollback that requires no terrain-data migration.
+- Advanced operator diagnostics consume the existing `ExcavationWorld` status
+  and show configured/active backend, material identity, and a bounded fallback
+  reason. Diagnostics never select a backend or mutate authority.
+- Windows release validation runs the same dedicated smoke scene once from the
+  source project and once as the entry scene of an isolated temporary export.
+  The real project entry remains `res://scenes/main.tscn`.
+- The packaged Windows directory contains the executable, Terrain3D release
+  DLL, root `LICENSE`/`NOTICE.md`, and adjacent Terrain3D/Sky3D license and Sky3D
+  provenance files.
+
+##### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Native startup succeeds | One native surface, project soil material, no native demo dressing |
+| Native startup/update fails | One synchronized fallback surface plus bounded reason; simulation continues |
+| Explicit `soil_shader` rollback | Custom renderer starts directly; logical bytes/collider/soil/Jolt contracts stay unchanged |
+| Export omits Terrain3D DLL or notice files | Packaging gate fails |
+| Source/export checkpoint differs | Parity gate fails and retains both JSON/log sets |
+
+##### 5. Good / Base / Bad Cases
+
+- Good: default native startup -> cut/deposit -> Test Grid -> recovery -> model
+  switch/reset, with matching source/export checkpoints.
+- Base: set `terrain_backend="soil_shader"` and keep the same authority data and
+  project collider without migration.
+- Bad: change `main.tscn` to a test entry or add a production-only hidden test
+  hook merely to exercise an exported build.
+
+##### 6. Tests Required
+
+- `visual_pass_test.gd` asserts the native product default, approved project-soil
+  identity, single visible surface, and no native demo dressing.
+- `operator_ui_test.gd` asserts backend/material identity appears only behind
+  Advanced diagnostics; its documented legacy model-switch failures remain
+  separate from this assertion.
+- `terrain3d_export_smoke.tscn` covers cut/deposit, Test Grid, forced
+  fallback/recovery, explicit `soil_shader` rollback/restoration, SY135 switch,
+  reset, and a successful test-process exit.
+- `run_terrain3d_release_validation.ps1` compares source/export checkpoints and
+  hashes the packaged artifacts.
+
+##### 7. Wrong vs Correct
+
+```text
+Wrong: exported test requires changing the production main scene or adding a runtime test backdoor
+Correct: copy to an isolated temp project -> select smoke entry there -> export/run -> compare JSON
+
+Wrong: native visual default -> infer Terrain3D owns terrain collision or soil state
+Correct: native visual default -> TerrainState/soil/Jolt/TerrainCollider remain authoritative -> synchronized fallback remains available
+```
 
 #### Incremental revision contract
 
@@ -1489,9 +1561,10 @@ into Terrain3D.
 - `terrain3d_adapter_test.gd` asserts the project material/override identity,
   default-off native demo dressing/background/texture sampling, presentation
   dimensions, snapshot guards, fallback, and Jolt collision seam.
-- `visual_pass_test.gd` asserts fallback shader identity, Test Grid material
-  retention/restore, unchanged Sky3D/shared cues/effects/camera/UI budgets, and
-  native demo dressing exclusions across quality profiles.
+- `visual_pass_test.gd` asserts the native product default/project material,
+  fallback shader identity, Test Grid material retention/restore, unchanged
+  Sky3D/shared cues/effects/camera/UI budgets, and native demo dressing
+  exclusions across quality profiles.
 - The full standalone matrix must keep terrain/excavation/release-candidate
   contracts green.
 

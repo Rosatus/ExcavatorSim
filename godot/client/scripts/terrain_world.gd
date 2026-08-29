@@ -23,7 +23,7 @@ const FALLBACK_SYNC_FAILED := "fallback_sync_failed"
 @export var foundation_ground_path := NodePath("../FoundationGround")
 ## "terrain3d" uses the native GDExtension surface; "soil_shader" forces the
 ## built-in procedural soil mesh (deterministic across machines/GPU drivers).
-@export var terrain_backend := "soil_shader"
+@export var terrain_backend := "terrain3d"
 
 var terrain_state: TerrainState
 @onready var terrain_renderer := get_node_or_null("TerrainMesh") as TerrainRenderer

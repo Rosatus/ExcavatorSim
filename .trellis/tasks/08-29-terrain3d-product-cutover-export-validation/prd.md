@@ -31,19 +31,19 @@ evidence. This phase may not waive a previous stop gate.
 
 ## Acceptance Criteria
 
-- [ ] Main product startup selects native Terrain3D and renders a non-black
+- [x] Main product startup selects native Terrain3D and renders a non-black
   project-soil surface with no demo vegetation/dressing/background.
-- [ ] Editor and exported Windows build agree on backend/material/applied identity
+- [x] Editor and exported Windows build agree on backend/material/applied identity
   and pass deformation, reset, model-switch, failure/recovery, and shutdown smoke.
-- [ ] Forced native failure automatically exposes the synchronized fallback and
+- [x] Forced native failure automatically exposes the synchronized fallback and
   reports a bounded actionable reason while simulation continues.
-- [ ] Test Grid is presentation-only and restores native after successful resync.
-- [ ] Full deterministic, Jolt, terrain, soil, visual, offline, model, telemetry,
+- [x] Test Grid is presentation-only and restores native after successful resync.
+- [x] Full deterministic, Jolt, terrain, soil, visual, offline, model, telemetry,
   release, packaging, and repository verification gates pass.
-- [ ] Focused human review accepts current visual composition/material continuity.
-- [ ] Documentation and specs state Terrain3D is visible presentation only,
+- [x] Focused human review accepts current visual composition/material continuity.
+- [x] Documentation and specs state Terrain3D is visible presentation only,
   project collision/authority remain unchanged, and fallback is supported.
-- [ ] Parent integration acceptance has complete linked evidence.
+- [x] Parent integration acceptance has complete linked evidence.
 
 ## Out of Scope
 

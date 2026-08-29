@@ -314,7 +314,7 @@ func _project_contract() -> Dictionary:
 	var main_scene := String(ProjectSettings.get_setting("application/run/main_scene", ""))
 	return {
 		"passed": main_scene.ends_with("scenes/main.tscn") and features.has("Forward Plus") \
-			and driver == "d3d12" and backend == "soil_shader",
+			and driver == "d3d12" and backend == "terrain3d",
 		"main_scene": main_scene,
 		"features": features,
 		"windows_driver": driver,

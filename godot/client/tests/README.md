@@ -15,6 +15,18 @@ For one focused contract, run the same executable from `godot/client/`:
 & $GodotExe --headless --path . --script res://tests/foundation_scene_test.gd
 ```
 
+Validate the Terrain3D product default and an actual Windows export from the
+repository root:
+
+```powershell
+.\godot\client\tests\run_terrain3d_release_validation.ps1
+```
+
+This uses an isolated temporary project to select
+`terrain3d_export_smoke.tscn` as the exported entry. It does not modify the
+product main scene. Structured source/export evidence and the staged package
+are written under `output/terrain3d_phase4/`.
+
 The release-candidate matrix is:
 
 ```text

@@ -260,7 +260,7 @@ Godot builds a derived render mesh from its selected local surface snapshot.
 is generation-gated, stale-safe, and disabled/fail-open by default. A disabled
 or failed physics backend must leave the Python service and visual state usable.
 
-The optional `Terrain3DAdapter` is another derived backend. It receives copied
+The product-default `Terrain3DAdapter` is a derived presentation backend. It receives copied
 `TerrainState.surface_snapshot()` data only after the fixed-step logical edit has
 been accepted. `TerrainState` keeps the stable/loose Float32 layers, revision
 and generation guards, while the selected `SoilInteractionAuthority` or legacy
@@ -268,8 +268,10 @@ and generation guards, while the selected `SoilInteractionAuthority` or legacy
 accounting. Terrain3D is therefore a rendering,
 heightmap materialization, and optional collision provider; editor sculpting or
 direct native height edits are not gameplay mutation paths. If its GDExtension,
-map import, or collision mode is unavailable, the custom mesh/collider path
-continues to provide the fail-open fallback.
+map import, or material setup is unavailable, the synchronized custom mesh
+continues to provide the visible fallback. Setting `TerrainWorld.terrain_backend`
+to `soil_shader` is the explicit low-risk rollback; it changes presentation only
+and requires no terrain or soil-state migration.
 
 Terrain3D 1.0.2 performs native setup on enter-tree. The adapter assigns
 non-null assets/material before adding the node, then assigns `region_size=128`
@@ -287,7 +289,9 @@ Grid override, accepted/queued/applied identities, bounded fallback reason, and
 full/patch/failure counters. Test Grid never changes the configured product
 backend: entry synchronizes fallback before showing the one-metre grid, and exit
 performs a full native resync before Terrain3D is shown again. A failed exit
-keeps the synchronized fallback active.
+keeps the synchronized fallback active. The operator HUD's Advanced panel shows
+the configured/active backend, project material identity, and bounded fallback
+reason without becoming a control or authority source.
 
 Terrain3D and the fallback mesh now share the project-owned
 `worksite_soil_common.gdshaderinc` classification for compacted, loose,
@@ -327,8 +331,22 @@ Tracked support follows the same one-way rule. The bilinear `TerrainState`
 surface is authoritative. Optional `TerrainCollider` ray hits are accepted only
 when the collider's applied `(world_generation, terrain_revision)` equals the
 current TerrainState identity and the hit height remains within the configured
-tolerance; every miss, stale collider, or unavailable physics path fails open
-to the heightfield.
+tolerance. A matching project-collider ray miss may use the logical heightfield;
+a stale, unavailable, or disabled collider identity disarms Jolt track forces
+and bucket evidence until the project collider catches up.
+
+Windows release validation is reproducible from the repository root:
+
+```powershell
+.\godot\client\tests\run_terrain3d_release_validation.ps1
+```
+
+The runner validates the same cut/deposit, Test Grid, fallback/recovery,
+explicit `soil_shader` rollback/restoration, SY135-switch, reset, and successful
+test-process exit in the source project and an isolated Windows export. It
+compares their structured checkpoints, verifies the exported Terrain3D DLL
+against the vendored release binary, and stages project/add-on notices next to
+the executable. It never changes the real `main.tscn` entry.
 
 The first soil presentation is not a per-grain rigid-body simulation. It combines the authoritative stable/loose heightfield and bucket volume with bounded visual particles or clumps. Those effects are disposable presentation state and must clear on historical seek, reset, reconnect, and authority-generation changes.
 

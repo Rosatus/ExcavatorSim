@@ -37,12 +37,13 @@ inertia, terrain/contact behavior, hydraulics, or dynamics.
 The Godot client vendors Terrain3D 1.0.2 under
 `godot/client/addons/terrain_3d/`. Terrain3D is Copyright © 2023-2026 Cory
 Petkovsek, Roope Palmroos, and Contributors and is provided under the MIT
-License retained at `godot/client/addons/terrain_3d/LICENSE.txt`. The current
-temporary Godot visual baseline intentionally reuses Terrain3D's bundled demo
-assets, material configuration, scanned rocks, and grass particles. Demo texture
-sources are ambientCG assets supplied under CC0 1.0 Universal as recorded in
-`godot/client/demo/assets/textures/asset_licenses.txt`. ExcavatorSim still owns
-the logical height/control maps; demo terrain heights are not authoritative.
+License retained at `godot/client/addons/terrain_3d/LICENSE.txt`. The product
+uses a project-owned procedural soil shader override and creates no Terrain3D
+demo rocks, grass particles, trees, foliage, or infinite background. Two
+provenanced Terrain3D texture slots remain initialized for native compatibility
+but are not sampled by the override; their ambientCG CC0 sources are recorded
+in `godot/client/demo/assets/textures/asset_licenses.txt`. ExcavatorSim owns the
+logical height/control maps; demo terrain heights are never authoritative.
 
 The Godot client also vendors Sky3D 2.1 under
 `godot/client/addons/sky_3d/`. Sky3D is Copyright © 2023-2026 Cory Petkovsek

@@ -65,8 +65,12 @@ func _check_default_hierarchy(ui: MotionOperatorUI) -> void:
 		_fail("default HUD did not expose operation, bucket, and recovery state")
 	var advanced_toggle := ui.get_node("StatusPanel/Margin/VBox/Tools/Advanced") as CheckButton
 	advanced_toggle.button_pressed = true
-	if not advanced.visible or "Gen:" not in _visible_label_copy(ui):
+	var advanced_copy := _visible_label_copy(ui)
+	if not advanced.visible or "Gen:" not in advanced_copy:
 		_fail("advanced diagnostics did not expose generation details on request")
+	if "Terrain: terrain3d -> terrain3d" not in advanced_copy \
+			or "Material: project_procedural_worksite_soil" not in advanced_copy:
+		_fail("advanced diagnostics did not expose the active Terrain3D backend and material identity")
 	advanced_toggle.button_pressed = false
 
 

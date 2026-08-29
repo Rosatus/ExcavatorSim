@@ -14,7 +14,7 @@ func _run() -> void:
 	if result == 0:
 		result = _test_effect_budget()
 	if result == 0:
-		result = await _test_default_soil_shader_scene()
+		result = await _test_default_terrain3d_scene()
 	if result == 0:
 		result = await _test_scene_visual_nodes()
 	if result == 0:
@@ -65,7 +65,7 @@ func _test_effect_budget() -> int:
 	return 0
 
 
-func _test_default_soil_shader_scene() -> int:
+func _test_default_terrain3d_scene() -> int:
 	var packed := load(MAIN_SCENE) as PackedScene
 	if packed == null:
 		return _fail("default backend scene loads")
@@ -83,14 +83,16 @@ func _test_default_soil_shader_scene() -> int:
 	await process_frame
 	await process_frame
 	var after := terrain_world.terrain_state.surface_snapshot()
-	if terrain_world.terrain_backend != "soil_shader" or not terrain_renderer.visible \
-			or terrain_adapter.is_native_mesh_active():
+	var terrain_status := terrain_world.get_status_snapshot()
+	if terrain_world.terrain_backend != "terrain3d" or terrain_renderer.visible \
+			or not terrain_adapter.is_native_mesh_active():
 		scene.queue_free()
-		return _fail("main scene enters tree on the soil_shader fallback product default")
-	if String(terrain_renderer.get_status_snapshot().get("shader_source", "")) \
-			!= "res://assets/terrain/shaders/worksite_soil_fallback.gdshader":
+		return _fail("main scene enters tree on the native Terrain3D product default")
+	if String(terrain_status.get("active_backend", "")) != "terrain3d" \
+			or String(terrain_status.get("material_identity", "")) != "project_procedural_worksite_soil" \
+			or bool(terrain_status.get("native_demo_dressing_active", true)):
 		scene.queue_free()
-		return _fail("default product backend uses the shared procedural soil shader")
+		return _fail("default product backend keeps the approved project soil material without demo dressing")
 	if before["surface_bytes"] != after["surface_bytes"] \
 			or before["terrain_revision"] != after["terrain_revision"]:
 		scene.queue_free()
@@ -108,9 +110,8 @@ func _test_scene_visual_nodes() -> int:
 	var configured_world := scene.get_node_or_null("TerrainRoot/TerrainWorld") as TerrainWorld
 	if configured_world == null:
 		return _fail("main scene exposes TerrainWorld before visual activation")
-	# This contract exercises native/test/fallback presentation transitions.
-	# Product default remains soil_shader and is asserted by the real probe.
-	configured_world.terrain_backend = "terrain3d"
+	# This contract exercises native/test/fallback presentation transitions from
+	# the product-default Terrain3D backend.
 	root.add_child(scene)
 	await process_frame
 	var visual_environment := scene.get_node_or_null("VisualEnvironment") as VisualEnvironment

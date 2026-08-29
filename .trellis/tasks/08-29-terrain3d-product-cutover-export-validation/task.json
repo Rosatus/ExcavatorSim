@@ -3,7 +3,7 @@
   "name": "terrain3d-product-cutover-export-validation",
   "title": "Terrain3D product cutover and export validation",
   "description": "Phase 4: switch the approved product default, validate diagnostics and Test Grid, run full quality gates, and prove Windows editor/export parity.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

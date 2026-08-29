@@ -41,9 +41,17 @@ explicit Godot 4.7 executable, so it does not depend on a user profile PATH:
 ```powershell
 .\godot\client\tests\run_standalone_matrix.ps1 `
   -GodotExe "E:\applications\Godot_v4.7.1-stable_mono_win64\Godot_v4.7.1-stable_mono_win64.exe"
+.\godot\client\tests\run_terrain3d_release_validation.ps1
 pixi run backend-smoke
 pixi run verify
 ```
+
+The Terrain3D release runner keeps the production entry scene unchanged. It
+exports an isolated Windows smoke entry, proves native-default/material and
+source/export lifecycle parity, exercises the explicit `soil_shader` rollback,
+verifies the native DLL against its vendored release binary, and stages license
+and provenance files beside the package. The rollback does not migrate authority
+data.
 
 Run the rendered Jolt product soak against a fresh `gateway-only` process for
 both models:

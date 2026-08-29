@@ -625,6 +625,7 @@ func _refresh() -> void:
 	var diagnostics := "Local input" if local_mode else "Input ACK: %s" % (str(last_ack.get("client_sequence", "—")) if not last_ack.is_empty() else "—")
 	if not last_error.is_empty():
 		diagnostics += "   Error: %s" % String(last_error.get("code", "unknown"))
+	diagnostics += "\n%s" % _terrain_diagnostics_text()
 	_diagnostics_label.text = diagnostics
 	_refresh_can_status()
 	_model_selector.tooltip_text = "%s — switching starts a fresh work session" % UIStrings.model_name(model_id)
@@ -632,6 +633,21 @@ func _refresh() -> void:
 	_refresh_warning(status, lifecycle, connection)
 	_maybe_complete_action(status)
 	_refresh_model_selector()
+
+
+func _terrain_diagnostics_text() -> String:
+	if _excavation_world == null:
+		return "Terrain: unavailable"
+	var excavation_status := _excavation_world.get_status_snapshot()
+	var terrain_status := excavation_status.get("terrain3d", {}) as Dictionary
+	var configured := String(terrain_status.get("configured_backend", "unknown"))
+	var active := String(terrain_status.get("active_backend", "unknown"))
+	var material := String(terrain_status.get("material_identity", "unknown"))
+	var line := "Terrain: %s -> %s   Material: %s" % [configured, active, material]
+	var fallback_reason := String(terrain_status.get("fallback_reason", "")).strip_edges()
+	if not fallback_reason.is_empty():
+		line += "   Fallback: %s" % fallback_reason.replace("\n", " ").left(120)
+	return line
 
 
 func _refresh_soil() -> void:
