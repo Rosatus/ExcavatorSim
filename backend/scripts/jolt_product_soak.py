@@ -6,6 +6,7 @@ import argparse
 import ctypes
 import json
 import os
+import platform
 import shutil
 import socket
 import subprocess
@@ -19,11 +20,14 @@ from pathlib import Path
 from typing import Any
 
 from babylon_sim.product_soak import (
+    BUCKET_GROUND_MODES,
     QUALITY_PROFILES,
     SOAK_REPORT_SCHEMA_VERSION,
     SoakBudgets,
     evaluate_gateway_report,
     evaluate_godot_report,
+    paired_bucket_ground_coverage_complete,
+    summarize_paired_bucket_ground_reports,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -70,39 +74,90 @@ def main() -> int:
     output.parent.mkdir(parents=True, exist_ok=True)
     budgets = SoakBudgets()
     model_reports: list[dict[str, Any]] = []
+    execution_order: list[dict[str, Any]] = []
+    run_ordinal = 0
     for model_id in args.models:
         for quality_profile in args.quality_profiles:
-            model_reports.append(
-                _run_model_with_retry(
-                    model_id=model_id,
-                    quality_profile=quality_profile,
-                    godot_exe=godot_exe,
-                    duration_seconds=duration_seconds,
-                    warmup_seconds=warmup_seconds,
-                    output_dir=output.parent,
-                    budgets=budgets,
-                    allow_incomplete_scenario=args.allow_incomplete_scenario,
-                    headless=args.headless,
-                )
-            )
+            for repetition in range(1, args.repetitions + 1):
+                ordered_modes = list(args.bucket_ground_modes)
+                if repetition % 2 == 0:
+                    ordered_modes.reverse()
+                for bucket_ground_mode in ordered_modes:
+                    run_ordinal += 1
+                    execution_order.append(
+                        {
+                            "run_ordinal": run_ordinal,
+                            "model_id": model_id,
+                            "quality_profile": quality_profile,
+                            "repetition": repetition,
+                            "bucket_ground_mode": bucket_ground_mode,
+                            "trace_identity": "bucket-ground-cycle-v1",
+                        }
+                    )
+                    model_reports.append(
+                        _run_model_with_retry(
+                            model_id=model_id,
+                            quality_profile=quality_profile,
+                            bucket_ground_mode=bucket_ground_mode,
+                            repetition=repetition,
+                            run_ordinal=run_ordinal,
+                            trace_identity="bucket-ground-cycle-v1",
+                            godot_exe=godot_exe,
+                            duration_seconds=duration_seconds,
+                            warmup_seconds=warmup_seconds,
+                            output_dir=output.parent,
+                            budgets=budgets,
+                            allow_incomplete_scenario=args.allow_incomplete_scenario,
+                            headless=args.headless,
+                        )
+                    )
+    comparisons = summarize_paired_bucket_ground_reports(model_reports)
+    paired_comparison_required = "bucket_passthrough" in args.bucket_ground_modes
+    paired_comparison_complete = not paired_comparison_required or (
+        "normal" in args.bucket_ground_modes
+        and paired_bucket_ground_coverage_complete(
+            comparisons, args.models, args.quality_profiles
+        )
+    )
     report = {
         "schema_version": SOAK_REPORT_SCHEMA_VERSION,
         "captured_at_utc": datetime.now(UTC).isoformat(),
+        "machine_id": platform.node(),
+        "source_revision": _source_revision(),
         "mode": args.mode,
         "rendered": not args.headless,
         "quality_profiles": args.quality_profiles,
+        "bucket_ground_modes": args.bucket_ground_modes,
+        "repetitions": args.repetitions,
         "duration_seconds_per_cell": duration_seconds,
-        "duration_seconds_per_model": duration_seconds * len(args.quality_profiles),
+        "duration_seconds_per_model": (
+            duration_seconds
+            * len(args.quality_profiles)
+            * len(args.bucket_ground_modes)
+            * args.repetitions
+        ),
         "warmup_seconds": warmup_seconds,
         "budgets": budgets.as_dict(),
         "models": model_reports,
-        "pass": all(bool(model.get("pass", False)) for model in model_reports),
+        "execution_order": execution_order,
+        "paired_comparisons": comparisons,
+        "paired_comparison_required": paired_comparison_required,
+        "paired_comparison_complete": paired_comparison_complete,
+        "pass": all(bool(model.get("pass", False)) for model in model_reports)
+        and paired_comparison_complete
+        and all(
+            bool(comparison.get("pass_through_lower_median_p95", False))
+            for comparison in comparisons
+        ),
     }
     output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     for model in model_reports:
         failed = [name for name, passed in model["gates"].items() if not passed]
         status = "PASS" if model["pass"] else "FAIL"
-        identity = f"{model['model_id']}/{model['quality_profile']}"
+        identity = (
+            f"{model['model_id']}/{model['quality_profile']}/"
+            f"{model['bucket_ground_mode']}#{model['repetition']}"
+        )
         print(f"{identity}: {status}" + (f" ({', '.join(failed)})" if failed else ""))
     print(f"Jolt product soak report: {output}")
     return 0 if report["pass"] else 1
@@ -126,8 +181,37 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--godot-exe", type=Path)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--allow-incomplete-scenario", action="store_true")
+    parser.add_argument(
+        "--bucket-ground-mode",
+        dest="bucket_ground_modes",
+        nargs="+",
+        choices=BUCKET_GROUND_MODES,
+        default=["normal"],
+    )
+    parser.add_argument("--repetitions", type=int, choices=range(1, 10), default=1)
     parser.add_argument("--headless", action="store_true")
     return parser
+
+
+def _source_revision() -> dict[str, Any]:
+    completed = subprocess.run(
+        ["git", "status", "--porcelain=v1"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return {
+        "git_head": head.stdout.strip() if head.returncode == 0 else "unavailable",
+        "working_tree_dirty": bool(completed.stdout.strip()) if completed.returncode == 0 else None,
+    }
 
 
 def _find_godot(explicit: Path | None) -> Path:
@@ -161,6 +245,10 @@ def _run_model(
     *,
     model_id: str,
     quality_profile: str,
+    bucket_ground_mode: str,
+    repetition: int,
+    run_ordinal: int,
+    trace_identity: str,
     godot_exe: Path,
     duration_seconds: float,
     warmup_seconds: float,
@@ -172,7 +260,7 @@ def _run_model(
     port = _reserve_port()
     health_url = f"http://127.0.0.1:{port}/health"
     endpoint = f"ws://127.0.0.1:{port}/ws"
-    cell_id = f"{model_id}-{quality_profile}"
+    cell_id = f"{model_id}-{quality_profile}-{bucket_ground_mode}-r{repetition}"
     godot_report_path = output_dir / f"jolt-product-soak-{cell_id}-godot.json"
     backend_log_path = output_dir / f"jolt-product-soak-{cell_id}-backend.log"
     godot_log_path = output_dir / f"jolt-product-soak-{cell_id}-godot.log"
@@ -207,6 +295,8 @@ def _run_model(
             model_id,
             "--quality-profile",
             quality_profile,
+            "--bucket-ground-mode",
+            bucket_ground_mode,
             "--duration-seconds",
             str(duration_seconds),
             "--warmup-seconds",
@@ -283,7 +373,9 @@ def _run_model(
         "telemetry": telemetry,
         "memory": memory,
     }
-    gates = evaluate_godot_report(godot_report, budgets, model_id, quality_profile)
+    gates = evaluate_godot_report(
+        godot_report, budgets, model_id, quality_profile, bucket_ground_mode
+    )
     gates.update(evaluate_gateway_report(gateway_report, budgets, model_id))
     gates["godot_process_exit"] = godot_exit_code == 0
     gates["rendered_product_path"] = not headless
@@ -294,6 +386,10 @@ def _run_model(
     return {
         "model_id": model_id,
         "quality_profile": quality_profile,
+        "bucket_ground_mode": bucket_ground_mode,
+        "repetition": repetition,
+        "run_ordinal": run_ordinal,
+        "trace_identity": trace_identity,
         "godot_exit_code": godot_exit_code,
         "godot": godot_report,
         "gateway": gateway_report,

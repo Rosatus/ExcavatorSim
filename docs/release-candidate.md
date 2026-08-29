@@ -77,6 +77,28 @@ It also requires track and articulation movement, cut/load/dump/support evidence
 reset, reconnect, the selected model identity, and exactly one Jolt runtime. The
 JSON report and per-process logs are written under `artifacts/benchmark/`.
 
+The soak runner also supports the bucket pass-through inverse contract. For the
+required alternating three-pair balanced comparison on both production models:
+
+```powershell
+pixi run python backend/scripts/jolt_product_soak.py --models sy205 sy135 --quality-profile balanced --bucket-ground-mode normal bucket_passthrough --repetitions 3 --output artifacts/benchmark/bucket-pass-through-paired.json
+```
+
+Each pass-through cell requires zero bucket query execution, soil steps,
+bucket terrain commits, payload, cut/dump, support response, and effects update,
+while the corresponding bypass counters must advance. The summary records all
+six raw fixed-step p95 values per model, their mode medians, counter deltas, and
+requires the pass-through median to be lower than the normal median. Ordinary
+mode retains the existing cut/load/dump/support gates unchanged.
+
+Repetitions alternate order (`normal/pass-through`, `pass-through/normal`, then
+`normal/pass-through`) and record run ordinal plus a stable trace identity.
+ProductSession owns model and lifecycle; MotionClient is connected explicitly
+only for Gateway telemetry/reconnect coverage. Active-patch dump/spill evidence
+comes from accepted authority transactions. Completed inert scenario cells are
+never retried or discarded; only a pre-scenario Gateway health startup failure
+may receive the existing single retry.
+
 The backend smoke starts a temporary legacy service and verifies health, URDF,
 the five-part visual manifest/GLB, WebSocket handshake, aligned `view_state` /
 `terrain_view`, and the authoritative Float32 terrain snapshot. It is kept out
