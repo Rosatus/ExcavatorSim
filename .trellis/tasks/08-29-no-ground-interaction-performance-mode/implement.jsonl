@@ -1,0 +1,9 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/frontend/index.md", "reason": "Godot client pre-development boundary and quality checklist"}
+{"file": ".trellis/spec/frontend/client-boundary.md", "reason": "Jolt, terrain, soil authority, payload, and bucket support contracts"}
+{"file": ".trellis/spec/frontend/motion-transport.md", "reason": "Lifecycle, reconnect, model-switch, and generation cleanup contracts"}
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend soak tooling quality and verification checklist"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Python soak/reporting quality and deterministic test guidance"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Mode crosses UI, session, physics, soil, effects, and benchmark boundaries"}
+{"file": ".trellis/tasks/08-29-no-ground-interaction-performance-mode/research/interaction-boundaries.md", "reason": "Authoritative bucket, chassis, soil workload, and lifecycle findings"}
+{"file": ".trellis/tasks/08-29-no-ground-interaction-performance-mode/research/validation-strategy.md", "reason": "Deterministic, soak, standalone, and export validation plan"}
