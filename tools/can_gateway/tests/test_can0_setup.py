@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 import stat
@@ -37,7 +38,11 @@ from can0_setup import (  # noqa: E402
 )
 from can0_setup_helper import main as helper_main  # noqa: E402
 
-TEST_LOCK_PATH = Path("C:/run/excavatorsim/can0.lock")
+TEST_LOCK_PATH = (
+    Path("C:/run/excavatorsim/can0.lock")
+    if os.name == "nt"
+    else Path("/run/excavatorsim/can0.lock")
+)
 
 
 def link_json(
@@ -96,6 +101,7 @@ def make_lock_ops(
     directory_metadata: SimpleNamespace | None = None,
     lock_metadata: SimpleNamespace | None = None,
     fail_phase: str | None = None,
+    fail_error: OSError | None = None,
 ) -> Can0LockOps:
     metadata = {
         10: runtime_metadata or fake_stat(stat.S_IFDIR | 0o755),
@@ -107,7 +113,7 @@ def make_lock_ops(
     def open_fd(*args, **kwargs):
         fd = next(open_fds)
         if fail_phase == f"open_{fd}":
-            raise PermissionError("attacker-controlled open detail")
+            raise fail_error or PermissionError("attacker-controlled open detail")
         return fd
 
     def mkdir(*args, **kwargs):
@@ -280,7 +286,9 @@ class Can0SecureLockTest(unittest.TestCase):
         self.assertEqual(CAN0_LOCK_PATH, Path("/run/excavatorsim/can0.lock"))
 
     def test_safe_metadata_is_accepted(self) -> None:
-        _validate_runtime_root(fake_stat(stat.S_IFDIR | 0o755))
+        for mode in (0o755, 0o777):
+            with self.subTest(mode=mode):
+                _validate_runtime_root(fake_stat(stat.S_IFDIR | mode))
         _validate_lock_directory(fake_stat(stat.S_IFDIR | 0o700))
         _validate_lock_file(fake_stat(stat.S_IFREG | 0o600))
 
@@ -288,12 +296,21 @@ class Can0SecureLockTest(unittest.TestCase):
         cases = (
             fake_stat(stat.S_IFREG | 0o755),
             fake_stat(stat.S_IFDIR | 0o755, uid=1000),
-            fake_stat(stat.S_IFDIR | 0o777),
         )
         for metadata in cases:
             with self.subTest(metadata=metadata), self.assertRaises(Can0SetupError) as ctx:
                 _validate_runtime_root(metadata)
             self.assertEqual(ctx.exception.code, "CAN0_SETUP_FAILED")
+
+    def test_writable_root_owned_runtime_reaches_the_configure_transaction(self) -> None:
+        runner = SequenceRunner([link_json()])
+        snapshot = configure_can0(
+            runner=runner,
+            lock_path=TEST_LOCK_PATH,
+            lock_ops=make_lock_ops(runtime_metadata=fake_stat(stat.S_IFDIR | 0o777)),
+        )
+        self.assertTrue(snapshot.ready)
+        self.assertEqual(len(runner.calls), 1)
 
     def test_wrong_directory_owner_or_mode_is_rejected(self) -> None:
         cases = (
@@ -305,6 +322,26 @@ class Can0SecureLockTest(unittest.TestCase):
             with self.subTest(metadata=metadata), self.assertRaises(Can0SetupError) as ctx:
                 _validate_lock_directory(metadata)
             self.assertEqual(ctx.exception.code, "CAN0_SETUP_FAILED")
+
+    def test_unsafe_directory_under_writable_runtime_is_rejected_without_mutation(self) -> None:
+        cases = (
+            fake_stat(stat.S_IFDIR | 0o700, uid=1000),
+            fake_stat(stat.S_IFDIR | 0o750),
+            fake_stat(stat.S_IFREG | 0o700),
+        )
+        for metadata in cases:
+            runner = SequenceRunner([])
+            with self.subTest(metadata=metadata), self.assertRaises(Can0SetupError) as ctx:
+                configure_can0(
+                    runner=runner,
+                    lock_path=TEST_LOCK_PATH,
+                    lock_ops=make_lock_ops(
+                        runtime_metadata=fake_stat(stat.S_IFDIR | 0o777),
+                        directory_metadata=metadata,
+                    ),
+                )
+            self.assertEqual(ctx.exception.code, "CAN0_SETUP_FAILED")
+            self.assertEqual(runner.calls, [])
 
     def test_preoccupied_or_unsafe_lock_object_is_rejected(self) -> None:
         cases = (
@@ -319,7 +356,10 @@ class Can0SecureLockTest(unittest.TestCase):
                 configure_can0(
                     runner=runner,
                     lock_path=TEST_LOCK_PATH,
-                    lock_ops=make_lock_ops(lock_metadata=metadata),
+                    lock_ops=make_lock_ops(
+                        runtime_metadata=fake_stat(stat.S_IFDIR | 0o777),
+                        lock_metadata=metadata,
+                    ),
                 )
             self.assertEqual(ctx.exception.code, "CAN0_SETUP_FAILED")
             self.assertEqual(runner.calls, [])
@@ -345,6 +385,65 @@ class Can0SecureLockTest(unittest.TestCase):
             self.assertEqual(ctx.exception.code, "CAN0_SETUP_FAILED")
             self.assertNotIn("attacker-controlled", str(ctx.exception))
             self.assertEqual(runner.calls, [])
+
+    def test_symlink_style_open_failure_is_stable_and_sanitized(self) -> None:
+        runner = SequenceRunner([])
+        with self.assertRaises(Can0SetupError) as ctx:
+            configure_can0(
+                runner=runner,
+                lock_path=TEST_LOCK_PATH,
+                lock_ops=make_lock_ops(
+                    runtime_metadata=fake_stat(stat.S_IFDIR | 0o777),
+                    fail_phase="open_11",
+                    fail_error=OSError(errno.ELOOP, "attacker-controlled symlink detail"),
+                ),
+            )
+        self.assertEqual(ctx.exception.code, "CAN0_SETUP_FAILED")
+        self.assertEqual(str(ctx.exception), "can0 lock directory unavailable")
+        self.assertEqual(runner.calls, [])
+
+    def test_lock_opens_retain_directory_and_no_follow_flags(self) -> None:
+        opened: list[tuple[str, int]] = []
+        fds = iter((10, 11, 12))
+
+        def open_fd(path, flags, mode=0o777, *, dir_fd=None):
+            opened.append((str(path), flags))
+            return next(fds)
+
+        metadata = {
+            10: fake_stat(stat.S_IFDIR | 0o777),
+            11: fake_stat(stat.S_IFDIR | 0o700),
+            12: fake_stat(stat.S_IFREG | 0o600),
+        }
+        ops = Can0LockOps(
+            open_fd,
+            lambda *args, **kwargs: None,
+            metadata.__getitem__,
+            lambda *args: None,
+            lambda fd: None,
+            1,
+        )
+        directory_flag = 1 << 20
+        no_follow_flag = 1 << 21
+        with (
+            patch.object(os, "O_DIRECTORY", directory_flag, create=True),
+            patch.object(os, "O_NOFOLLOW", no_follow_flag, create=True),
+        ):
+            snapshot = configure_can0(
+                runner=SequenceRunner([link_json()]),
+                lock_path=TEST_LOCK_PATH,
+                lock_ops=ops,
+            )
+        self.assertTrue(snapshot.ready)
+        self.assertEqual(
+            [path for path, _ in opened],
+            [str(TEST_LOCK_PATH.parent.parent), "excavatorsim", "can0.lock"],
+        )
+        self.assertTrue(opened[0][1] & directory_flag)
+        self.assertTrue(opened[1][1] & directory_flag)
+        self.assertTrue(opened[0][1] & no_follow_flag)
+        self.assertTrue(opened[1][1] & no_follow_flag)
+        self.assertTrue(opened[2][1] & no_follow_flag)
 
     def test_injected_lock_serializes_complete_transactions(self) -> None:
         mutex = threading.Lock()

@@ -87,13 +87,16 @@ TCP server currently stores a client accepted after `who` / `PC001`.
   `sudo -n /usr/local/libexec/excavatorsim/can0-setup-helper`. The installed
   root helper accepts no arguments and runs down → bitrate/restart → queue → up
   → post-check under an exclusive lock. The complete transaction is serialized
-  by `/run/excavatorsim/can0.lock`: its directory is root-owned mode `0700`,
-  and the persistent lock is a root-owned mode `0600` regular inode with one
-  link. The helper uses fd-relative no-follow opens, validates metadata after
-  open, rejects unsafe existing objects before mutation, and maps every lock
-  failure to sanitized `CAN0_SETUP_FAILED` output without a traceback. Its `ip`
-  executable and subprocess environment come from fixed system allowlists, not
-  caller `PATH`.
+  by `/run/excavatorsim/can0.lock`: the opened `/run` parent must be a real
+  root-owned directory but may be group/other-writable for target compatibility;
+  its `excavatorsim` child remains root-owned mode `0700`, and the persistent
+  lock remains a root-owned mode `0600` regular inode with one link. The helper
+  uses fd-relative no-follow opens, validates metadata after open, rejects
+  unsafe existing child/lock objects before mutation, and maps every lock
+  failure to sanitized `CAN0_SETUP_FAILED` output without a traceback. A
+  writable `/run` can permit local denial of service through entry preoccupation,
+  but never authorizes takeover or repair. Its `ip` executable and subprocess
+  environment come from fixed system allowlists, not caller `PATH`.
 - Godot treats ICT_START as connecting until a matching CTNR success arrives.
   Matching failure, terminal send failure, or timeout clears requested/active
   state; timeout also queues ICT_STOP so a helper that finishes late cannot
@@ -157,7 +160,7 @@ TCP server currently stores a client accepted after `who` / `PC001`.
 | can0 exists but is down, mismatched, stopped, or unverifiable | Run only the fixed helper transaction; post-verify before bind |
 | can0 is absent | Do not create it; return result 2 with USB-CAN/driver guidance |
 | Helper/sudoers is absent or `sudo -n` is denied | Fail without a prompt; return result 3 with installer guidance |
-| Runtime lock directory/file has wrong owner, unsafe mode/type/link count, or cannot be opened/flocked | Run no mutation; return sanitized `CAN0_SETUP_FAILED` without traceback |
+| `/run` is not a real root-owned directory, or the runtime child/lock has wrong owner, unsafe mode/type/link count, or cannot be opened/flocked | Run no mutation; return sanitized `CAN0_SETUP_FAILED` without traceback |
 | SocketCAN send returns `ENOBUFS`, `EAGAIN`, or `EWOULDBLOCK` | Drop the attempted occurrence, increment congestion totals, stop that service turn, and keep ICT active |
 | SocketCAN send returns another `OSError` | Latch one terminal error, purge pending values, stop timed/DBC sending, close ICT, and report result 8 |
 | A timed generation reaches its deadline, is retriggered, or is stopped | Purge that generation's pending physical slot; never send it after the window |
@@ -256,8 +259,8 @@ Correct: close/reset the test ACK peer, bind the isolated port, then spawn the g
 Wrong: Connect ICT -> bind/create can0 or run `sudo ip ...` with runtime parameters -> immediately show connected
 Correct: inspect fixed can0 -> fixed `sudo -n` helper only if needed -> post-check -> bind -> matching CTNR success -> connected
 
-Wrong: open a helper lock directly under a user-writable shared directory, or repair an unsafe inode in place
-Correct: fd-open validated `/run` -> root-only `excavatorsim/` -> no-follow regular singleton lock -> complete transaction
+Wrong: trust a path-only `/run` check, open a helper lock directly under its writable parent, or repair an unsafe inode in place
+Correct: fd-open root-owned `/run` -> strict root-only `excavatorsim/` -> no-follow regular singleton lock -> complete transaction
 
 Wrong: blocking `send()` or treating `ENOBUFS` as disconnect -> replay seconds of stale telemetry or drop ICT
 Correct: submit latest value per ID -> fair bounded non-blocking service -> count/drop congestion -> retain ICT

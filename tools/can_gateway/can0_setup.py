@@ -216,11 +216,7 @@ def _linux_lock_ops() -> Can0LockOps:
 
 
 def _validate_runtime_root(metadata: os.stat_result) -> None:
-    if (
-        not stat.S_ISDIR(metadata.st_mode)
-        or metadata.st_uid != 0
-        or stat.S_IMODE(metadata.st_mode) & 0o022
-    ):
+    if not stat.S_ISDIR(metadata.st_mode) or metadata.st_uid != 0:
         raise Can0SetupError("CAN0_SETUP_FAILED", "unsafe can0 lock runtime")
 
 
