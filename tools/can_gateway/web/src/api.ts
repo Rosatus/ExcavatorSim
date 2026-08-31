@@ -1,4 +1,4 @@
-import type { ApiErrorBody, DbcContentEdit, DbcPreview, DbcSnapshot, GatewayStatus } from "./types";
+import type { ApiErrorBody, CanAuthority, CanConsoleProfile, CanConsoleSnapshot, DbcContentEdit, DbcPreview, DbcSnapshot, GatewayStatus } from "./types";
 import { GatewayApiError } from "./types";
 
 async function decode<T>(response: Response): Promise<T> {
@@ -31,6 +31,64 @@ export async function getDbc(): Promise<DbcSnapshot> {
 
 export async function getGatewaySnapshot(): Promise<{ status: GatewayStatus; dbc: DbcSnapshot }> {
   return decode<{ status: GatewayStatus; dbc: DbcSnapshot }>(await fetch("./api/v1/dbc"));
+}
+
+export async function getCanConsoleSnapshot(): Promise<{ status: GatewayStatus; console: CanConsoleSnapshot }> {
+  return decode<{ status: GatewayStatus; console: CanConsoleSnapshot }>(await fetch("./api/v1/can-console"));
+}
+
+export async function updateCanConsoleMessage(
+  status: GatewayStatus,
+  key: string,
+  edit: DbcContentEdit,
+  frequencyHz: number,
+): Promise<void> {
+  await mutation(`./api/v1/can-console/messages/${encodeURIComponent(key)}`, "PUT", {
+    ...edit,
+    frequency_hz: frequencyHz,
+    expected_revision: status.revision,
+  });
+}
+
+export async function previewCanConsoleMessage(
+  key: string,
+  edit: DbcContentEdit,
+  signal?: AbortSignal,
+): Promise<DbcPreview> {
+  const response = await mutation<{ result: { preview: DbcPreview } }>(
+    `./api/v1/can-console/messages/${encodeURIComponent(key)}/preview`,
+    "POST",
+    edit,
+    signal,
+  );
+  return response.result.preview;
+}
+
+export async function updateCanAuthority(status: GatewayStatus, key: string, authority: CanAuthority): Promise<void> {
+  await mutation(`./api/v1/can-console/messages/${encodeURIComponent(key)}/authority`, "PUT", {
+    authority,
+    expected_revision: status.revision,
+  });
+}
+
+export async function canConsoleAction(action: "start" | "stop", status: GatewayStatus): Promise<void> {
+  await mutation(`./api/v1/can-console/${action}`, "POST", { expected_revision: status.revision });
+}
+
+export async function exportCanConsoleProfile(): Promise<CanConsoleProfile> {
+  const response = await mutation<{ result: { profile: CanConsoleProfile } }>(
+    "./api/v1/can-console/export",
+    "POST",
+    {},
+  );
+  return response.result.profile;
+}
+
+export async function importCanConsoleProfile(status: GatewayStatus, profile: unknown): Promise<void> {
+  await mutation("./api/v1/can-console/import", "POST", {
+    profile,
+    expected_revision: status.revision,
+  });
 }
 
 export async function updateTcp(status: GatewayStatus, host: string, port: number): Promise<void> {

@@ -151,6 +151,49 @@ class GatewayRuntimeCoreTest(unittest.TestCase):
         self.assertEqual(event.detail["coalesced"], 1)
         self.assertEqual(event.detail["sent"], 1)
 
+    def test_egress_tracker_uses_last_ten_successes_and_resets_rate_only(self) -> None:
+        key = "eff:18FF3A00"
+        for index in range(12):
+            self.core.record_egress(
+                key=key,
+                source="godot",
+                authority="simulation",
+                payload=bytes([index]) * 8,
+                values={"AngleX": float(index)},
+                monotonic_s=10.0 + index * 0.02,
+            )
+        _status, snapshot = self.core.console_web_snapshot()
+        # Publish a row so the tracker projection is joined at the HTTP boundary.
+        self.core.publish_console_snapshot({"messages": [{"key": key}], "custom_armed": False})
+        _status, snapshot = self.core.console_web_snapshot()
+        runtime = snapshot["messages"][0]["runtime"]
+        self.assertEqual(runtime["sample_count"], 10)
+        self.assertAlmostEqual(runtime["actual_frequency_hz"], 50.0)
+        self.assertEqual(runtime["last_payload_hex"], "0B" * 8)
+        self.assertEqual(runtime["values"], {"AngleX": 11.0})
+
+        self.core.reset_egress_rate(key)
+        _status, reset = self.core.console_web_snapshot()
+        runtime = reset["messages"][0]["runtime"]
+        self.assertIsNone(runtime["actual_frequency_hz"])
+        self.assertEqual(runtime["sample_count"], 0)
+        self.assertEqual(runtime["last_payload_hex"], "0B" * 8)
+
+    def test_console_runtime_events_are_coalesced_to_fifty_milliseconds(self) -> None:
+        self.core.record_egress(
+            key="sff:00000123",
+            source="web",
+            authority="custom",
+            payload=b"\x01",
+            monotonic_s=1.0,
+        )
+        self.core.flush_console_runtime(self.core._last_egress_event_s + 0.01)
+        self.assertEqual(self.events.events_after(0)[0], [])
+        self.core.flush_console_runtime(self.core._last_egress_event_s + 0.05)
+        events, _gap = self.events.events_after(0)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].kind, "can_console_runtime")
+
 
 class GatewayConfigStoreTest(unittest.TestCase):
     def test_atomic_roundtrip_and_invalid_fallback(self) -> None:

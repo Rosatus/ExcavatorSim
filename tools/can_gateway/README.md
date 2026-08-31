@@ -47,18 +47,24 @@ Godot: tests/can_gateway_e2e_test.gd                     # 进程监督+录制�
 ## Web CAN 后台
 
 Gateway 启动后访问 `http://127.0.0.1:29777`。Web 服务固定只绑定本机；
-Godot 以 `--mode godot-managed` 拉起时页面只展示运行状态、传输统计和发送日志。
-独立启动（默认 `standalone`）时，Windows 页面可重配本机 PC001 TCP 服务端，
+Godot 以 `--mode godot-managed` 拉起时，持续遥测 ID 默认使用“仿真”权威；用户可在
+当前会话逐 ID 临时切换为“关闭”或“自定义”，重启后恢复默认仿真。托管模式仍拒绝
+传输重配、DBC reload、全局 arm 和配置导入/导出。独立启动（默认 `standalone`）时，
+Windows 页面可重配本机 PC001 TCP 服务端，
 Linux 页面可在二次确认后重启并复核 `can0`；不同平台不会暴露另一平台的传输控制。
 
-独立模式还可扫描、重载并表格展示 DBC，逐报文可在“信号值”与
-“原始 payload”两种方式中任选一种编辑：修改信号值会同步生成 payload，
-输入与该报文 DLC 精确匹配的十六进制 payload 则会同步解码信号值。
-预览不会修改运行状态，仅在点击保存后才更新配置。每个报文还可启停并设置
-`1..100 Hz` 的整数发送频率（默认 50 Hz）。点击“开始周期发送”后，启用报文
-经 strict DBC 编码器进入同一 Gateway 发送核心，再由平台对应的 TCP/can0 transport
-发出。页面估算总线负载率并在负载较高时告警，但不会阻止发送。配置持久化时绑定
-DBC 内容 hash 并保存规范化 payload；DBC 内容变化后旧值不会静默套用到新布局。
+主表按 CAN ID 展示最近一次成功 transport-egress payload、目标频率、最近 10 次成功
+egress 平均得到的实际频率和实时新鲜度；这里的 egress 是本地 SocketCAN `send()` 或
+TCP `sendall()` 成功，不表示物理 CAN ACK。展开行显示该真实 payload 对应的物理量。
+编辑窗口支持物理值与 exact-DLC payload 双向预览，`1..100 Hz` 整数频率和显式保存。
+DBC 报文继续使用 strict codec；回转 `0x18FFF000` 与行走 `0x256` 直接复用既有专用
+encoder/decoder。timed CAN `0x18FFF100` 不进入三态控制，仍保持显式触发、50 Hz、10 秒。
+
+独立模式保存逐 ID 的关闭/自定义选择、payload 和频率到 `can-console.json`，但全局
+“开始自定义发送”永不持久化，进程重启不会自动发包。页面可导入/导出完整、带 catalog
+fingerprint 的 `excavatorsim-can-console` JSON；它不包含 TCP endpoint、can0、主题、arm
+状态或实时统计。主题偏好只保存在浏览器 `localStorage`。页面估算总线负载率并在负载
+较高时告警，但不会阻止发送。
 
 默认扫描随包 `resources/dbc` 与可执行文件相邻的 `dbc/`，额外目录可重复传入
 `--dbc-dir DIR`。随包包含获批的 `can3.sy135c.dbc` 和 `can4.sy135c.dbc`。
@@ -147,12 +153,14 @@ ExcavatorSim gateway.exe (--sink tcp)          ICT 侧 (LinuxPC)
 
 - **RTK A000-A900 与四个 IMU 角度帧的编码权威 = 随包的批准 DBC**。
   Godot 遥测与 Web 编辑值都调用同一个 hash 绑定的 strict `cantools` codec；
-  它们只保留各自独立的数据来源、权限和调度路径。
+  per-ID authority gate 保证同一 ID 不会交错使用仿真和自定义来源。
 - A800 的 `VelE/VelN/VelU/Vel` 现在和 DBC 一致，固定为小端；QML profile
   不再保留历史的大端例外。其余 RTK/IMU 帧经 differential tests 保持原字节。
 - Web operator catalog 在启动或显式 reload 时扫描随包 `resources/dbc`、
   gateway 可执行文件相邻 `dbc/` 及 `--dbc-dir` 的直属 `.dbc` 文件。reload
-  不会替换 Godot 使用的 hash 绑定 protocol catalog。
+  会重建 Web 统一控制台并保持自定义发送未启动；不会替换 Godot 使用的 hash
+  绑定 protocol catalog。回转状态与左右行走压力是整数字段，输入小数会被拒绝，
+  不会静默截断。
 - 瑞芬 IMU：slot=count×0.01−180°；count 三连零 = 无效标记 → 编码器钳位 ≥1。
   parser 安装重映射 roll=s1/pitch=−s0/yaw=s2，在 `conventions.MachineState.
   sensor_slots` 反演。

@@ -138,6 +138,18 @@ class GatewayWebServer:
         app.router.add_get("/api/v1/logs/current", self._current_log)
         app.router.add_get("/api/v1/logs/archive", self._archive_logs)
         app.router.add_get("/api/v1/dbc", self._dbc_catalog)
+        app.router.add_get("/api/v1/can-console", self._can_console)
+        app.router.add_put("/api/v1/can-console/messages/{message_key}", self._console_message)
+        app.router.add_post(
+            "/api/v1/can-console/messages/{message_key}/preview", self._console_message_preview
+        )
+        app.router.add_put(
+            "/api/v1/can-console/messages/{message_key}/authority", self._console_authority
+        )
+        app.router.add_post("/api/v1/can-console/start", self._console_start)
+        app.router.add_post("/api/v1/can-console/stop", self._console_stop)
+        app.router.add_post("/api/v1/can-console/export", self._console_export)
+        app.router.add_post("/api/v1/can-console/import", self._console_import)
         app.router.add_put("/api/v1/dbc/messages/{message_key}", self._dbc_message)
         app.router.add_post("/api/v1/dbc/messages/{message_key}/preview", self._dbc_message_preview)
         app.router.add_post("/api/v1/dbc/start", self._dbc_start)
@@ -227,6 +239,94 @@ class GatewayWebServer:
     async def _dbc_catalog(self, _request: web.Request) -> web.Response:
         status, dbc = self.core.web_snapshot()
         return web.json_response({"status": status.to_dict(), "dbc": dbc})
+
+    async def _can_console(self, _request: web.Request) -> web.Response:
+        status, console = self.core.console_web_snapshot()
+        return web.json_response({"status": status.to_dict(), "console": console})
+
+    async def _console_message(self, request: web.Request) -> web.Response:
+        body = await _read_json_object(request)
+        self._require_fields(
+            body, {"values", "payload_hex", "frequency_hz", "expected_revision", "request_id"}
+        )
+        has_values = "values" in body
+        has_payload = "payload_hex" in body
+        if has_values and has_payload:
+            raise GatewayRuntimeError(
+                "dbc_edit_source_conflict", "provide values or payload_hex, not both"
+            )
+        if has_values and not isinstance(body["values"], dict):
+            raise GatewayRuntimeError("dbc_values_invalid", "values must be an object")
+        if has_payload and not isinstance(body["payload_hex"], str):
+            raise GatewayRuntimeError("dbc_payload_invalid", "payload_hex must be a string")
+        payload: dict[str, Any] = {"key": request.match_info["message_key"]}
+        for field in ("values", "payload_hex", "frequency_hz"):
+            if field in body:
+                payload[field] = body[field]
+        return await self._submit(request, "console_message_update", payload, body)
+
+    async def _console_message_preview(self, request: web.Request) -> web.Response:
+        body = await _read_json_object(request)
+        self._require_fields(body, {"values", "payload_hex", "request_id"})
+        has_values = "values" in body
+        has_payload = "payload_hex" in body
+        if has_values == has_payload:
+            raise GatewayRuntimeError(
+                "dbc_edit_source_invalid", "provide exactly one of values or payload_hex"
+            )
+        if has_values and not isinstance(body["values"], dict):
+            raise GatewayRuntimeError("dbc_values_invalid", "values must be an object")
+        if has_payload and not isinstance(body["payload_hex"], str):
+            raise GatewayRuntimeError("dbc_payload_invalid", "payload_hex must be a string")
+        field = "values" if has_values else "payload_hex"
+        return await self._submit(
+            request,
+            "console_message_preview",
+            {"key": request.match_info["message_key"], field: body[field]},
+            body,
+            require_revision=False,
+        )
+
+    async def _console_authority(self, request: web.Request) -> web.Response:
+        body = await _read_json_object(request)
+        self._require_fields(body, {"authority", "expected_revision", "request_id"})
+        authority = body.get("authority")
+        if authority not in ("off", "custom", "simulation"):
+            raise GatewayRuntimeError(
+                "console_authority_invalid", "authority must be off/custom/simulation"
+            )
+        return await self._submit(
+            request,
+            "console_authority_update",
+            {"key": request.match_info["message_key"], "authority": authority},
+            body,
+        )
+
+    async def _console_start(self, request: web.Request) -> web.Response:
+        self._require_standalone()
+        body = await _read_json_object(request)
+        self._require_fields(body, {"expected_revision", "request_id"})
+        return await self._submit(request, "console_start", {}, body)
+
+    async def _console_stop(self, request: web.Request) -> web.Response:
+        self._require_standalone()
+        body = await _read_json_object(request)
+        self._require_fields(body, {"expected_revision", "request_id"})
+        return await self._submit(request, "console_stop", {}, body)
+
+    async def _console_export(self, request: web.Request) -> web.Response:
+        self._require_standalone()
+        body = await _read_json_object(request)
+        self._require_fields(body, {"request_id"})
+        return await self._submit(request, "console_export", {}, body, require_revision=False)
+
+    async def _console_import(self, request: web.Request) -> web.Response:
+        self._require_standalone()
+        body = await _read_json_object(request)
+        self._require_fields(body, {"profile", "expected_revision", "request_id"})
+        if not isinstance(body.get("profile"), dict):
+            raise GatewayRuntimeError("console_profile_invalid", "profile must be an object")
+        return await self._submit(request, "console_import", {"profile": body["profile"]}, body)
 
     async def _dbc_message(self, request: web.Request) -> web.Response:
         self._require_standalone()

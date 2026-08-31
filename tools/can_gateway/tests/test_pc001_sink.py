@@ -96,6 +96,28 @@ class TcpPc001SinkTest(unittest.TestCase):
         finally:
             client.close()
 
+    def test_egress_observer_runs_only_after_successful_batch_write(self) -> None:
+        observed: list[tuple[str, str, int, bool, bytes, float]] = []
+        self.sink.set_egress_observer(
+            lambda source, family, can_id, is_extended, payload, completed_s: observed.append(
+                (source, family, can_id, is_extended, payload, completed_s)
+            )
+        )
+        client = _Client(self.port)
+        try:
+            self.assertTrue(self.wait_handshake_state(True))
+            payload = b"\x33" * 8
+            self.sink.submit(0x18FF3A00, payload, source="godot", family="imu")
+            self.assertEqual(observed, [])
+            client.recv_batch()
+            deadline = time.time() + 1.0
+            while not observed and time.time() < deadline:
+                time.sleep(0.01)
+            self.assertEqual(observed[0][:5], ("godot", "imu", 0x18FF3A00, True, payload))
+            self.assertIsInstance(observed[0][5], float)
+        finally:
+            client.close()
+
     def test_handshake_state_clears_on_disconnect_and_close(self) -> None:
         client = _Client(self.port)
         self.assertTrue(self.wait_handshake_state(True))
@@ -131,6 +153,22 @@ class TcpPc001SinkTest(unittest.TestCase):
             self.sink.append(0x18FF3A00, b"\x44" * 8)
             _count, frames = client.recv_batch()
             self.assertEqual(frames[0][0], CAN_EFF_FLAG | 0x18FF3A00)
+        finally:
+            client.close()
+
+    def test_low_numeric_extended_id_uses_explicit_eff_flag(self) -> None:
+        client = _Client(self.port)
+        try:
+            self.assertTrue(self.wait_handshake_state(True))
+            self.sink.submit(
+                0x123,
+                b"\x55" * 8,
+                source="web",
+                family="dbc",
+                is_extended=True,
+            )
+            _count, frames = client.recv_batch()
+            self.assertEqual(frames[0][0], CAN_EFF_FLAG | 0x123)
         finally:
             client.close()
 

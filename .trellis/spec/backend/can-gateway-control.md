@@ -292,7 +292,8 @@ POST /api/v1/transport/can0/restart
 ### 3. Contracts
 
 - Web binds only `127.0.0.1`; default port is `29777`. `godot-managed` exposes status,
-  statistics, events, and log downloads but rejects all mutation with HTTP 403.
+  statistics, events and row-level CAN authority/custom editing; transport, global arm,
+  DBC reload and profile import/export remain HTTP 403.
 - `standalone` exposes only the host platform transport: Windows TCP rebind or Linux
   confirmed can0 restart. Every mutation includes `expected_revision` and a bounded
   `request_id`; only the Gateway owner loop performs transport or scheduler mutation.
@@ -331,7 +332,7 @@ POST /api/v1/transport/can0/restart
 | Condition | Required behavior |
 |---|---|
 | Non-local browser origin opens event WebSocket | `403 origin_forbidden` |
-| Mutation in `godot-managed` | `403 managed_mode_read_only` |
+| Transport/global arm/reload/import/export in `godot-managed` | `403 managed_mode_read_only` |
 | Windows requests can0 or Linux requests TCP | `409 capability_unavailable` |
 | Missing/old revision | `revision_invalid` or revision conflict; no mutation |
 | Frequency is bool, non-integer, `<1`, or `>100` | reject; preserve previous config |
@@ -350,8 +351,8 @@ POST /api/v1/transport/can0/restart
   uses the same codec/send core as Godot telemetry.
 - Good: Web enters an exact-DLC raw payload, receives a side-effect-free decoded preview,
   then explicitly saves; the exact bytes become the send/persistence authority.
-- Base: Gateway is Godot-managed; the browser continues showing transport state and live
-  logs while all controls remain absent/read-only.
+- Base: Gateway is Godot-managed; transport/global controls remain absent while each
+  simulation-capable CAN row can be switched for the current session to off/custom.
 - Bad: let the Web thread replace sinks directly, keep a second handwritten A800 codec,
   persist payload and values as competing authorities, reuse persisted data after a DBC
   hash change, or pad a short DBC frame's wire DLC to 8.
@@ -390,4 +391,125 @@ Correct: preview through the codec without side effects -> explicit save -> one 
 
 Wrong: emit an operator warning for byte-identical bundled and adjacent DBC copies
 Correct: content-hash collapse silently -> expose all source paths on the one catalog entry
+```
+
+## Scenario: Per-ID CAN authority console and transport-egress projection
+
+### 1. Scope / Trigger
+
+Use this contract when changing `can_console.py`, Godot telemetry gating, custom scheduling,
+the `/api/v1/can-console` API, PC001/SocketCAN success callbacks, or the React row console.
+The goal is one sending authority per CAN identity without changing any encoder or wire bytes.
+
+### 2. Signatures
+
+```text
+CAN identity = (is_extended, arbitration_id)
+API key = eff:18FF3A00 | sff:00000256
+authority = off | custom | simulation
+
+GET  /api/v1/can-console
+PUT  /api/v1/can-console/messages/{key}
+POST /api/v1/can-console/messages/{key}/preview
+PUT  /api/v1/can-console/messages/{key}/authority
+POST /api/v1/can-console/{start,stop,export,import}
+
+WebSocket event kind = can_console_runtime
+portable format = excavatorsim-can-console, schema_version=1
+internal store = can-console.json, schema_version=3
+```
+
+`GET /api/v1/can-console` returns one status/config publication plus
+`server_monotonic_s`. Each row contains descriptor, custom payload/values/frequency,
+selected authority, expected frequency, capabilities, and runtime egress projection.
+
+### 3. Contracts
+
+- `CanConsoleRuntime` is owner-loop-only. `emit_frames()` may submit a continuous Godot
+  RTK/IMU/slew/travel frame only when that canonical ID selects `simulation`; the shared
+  custom scheduler may submit it only when it selects `custom`. Timed `0x18FFF100` bypasses
+  this gate and retains its explicit 50 Hz / 10 second command contract.
+- DBC rows reuse `DbcCodec`; native slew/travel rows reuse `encode_slew_frame` /
+  `decode_slew` and `encode_travel_frame` / `decode_travel`. No UI or console module may
+  copy their byte-order, scale, DLC or EFF packing rules. Native byte-valued status and
+  pilot-pressure fields are integer-only; preview/save rejects fractional values instead
+  of silently truncating them.
+- Standalone restores off/custom, payload and integer `1..100` Hz but always starts
+  globally disarmed. Godot-managed starts simulation-capable IDs at simulation and other
+  IDs off; its row overrides and custom drafts are session-only.
+- Managed API allows only row preview/save/authority. TCP/can0 mutation, DBC reload,
+  standalone start/stop, portable import/export remain server-side 403.
+- Successful transport egress means SocketCAN nonblocking `send()` returned or one PC001
+  `sendall(batch)` returned. Queue submission, CSV append, congestion/coalescing and
+  inferred handshake readiness never update freshness. This is not physical bus ACK.
+- The tracker keeps last payload/decoded values and at most 10 successful monotonic
+  timestamps per canonical ID. Actual Hz is null before two samples, otherwise
+  `(n-1)/(last-first)`. Authority change clears rate samples but retains last payload.
+- Dirty row runtime state is emitted in one typed `can_console_runtime` batch at most every
+  50 ms over the existing sequence/gap-aware WebSocket. React uses one shared 50 ms ticker
+  to advance freshness; components do not create per-row timers or parse raw event fields.
+- Portable import is full-profile replacement. It requires exact top-level/message field
+  allowlists, format/schema/catalog/descriptor fingerprints, all catalog keys, exact DLC,
+  off/custom authority and integer frequency. Candidate validation and atomic persistence
+  complete before live state changes; machine transport, theme, arm and metrics are absent.
+- Standalone DBC reload rebuilds the unified console from the reloaded operator catalog
+  before publishing the new snapshot. Old descriptor keys and scheduler entries must not
+  survive reload, and the rebuilt custom scheduler remains disarmed.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| SFF and EFF share numeric arbitration ID | Different canonical keys; never merge |
+| Standalone selects simulation | `409 console_simulation_unavailable`; no mutation |
+| Message is not custom when preview/save is requested | `409 console_message_not_custom` |
+| Managed transport/global/import/export request | HTTP 403 before owner queue |
+| Unknown authority or message | stable `console_authority_invalid` / `console_message_unknown` |
+| Import has unknown/missing fields, keys or wrong DLC | reject entire candidate; no revision/write |
+| Import fingerprint differs | `409 console_profile_incompatible`; no partial state |
+| SocketCAN congestion/coalescing or TCP write failure | no freshness/rate update |
+| Authority changes with pending SocketCAN value | purge that CAN ID before new authority sends |
+| Fewer than two successful egress samples | actual frequency is null, not zero |
+| WebSocket gap/unknown event | refresh atomic HTTP snapshot |
+| Fractional native integer-only value | `dbc_value_invalid`; preserve previous payload |
+| Standalone DBC reload changes catalog | rebuild console rows/scheduler; remain disarmed |
+
+### 5. Good / Base / Bad Cases
+
+- Good: a managed IMU row switches simulation → custom; its pending simulation value is
+  purged, only the saved custom payload is scheduled, and a later switch back restores
+  simulation without changing any sibling ID.
+- Base: standalone restores several custom selections after restart but emits none until
+  the operator explicitly presses Start.
+- Good: one TCP batch contains several IDs; wire bytes remain identical and each metadata
+  item is recorded only after the shared `sendall` returns.
+- Bad: use SocketCAN last-value coalescing as authority arbitration, update freshness when a
+  frame is enqueued, persist managed overrides, or let the browser reimplement CAN decoding.
+
+### 6. Tests Required
+
+- Console unit tests: canonical SFF/EFF identity, DBC/native payload round trips, managed
+  defaults/override/reset, standalone restore-but-disarmed, scheduler gate and timed bypass.
+- Persistence tests: full export/import round trip plus wrong catalog, missing/unknown key,
+  invalid frequency/DLC and write-failure zero-side-effect cases.
+- Runtime tests: rolling 10-sample mean, warm-up null, authority rate reset retaining last
+  payload, decoded values, bounded dirty state and 50 ms event coalescing.
+- Sink tests: PC001 byte-for-byte framing and callbacks only after successful batch writes;
+  SocketCAN sent vs congestion/coalesced/terminal outcome separation and per-ID purge.
+- API tests: standalone/managed permission matrix, revision/request ID, strict JSON, atomic
+  snapshot and existing WebSocket replay/gap recovery.
+- Frontend tests: theme persistence, row expansion, capability-aware three-state radio,
+  modal bidirectional preview/explicit save, runtime delta reducer and freshness boundaries.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: Godot producer + Web scheduler -> same CAN ID -> sink coalescing decides the winner
+Correct: producer/scheduler -> canonical per-ID authority gate -> shared send core
+
+Wrong: append/enqueue/handshake ready -> mark payload sent and freshness green
+Correct: SocketCAN send() / TCP sendall() returns -> egress tracker -> bounded WS delta
+
+Wrong: managed mode hides buttons in React but accepts forbidden server mutations
+Correct: React reflects capability -> HTTP allowlist rejects forbidden endpoints -> owner loop mutates rows only
 ```

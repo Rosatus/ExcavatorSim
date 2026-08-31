@@ -3,8 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
-import type { DbcSnapshot, GatewayStatus } from "./types";
-import webContract from "./test/web_contract.json";
+import type { CanConsoleMessage, CanConsoleSnapshot, GatewayStatus } from "./types";
 
 const status: GatewayStatus = {
   revision: 4,
@@ -36,44 +35,62 @@ const status: GatewayStatus = {
   log_dropped_records: 0,
 };
 
-const message = {
-  key: "hash:CFDA800:1:layout",
-  file_sha256: "abc123",
-  name: "MSG_0CFDA800",
-  frame_id: 0x0cfda800,
-  frame_id_hex: "0xCFDA800",
-  is_extended: true,
-  length: 8,
-  signals: [
-    {
-      key: "vel-e",
-      name: "VelE",
-      start: 0,
-      length: 16,
-      byte_order: "little_endian",
-      is_signed: true,
-      scale: 0.01,
-      offset: 0,
-      minimum: -327.68,
-      maximum: 327.67,
-      unit: "m/s",
-      is_multiplexer: false,
-      multiplexer_signal: null,
-      multiplexer_ids: [],
-    },
-  ],
+const signal = {
+  key: "vel-e",
+  name: "VelE",
+  start: 0,
+  length: 16,
+  byte_order: "little_endian",
+  is_signed: true,
+  scale: 0.01,
+  offset: 0,
+  minimum: -327.68,
+  maximum: 327.67,
+  unit: "m/s",
+  is_multiplexer: false,
+  multiplexer_signal: null,
+  multiplexer_ids: [],
 };
 
-const dbc: DbcSnapshot = {
-  armed: false,
-  catalog: {
-    message_count: 1,
-    notices: [],
-    files: [{ sha256: "abc123", sources: ["resources/dbc/can4.sy135c.dbc"], messages: [message], parse_error: "" }],
+const row: CanConsoleMessage = {
+  key: "eff:0CFDA800",
+  message: {
+    key: "eff:0CFDA800",
+    file_sha256: "abc",
+    name: "MSG_0CFDA800",
+    frame_id: 0x0cfda800,
+    frame_id_hex: "0xCFDA800",
+    is_extended: true,
+    length: 8,
+    signals: [signal],
+    descriptor_fingerprint: "fingerprint",
+    kind: "dbc",
+    dbc_key: "legacy-key",
   },
-  messages: [{ message, values: { VelE: 0 }, enabled: true, frequency_hz: 50, generated_default: true, payload_hex: "00 00 00 00 00 00 00 00" }],
-  notices: [],
-  load: { bitrate: 250000, estimated_bits_per_second: 8000, percent: 72, level: "yellow", warning: true, caveat: "informational only" },
+  values: { VelE: 0 },
+  payload_hex: "00 00 00 00 00 00 00 00",
+  frequency_hz: 50,
+  authority: "custom",
+  expected_frequency_hz: 50,
+  simulation_capable: true,
+  simulation_available: false,
+  runtime: {
+    last_payload_hex: "7B00000000000000",
+    last_egress_monotonic_s: 99.95,
+    actual_frequency_hz: 49.875,
+    sample_count: 10,
+    source: "web",
+    authority: "custom",
+    values: { VelE: 1.23 },
+  },
+};
+
+const consoleSnapshot: CanConsoleSnapshot = {
+  catalog_fingerprint: "catalog",
+  custom_armed: false,
+  server_monotonic_s: 100,
+  messages: [row],
+  load: { bitrate: 250000, estimated_bits_per_second: 8000, percent: 72, level: "yellow", warning: true, caveat: "informational" },
 };
 
 class MockWebSocket {
@@ -91,154 +108,119 @@ function json(value: unknown, statusCode = 200): Response {
   return new Response(JSON.stringify(value), { status: statusCode, headers: { "Content-Type": "application/json" } });
 }
 
-function installFetch(currentStatus: GatewayStatus, mutation?: (url: string, init: RequestInit) => Response) {
+function installFetch(currentStatus = status, currentConsole = consoleSnapshot) {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    if (init?.method) {
-      if (url.endsWith("/preview")) {
-        const body = JSON.parse(String(init.body)) as { values?: Record<string, number>; payload_hex?: string };
-        return mutation?.(url, init) ?? json({ request_id: "preview", result: { preview: body.payload_hex ? { values: { VelE: 1.23 }, payload_hex: "7B 00 00 00 00 00 00 00" } : { values: body.values ?? {}, payload_hex: "7B 00 00 00 00 00 00 00" } } });
-      }
-      return mutation?.(url, init) ?? json({ request_id: "test", result: { status: currentStatus } });
+    if (!init?.method) return json({ status: currentStatus, console: currentConsole });
+    if (url.endsWith("/preview")) {
+      const body = JSON.parse(String(init.body)) as { payload_hex?: string; values?: Record<string, number> };
+      return json({ request_id: "preview", result: { preview: body.payload_hex ? { values: { VelE: 1.23 }, payload_hex: "7B 00 00 00 00 00 00 00" } : { values: body.values, payload_hex: "7B 00 00 00 00 00 00 00" } } });
     }
-    if (url.includes("/dbc")) return json({ status: currentStatus, dbc });
-    return json({ status: currentStatus });
+    return json({ request_id: "mutation", result: { status: currentStatus } });
   }));
 }
 
 beforeEach(() => {
+  localStorage.clear();
   MockWebSocket.instances = [];
   vi.stubGlobal("WebSocket", MockWebSocket);
+  vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
+  Object.defineProperty(window, "matchMedia", { configurable: true, value: vi.fn(() => ({ matches: false })) });
 });
 
-afterEach(() => {
-  cleanup();
-  vi.unstubAllGlobals();
-});
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-describe("Gateway console capabilities", () => {
-  it("keeps the typed status fixture aligned", () => {
-    expect(Object.keys(status).sort()).toEqual(webContract.status_keys);
-    expect(Object.keys(dbc).sort()).toEqual(webContract.dbc_root_keys);
+describe("CAN console", () => {
+  it("renders egress payload, frequency, freshness and expanded physical values", async () => {
+    installFetch();
+    render(<App />);
+    expect(await screen.findByText("0xCFDA800")).toBeInTheDocument();
+    expect(screen.getByText("7B 00 00 00 00 00 00 00")).toBeInTheDocument();
+    expect(screen.getByText("49.875 Hz")).toBeInTheDocument();
+    expect(screen.getByText(/ms$/)).toHaveClass("text-emerald-500");
+    await userEvent.click(screen.getByRole("button", { name: "展开物理量" }));
+    expect(screen.getByText("1.230000")).toBeInTheDocument();
   });
 
-  it("omits every mutation control in Godot-managed mode", async () => {
-    installFetch({ ...status, mode: "godot-managed" });
+  it("toggles and persists light/dark theme", async () => {
+    installFetch();
     render(<App />);
-    expect(await screen.findByText("Godot 托管只读模式")).toBeInTheDocument();
-    expect(screen.queryByText("DBC 周期发送")).not.toBeInTheDocument();
-    expect(screen.queryByText("Windows PC001 服务端")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /当前日志/ })).toBeInTheDocument();
+    const toggle = await screen.findByRole("button", { name: "切换明暗主题" });
+    expect(document.documentElement).not.toHaveClass("dark");
+    await userEvent.click(toggle);
+    expect(document.documentElement).toHaveClass("dark");
+    expect(localStorage.getItem("gateway-theme")).toBe("dark");
   });
 
-  it("shows only the Windows transport control and validates integer frequency", async () => {
-    installFetch(status);
+  it("previews raw payload and saves only after explicit confirmation", async () => {
+    installFetch();
     render(<App />);
-    expect(await screen.findByText("Windows PC001 服务端")).toBeInTheDocument();
-    expect(screen.queryByText("Linux can0")).not.toBeInTheDocument();
-    expect(screen.getByText("72.00%")).toHaveClass("text-amber-300");
-    const frequency = screen.getByLabelText("频率 (1–100 Hz)");
-    fireEvent.change(frequency, { target: { value: "50.5" } });
-    expect(screen.getByRole("button", { name: /保存报文/ })).toBeDisabled();
-    expect(screen.getByText(/频率只接受 1–100 的整数/)).toBeInTheDocument();
-  });
-
-  it("previews payload into values but commits only after explicit save", async () => {
-    installFetch(status);
-    render(<App />);
-    const payload = await screen.findByLabelText("Payload（8 字节）");
-    const fetchMock = vi.mocked(fetch);
-    const putCountBefore = fetchMock.mock.calls.filter(([, init]) => init?.method === "PUT").length;
+    await userEvent.click(await screen.findByRole("button", { name: /编辑/ }));
+    const payload = screen.getByLabelText("Payload");
     fireEvent.change(payload, { target: { value: "7b00000000000000" } });
     await waitFor(() => expect(screen.getByLabelText(/^VelE/)).toHaveValue(1.23));
-    expect(payload).toHaveValue("7B 00 00 00 00 00 00 00");
-    expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("/preview"))).toBe(true);
-    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "PUT")).toHaveLength(putCountBefore);
-    await userEvent.click(screen.getByRole("button", { name: /保存报文/ }));
-    await waitFor(() => expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "PUT")).toHaveLength(putCountBefore + 1));
-    const saveCalls = fetchMock.mock.calls.filter(([, init]) => init?.method === "PUT");
-    const saveCall = saveCalls[saveCalls.length - 1]!;
-    expect(JSON.parse(String(saveCall[1]!.body))).toMatchObject({ payload_hex: "7B 00 00 00 00 00 00 00" });
-    expect(JSON.parse(String(saveCall[1]!.body))).not.toHaveProperty("values");
-  });
-
-  it("does not preview or save incomplete payload", async () => {
-    installFetch(status);
-    render(<App />);
-    const payload = await screen.findByLabelText("Payload（8 字节）");
     const fetchMock = vi.mocked(fetch);
-    const previewsBefore = fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/preview")).length;
-    fireEvent.change(payload, { target: { value: "7B 00" } });
-    expect(await screen.findByText(/恰好包含 8 字节/)).toBeInTheDocument();
-    await new Promise((resolve) => setTimeout(resolve, 350));
-    expect(fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/preview"))).toHaveLength(previewsBefore);
-    expect(screen.getByRole("button", { name: /保存报文/ })).toBeDisabled();
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "PUT")).toHaveLength(0);
+    await userEvent.click(screen.getByRole("button", { name: /^保存$/ }));
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "PUT")).toHaveLength(1));
   });
 
-  it("preserves unsaved edits across background snapshot refresh", async () => {
-    installFetch(status);
+  it("closes the editor with Escape and restores trigger focus", async () => {
+    installFetch();
     render(<App />);
-    const payload = await screen.findByLabelText("Payload（8 字节）");
-    fireEvent.change(payload, { target: { value: "7B 00" } });
-    MockWebSocket.instances.at(-1)!.emit({
-      type: "event",
-      event: {
-        sequence: 1,
-        timestamp: "2026-08-28T00:00:00",
-        monotonic_s: 1,
-        kind: "socketcan_transmission_aggregate",
-        source: "godot",
-        detail: { family: "imu", sent: 10 },
+    const trigger = await screen.findByRole("button", { name: /编辑/ });
+    await userEvent.click(trigger);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
+  it("keeps managed row overrides while hiding standalone-only controls", async () => {
+    installFetch(
+      { ...status, mode: "godot-managed" },
+      { ...consoleSnapshot, messages: [{ ...row, authority: "simulation", simulation_available: true }] },
+    );
+    render(<App />);
+    expect(await screen.findByText("Godot 托管会话")).toBeInTheDocument();
+    expect(screen.queryByText("Windows PC001 Server")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /导出/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("radio", { name: "关闭" }));
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([url, init]) => String(url).endsWith("/authority") && init?.method === "PUT")).toBe(true));
+  });
+
+  it("applies typed realtime deltas without a snapshot fetch", async () => {
+    installFetch();
+    render(<App />);
+    await screen.findByText("49.875 Hz");
+    const fetchCount = vi.mocked(fetch).mock.calls.length;
+    MockWebSocket.instances.at(-1)!.emit({ type: "event", event: { sequence: 1, timestamp: "2026-08-31T00:00:00", monotonic_s: 101, kind: "can_console_runtime", source: "transport", detail: { server_monotonic_s: 101, rows: { [row.key]: { ...row.runtime, actual_frequency_hz: 25, last_egress_monotonic_s: 101 } } } } });
+    expect(await screen.findByText("25.000 Hz")).toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls).toHaveLength(fetchCount);
+  });
+
+  it("falls back to a full snapshot for an invalid realtime row", async () => {
+    installFetch();
+    render(<App />);
+    await screen.findByText("49.875 Hz");
+    const fetchCount = vi.mocked(fetch).mock.calls.length;
+    MockWebSocket.instances.at(-1)!.emit({ type: "event", event: { sequence: 1, timestamp: "2026-08-31T00:00:00", monotonic_s: 101, kind: "can_console_runtime", source: "transport", detail: { server_monotonic_s: 101, rows: { [row.key]: { ...row.runtime, sample_count: "bad" } } } } });
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.length).toBeGreaterThan(fetchCount));
+  });
+
+  it("surfaces profile export failures through the shared error banner", async () => {
+    installFetch();
+    render(<App />);
+    const exportButton = await screen.findByRole("button", { name: /导出/ });
+    vi.mocked(fetch).mockImplementationOnce(async () => json({
+      error: {
+        code: "export_failed",
+        message: "profile unavailable",
+        request_id: "test",
+        recoverable: true,
       },
-    });
-    await waitFor(() => expect(vi.mocked(fetch).mock.calls.filter(([input]) => String(input).includes("/dbc")).length).toBeGreaterThan(1));
-    expect(payload).toHaveValue("7B 00");
-  });
-
-  it("shows only confirmed can0 restart on Linux", async () => {
-    installFetch({
-      ...status,
-      platform: "linux",
-      transport_kind: "socketcan",
-      socketcan_submitted: 120,
-      socketcan_sent: 100,
-      socketcan_congestion_dropped: 8,
-      socketcan_coalesced: 12,
-      socketcan_pending: 0,
-    });
-    render(<App />);
-    expect(await screen.findByText("Linux can0")).toBeInTheDocument();
-    expect(screen.queryByText("Windows PC001 服务端")).not.toBeInTheDocument();
-    expect(screen.getByText("120 / 100")).toBeInTheDocument();
-    expect(screen.getByText("8 / 12")).toBeInTheDocument();
-    const fetchMock = vi.mocked(fetch);
-    const callsBeforeAggregate = fetchMock.mock.calls.length;
-    MockWebSocket.instances.at(-1)!.emit({
-      type: "event",
-      event: {
-        sequence: 1,
-        timestamp: "2026-08-28T00:00:00",
-        monotonic_s: 1,
-        kind: "socketcan_transmission_aggregate",
-        source: "godot",
-        detail: { family: "imu", sent: 10 },
-      },
-    });
-    await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(callsBeforeAggregate));
-    const restart = screen.getByRole("button", { name: /重启 can0/ });
-    expect(restart).toBeDisabled();
-    await userEvent.click(screen.getByText("我确认停发并重启 can0"));
-    expect(restart).toBeEnabled();
-  });
-
-  it("surfaces stale revision errors and event sequence gaps", async () => {
-    installFetch(status, () => json({ error: { code: "stale_revision", message: "snapshot is stale", request_id: "x", recoverable: true } }, 409));
-    render(<App />);
-    await screen.findByText("DBC 周期发送");
-    await userEvent.click(screen.getByRole("button", { name: /开始发送/ }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("stale_revision");
-    const socket = MockWebSocket.instances.at(-1)!;
-    socket.emit({ type: "gap", earliest_sequence: 42 });
-    await waitFor(() => expect(screen.getByText(/最早可用序列为 42/)).toBeInTheDocument());
+    }, 500));
+    await userEvent.click(exportButton);
+    expect(await screen.findByText(/export_failed: profile unavailable/)).toBeInTheDocument();
   });
 });

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import socket
@@ -15,6 +16,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
+
+from aiohttp import ClientSession, WSMsgType
 
 TOOLS_DIR = Path(__file__).resolve().parents[1]
 if str(TOOLS_DIR) not in sys.path:
@@ -53,6 +56,29 @@ def recv_exact(client: socket.socket, size: int) -> bytes:
             raise ConnectionError("PC001 connection closed")
         result += chunk
     return result
+
+
+async def mutate_and_wait_event(
+    base: str,
+    after: int,
+    kind: str,
+    mutation,
+) -> dict:
+    async with ClientSession() as session, session.ws_connect(
+        f"{base}/api/v1/events?after={after}",
+        origin=base,
+    ) as websocket:
+        result = await asyncio.to_thread(mutation)
+        while True:
+            message = await websocket.receive(timeout=3.0)
+            if message.type != WSMsgType.TEXT:
+                raise AssertionError(f"unexpected WebSocket message {message.type}")
+            envelope = message.json()
+            if (
+                envelope.get("type") == "event"
+                and envelope.get("event", {}).get("kind") == kind
+            ):
+                return result
 
 
 class GatewayStandaloneDbcProcessTest(unittest.TestCase):
@@ -124,16 +150,19 @@ class GatewayStandaloneDbcProcessTest(unittest.TestCase):
                     status = request_json(f"{base}/api/v1/status")["status"]
                 self.assertTrue(status["pc001_handshake"])
 
-                dbc = request_json(f"{base}/api/v1/dbc")["dbc"]
+                snapshot = request_json(f"{base}/api/v1/can-console")
+                console = snapshot["console"]
+                status = snapshot["status"]
                 message = next(
-                    item for item in dbc["messages"] if item["message"]["frame_id"] == 0x0CFDA800
+                    item
+                    for item in console["messages"]
+                    if item["message"]["frame_id"] == 0x0CFDA800
                 )
-                key = urllib.parse.quote(message["message"]["key"], safe="")
+                key = urllib.parse.quote(message["key"], safe="")
                 preview = request_json(
-                    f"{base}/api/v1/dbc/messages/{key}/preview",
+                    f"{base}/api/v1/can-console/messages/{key}/preview",
                     "POST",
                     {
-                        "expected_revision": status["revision"],
                         "payload_hex": "7B 00 C7 FF 00 00 87 00",
                     },
                 )["result"]["preview"]
@@ -143,25 +172,50 @@ class GatewayStandaloneDbcProcessTest(unittest.TestCase):
                     request_json(f"{base}/api/v1/status")["status"]["revision"],
                     status["revision"],
                 )
+                authority = asyncio.run(
+                    mutate_and_wait_event(
+                        base,
+                        status["event_sequence"],
+                        "can_console_authority_updated",
+                        lambda: request_json(
+                            f"{base}/api/v1/can-console/messages/{key}/authority",
+                            "PUT",
+                            {
+                                "expected_revision": status["revision"],
+                                "authority": "custom",
+                            },
+                        ),
+                    )
+                )
+                revision = authority["result"]["status"]["revision"]
                 updated = request_json(
-                    f"{base}/api/v1/dbc/messages/{key}",
+                    f"{base}/api/v1/can-console/messages/{key}",
                     "PUT",
                     {
-                        "expected_revision": status["revision"],
+                        "expected_revision": revision,
                         "payload_hex": "7B 00 C7 FF 00 00 87 00",
-                        "enabled": True,
                         "frequency_hz": 50,
                     },
                 )
                 revision = updated["result"]["status"]["revision"]
                 started = request_json(
-                    f"{base}/api/v1/dbc/start", "POST", {"expected_revision": revision}
+                    f"{base}/api/v1/can-console/start",
+                    "POST",
+                    {"expected_revision": revision},
                 )
                 self.assertTrue(started["result"]["status"]["periodic_armed"])
                 (count,) = BATCH_PREFIX_STRUCT.unpack(recv_exact(client, BATCH_PREFIX_STRUCT.size))
                 body = recv_exact(client, count * SINGLE_FRAME_SIZE)
                 self.assertEqual(struct.unpack("<I", body[:4])[0] & 0x1FFFFFFF, 0x0CFDA800)
                 self.assertEqual(body[8:16].hex(), "7b00c7ff00008700")
+
+                revision = started["result"]["status"]["revision"]
+                stopped = request_json(
+                    f"{base}/api/v1/can-console/stop",
+                    "POST",
+                    {"expected_revision": revision},
+                )
+                self.assertFalse(stopped["result"]["status"]["periodic_armed"])
 
                 client.close()
                 client = None

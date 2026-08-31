@@ -199,6 +199,43 @@ class SocketCanSinkTest(unittest.TestCase):
             [item.outcome for item in outcomes], ["submitted", "submitted", "coalesced", "sent"]
         )
 
+    def test_low_numeric_sff_and_eff_ids_keep_distinct_pending_slots(self):
+        fake = _FakeSocket()
+        self._patch_socket(lambda *a, **k: fake)
+        sink = SocketCanSink("can0")
+        sink.submit(
+            0x123,
+            b"sff",
+            source="web",
+            family="dbc",
+            is_extended=False,
+        )
+        sink.submit(
+            0x123,
+            b"eff",
+            source="web",
+            family="dbc",
+            is_extended=True,
+        )
+        self.assertEqual(sink.stats.pending, 2)
+        self.assertEqual(sink.stats.coalesced, 0)
+        sink.service(maximum=2)
+        sent_ids = {struct.unpack("<I", frame[:4])[0] for frame in fake.sent}
+        self.assertEqual(sent_ids, {0x123, CAN_EFF_FLAG | 0x123})
+
+    def test_purge_matches_full_sff_eff_identity(self):
+        fake = _FakeSocket()
+        self._patch_socket(lambda *a, **k: fake)
+        sink = SocketCanSink("can0")
+        sink.submit(0x123, b"sff", source="web", family="dbc", is_extended=False)
+        sink.submit(0x123, b"eff", source="web", family="dbc", is_extended=True)
+        self.assertEqual(
+            sink.purge(can_id=0x123, is_extended=True, reason="authority_change"),
+            1,
+        )
+        sink.service()
+        self.assertEqual(struct.unpack("<I", fake.sent[0][:4])[0], 0x123)
+
     def test_pending_ids_are_bounded_and_capacity_drop_keeps_existing_values(self):
         fake = _FakeSocket()
         self._patch_socket(lambda *a, **k: fake)

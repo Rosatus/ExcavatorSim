@@ -53,6 +53,7 @@ class SocketCanDelta:
     source: str
     family: str
     can_id: int
+    is_extended: bool
     payload: bytes
     outcome: SocketCanOutcome
     reason: str = ""
@@ -63,6 +64,7 @@ class _PendingSocketCanFrame:
     source: str
     family: str
     can_id: int
+    is_extended: bool
     payload: bytes
     generation: int | None = None
 
@@ -159,14 +161,20 @@ class SocketCanSink:
         source: str,
         family: str,
         generation: int | None = None,
+        is_extended: bool | None = None,
     ) -> None:
         if self.last_send_error is not None:
             return
-        normalized_id = can_id & CAN_EFF_MASK
+        raw_id = can_id & CAN_EFF_MASK
+        extended = bool(can_id & CAN_EFF_FLAG) or raw_id > CAN_SFF_MASK
+        if is_extended is not None:
+            extended = is_extended
+        normalized_id = raw_id | (CAN_EFF_FLAG if extended else 0)
         frame = _PendingSocketCanFrame(
             source=source,
             family=family,
-            can_id=can_id,
+            can_id=raw_id,
+            is_extended=extended,
             payload=bytes(payload),
             generation=generation,
         )
@@ -195,7 +203,8 @@ class SocketCanSink:
                 break
             attempts += 1
             try:
-                self.sock.send(pack_can_frame(frame.can_id, frame.payload))
+                transport_id = frame.can_id | (CAN_EFF_FLAG if frame.is_extended else 0)
+                self.sock.send(pack_can_frame(transport_id, frame.payload))
             except OSError as exc:
                 if exc.errno in SOCKETCAN_CONGESTION_ERRNOS:
                     self._count(frame, "congestion_dropped", reason="kernel_congestion")
@@ -211,6 +220,8 @@ class SocketCanSink:
         *,
         generation: int | None = None,
         family: str | None = None,
+        can_id: int | None = None,
+        is_extended: bool | None = None,
         reason: str,
     ) -> int:
         selected = [
@@ -218,6 +229,23 @@ class SocketCanSink:
             for normalized_id, frame in self._pending.items()
             if (generation is None or frame.generation == generation)
             and (family is None or frame.family == family)
+            and (
+                can_id is None
+                or normalized_id
+                == (
+                    (can_id & CAN_EFF_MASK)
+                    | (
+                        CAN_EFF_FLAG
+                        if (
+                            is_extended
+                            if is_extended is not None
+                            else bool(can_id & CAN_EFF_FLAG)
+                            or (can_id & CAN_EFF_MASK) > CAN_SFF_MASK
+                        )
+                        else 0
+                    )
+                )
+            )
         ]
         for normalized_id in selected:
             frame = self._remove_pending(normalized_id)
@@ -242,6 +270,7 @@ class SocketCanSink:
                     source=frame.source,
                     family=frame.family,
                     can_id=frame.can_id,
+                    is_extended=frame.is_extended,
                     payload=frame.payload,
                     outcome=outcome,
                     reason=reason,

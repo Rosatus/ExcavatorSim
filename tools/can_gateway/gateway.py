@@ -20,6 +20,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from can0_setup import CAN_INTERFACE, Can0SetupError, prepare_can0, restart_can0
+from can_console import CanConsoleRuntime, canonical_can_key
 from control_protocol import (
     CMD_ICT_START,
     CMD_ICT_STOP,
@@ -100,6 +101,7 @@ def append_frame(
     source: str,
     family: str,
     generation: int | None = None,
+    is_extended: bool | None = None,
 ) -> None:
     if isinstance(sink, SocketCanSink):
         sink.submit(
@@ -108,6 +110,15 @@ def append_frame(
             source=source,
             family=family,
             generation=generation,
+            is_extended=is_extended,
+        )
+    elif isinstance(sink, TcpPc001Sink):
+        sink.submit(
+            can_id,
+            payload,
+            source=source,
+            family=family,
+            is_extended=is_extended,
         )
     else:
         sink.append(can_id, payload)
@@ -264,6 +275,17 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
             operator_roots.append(adjacent_root)
         operator_roots.extend(Path(path) for path in getattr(args, "dbc_dir", []))
         operator_dbc = OperatorDbcRuntime(operator_roots)
+        simulation_rates = {
+            **{can_id: float(args.imu_hz) for can_id in RUFINEN_IDS.values()},
+            **{can_id: float(args.rtk_hz) for can_id in range(0x0CFDA000, 0x0CFDAA00, 0x100)},
+            0x18FFF000: float(args.slew_hz),
+            0x256: float(args.travel_hz),
+        }
+        can_console = CanConsoleRuntime(
+            operator_dbc,
+            mode=args.mode,
+            simulation_rates=simulation_rates,
+        )
     except GatewayRuntimeError as exc:
         print(f"Gateway DBC startup failed ({exc.code}): {exc}", file=sys.stderr)
         return 1
@@ -278,6 +300,7 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
         can_interface=args.interface,
     )
     core.publish_dbc_snapshot(operator_dbc.snapshot())
+    core.publish_console_snapshot(can_console.snapshot())
     ict_sink: FrameSink | None = None
     if args.sink == "vcan":
         ict_sink = _open_vcan(args.interface)
@@ -402,6 +425,28 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
     observe_timed = observe_transmission("timed")
     observe_web = observe_transmission("web")
 
+    def record_egress(
+        source: str,
+        family: str,
+        can_id: int,
+        is_extended: bool,
+        payload: bytes,
+        monotonic_s: float | None = None,
+    ) -> None:
+        authority = "simulation" if source == "godot" else "custom" if source == "web" else source
+        core.record_egress(
+            key=canonical_can_key(can_id, is_extended),
+            source=source,
+            authority=authority,
+            payload=payload,
+            values=can_console.decode_egress(can_id, payload, is_extended=is_extended),
+            monotonic_s=monotonic_s,
+        )
+
+    def attach_tcp_observer(candidate: FrameSink | None) -> None:
+        if isinstance(candidate, TcpPc001Sink):
+            candidate.set_egress_observer(record_egress)
+
     def record_socketcan_delta(delta: SocketCanDelta) -> None:
         core.record_socketcan_outcome(
             source=delta.source,
@@ -411,6 +456,14 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
             outcome=delta.outcome,
             reason=delta.reason,
         )
+        if delta.outcome == "sent":
+            record_egress(
+                delta.source,
+                delta.family,
+                delta.can_id,
+                delta.is_extended,
+                delta.payload,
+            )
 
     def attach_socketcan_observer(candidate: FrameSink | None) -> None:
         if isinstance(candidate, SocketCanSink):
@@ -424,6 +477,7 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
             socketcan_totals[name] += getattr(snapshot, name)
 
     attach_socketcan_observer(ict_sink)
+    attach_tcp_observer(ict_sink)
 
     def transport_ready() -> bool:
         if isinstance(ict_sink, TcpPc001Sink):
@@ -437,18 +491,33 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
             mutate_revision=mutate_revision,
         )
 
+    def publish_can_console(*, mutate_revision: bool = False) -> None:
+        core.publish_console_snapshot(can_console.snapshot(), mutate_revision=mutate_revision)
+
     def send_operator_frame(_key: str, can_id: int, payload: bytes) -> None:
         if not transport_ready():
             operator_dbc.stop()
             publish_operator_dbc()
+            if args.mode == "godot-managed":
+                can_console.reset_managed_overrides()
+            else:
+                can_console.stop()
+            publish_can_console()
             return
         assert ict_sink is not None
+        console_entry = can_console.entries.get(_key)
+        is_extended = (
+            console_entry.is_extended
+            if console_entry is not None
+            else operator_dbc.codec.messages[_key].is_extended
+        )
         append_frame(
             ict_sink,
             can_id,
             payload,
             source="web",
             family="dbc",
+            is_extended=is_extended,
         )
         observe_web(can_id, payload)
 
@@ -481,6 +550,11 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
             core=core,
         )
         if retired:
+            if args.mode == "godot-managed":
+                can_console.reset_managed_overrides()
+            else:
+                can_console.stop()
+            publish_can_console()
             ict_sink = None
             active_ict_seq = None
 
@@ -501,9 +575,14 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                 "transport",
             )
             last_pc001_handshake = handshake_connected
-            if not handshake_connected and operator_dbc.armed:
+            if not handshake_connected and can_console.armed:
                 operator_dbc.stop()
                 publish_operator_dbc()
+                if args.mode == "godot-managed":
+                    can_console.reset_managed_overrides()
+                else:
+                    can_console.stop()
+                publish_can_console()
         core.publish(
             recording=recording,
             timed_can_active=timed_can.active,
@@ -535,9 +614,13 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
         return normalized
 
     def handle_runtime_command(command: GatewayCommand) -> None:
-        nonlocal ict_sink, active_ict_seq, socketcan_guard_until_s
+        nonlocal can_console, ict_sink, active_ict_seq, socketcan_guard_until_s
         try:
-            if command.kind != "dbc_message_preview":
+            if command.kind not in {
+                "dbc_message_preview",
+                "console_message_preview",
+                "console_export",
+            }:
                 core.require_revision(command)
             if command.kind == "tcp_rebind":
                 host = validate_tcp_host(command.payload.get("host"))
@@ -549,6 +632,8 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                 stop_timed("transport_reconfigure")
                 operator_dbc.stop()
                 publish_operator_dbc()
+                can_console.stop()
+                publish_can_console()
                 core.publish(
                     transport_state="reconfiguring",
                     transport_detail=f"rebinding TCP {host}:{port}",
@@ -582,6 +667,7 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                         "config_write_failed", "TCP endpoint could not be persisted", status=500
                     ) from exc
                 ict_sink = replacement
+                attach_tcp_observer(ict_sink)
                 status = core.publish(
                     mutate_revision=True,
                     transport_kind="tcp",
@@ -599,6 +685,8 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                 stop_timed("transport_reconfigure")
                 operator_dbc.stop()
                 publish_operator_dbc()
+                can_console.stop()
+                publish_can_console()
                 core.publish(
                     transport_state="reconfiguring",
                     transport_detail="restarting fixed can0 contract",
@@ -661,7 +749,83 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                 )
                 core.complete(command, {"preview": preview})
                 return
+            if command.kind == "console_authority_update":
+                operator_dbc.stop()
+                publish_operator_dbc()
+                key = str(command.payload.get("key", ""))
+                previous = (
+                    can_console.entries.get(key).authority if key in can_console.entries else None
+                )
+                updated = can_console.set_authority(key, command.payload.get("authority"))
+                if isinstance(ict_sink, SocketCanSink):
+                    ict_sink.purge(
+                        can_id=updated["message"]["frame_id"],
+                        is_extended=updated["message"]["is_extended"],
+                        reason="authority_change",
+                    )
+                core.reset_egress_rate(key)
+                publish_can_console(mutate_revision=True)
+                core.emit_event(
+                    "can_console_authority_updated",
+                    "web",
+                    key=key,
+                    previous=previous,
+                    authority=updated["authority"],
+                )
+                core.complete(command, {"message": updated, "status": core.snapshot().to_dict()})
+                return
+            if command.kind == "console_message_update":
+                operator_dbc.stop()
+                publish_operator_dbc()
+                updated = can_console.update(
+                    str(command.payload.get("key", "")),
+                    values=command.payload.get("values"),
+                    payload_hex=command.payload.get("payload_hex"),
+                    frequency_hz=command.payload.get("frequency_hz"),
+                )
+                publish_can_console(mutate_revision=True)
+                core.emit_event("can_console_message_updated", "web", key=updated["key"])
+                core.complete(command, {"message": updated, "status": core.snapshot().to_dict()})
+                return
+            if command.kind == "console_message_preview":
+                preview = can_console.preview(
+                    str(command.payload.get("key", "")),
+                    values=command.payload.get("values"),
+                    payload_hex=command.payload.get("payload_hex"),
+                )
+                core.complete(command, {"preview": preview})
+                return
+            if command.kind == "console_start":
+                operator_dbc.stop()
+                publish_operator_dbc()
+                can_console.start(transport_ready=transport_ready())
+                publish_can_console(mutate_revision=True)
+                core.emit_event("can_console_started", "web")
+                core.complete(command, {"status": core.snapshot().to_dict()})
+                return
+            if command.kind == "console_stop":
+                can_console.stop()
+                publish_can_console(mutate_revision=True)
+                core.emit_event("can_console_stopped", "web")
+                core.complete(command, {"status": core.snapshot().to_dict()})
+                return
+            if command.kind == "console_export":
+                core.complete(command, {"profile": can_console.export_profile()})
+                return
+            if command.kind == "console_import":
+                profile = command.payload.get("profile")
+                if not isinstance(profile, dict):
+                    raise GatewayRuntimeError(
+                        "console_profile_invalid", "profile must be an object"
+                    )
+                can_console.import_profile(profile)
+                publish_can_console(mutate_revision=True)
+                core.emit_event("can_console_profile_imported", "web")
+                core.complete(command, {"status": core.snapshot().to_dict()})
+                return
             if command.kind == "dbc_start":
+                can_console.stop()
+                publish_can_console()
                 operator_dbc.start(transport_ready=transport_ready())
                 publish_operator_dbc(mutate_revision=True)
                 core.emit_event("dbc_started", "web")
@@ -676,7 +840,13 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
             if command.kind == "dbc_reload":
                 operator_dbc.stop()
                 operator_dbc.reload()
+                can_console = CanConsoleRuntime(
+                    operator_dbc,
+                    mode=args.mode,
+                    simulation_rates=simulation_rates,
+                )
                 publish_operator_dbc(mutate_revision=True)
+                publish_can_console()
                 core.emit_event("dbc_reloaded", "web")
                 core.complete(
                     command,
@@ -702,6 +872,7 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
             timed_emitted = timed_can.service(monotonic_s, active_sinks(), observe_timed)
             if timed_generation is not None and not timed_can.active and not timed_emitted:
                 purge_socketcan_timed(timed_generation, "deadline")
+            can_console.service(send_operator_frame, monotonic_s)
             operator_dbc.scheduler.service(send_operator_frame, monotonic_s)
             if isinstance(ict_sink, SocketCanSink) and monotonic_s >= socketcan_guard_until_s:
                 ict_sink.service()
@@ -709,6 +880,7 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                 purge_socketcan_timed(timed_generation, "completed")
             retire_failed_socketcan()
             core.flush_transmission_aggregates(monotonic_s)
+            core.flush_console_runtime(monotonic_s)
             refresh_runtime_status()
             now_s = time.time()
             if now_s - last_heartbeat_s >= HEARTBEAT_INTERVAL_S:
@@ -726,7 +898,9 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                 )
                 last_heartbeat_s = now_s
             timeout_s = min(
-                timed_can.timeout_s(time.monotonic()), operator_dbc.scheduler.timeout_s()
+                timed_can.timeout_s(time.monotonic()),
+                can_console.timeout_s(),
+                operator_dbc.scheduler.timeout_s(),
             )
             try:
                 readable, _writable, _exceptional = select.select(
@@ -813,6 +987,11 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                     stop_timed("ict_stop")
                     operator_dbc.stop()
                     publish_operator_dbc()
+                    if args.mode == "godot-managed":
+                        can_console.reset_managed_overrides()
+                    else:
+                        can_console.stop()
+                    publish_can_console()
                     if ict_sink is not None and args.sink in ("vcan", "socketcan"):
                         # TCP stays listening across ICT stop; SocketCAN closes.
                         if isinstance(ict_sink, SocketCanSink):
@@ -828,6 +1007,8 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                     stop_timed("shutdown")
                     operator_dbc.stop()
                     publish_operator_dbc()
+                    can_console.stop()
+                    publish_can_console()
                     print("shutdown requested")
                     break
                 elif cmd == CMD_TIMED_CAN_START:
@@ -855,6 +1036,7 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                         qml_mapper,
                         observe_godot,
                         protocol,
+                        can_console.allows,
                     )
                     retire_failed_socketcan()
                 except QmlMappingError as exc:
@@ -934,12 +1116,13 @@ def emit_frames(
     qml_mapper: QmlCanMapper | None = None,
     observer: Callable[[int, bytes], None] | None = None,
     dbc_codec: DbcCodec | None = None,
+    authority_allows: Callable[[str, int, bool], bool] | None = None,
 ) -> None:
     codec = dbc_codec or protocol_codec()
     state = MachineState(sample, model=model)
     projection = qml_mapper.project(sample) if qml_mapper is not None else None
     tick = float(sample.tick_ms)
-    pending: list[tuple[str, int, bytes]] = []
+    pending: list[tuple[str, int, bool, bytes]] = []
 
     if scheduler.due("imu", tick):
         for link in ("body", "boom", "arm", "bucket"):
@@ -949,14 +1132,14 @@ def emit_frames(
                 roll, pitch, yaw = projection.imu_rpy_deg[link]
             slots = state.sensor_slots(roll, pitch, yaw)
             can_id = RUFINEN_IDS[link]
-            pending.append(("imu", can_id, encode_godot_imu(codec, can_id, slots)))
+            pending.append(("imu", can_id, True, encode_godot_imu(codec, can_id, slots)))
 
     if scheduler.due("slew", tick):
-        pending.append(("slew", 0x18FFF000, encode_slew_frame(state.slew_degrees())))
+        pending.append(("slew", 0x18FFF000, True, encode_slew_frame(state.slew_degrees())))
 
     if scheduler.due("travel", tick):
         left, right = state.travel_pressures()
-        pending.append(("travel", 0x256, encode_travel_frame(left, right)))
+        pending.append(("travel", 0x256, False, encode_travel_frame(left, right)))
 
     if scheduler.due("rtk", tick):
         rtk_state = state if projection is None else QmlRtkState(projection)
@@ -966,11 +1149,13 @@ def emit_frames(
             rtk_state,
             satellite_status=satellite_status,
         ).items():
-            pending.append(("rtk", can_id, payload))
+            pending.append(("rtk", can_id, True, payload))
 
     # Finish all profile math and encoding before exposing any frame. A bad
     # telemetry sample must never produce a partial CAN family.
-    for family, can_id, payload in pending:
+    for family, can_id, is_extended, payload in pending:
+        if authority_allows is not None and not authority_allows("godot", can_id, is_extended):
+            continue
         for sink in sinks:
             append_frame(
                 sink,
@@ -978,6 +1163,7 @@ def emit_frames(
                 payload,
                 source="godot",
                 family=family,
+                is_extended=is_extended,
             )
         if observer is not None:
             observer(can_id, payload)

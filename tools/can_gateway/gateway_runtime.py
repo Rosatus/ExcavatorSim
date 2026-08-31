@@ -10,6 +10,7 @@ import threading
 import time
 import uuid
 from collections import OrderedDict, deque
+from collections.abc import Mapping
 from concurrent.futures import Future
 from contextlib import suppress
 from dataclasses import asdict, dataclass, field, replace
@@ -342,6 +343,17 @@ class GatewayRuntimeCore:
             "notices": [],
             "load": {},
         }
+        self._console_snapshot_lock = threading.Lock()
+        self._console_snapshot: dict[str, Any] = {
+            "catalog_fingerprint": "",
+            "custom_armed": False,
+            "messages": [],
+            "load": {},
+        }
+        self._egress_lock = threading.Lock()
+        self._egress: dict[str, dict[str, Any]] = {}
+        self._egress_dirty: set[str] = set()
+        self._last_egress_event_s = time.monotonic()
         self._wakeup_read, self._wakeup_write = socket.socketpair()
         self._wakeup_read.setblocking(False)
         self._wakeup_write.setblocking(False)
@@ -418,6 +430,133 @@ class GatewayRuntimeCore:
                     json.loads(json.dumps(self._dbc_snapshot, allow_nan=False)),
                 )
         return status, dbc
+
+    def publish_console_snapshot(
+        self,
+        snapshot: dict[str, Any],
+        *,
+        mutate_revision: bool = False,
+    ) -> GatewayStatus:
+        """Atomically publish the configuration projection used by the CAN table."""
+        detached = cast(dict[str, Any], json.loads(json.dumps(snapshot, allow_nan=False)))
+        with self._status_lock:
+            revision = self._status.revision + 1 if mutate_revision else self._status.revision
+            self._status = replace(
+                self._status,
+                revision=revision,
+                periodic_armed=bool(detached.get("custom_armed", False)),
+            )
+            with self._console_snapshot_lock:
+                self._console_snapshot = detached
+            return self._status
+
+    def console_web_snapshot(self) -> tuple[GatewayStatus, dict[str, Any]]:
+        """Return one configuration snapshot enriched with egress truth."""
+        with self._status_lock:
+            status = replace(
+                self._status,
+                event_sequence=self.events.latest_sequence,
+                event_earliest_sequence=self.events.earliest_sequence,
+                log_dropped_records=self.events.dropped_records,
+            )
+            with self._console_snapshot_lock:
+                console = cast(
+                    dict[str, Any],
+                    json.loads(json.dumps(self._console_snapshot, allow_nan=False)),
+                )
+        with self._egress_lock:
+            metrics = {key: self._egress_projection(value) for key, value in self._egress.items()}
+        for row in console.get("messages", []):
+            if isinstance(row, dict):
+                row["runtime"] = metrics.get(str(row.get("key")), self._empty_egress())
+        console["server_monotonic_s"] = time.monotonic()
+        return status, console
+
+    @staticmethod
+    def _empty_egress() -> dict[str, Any]:
+        return {
+            "last_payload_hex": None,
+            "last_egress_monotonic_s": None,
+            "actual_frequency_hz": None,
+            "sample_count": 0,
+            "source": None,
+            "authority": None,
+            "values": None,
+        }
+
+    @classmethod
+    def _egress_projection(cls, value: Mapping[str, Any]) -> dict[str, Any]:
+        timestamps = value["timestamps"]
+        actual = None
+        if len(timestamps) >= 2 and timestamps[-1] > timestamps[0]:
+            actual = (len(timestamps) - 1) / (timestamps[-1] - timestamps[0])
+        return {
+            "last_payload_hex": value["payload"].hex().upper(),
+            "last_egress_monotonic_s": value["last_s"],
+            "actual_frequency_hz": actual,
+            "sample_count": len(timestamps),
+            "source": value["source"],
+            "authority": value["authority"],
+            "values": value.get("values"),
+        }
+
+    def record_egress(
+        self,
+        *,
+        key: str,
+        source: str,
+        authority: str,
+        payload: bytes,
+        values: Mapping[str, float] | None = None,
+        monotonic_s: float | None = None,
+    ) -> None:
+        now_s = time.monotonic() if monotonic_s is None else monotonic_s
+        with self._egress_lock:
+            value = self._egress.get(key)
+            if value is None:
+                value = {
+                    "payload": payload,
+                    "last_s": now_s,
+                    "source": source,
+                    "authority": authority,
+                    "timestamps": deque(maxlen=10),
+                    "values": None,
+                }
+                self._egress[key] = value
+            value["payload"] = payload
+            value["last_s"] = now_s
+            value["source"] = source
+            value["authority"] = authority
+            value["values"] = dict(values) if values is not None else None
+            value["timestamps"].append(now_s)
+            self._egress_dirty.add(key)
+
+    def reset_egress_rate(self, key: str) -> None:
+        with self._egress_lock:
+            value = self._egress.get(key)
+            if value is not None:
+                value["timestamps"].clear()
+                self._egress_dirty.add(key)
+
+    def flush_console_runtime(self, now_s: float | None = None) -> None:
+        current = time.monotonic() if now_s is None else now_s
+        with self._egress_lock:
+            if current - self._last_egress_event_s < 0.05 or not self._egress_dirty:
+                return
+            dirty = sorted(self._egress_dirty)
+            self._egress_dirty.clear()
+            self._last_egress_event_s = current
+            rows = {
+                key: self._egress_projection(self._egress[key])
+                for key in dirty
+                if key in self._egress
+            }
+        self.emit_event(
+            "can_console_runtime",
+            "transport",
+            server_monotonic_s=current,
+            rows=rows,
+        )
 
     def emit_event(self, kind: str, source: str, **detail: Any) -> GatewayEvent:
         return self.events.append(kind, source, detail)

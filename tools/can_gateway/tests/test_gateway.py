@@ -368,6 +368,25 @@ class _CaptureSink:
         return "capture"
 
 
+class SimulationIdentityTest(unittest.TestCase):
+    def test_authority_gate_receives_explicit_eff_identity(self) -> None:
+        sink = _CaptureSink()
+        observed: list[tuple[int, bool]] = []
+
+        def allows(_source: str, can_id: int, is_extended: bool) -> bool:
+            observed.append((can_id, is_extended))
+            return True
+
+        gateway.emit_frames(
+            [sink],
+            gateway.FrameScheduler({"imu": 100, "slew": 100, "rtk": 100, "travel": 100}),
+            parse_packet(make_packet(1)),
+            authority_allows=allows,
+        )
+        self.assertIn((0x256, False), observed)
+        self.assertTrue(all(is_extended for can_id, is_extended in observed if can_id != 0x256))
+
+
 class VcanCompatibilityTest(unittest.TestCase):
     def test_missing_vcan_is_prepared_before_socket_bind(self) -> None:
         events: list[tuple[str, str]] = []

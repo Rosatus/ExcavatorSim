@@ -115,6 +115,50 @@ class GatewayWebApiTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await response.json())["result"]["preview"]["payload_hex"], "00")
         self.assertEqual(self.core.snapshot().revision, 0)
 
+    async def test_managed_console_row_mutation_is_allowlisted_but_global_actions_are_denied(
+        self,
+    ) -> None:
+        async def complete_authority() -> None:
+            while True:
+                commands = self.core.take_commands()
+                if commands:
+                    command = commands[0]
+                    self.assertEqual(command.kind, "console_authority_update")
+                    self.assertEqual(command.payload["authority"], "custom")
+                    self.core.complete(command, {"message": {"authority": "custom"}})
+                    return
+                await asyncio.sleep(0)
+
+        owner = asyncio.create_task(complete_authority())
+        response = await self.client.put(
+            "/api/v1/can-console/messages/eff:18FF3A00/authority",
+            json={"authority": "custom", "expected_revision": 0},
+        )
+        await owner
+        self.assertEqual(response.status, 200)
+
+        denied = await self.client.post(
+            "/api/v1/can-console/start",
+            json={"expected_revision": 0},
+        )
+        self.assertEqual(denied.status, 403)
+        denied = await self.client.post(
+            "/api/v1/can-console/import",
+            json={"profile": {}, "expected_revision": 0},
+        )
+        self.assertEqual(denied.status, 403)
+
+    async def test_console_snapshot_is_atomic_and_contains_monotonic_anchor(self) -> None:
+        self.core.publish_console_snapshot(
+            {"catalog_fingerprint": "x", "custom_armed": False, "messages": []}
+        )
+        response = await self.client.get("/api/v1/can-console")
+        self.assertEqual(response.status, 200)
+        body = await response.json()
+        self.assertEqual(body["status"]["revision"], 0)
+        self.assertEqual(body["console"]["catalog_fingerprint"], "x")
+        self.assertIsInstance(body["console"]["server_monotonic_s"], float)
+
     async def test_dbc_edit_source_types_are_rejected_before_queue(self) -> None:
         self.core.mode = "standalone"
         cases = (

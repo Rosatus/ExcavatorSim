@@ -17,7 +17,9 @@ from __future__ import annotations
 import socket
 import struct
 import threading
+import time
 from collections import deque
+from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
 
@@ -47,6 +49,16 @@ class Pc001Status:
         return self.dropped_no_client + self.dropped_queue_full + self.dropped_disconnect
 
 
+@dataclass(frozen=True)
+class _PendingFrame:
+    wire: bytes
+    source: str
+    family: str
+    can_id: int
+    is_extended: bool
+    payload: bytes
+
+
 class TcpPc001Sink:
     """FrameSink writing packed can_frame batches to a connected PC001 client."""
 
@@ -63,7 +75,8 @@ class TcpPc001Sink:
         self.port = port
         self._queue_capacity = queue_capacity
         self._state = threading.Condition()
-        self._pending: deque[bytes] = deque()
+        self._pending: deque[_PendingFrame] = deque()
+        self._egress_observer: Callable[[str, str, int, bool, bytes, float], None] | None = None
         self._client: socket.socket | None = None
         self._candidate: socket.socket | None = None
         self._closing = False
@@ -106,7 +119,23 @@ class TcpPc001Sink:
             )
 
     def append(self, can_id: int, payload: bytes) -> None:
-        frame = pack_can_frame(can_id, payload)
+        self.submit(can_id, payload, source="unknown", family="unknown")
+
+    def submit(
+        self,
+        can_id: int,
+        payload: bytes,
+        *,
+        source: str,
+        family: str,
+        is_extended: bool | None = None,
+    ) -> None:
+        raw_id = can_id & 0x1FFFFFFF
+        extended = bool(can_id & 0x80000000) or raw_id > 0x7FF
+        if is_extended is not None:
+            extended = is_extended
+        transport_id = raw_id | (0x80000000 if extended else 0)
+        frame = pack_can_frame(transport_id, payload)
         with self._state:
             if self._closing or self._client is None:
                 self._dropped_no_client += 1
@@ -114,8 +143,23 @@ class TcpPc001Sink:
             if len(self._pending) >= self._queue_capacity:
                 self._dropped_queue_full += 1
                 return
-            self._pending.append(frame + CHANNEL_STRUCT.pack(0))
+            self._pending.append(
+                _PendingFrame(
+                    frame + CHANNEL_STRUCT.pack(0),
+                    source,
+                    family,
+                    raw_id,
+                    extended,
+                    bytes(payload),
+                )
+            )
             self._state.notify_all()
+
+    def set_egress_observer(
+        self, observer: Callable[[str, str, int, bool, bytes, float], None] | None
+    ) -> None:
+        with self._state:
+            self._egress_observer = observer
 
     def close(self) -> None:
         with self._state:
@@ -186,7 +230,8 @@ class TcpPc001Sink:
         try:
             client.settimeout(SEND_TIMEOUT_S)
             while not self._closing and self._is_current_client(client):
-                batch, batch_count = self._take_batch(client)
+                batch, frames = self._take_batch(client)
+                batch_count = len(frames)
                 if not batch:
                     # idle poll; keep detecting dead peers via timeout
                     self._probe_alive(client)
@@ -194,6 +239,23 @@ class TcpPc001Sink:
                 self._send_batch(client, batch)
                 with self._state:
                     self._sent_frames += batch_count
+                    observer = self._egress_observer
+                if observer is not None:
+                    completed_s = time.monotonic()
+                    for frame in frames:
+                        try:
+                            observer(
+                                frame.source,
+                                frame.family,
+                                frame.can_id,
+                                frame.is_extended,
+                                frame.payload,
+                                completed_s,
+                            )
+                        except Exception:
+                            # Metrics must never turn a successful wire write into
+                            # a transport disconnect.
+                            continue
                 batch_count = 0
         except OSError:
             pass
@@ -207,15 +269,15 @@ class TcpPc001Sink:
             with suppress(OSError):
                 client.close()
 
-    def _take_batch(self, client: socket.socket) -> tuple[bytes, int]:
+    def _take_batch(self, client: socket.socket) -> tuple[bytes, list[_PendingFrame]]:
         with self._state:
             if self._client is not client or self._closing:
-                return b"", 0
+                return b"", []
             count = min(len(self._pending), MAX_BATCH_FRAMES)
             if count == 0:
-                return b"", 0
+                return b"", []
             frames = [self._pending.popleft() for _ in range(count)]
-        return BATCH_PREFIX_STRUCT.pack(count) + b"".join(frames), count
+        return BATCH_PREFIX_STRUCT.pack(count) + b"".join(frame.wire for frame in frames), frames
 
     def _send_batch(self, client: socket.socket, batch: bytes) -> None:
         """Single service-thread wire-write seam used by deterministic tests."""
@@ -236,8 +298,6 @@ class TcpPc001Sink:
 
         Uses MSG_PEEK so no data is consumed (protocol is server->client only).
         """
-        import time
-
         time.sleep(0.05)
         try:
             client.setblocking(False)
