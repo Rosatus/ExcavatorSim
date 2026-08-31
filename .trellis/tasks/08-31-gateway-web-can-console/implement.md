@@ -69,7 +69,7 @@ Risk/rollback：先让新组件消费 fixture/typed snapshot，再切换真实 A
 - [x] 更新 `.trellis/spec/backend/can-gateway-control.md`，记录 unified authority、native adapters、egress tracker、API permissions、persistence/fault contracts。
 - [x] 如 Godot 文件无需修改，仅保留现有 `--mode godot-managed` argv regression；若实施发现必须编辑 Godot scene/script，先使用 godot-ai MCP 做结构检查/开发，并按 frontend spec 只增加最窄 deterministic test。
 - [x] 运行一次真实 Gateway process canary：HTTP snapshot → WS event → custom send → PC001 payload → stop；不建立浏览器 E2E runner。
-- [ ] 稳定且提交后仅运行一次 Windows/Linux unified release build，确认 React bundle、Gateway frozen resources、DBC/native code、manifest 和 Godot adjacent Gateway 均更新。
+- [x] 稳定且提交后仅运行一次 Windows/Linux unified release build，确认 React bundle、Gateway frozen resources、DBC/native code、manifest 和 Godot adjacent Gateway 均更新。
 - [x] 最终独立 review：检查同 ID 单 authority、managed permission、PC001 wire、no auto-arm、timed exclusion、event rate bound 与 spec drift。
 
 ## Agent Automated Validation
@@ -107,7 +107,7 @@ pixi run verify
 
 ## Human Manual Acceptance
 
-实现交付时提供最小步骤，以下保持 pending，不能由 Agent 声称通过：
+实现交付时提供最小步骤；以下项目已由用户于 2026-08-31 完成人工验收：
 
 1. Standalone：打开 `127.0.0.1:29777`，检查桌面/窄窗口布局、明暗主题、展开物理量和 Dialog 可读性。
 2. Standalone：选择两条 custom、分别编辑 values/payload 和频率；确认未点全局 Start 前不发，Start 后 expected/actual/freshness变化，Stop 后停止。
@@ -117,11 +117,11 @@ pixi run verify
 
 ## Completion Gate
 
-- [ ] PRD AC1–AC9 均有对应自动证据或明确 pending human evidence。
+- [x] PRD AC1–AC9 均有对应自动证据或已完成的人工验收证据。
 - [x] 没有修改 CAN encoding/timed/transport wire contracts。
 - [x] 新 config/import 失败路径零副作用；restart 不 auto-arm。
 - [x] 新 WebSocket event 有界、批量、可从 gap 恢复。
-- [ ] Specs、README、source tests 和最终 dist 对齐。
+- [x] Specs、README、source tests 和最终 dist 对齐。
 
 ## Implementation Verification — 2026-08-31
 
@@ -129,5 +129,5 @@ pixi run verify
 - React Vitest 8 passed，TypeScript typecheck、ESLint 与 Vite production build 通过；构建产物已同步到 `resources/web`。
 - 单进程 canary 已覆盖原子 console snapshot、既有 WebSocket event、custom authority/edit/start、PC001 exact payload 与 stop。
 - `pixi run verify` 的 backend lint/typecheck 通过，185 个 backend pytest 全部运行到 100%；pytest 在 Windows 清理用户临时目录 `pytest-current` 时因既有 ACL 返回 `WinError 5`，因此命令最终退出 1。按测试预算不重复宽 gate。
-- 尚待：人工浏览器/真实 Windows PC001/Linux can0 验收；提交后的 unified release build、manifest 与最终 dist 对齐。
+- 用户已完成人工验收。正式统一发行构建基于源码提交 `5e8e05b1faaa93f4b6ae1aa25f9d1341a821f068` 完成；Windows/Linux Gateway 与 Godot manifest 均标记 `git_tree_dirty=false` 且逐文件哈希、大小校验通过，Linux tar 可完整读取，包内 ELF 与可执行权限已核验。
 - Windows 验收包已于 2026-08-31 单独构建至 `dist/can_gateway`：`gateway.exe` SHA-256 为 `40d90423bef2c522e2c7ffb3360f9f4f95debdcc4a72edfd39d2dbb890f01db8`，内置 32 帧 CSV smoke 通过。该验收 manifest 明确标记 `git_tree_dirty=true`，不替代验收、提交后的统一正式发行构建。
