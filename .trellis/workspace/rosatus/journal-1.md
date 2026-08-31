@@ -1887,3 +1887,39 @@ Implemented and validated a process-local bucket pass-through mode that disables
 ### Next Steps
 
 - None - task complete
+
+
+## Session 51: Fix writable run compatibility and formalize release builds
+
+**Date**: 2026-08-31
+**Task**: Fix writable run compatibility and formalize release builds
+**Branch**: `main`
+
+### Summary
+
+Relaxed only the root-owned /run parent mode check for the Linux can0 helper while preserving strict child/lock validation, added cross-platform regressions and a root namespace smoke, rebuilt verified release artifacts, formalized build manifests and Linux packaging, and codified focused agent validation with human visual acceptance.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2c69c99` | (see git log) |
+| `ab216ff` | (see git log) |
+| `d212439` | (see git log) |
+| `d029cf2` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

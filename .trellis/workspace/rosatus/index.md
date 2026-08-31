@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 50
-- **Last Active**: 2026-08-30
+- **Total Sessions**: 51
+- **Last Active**: 2026-08-31
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1889 | Active |
+| `journal-1.md` | ~1925 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 51 | 2026-08-31 | Fix writable run compatibility and formalize release builds | `2c69c99`, `ab216ff`, `d212439`, `d029cf2` | `main` |
 | 50 | 2026-08-30 | Bucket pass-through performance mode | `f17f0f9`, `a21fe55`, `f90e074` | `main` |
 | 49 | 2026-08-29 | Restore Terrain3D visual parity and product cutover | `4f85886`, `422a204`, `2166332`, `1fb90f7`, `a26e906`, `59c5b86`, `2b814a9`, `322db50` | `main` |
 | 48 | 2026-08-29 | Gateway DBC payload editing and distribution | `626b3d9` | `main` |
