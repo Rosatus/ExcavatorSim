@@ -64,4 +64,3 @@
 - If any strict child/lock validator or CAN behavior changed, stop and revert
   that scope before packaging.
 - Record final artifact paths and manifests for redeployment.
-

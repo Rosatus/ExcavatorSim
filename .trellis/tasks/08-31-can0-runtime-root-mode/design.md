@@ -68,4 +68,3 @@ the Godot-bundled Linux copy, archive permissions, and build manifests.
 Rollback is a source revert plus a Linux release rebuild. No state migration is
 required because the on-disk lock path, directory/file modes, and helper CLI do
 not change.
-
