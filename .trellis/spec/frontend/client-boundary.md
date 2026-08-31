@@ -1564,18 +1564,15 @@ backend/scripts/jolt_product_soak.py
   manual dig/deposit, and fixed-step test seams while bypassed.
 - Verify reset and model/runtime rebuild retain the mode, stale support/soil
   work does not replay, and exiting restores normal behavior.
-- Keep ordinary standalone gates unchanged. Paired soak runs use alternating
-  normal/pass-through cells, three repetitions per model at balanced quality;
-  odd repetitions run `normal -> bucket_passthrough`, even repetitions reverse
-  the order. Preserve `run_ordinal`, `repetition`, one stable trace identity,
-  raw p95 values/counter deltas, and require a lower pass-through median.
-- The rendered soak enables MotionClient explicitly after scene `_ready()`
-  applies ProjectSettings, but ProductSession remains the lifecycle/model owner.
-  Read active-patch dump/spill evidence from accepted authority transactions,
-  not only the legacy batch interaction label.
-- Retry only an external gateway-health startup exception. Never discard and
-  rerun a completed inert/cut-free/payload-free cell: that result may be the
-  evidence for a real lifecycle, track-motion, or pass-through regression.
+- Keep the focused deterministic mode, Jolt payload/support, lifecycle, and
+  normal-restoration gates selected through `validation-budget.md`.
+- The paired normal/pass-through soak was completed and accepted for this
+  performance mode. It is retired as a development, release, and archive gate;
+  do not rerun it for ordinary regression evidence. Preserve the archived
+  report as historical evidence.
+- A future paired performance comparison requires an explicit new user-approved
+  performance evaluation scope. The retained runner capability does not make
+  the comparison an automatic gate.
 
 ### 7. Wrong vs Correct
 
@@ -1589,8 +1586,8 @@ Correct: one shared mode -> early-return before soil and effects execution
 Wrong: runtime reset -> default query policy for one tick -> stale support replay
 Correct: stored controller policy -> reapply immediately after every Jolt rebuild
 
-Wrong: completed inert soak cell -> rerun -> hide the first failure
-Correct: completed cell -> preserve it; retry only pre-scenario gateway startup failure
+Wrong: accepted performance mode -> rerun paired soak at every release/archive
+Correct: focused contract checks -> preserve archived performance evidence -> no paired soak
 ```
 
 ## Scenario: Construction-site Terrain3D presentation

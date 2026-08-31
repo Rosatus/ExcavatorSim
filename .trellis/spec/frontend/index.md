@@ -14,6 +14,7 @@ idempotent local soil transactions, and local hybrid truth.
 - [Client Boundary](./client-boundary.md) — ownership, transport, derived terrain, and local physics rules.
 - [Godot MCP Development Tool](./godot-mcp.md) — connection checks, safe editor automation, and cross-layer boundaries.
 - [Godot Motion Transport](./motion-transport.md) — WebSocket handshake, JSON normalization, generation guards, input safety, and visual parity.
+- [Validation Budget](./validation-budget.md) — risk-based Agent checks, human-owned visual/runtime review, escalation triggers, and rerun limits.
 
 Before changing or extending client code, read `docs/godot-integration.md` and
 the current protocol schemas. Do not copy React/Babylon scene code into the

@@ -1,6 +1,9 @@
 # Godot MCP Development Tool
 
-Godot MCP is an optional development-time adapter for inspecting and authoring the Godot client. It is not a runtime dependency and must never become an alternate source of simulator authority.
+Godot MCP is the recommended development-time adapter for inspecting and
+authoring the Godot client when a connected editor is available. It is not a
+runtime dependency and must never become an alternate source of simulator
+authority.
 
 ## Scope / Trigger
 
@@ -19,6 +22,8 @@ through `mcp__godot_ai__editor_manage`. A successful connection returns a struct
 ## Tool Boundaries
 
 - Prefer read operations first: editor state, scene hierarchy, node properties, filesystem/resource inspection, and logs.
+- Prefer MCP over blind textual scene editing when it can inspect or perform the
+  same scoped scene/resource operation safely and structurally.
 - Use scene/node/script/resource/UI tools only for an explicitly scoped implementation task.
 - Keep scene paths project-relative (`res://...`) and target the active session unless a specific `session_id` is required.
 - Use undoable authoring operations where available; inspect the result and the working-tree diff after writes.
@@ -74,6 +79,11 @@ to Python.
 - Scene authoring: reopen/inspect the edited scene and verify the expected node paths and properties through MCP.
 - Client lifecycle changes: exercise missing scene, reconnect, stale generation, reset, seek, and Return Live transitions where applicable.
 - Cross-layer changes: run `pixi run verify`; preserve protocol schema/version and deterministic backend tests.
+- Select and budget these checks through `validation-budget.md`. MCP-assisted
+  editor inspection, structured authoring, and objective state verification
+  remain recommended Agent development activities. Launching the game for
+  subjective visual or interaction judgment is human-owned by default; routine
+  automated tests stay focused and headless.
 
 ## Verification runner boundary
 
@@ -81,9 +91,14 @@ The bundled MCP test handler discovers only `res://tests/test_*.gd` scripts that
 instantiate `McpTestSuite`. The ExcavatorSim product contracts intentionally use
 standalone `SceneTree` scripts (for example `motion_client_test.gd` and
 `release_candidate_test.gd`) so they can run without the editor addon or a
-running service. Run those scripts through
-`godot/client/tests/run_standalone_matrix.ps1`, then use MCP for the live editor
-and runtime smoke sequence documented in `docs/release-candidate.md`.
+running service. For routine changes, invoke the single relevant standalone
+script (or focused test command) rather than
+`godot/client/tests/run_standalone_matrix.ps1`. The full matrix is reserved for
+the escalation triggers in `validation-budget.md`. MCP-driven **game runtime
+visual/interaction smoke** is a human-owned milestone unless the user explicitly
+requests Agent-driven runtime operation. This does not restrict normal MCP
+editor inspection or authoring. Follow the focused sequence in
+`docs/release-candidate.md` only when such a runtime milestone is active.
 
 The project baseline is a 1920x1080 viewport with responsive `canvas_items` /
 `expand` stretch. A smaller MCP capture is a resized observation, not evidence
