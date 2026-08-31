@@ -15,6 +15,7 @@ cd "$script_dir"
 PY="${PYTHON:-python3}"
 DIST_DIR="$repo_root/dist/can_gateway_linux"
 BUILD_DIR="$script_dir/build-linux"
+SPEC_DIR="$BUILD_DIR/specs"
 if ! command -v "$PY" >/dev/null 2>&1; then
     echo "error: $PY not found; install python3 >= 3.10" >&2
     exit 1
@@ -55,13 +56,15 @@ else
     PYEXE="$BUILD_DIR/.venv/bin/python"
 fi
 
+mkdir -p "$SPEC_DIR"
+
 "$PYEXE" -m PyInstaller \
     --onefile \
     --console \
     --name gateway \
     --distpath "$DIST_DIR" \
     --workpath "$BUILD_DIR" \
-    --specpath "$script_dir" \
+    --specpath "$SPEC_DIR" \
     --paths "$script_dir" \
     --add-data "$script_dir/resources:resources" \
     --collect-all cantools \
@@ -73,7 +76,7 @@ fi
     --name can0-setup-helper \
     --distpath "$DIST_DIR" \
     --workpath "$BUILD_DIR/helper" \
-    --specpath "$script_dir" \
+    --specpath "$SPEC_DIR" \
     --paths "$script_dir" \
     can0_setup_helper.py
 

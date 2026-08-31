@@ -46,6 +46,26 @@ pixi run backend-smoke
 pixi run verify
 ```
 
+After the implementation and focused checks are stable, build the distributable
+Windows and Linux packages once from the repository root:
+
+```powershell
+.\tools\build_release_dist.ps1
+```
+
+The builder rebuilds both Gateway targets, exports both Godot presets into a
+staging directory, places the platform Gateway beside the corresponding Godot
+executable, stages notices, and only then replaces `godot/dist/windows` and
+`godot/dist/linux`. Each platform package and each standalone Gateway package
+contains `build-manifest.json`. The sidecar records the source commit, dirty-tree
+state, software version, and raw-byte SHA-256 of every shipped file except the
+manifest itself. A formal release should be built from a clean tree; a dirty
+development build remains usable but is labelled `git_tree_dirty: true`.
+Distribute Linux as `godot/dist/ExcavatorSim-linux-x86_64.tar.gz`; the archive
+normalizes executable and data-file POSIX modes. Runtime `output/` residue found
+in an old Gateway package is preserved under `output/release-build-residue` and
+is never copied into the new release.
+
 The Terrain3D release runner keeps the production entry scene unchanged. It
 exports an isolated Windows smoke entry, proves native-default/material and
 source/export lifecycle parity, exercises the explicit `soil_shader` rollback,
@@ -53,8 +73,12 @@ verifies the native DLL against its vendored release binary, and stages license
 and provenance files beside the package. The rollback does not migrate authority
 data.
 
-Run the rendered Jolt product soak against a fresh `gateway-only` process for
-both models:
+Rendered Jolt product soak is a conditional final gate, not an iterative
+development loop. Run it only when the current release explicitly changes the
+corresponding renderer/performance contract. First finish focused checks and
+stabilize the implementation, then select the one applicable profile below and
+run it once after the final relevant edit; do not run quick, release, and the
+quality matrix cumulatively by default:
 
 ```powershell
 pixi run soak-jolt-quick
@@ -77,27 +101,11 @@ It also requires track and articulation movement, cut/load/dump/support evidence
 reset, reconnect, the selected model identity, and exactly one Jolt runtime. The
 JSON report and per-process logs are written under `artifacts/benchmark/`.
 
-The soak runner also supports the bucket pass-through inverse contract. For the
-required alternating three-pair balanced comparison on both production models:
-
-```powershell
-pixi run python backend/scripts/jolt_product_soak.py --models sy205 sy135 --quality-profile balanced --bucket-ground-mode normal bucket_passthrough --repetitions 3 --output artifacts/benchmark/bucket-pass-through-paired.json
-```
-
-Each pass-through cell requires zero bucket query execution, soil steps,
-bucket terrain commits, payload, cut/dump, support response, and effects update,
-while the corresponding bypass counters must advance. The summary records all
-six raw fixed-step p95 values per model, their mode medians, counter deltas, and
-requires the pass-through median to be lower than the normal median. Ordinary
-mode retains the existing cut/load/dump/support gates unchanged.
-
-Repetitions alternate order (`normal/pass-through`, `pass-through/normal`, then
-`normal/pass-through`) and record run ordinal plus a stable trace identity.
-ProductSession owns model and lifecycle; MotionClient is connected explicitly
-only for Gateway telemetry/reconnect coverage. Active-patch dump/spill evidence
-comes from accepted authority transactions. Completed inert scenario cells are
-never retried or discarded; only a pre-scenario Gateway health startup failure
-may receive the existing single retry.
+The bucket pass-through paired soak is retired. Its completed performance result
+was accepted and remains in the archived task evidence; it is not a release,
+regression, or archive command and must not be rerun automatically. The runner
+may retain paired-comparison support for diagnostics, but using it again requires
+a new explicit user-approved performance evaluation scope.
 
 The backend smoke starts a temporary legacy service and verifies health, URDF,
 the five-part visual manifest/GLB, WebSocket handshake, aligned `view_state` /

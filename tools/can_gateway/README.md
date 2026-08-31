@@ -76,10 +76,13 @@ helper 自动配置并复核。CAN 帧构造和 CSV 录制不受此流程影响�
 拥塞时允许丢弃已过时的物理遥测帧并保持 ICT 在线；CSV 仍记录全部逻辑帧。
 Web 状态页会显示 submitted、sent、拥塞丢弃、合并与终端错误统计。
 
-root helper 使用 `/run/excavatorsim/can0.lock` 串行化完整配置事务。运行时目录
-必须是 `root:root 0700`，锁文件必须是 `root:root 0600` 的单链接普通文件；
-不安全的既有目录、文件或符号链接会在任何 `ip link set` 前以稳定的
-`CAN0_SETUP_FAILED` 拒绝，不会被 helper 自动删除或修复。
+root helper 使用 `/run/excavatorsim/can0.lock` 串行化完整配置事务。父级 `/run`
+必须是 root 所有的真实目录，但兼容目标机的 group/other 可写模式；专属
+`/run/excavatorsim` 目录仍必须是 `root:root 0700`，锁文件仍必须是
+`root:root 0600` 的单链接普通文件。不安全的既有专属目录、文件或符号链接会在
+任何 `ip link set` 前以稳定的 `CAN0_SETUP_FAILED` 拒绝，不会被 helper 自动删除、
+改权或接管。若目标机 `/run` 可由普通用户写入且无 sticky-bit 保护，普通用户仍可能
+通过反复预占条目造成拒绝服务，但不能借此重定向 helper 的 root 操作。
 
 ```bash
 # WSL/Linux 出包（gateway + 固定 can0 helper + 安装脚本）
@@ -100,6 +103,23 @@ sudo ./uninstall_can0_helper.sh
 缺设备、缺 helper/授权、配置、bind 或 send 失败会回传到游戏 UI。
 
 WSL2 通常没有真实 `can0`，只能用于构建和无硬件测试。构建机 glibc 需不高于目标机。
+
+## 正式发布构建
+
+从仓库根目录运行统一构建器，可重建 Windows/Linux Gateway、导出两个 Godot
+平台、把 Gateway 同步到可执行文件旁，并补齐许可证与构建来源清单：
+
+```powershell
+.\tools\build_release_dist.ps1
+```
+
+最终平台包位于 `godot/dist/windows` 与 `godot/dist/linux`。每个平台包和根目录
+下的独立 Gateway 包都包含 `build-manifest.json`；清单记录 Git commit、构建时
+工作树是否有未提交内容、软件版本，以及包内每个文件的大小和原始字节 SHA-256。
+Linux 正式交付请使用 `godot/dist/ExcavatorSim-linux-x86_64.tar.gz`，该归档显式
+保留游戏、Gateway、can0 helper 与安装脚本的 POSIX 执行权限。构建器若发现
+旧包目录中的运行日志，会将其移到 `output/release-build-residue`，不会发布或删除。
+正式发布前应先提交计划纳入发布的源码，使 `git_tree_dirty` 为 `false`。
 
 ## Windows / PC001 TCP（ICT 直连）
 
