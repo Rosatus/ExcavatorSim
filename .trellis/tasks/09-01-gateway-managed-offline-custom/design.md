@@ -76,4 +76,3 @@ TCP sink 自己拥有无客户端丢弃和断连清队列语义；authority mana
 - 若绕过 handshake 判断时错误地直接标记成功，会污染实际频率/新鲜度；必须通过 `TcpPc001Sink.submit()` 的既有 drop seam，而不能调用 egress observer。
 - 若 managed 和 standalone 共用同一修改分支，可能破坏 standalone 的显式 arm 安全；测试必须分别覆盖两种 mode。
 - 重连瞬间可能有一个新周期帧很快到达，但不得有断连期间 backlog；no-replay 由 sink 单测和进程 canary共同验证。
-
