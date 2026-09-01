@@ -1,7 +1,10 @@
 [CmdletBinding()]
 param(
     [Parameter()]
-    [string]$GodotExe = "E:\applications\Godot_v4.7.1-stable_mono_win64\Godot_v4.7.1-stable_mono_win64_console.exe"
+    [string]$GodotExe = "",
+
+    [Parameter()]
+    [string]$ToolchainRoot = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,10 +16,7 @@ $gatewayLinux = Join-Path $repoRoot "dist\can_gateway_linux"
 $manifestTool = Join-Path $repoRoot "tools\build_manifest.py"
 $linuxPackager = Join-Path $repoRoot "tools\package_linux_release.sh"
 $stagingRoot = Join-Path $godotDist (".release-staging-" + [guid]::NewGuid().ToString("N"))
-
-if (-not (Test-Path -LiteralPath $GodotExe -PathType Leaf)) {
-    throw "Godot executable not found: $GodotExe"
-}
+. (Join-Path $PSScriptRoot "godot_voxel_toolchain.ps1")
 
 function Invoke-NativeChecked {
     param(
@@ -27,17 +27,41 @@ function Invoke-NativeChecked {
         [Parameter(Mandatory)]
         [string]$Name,
         [Parameter()]
-        [string]$WorkingDirectory = $repoRoot
+        [string]$WorkingDirectory = $repoRoot,
+        [Parameter()]
+        [int]$TimeoutSeconds = 1800
     )
-    Push-Location $WorkingDirectory
-    try {
-        & $FilePath @Arguments
-        if ($LASTEXITCODE -ne 0) {
-            throw "$Name failed with exit code $LASTEXITCODE"
-        }
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $FilePath
+    $startInfo.WorkingDirectory = $WorkingDirectory
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    foreach ($argument in $Arguments) {
+        [void]$startInfo.ArgumentList.Add($argument)
     }
-    finally {
-        Pop-Location
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    if (-not $process.Start()) {
+        throw "$Name could not be started"
+    }
+    $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+    $stderrTask = $process.StandardError.ReadToEndAsync()
+    if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+        $process.Kill($true)
+        throw "$Name timed out after $TimeoutSeconds seconds"
+    }
+    $stdoutText = $stdoutTask.GetAwaiter().GetResult()
+    $stderrText = $stderrTask.GetAwaiter().GetResult()
+    if (-not [string]::IsNullOrEmpty($stdoutText)) {
+        [Console]::Out.Write($stdoutText)
+    }
+    if (-not [string]::IsNullOrEmpty($stderrText)) {
+        [Console]::Error.Write($stderrText)
+    }
+    if ($process.ExitCode -ne 0) {
+        throw "$Name failed with exit code $($process.ExitCode)"
     }
 }
 
@@ -53,6 +77,10 @@ function Copy-ReleaseNotices {
         -Destination (Join-Path $thirdParty "Sky3D-LICENSE.txt") -Force
     Copy-Item -LiteralPath (Join-Path $godotProject "addons\sky_3d\EXCAVATORSIM-PROVENANCE.md") `
         -Destination (Join-Path $thirdParty "Sky3D-PROVENANCE.md") -Force
+    Copy-Item -LiteralPath (Join-Path $repoRoot "assets\licenses\VoxelTools-LICENSE.txt") `
+        -Destination (Join-Path $thirdParty "VoxelTools-LICENSE.txt") -Force
+    Copy-Item -LiteralPath (Join-Path $repoRoot "assets\licenses\VoxelTools-PROVENANCE.md") `
+        -Destination (Join-Path $thirdParty "VoxelTools-PROVENANCE.md") -Force
 }
 
 function Assert-ReleaseFile {
@@ -206,18 +234,45 @@ function Write-BuildManifest {
     param(
         [Parameter(Mandatory)][string]$Output,
         [Parameter(Mandatory)][string]$Name,
-        [Parameter(Mandatory)][string]$ArtifactRoot
+        [Parameter(Mandatory)][string]$ArtifactRoot,
+        [Parameter()][string]$BuildToolchain = ""
     )
-    Invoke-NativeChecked -FilePath "python" -Name "manifest $Name" -Arguments @(
+    $arguments = @(
         $manifestTool,
         "--output", $Output,
         "--artifact-root", "$Name=$ArtifactRoot"
     )
+    if (-not [string]::IsNullOrWhiteSpace($BuildToolchain)) {
+        $arguments += @("--build-toolchain", $BuildToolchain)
+    }
+    Invoke-NativeChecked -FilePath "python" -Name "manifest $Name" -Arguments $arguments
 }
 
 Assert-NoRunningReleaseProcesses
 New-Item -ItemType Directory -Path $stagingRoot -Force | Out-Null
 try {
+    $isolatedProject = Join-Path $stagingRoot "client"
+    $toolchain = New-GodotVoxelExportProject -Source $godotProject `
+        -Destination $isolatedProject -GodotExe $GodotExe -ToolchainRoot $ToolchainRoot
+    $GodotExe = [string]$toolchain.components.windows_editor.path
+    $toolchainEvidence = Join-Path $stagingRoot "build-toolchain.json"
+    [IO.File]::WriteAllText(
+        $toolchainEvidence,
+        ($toolchain | ConvertTo-Json -Depth 10),
+        [Text.UTF8Encoding]::new($false)
+    )
+
+    Write-Output "== Import isolated Godot project =="
+    Invoke-NativeChecked -FilePath $GodotExe -Name "isolated Godot import" -Arguments @(
+        "--headless", "--path", $isolatedProject, "--editor", "--quit"
+    )
+
+    Write-Output "== Verify source Voxel Tools module =="
+    Invoke-NativeChecked -FilePath $GodotExe -Name "source Voxel module canary" -Arguments @(
+        "--headless", "--path", $isolatedProject,
+        "--script", "res://tests/voxel_module_smoke.gd"
+    )
+
     Write-Output "== Build Windows Gateway =="
     Invoke-NativeChecked -FilePath "python" -Name "Windows Gateway build" -Arguments @(
         (Join-Path $repoRoot "tools\can_gateway\build_exe.py")
@@ -256,15 +311,67 @@ try {
 
     Write-Output "== Export Godot Windows =="
     Invoke-NativeChecked -FilePath $GodotExe -Name "Godot Windows export" -Arguments @(
-        "--headless", "--path", $godotProject,
+        "--headless", "--path", $isolatedProject,
         "--export-release", "ExcavatorSim", (Join-Path $stagedWindows "ExcavatorSim.exe")
     )
 
     Write-Output "== Export Godot Linux =="
     Invoke-NativeChecked -FilePath $GodotExe -Name "Godot Linux export" -Arguments @(
-        "--headless", "--path", $godotProject,
+        "--headless", "--path", $isolatedProject,
         "--export-release", "Linux", (Join-Path $stagedLinux "ExcavatorSim.x86_64")
     )
+
+    Write-Output "== Export and run Voxel Tools template canaries =="
+    $projectFile = Join-Path $isolatedProject "project.godot"
+    $productProjectText = [IO.File]::ReadAllText($projectFile)
+    $canaryProjectText = $productProjectText.Replace(
+        'run/main_scene="res://scenes/main.tscn"',
+        'run/main_scene="res://tests/voxel_module_export_smoke.tscn"'
+    )
+    if (-not $canaryProjectText.Contains(
+            'run/main_scene="res://tests/voxel_module_export_smoke.tscn"')) {
+        throw "Unable to select the isolated Voxel module export canary scene"
+    }
+    $canaryRoot = Join-Path $stagingRoot "voxel-canary"
+    $canaryWindows = Join-Path $canaryRoot "windows\VoxelModuleCanary.exe"
+    $canaryLinux = Join-Path $canaryRoot "linux\VoxelModuleCanary.x86_64"
+    New-Item -ItemType Directory -Path (Split-Path -Parent $canaryWindows), `
+        (Split-Path -Parent $canaryLinux) -Force | Out-Null
+    try {
+        [IO.File]::WriteAllText(
+            $projectFile,
+            $canaryProjectText,
+            [Text.UTF8Encoding]::new($false)
+        )
+        Invoke-NativeChecked -FilePath $GodotExe -Name "Windows Voxel template canary export" `
+            -Arguments @(
+                "--headless", "--path", $isolatedProject,
+                "--export-release", "ExcavatorSim", $canaryWindows
+            )
+        Invoke-NativeChecked -FilePath $GodotExe -Name "Linux Voxel template canary export" `
+            -Arguments @(
+                "--headless", "--path", $isolatedProject,
+                "--export-release", "Linux", $canaryLinux
+            )
+    }
+    finally {
+        [IO.File]::WriteAllText(
+            $projectFile,
+            $productProjectText,
+            [Text.UTF8Encoding]::new($false)
+        )
+    }
+    Invoke-NativeChecked -FilePath $canaryWindows `
+        -Name "Windows packaged Voxel module canary" -Arguments @("--headless")
+    $wslCanaryLinux = (& wsl.exe wslpath -a $canaryLinux.Replace("\", "/")).Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($wslCanaryLinux)) {
+        throw "Unable to resolve the Linux Voxel canary executable inside WSL"
+    }
+    Invoke-NativeChecked -FilePath "wsl.exe" -Name "Linux packaged Voxel module canary" `
+        -Arguments @(
+            "--exec", "sh", "-c", 'chmod +x "$1" && "$1" --headless',
+            "sh", $wslCanaryLinux
+        )
 
     Copy-Item -LiteralPath $gatewayWindows -Destination (Join-Path $stagedWindows "can_gateway") -Recurse -Force
     Copy-Item -LiteralPath $gatewayLinux -Destination (Join-Path $stagedLinux "can_gateway") -Recurse -Force
@@ -283,9 +390,9 @@ try {
         -Destination (Join-Path $stagedLinux "libterrain.linux.release.x86_64.so")
 
     Write-BuildManifest -Output (Join-Path $stagedWindows "build-manifest.json") `
-        -Name "godot-windows" -ArtifactRoot $stagedWindows
+        -Name "godot-windows" -ArtifactRoot $stagedWindows -BuildToolchain $toolchainEvidence
     Write-BuildManifest -Output (Join-Path $stagedLinux "build-manifest.json") `
-        -Name "godot-linux" -ArtifactRoot $stagedLinux
+        -Name "godot-linux" -ArtifactRoot $stagedLinux -BuildToolchain $toolchainEvidence
 
     $wslStagedLinux = (& wsl.exe wslpath -a $stagedLinux.Replace("\", "/")).Trim()
     $stagedLinuxArchive = Join-Path $stagingRoot "ExcavatorSim-linux-x86_64.tar.gz"

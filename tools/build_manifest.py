@@ -22,6 +22,30 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 VERSION_MANIFEST = REPO_ROOT / "protocol" / "version-manifest.json"
 _ARTIFACT_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 _COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+_TOOLCHAIN_COMPONENTS = {
+    "windows_editor",
+    "windows_release_template",
+    "linux_editor",
+    "linux_release_template",
+}
+_TOOLCHAIN_FIELDS = {
+    "release_url",
+    "tag",
+    "release_commit",
+    "voxel_tools_version",
+    "godot_version",
+    "engine_commit",
+    "components",
+}
+_TOOLCHAIN_COMPONENT_FIELDS = {
+    "component",
+    "filename",
+    "binary_sha256",
+    "binary_size_bytes",
+    "archive_filename",
+    "archive_sha256",
+}
 
 
 class ManifestError(RuntimeError):
@@ -122,12 +146,61 @@ def read_source(repo_root: Path = REPO_ROOT) -> dict[str, object]:
     }
 
 
+def validate_build_toolchain(value: Mapping[str, object]) -> dict[str, object]:
+    payload = dict(value)
+    if set(payload) != _TOOLCHAIN_FIELDS:
+        raise ManifestError("build toolchain provenance has an invalid top-level schema")
+    for field in _TOOLCHAIN_FIELDS - {"components"}:
+        item = payload[field]
+        if not isinstance(item, str) or not item:
+            raise ManifestError(f"build toolchain {field} must be a non-empty string")
+    components = payload["components"]
+    if not isinstance(components, list):
+        raise ManifestError("build toolchain components must be a list")
+    normalized: list[dict[str, object]] = []
+    names: set[str] = set()
+    for index, item in enumerate(components):
+        if not isinstance(item, dict) or set(item) != _TOOLCHAIN_COMPONENT_FIELDS:
+            raise ManifestError(f"build toolchain component {index} has an invalid schema")
+        name = item["component"]
+        if not isinstance(name, str) or name not in _TOOLCHAIN_COMPONENTS or name in names:
+            raise ManifestError(f"build toolchain component {index} has an invalid name")
+        names.add(name)
+        for field in ("filename", "archive_filename"):
+            filename = item[field]
+            if (
+                not isinstance(filename, str)
+                or not filename
+                or Path(filename).name != filename
+            ):
+                raise ManifestError(
+                    f"build toolchain component {name}.{field} is invalid"
+                )
+        for field in ("binary_sha256", "archive_sha256"):
+            digest = item[field]
+            if not isinstance(digest, str) or not _SHA256_RE.fullmatch(digest):
+                raise ManifestError(
+                    f"build toolchain component {name}.{field} is invalid"
+                )
+        size = item["binary_size_bytes"]
+        if not isinstance(size, int) or isinstance(size, bool) or size <= 0:
+            raise ManifestError(
+                f"build toolchain component {name}.binary_size_bytes is invalid"
+            )
+        normalized.append(dict(item))
+    if names != _TOOLCHAIN_COMPONENTS:
+        raise ManifestError("build toolchain provenance must contain the pinned four components")
+    payload["components"] = normalized
+    return payload
+
+
 def create_manifest(
     output_path: Path,
     artifact_specs: Sequence[tuple[str, Path]],
     *,
     repo_root: Path = REPO_ROOT,
     source: Mapping[str, object] | None = None,
+    build_toolchain: Mapping[str, object] | None = None,
     generated_at_utc: str | None = None,
 ) -> dict[str, object]:
     if not artifact_specs:
@@ -154,6 +227,8 @@ def create_manifest(
         "source": dict(source) if source is not None else read_source(repo_root),
         "artifacts": artifacts,
     }
+    if build_toolchain is not None:
+        document["build_toolchain"] = validate_build_toolchain(build_toolchain)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     temporary = output_path.with_name(f".{output_path.name}.{uuid4().hex}.tmp")
@@ -187,19 +262,47 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         type=_parse_artifact,
         metavar="NAME=PATH",
     )
+    parser.add_argument(
+        "--build-toolchain",
+        type=Path,
+        help="JSON file containing the verified build_toolchain provenance object",
+    )
     return parser.parse_args(argv)
+
+
+def _read_build_toolchain(path: Path | None) -> Mapping[str, object] | None:
+    if path is None:
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ManifestError(f"unable to read build toolchain provenance: {exc}") from exc
+    if isinstance(payload, dict) and isinstance(payload.get("build_toolchain"), dict):
+        payload = payload["build_toolchain"]
+    if not isinstance(payload, dict):
+        raise ManifestError("build toolchain provenance must be a JSON object")
+    return validate_build_toolchain(payload)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     try:
-        document = create_manifest(args.output, args.artifact_root)
+        document = create_manifest(
+            args.output,
+            args.artifact_root,
+            build_toolchain=_read_build_toolchain(args.build_toolchain),
+        )
     except ManifestError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
-    file_count = sum(
-        len(artifact["files"]) for artifact in document["artifacts"]  # type: ignore[index]
-    )
+    artifact_values = document["artifacts"]
+    if not isinstance(artifact_values, list):
+        raise ManifestError("generated manifest artifacts must be a list")
+    file_count = 0
+    for artifact in artifact_values:
+        if not isinstance(artifact, dict) or not isinstance(artifact.get("files"), list):
+            raise ManifestError("generated manifest artifact has an invalid schema")
+        file_count += len(artifact["files"])
     print(f"wrote: {args.output} ({file_count} files)")
     return 0
 

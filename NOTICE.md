@@ -59,6 +59,15 @@ links are retained beside those assets and summarized in
 `godot/client/addons/sky_3d/EXCAVATORSIM-PROVENANCE.md`. Sky3D is a fixed-time,
 presentation-only environment and is not simulation or replay authority.
 
+The Godot development and release toolchain includes Voxel Tools 1.7 as a
+native module in a pinned Godot 4.7.2 custom build from the upstream `v1.7`
+release. Voxel Tools is Copyright (c) 2016-2024 Marc Gilleron and is provided
+under the MIT License retained at `assets/licenses/VoxelTools-LICENSE.txt`.
+Build provenance is recorded at `assets/licenses/VoxelTools-PROVENANCE.md` and
+in each Godot package manifest. In the current phase the module is only an
+available capability; it does not own terrain, soil, collision, or simulation
+state.
+
 ExcavatorSim is licensed under `AGPL-3.0-only`. Technical provenance review is
 complete, but external distribution still requires owner/legal approval of the
 source-offer process, UI notice, and machine calibration rights. Visual asset rights were confirmed

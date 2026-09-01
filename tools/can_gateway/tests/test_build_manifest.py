@@ -20,6 +20,7 @@ from build_manifest import (  # noqa: E402
     collect_artifact,
     create_manifest,
     read_source,
+    validate_build_toolchain,
 )
 
 
@@ -55,23 +56,85 @@ class BuildManifestTest(unittest.TestCase):
                 "git_tree_dirty": False,
                 "software_version": "0.1.0",
             }
+            build_toolchain = {
+                "release_url": "https://example.invalid/v1.7",
+                "tag": "v1.7",
+                "release_commit": "1234567",
+                "voxel_tools_version": "1.7",
+                "godot_version": "4.7.2.stable.custom_build.ed1daf0bf",
+                "engine_commit": "ed1daf0bf",
+                "components": [
+                    {
+                        "component": component,
+                        "filename": f"{component}.bin",
+                        "binary_sha256": str(index) * 64,
+                        "binary_size_bytes": index,
+                        "archive_filename": f"{component}.zip",
+                        "archive_sha256": str(index + 4) * 64,
+                    }
+                    for index, component in enumerate(
+                        (
+                            "windows_editor",
+                            "windows_release_template",
+                            "linux_editor",
+                            "linux_release_template",
+                        ),
+                        start=1,
+                    )
+                ],
+            }
 
             create_manifest(
                 output,
                 [("windows", root)],
                 repo_root=Path(tmp),
                 source=source,
+                build_toolchain=build_toolchain,
                 generated_at_utc="2026-08-31T00:00:00Z",
             )
 
             payload = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(payload["source"], source)
+            self.assertEqual(payload["build_toolchain"], build_toolchain)
             self.assertEqual(
                 [item["path"] for item in payload["artifacts"][0]["files"]],
                 ["app.exe"],
             )
             self.assertTrue(output.read_bytes().endswith(b"\n"))
             self.assertFalse(list(root.glob(".*.tmp")))
+
+    def test_invalid_build_toolchain_is_rejected_by_direct_api(self) -> None:
+        with self.assertRaises(ManifestError):
+            validate_build_toolchain(
+                {
+                    "release_url": 1,
+                    "tag": "v1.7",
+                    "release_commit": "1234567",
+                    "voxel_tools_version": "1.7",
+                    "godot_version": "4.7.2",
+                    "engine_commit": "ed1daf0bf",
+                    "components": [],
+                }
+            )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "app.exe").write_bytes(b"app")
+            with self.assertRaises(ManifestError):
+                create_manifest(
+                    root / "build-manifest.json",
+                    [("windows", root)],
+                    source={"git_commit": "d" * 40},
+                    build_toolchain={
+                        "release_url": "https://example.invalid",
+                        "tag": "v1.7",
+                        "release_commit": "1234567",
+                        "voxel_tools_version": "1.7",
+                        "godot_version": "4.7.2",
+                        "engine_commit": "ed1daf0bf",
+                        "components": [],
+                    },
+                )
 
     def test_changed_artifact_changes_hash(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
