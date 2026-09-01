@@ -436,7 +436,11 @@ selected authority, expected frequency, capabilities, and runtime egress project
   of silently truncating them.
 - Standalone restores off/custom, payload and integer `1..100` Hz but always starts
   globally disarmed. Godot-managed starts simulation-capable IDs at simulation and other
-  IDs off; its row overrides and custom drafts are session-only.
+  IDs off; its row overrides and custom drafts are session-only. A TCP listener that is
+  ready but has no completed PC001 handshake, or a transient PC001 disconnect, does not
+  reset managed row authority: the sink drops offline occurrences without replay, and
+  retained custom rows resume on a later handshake. Managed overrides are reset only by
+  an explicit session reset, process restart, or a real terminal transport retirement.
 - Managed API allows only row preview/save/authority. TCP/can0 mutation, DBC reload,
   standalone start/stop, portable import/export remain server-side 403.
 - Successful transport egress means SocketCAN nonblocking `send()` returned or one PC001

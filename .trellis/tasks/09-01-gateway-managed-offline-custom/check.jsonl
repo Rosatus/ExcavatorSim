@@ -1,0 +1,1 @@
+{"file":".trellis/spec/backend/can-gateway-control.md","reason":"Verify the fix preserves managed per-ID authority, standalone arm safety, PC001 no-replay, egress metrics, timed CAN, and wire compatibility."}

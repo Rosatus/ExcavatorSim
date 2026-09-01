@@ -48,7 +48,9 @@ Godot: tests/can_gateway_e2e_test.gd                     # 进程监督+录制�
 
 Gateway 启动后访问 `http://127.0.0.1:29777`。Web 服务固定只绑定本机；
 Godot 以 `--mode godot-managed` 拉起时，持续遥测 ID 默认使用“仿真”权威；用户可在
-当前会话逐 ID 临时切换为“关闭”或“自定义”，重启后恢复默认仿真。托管模式仍拒绝
+当前会话逐 ID 临时切换为“关闭”或“自定义”，重启后恢复默认仿真。即使 TCP listener
+已就绪但 PC001 尚未握手或暂时断连，逐 ID authority 仍保持可编辑；离线帧由 TCP sink
+丢弃且不在重连后重放。托管模式仍拒绝
 传输重配、DBC reload、全局 arm 和配置导入/导出。独立启动（默认 `standalone`）时，
 Windows 页面可重配本机 PC001 TCP 服务端，
 Linux 页面可在二次确认后重启并复核 `can0`；不同平台不会暴露另一平台的传输控制。

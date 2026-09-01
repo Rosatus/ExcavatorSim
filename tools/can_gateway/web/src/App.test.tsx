@@ -178,13 +178,14 @@ describe("CAN console", () => {
 
   it("keeps managed row overrides while hiding standalone-only controls", async () => {
     installFetch(
-      { ...status, mode: "godot-managed" },
+      { ...status, mode: "godot-managed", pc001_handshake: false, pc001_dropped_frames: 456822 },
       { ...consoleSnapshot, messages: [{ ...row, authority: "simulation", simulation_available: true }] },
     );
     render(<App />);
     expect(await screen.findByText("Godot 托管会话")).toBeInTheDocument();
     expect(screen.queryByText("Windows PC001 Server")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /导出/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "自定义" })).toBeEnabled();
     await userEvent.click(screen.getByRole("radio", { name: "关闭" }));
     await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([url, init]) => String(url).endsWith("/authority") && init?.method === "PUT")).toBe(true));
   });

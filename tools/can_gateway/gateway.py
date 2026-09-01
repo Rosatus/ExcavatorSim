@@ -495,7 +495,12 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
         core.publish_console_snapshot(can_console.snapshot(), mutate_revision=mutate_revision)
 
     def send_operator_frame(_key: str, can_id: int, payload: bytes) -> None:
-        if not transport_ready():
+        # A TCP listener without a completed PC001 handshake is still a valid
+        # managed-session transport.  Let TcpPc001Sink account for the
+        # occurrence as a no-client drop instead of treating temporary client
+        # absence as an authority/session reset.  This preserves the selected
+        # managed row authority so it can resume naturally after reconnect.
+        if not isinstance(ict_sink, TcpPc001Sink) and not transport_ready():
             operator_dbc.stop()
             publish_operator_dbc()
             if args.mode == "godot-managed":
@@ -575,13 +580,14 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                 "transport",
             )
             last_pc001_handshake = handshake_connected
-            if not handshake_connected and can_console.armed:
+            # In managed mode a missing/closed PC001 client is transient
+            # transport unavailability, not a reason to discard per-ID custom
+            # overrides.  TcpPc001Sink drops without replaying while offline;
+            # only standalone keeps its existing disarm-on-disconnect rule.
+            if not handshake_connected and can_console.armed and args.mode != "godot-managed":
                 operator_dbc.stop()
                 publish_operator_dbc()
-                if args.mode == "godot-managed":
-                    can_console.reset_managed_overrides()
-                else:
-                    can_console.stop()
+                can_console.stop()
                 publish_can_console()
         core.publish(
             recording=recording,
