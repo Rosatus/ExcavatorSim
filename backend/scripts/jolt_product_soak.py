@@ -7,7 +7,6 @@ import ctypes
 import json
 import os
 import platform
-import shutil
 import socket
 import subprocess
 import sys
@@ -33,11 +32,7 @@ from babylon_sim.product_soak import (
 ROOT = Path(__file__).resolve().parents[2]
 CLIENT_DIR = ROOT / "godot/client"
 DEFAULT_OUTPUT = ROOT / "artifacts/benchmark/jolt-product-soak.json"
-KNOWN_GODOT_EXECUTABLES = (
-    Path(r"E:\applications\Godot_v4.7.1-stable_mono_win64") / "Godot_v4.7.1-stable_mono_win64.exe",
-    Path(r"E:\applications\Godot_v4.7.1-stable_mono_win64")
-    / "Godot_v4.7.1-stable_mono_win64_console.exe",
-)
+GODOT_TOOLCHAIN_CLI = ROOT / "tools/godot_voxel_toolchain.py"
 STARTUP_TIMEOUT_SECONDS = 120.0
 GODOT_STARTUP_TIMEOUT_SECONDS = 240.0
 PROCESS_QUERY_INFORMATION = 0x0400
@@ -215,20 +210,36 @@ def _source_revision() -> dict[str, Any]:
 
 
 def _find_godot(explicit: Path | None) -> Path:
-    candidates: list[Path] = []
-    if explicit is not None:
-        candidates.append(explicit)
-    configured = os.environ.get("GODOT_EXE")
-    if configured:
-        candidates.append(Path(configured))
-    discovered = shutil.which("godot")
-    if discovered:
-        candidates.append(Path(discovered))
-    candidates.extend(KNOWN_GODOT_EXECUTABLES)
-    for candidate in candidates:
-        if candidate.is_file():
-            return candidate.resolve()
-    raise SystemExit("Godot executable unavailable; pass --godot-exe or set GODOT_EXE")
+    selected = explicit
+    if selected is None:
+        configured = os.environ.get("GODOT_EXE")
+        selected = Path(configured) if configured else None
+    command = [
+        sys.executable,
+        str(GODOT_TOOLCHAIN_CLI),
+        "verify",
+        "--component",
+        "windows_editor",
+    ]
+    if selected is not None:
+        command.extend(("--godot-exe", str(selected)))
+    result = subprocess.run(
+        command,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or "unknown error"
+        raise SystemExit(detail)
+    try:
+        payload = json.loads(result.stdout)
+        return Path(payload["components"]["windows_editor"]["path"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise SystemExit(f"Godot toolchain resolver returned invalid JSON: {exc}") from exc
 
 
 def _run_model_with_retry(**kwargs: Any) -> dict[str, Any]:
