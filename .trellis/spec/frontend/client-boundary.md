@@ -1118,9 +1118,11 @@ ExcavationWorld.set_active_soil_patch_prototype_enabled(value: bool) -> void
   The copy may debit the shadow field and create representatives, but it cannot
   credit/debit `BucketSoilState`, spawn authoritative parcels, mutate accepted
   equipment state, or write the product `TerrainState`.
-- The local window is 3/4/5 metres for low/balanced/high. Each profile fixes
-  representative, substep, neighbor, settlement, memory, and tick-time budgets.
-  Quality changes may merge representatives but must preserve aggregate volume.
+- The local window is 3/4/5 metres for low/balanced/high. Logical aggregates
+  own exact mobile volume independently of disposable visual representatives.
+  Each profile fixes only visual density, substep, neighbor, settlement,
+  memory, and tick-time budgets; a quality change rebuilds visual samples and
+  cannot merge, split, debit, or settle logical material.
 - `loose`, `compact`, `sand`, and `damp` are game-feel presets with distinct
   friction, cohesion, damping, sleep, compaction, and repose values. They are
   not calibrated geotechnical material claims.
@@ -1130,9 +1132,10 @@ ExcavationWorld.set_active_soil_patch_prototype_enabled(value: bool) -> void
   settles through `ActiveSoilPersistentField.settle_volume()` and its scheduler.
 - `ActiveSoilPatchPresenter` is a disposable `MultiMeshInstance3D` derivative.
   Its instance count, transforms, visibility, or loss never changes volume.
-- Model switch, pose clear, authority/world generation change, reset, disable,
-  or material reconfiguration drops the old shadow generation and its visual
-  derivative. Default-off product snapshots remain byte-identical.
+- A shadow model/pose/generation boundary may drop the isolated clone. A product
+  model or pose boundary must first settle active/released aggregates and drain
+  bucket cells into persistent loose terrain; only an explicit world reset is
+  destructive. Default-off product snapshots remain byte-identical.
 
 ### 4. Validation & Error Matrix
 
@@ -1195,7 +1198,10 @@ SoilInteractionAuthority.configure(contract: Dictionary,
   mode: String = "shadow") -> bool
 SoilInteractionAuthority.step_fixed(delta: float, tick: int,
   tool_snapshot: Dictionary, tool_classification: Dictionary,
-  patch: ActiveSoilPatch, focus_world: Vector3) -> Dictionary
+  patch: ActiveSoilPatch, focus_world: Vector3,
+  surface_sweep_result: Dictionary = {},
+  terrain_scheduler: TerrainCommitScheduler = null,
+  solver_mode: String = "point_brush_v1") -> Dictionary
 SoilInteractionAuthority.get_status_snapshot() -> Dictionary
 SoilInteractionAuthority.get_journal_snapshot() -> Array[Dictionary]
 ActiveSoilPatch.extract_contained_volume(maximum_volume_m3: float) -> Dictionary
@@ -1239,9 +1245,10 @@ telemetry conforms to `simulation-truth-v1.soil_lifecycle_shadow`.
   returns `source=legacy`; Jolt, top-level truth payload, HUD, and existing VFX
   therefore never mix new bucket mass with legacy mass. The new ledger is an
   optional sibling observation and comparison record only.
-- Disable, reset, model switch, authority generation change, or material change
-  clears the patch and ledger together. Mid-scoop primary authority migration is
-  forbidden in this contract.
+- Disable or quality/presenter change preserves logical material. Ordinary
+  model, pose, or authority boundaries call `settle_all_for_boundary()` before
+  clearing the patch and ledger. World reset is the explicit destructive
+  boundary. Mid-scoop primary authority migration remains forbidden.
 
 ### 4. Validation & Error Matrix
 
@@ -1352,7 +1359,8 @@ retains `mode=shadow` and is never reused for product authority.
 | Both legacy and active writers registered | Reject binding, increment owner violation, pause use |
 | Active initialization fails before first write | Select legacy in the same clean generation and expose fallback reason |
 | Active runtime fails after any write | Pause writes; request legacy; require reset/new generation |
-| Reset/model/authority boundary | Clear payload, reps, parcels, transactions, response, then create one new selection |
+| Ordinary model/pose/authority boundary | Settle active/released and drain bucket to persistent loose before clearing; on failure retain the generation and pause writes |
+| Explicit world reset | Destructively clear payload, reps, parcels, transactions, response, then create one new selection |
 | Presenter/quality/hero-clod setting changes | Preserve ledger and product terrain totals |
 
 ### 5. Good / Base / Bad Cases
@@ -1383,6 +1391,284 @@ Correct: requested_mode changes -> next clean generation selects one writer
 
 Wrong: active cut -> legacy parcel capture -> second bucket credit
 Correct: active cut -> active aggregate -> one conservative bucket transaction
+```
+
+## Scenario: Continuous surface-patch soil solver
+
+### 1. Scope / Trigger
+
+Use this contract whenever semantic bucket surfaces propose stable/loose terrain
+changes, the product collider is synchronized with those changes, or loosened
+material is transferred between terrain, active aggregates, the bucket, and
+settlement. It replaces overlapping point brushes only when the generation has
+selected `surface_patch_v2`; `point_brush_v1` remains the release default until
+both-model focused gates and the manual digging pass are accepted, while
+`surface_patch_v2_shadow` is the zero-mutation comparison mode.
+
+### 2. Signatures
+
+```text
+BucketSurfaceSweep.build_patch(tool_snapshot: Dictionary,
+  classification: Dictionary, terrain_snapshot: Dictionary,
+  interaction: Dictionary, tick: int) -> Dictionary
+SoilCellPatch.validate_for_snapshot(patch: Dictionary,
+  snapshot: Dictionary) -> Dictionary
+SoilCellPatch.volume_metrics(patch: Dictionary,
+  snapshot: Dictionary) -> Dictionary
+TerrainState.cell_patch_read_snapshot() -> Dictionary
+TerrainState.preview_cell_patch(patch: Dictionary) -> Dictionary
+TerrainCommitScheduler.queue_cell_patch(sequence: int, patch: Dictionary,
+  generation: int, transfer_id: String) -> bool
+TerrainCollider.prepare_snapshot(snapshot: Dictionary) -> bool
+TerrainCollider.install_prepared(snapshot: Dictionary) -> bool
+TerrainCollider.restore_snapshot(snapshot: Dictionary) -> bool
+ActiveSoilPatch.reserve_predebited_volume(event: Dictionary,
+  aggregate_hint: String, compartment: String = "active") -> Dictionary
+ActiveSoilPersistentField.schedule_tool_flux(dirty_rect_cells: Rect2i,
+  horizontal_impulse_xz: Vector2) -> bool
+SoilInteractionAuthority.settle_all_for_boundary(patch: ActiveSoilPatch,
+  tick: int, origin_world: Vector3) -> Dictionary
+ExcavationWorld.set_soil_surface_solver_mode(value: String) -> bool
+```
+
+### 3. Contracts
+
+- `BucketSurfaceSweep` consumes accepted previous/current semantic transforms
+  and is mutation-free. Adaptive sampling that exceeds the descriptor cap marks
+  `sweep_discontinuous` and emits no patch. Sampling bounds the most distant
+  semantic point's rotational travel, not only `bucket_link.origin`. An explicit
+  active classification is a hard deny, but a sparse classifier `none` result
+  may be recovered by the continuous surface's own motion/role/overlap proof.
+  Only actions `cut`, `side_cut`, `scrape`, or `grade` remove terrain;
+  push/back-drag/compact move existing loose material instead.
+- Box semantic surfaces align their thickness axis with
+  `outward_normal_godot`; diagonal floor/back normals must not be flattened into
+  bucket-link-aligned faces. Heightfield coverage is conservative over each
+  sample's square support cell (half-cell expansion), not a point-only triangle
+  test and not an arbitrary circular brush.
+- Every fixed tick merges all eligible teeth, side, floor, and outer-face offers
+  into one sorted, unique, absolute-target `soil-cell-patch-v2`. Inner shell and
+  opening have no stable role. A one-cell closure is allowed only when the cell
+  is proven inside swept coverage and enclosed by four already-cut cardinal
+  neighbors; closure is computed from a frozen offer set and cannot flood-fill.
+- Patch rows carry original/target stable and loose Float32 values, action, and
+  sorted contributors. Generation/base revision, row order, originals, finite
+  values, safety floor, dirty rectangle, derived volume metrics, and SHA-256
+  must all validate before mutation. Metadata never overrides row-derived
+  volume.
+- `TerrainCommitScheduler` previews one immutable candidate snapshot, prepares
+  all changed collider chunks, installs the prepared candidate, commits the
+  authoritative rows once, then publishes that same revision to the renderer.
+  A prepare/install failure leaves terrain unchanged. The post-install invariant
+  branch restores the previous collider snapshot before returning failure.
+- Sweep/patch validation uses `cell_patch_read_snapshot()`, a synchronous
+  copy-on-write stable/loose view with no synthesized surface bytes or SHA. Full
+  presentation snapshots are materialized only for a candidate collider and the
+  committed renderer revision. Live collision chunks default to 16 cells so a
+  small patch does not rebuild a 32x32 concave shape every physics tick.
+- Logical active aggregates own volume/provenance; visual representatives are
+  deterministic derivatives and quality changes affect only those derivatives.
+  Transfers reserve destination capacity before source debit. Any partial bucket
+  acceptance restores the exact unaccepted active volume.
+- Settlement is a `settle_loose` absolute cell patch whose committed volume is
+  derived from quantized target rows. Repose flow moves loose depth only through
+  simultaneous four-neighbor proposals. The bounded frontier survives across
+  ticks until below repose; horizontal tool impulse may bias push/back-drag flow
+  without minting or deleting volume.
+- Material-ledger values are deltas relative to the generation baseline; their
+  sum must remain zero. An ordinary local authority boundary drains transient
+  compartments to persistent loose terrain. Only world reset or the explicitly
+  user-approved Bucket Pass transition may intentionally discard the generation.
+- Solver selection remains generation-bound. The public runtime setter performs
+  an ordinary drain/pose-history clear and begins a clean generation; it may not
+  return success while only changing the requested value. Status/payload getters
+  queried re-entrantly during that boundary return an empty transitional fill
+  profile instead of indexing cleared bucket cells.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Sparse classifier returns `none`, but semantic role/motion and swept surface prove overlap | Rasterize the continuous surface; do not inherit the point-probe miss |
+| Explicit active/non-stable role, rest/separation, inner/opening, or discontinuous sweep | Emit no debit and leave terrain bytes/revision unchanged |
+| Duplicate/unsorted row, stale generation/revision, original mismatch, non-finite target, bad metadata/hash/dirty rectangle | Reject before collider preparation or terrain mutation |
+| Collider prepare/install fails | Reject patch; TerrainState and prior collider identity stay unchanged |
+| Terrain invariant fails after collider install | Restore the previous collider snapshot and reject; increment rollback diagnostics only if compensation fails |
+| Active/bucket/released destination lacks capacity | Retain exact source; publish no accepted transaction or authoritative visual event |
+| Settlement scheduler rejects | Retain residual logical aggregate volume for retry |
+| Loose frontier reaches below repose | Clear retained frontier; do not emit another terrain revision |
+| Ordinary model/pose boundary cannot drain | Preserve current authority/material, report runtime failure, and do not clear |
+| UI/status reads during solver generation replacement | Return a valid transitional status with empty fill profile; never index cleared cells |
+
+### 5. Good / Base / Bad Cases
+
+- Good: accepted semantic sweep -> one validated cell patch -> prepared collider
+  transaction -> exact stable/loose debit -> logical aggregate -> bucket ->
+  released -> exact loose settlement and bounded repose flow.
+- Base: `surface_patch_v2_shadow` runs `point_brush_v1` as the unchanged product
+  writer and computes v2 diagnostics as a read-only sibling; the terrain and
+  ledger outcome must equal a pure v1 run for the same input.
+- Bad: convert v2 rows back into overlapping brushes, let a visual clod own
+  volume, clear mobile soil on model activation, or accept whichever collider
+  identity happens to answer first.
+
+### 6. Tests Required
+
+- `surface_sweep_patch_test.gd`: both models, flat/slope continuity, semantic
+  tooth/side/floor/outer coverage, bounded envelope, region permutation,
+  diagonal plate orientation, far-point rotation sampling, the product
+  `129x129 @ 0.5m` grid, sparse-probe recovery, isolated-spike closure,
+  rest/separation/non-stable/discontinuity fail-closed, and unchanged cells
+  outside canonical rows. Identity-basis `41x41 @ 0.25m` fixtures alone are not
+  product acceptance evidence.
+- `terrain_cell_patch_test.gd` and
+  `terrain_cell_patch_collider_test.gd`: exact layer metrics, one revision,
+  malformed/stale/tampered rejection, prepare/install zero side effects,
+  post-install compensation, and collider/TerrainState identity equality.
+- `soil_surface_authority_test.gd`, `soil_interaction_authority_test.gd`, and
+  `active_soil_patch_test.gd`: exact source split, destination-first transfers,
+  both-model journeys, 20 cycles, ordinary-boundary drain, quality-independent
+  logical digest, and zero invariant failures.
+- Migration/runtime tests switch the public solver setter, assert requested and
+  selected modes match immediately after its clean boundary, and query both
+  SY205/SY135 fill profiles plus the cleared transitional authority.
+- `loose_soil_flux_test.gd`: below-repose rest, conservative convergence,
+  order equivalence, compaction response, tool-biased push, retained frontier,
+  and exact typed settlement.
+- Before selecting product v2, manually verify full-width clean cuts, no spikes,
+  intuitive carry/dump/pile behavior, no commit-tick collider blocking, and
+  unchanged Terrain3D materials/vegetation on both models.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: several bucket faces -> several overlapping brushes -> repeated debit
+Correct: several semantic sweeps -> one sorted unique absolute-target cell patch
+
+Wrong: quality=low -> merge/drop authoritative soil aggregates
+Correct: logical aggregates unchanged -> rebuild fewer disposable visual samples
+
+Wrong: model activation -> clear active patch and bucket -> leave cut terrain behind
+Correct: ordinary boundary -> exact transient drain -> clear only after success
+
+Wrong: synthetic 0.25 m identity-frame sweep passes -> assume product geometry passes
+Correct: also assert real diagonal semantic axes and the product 0.5 m grid
+
+Wrong: every v2 tick -> full surface bytes + duplicated layers + SHA even when idle
+Correct: synchronous cell-patch read view -> full immutable snapshot only at commit boundaries
+```
+
+## Scenario: Visual-first arcade excavation stamp
+
+### 1. Scope / Trigger
+
+Use this contract when the generation selects `active_patch` plus
+`arcade_stamp_v3`. This candidate prioritizes a continuous, decisive trench and
+bounded frame cost over soil conservation. It must not enter
+`SoilInteractionAuthority`, `ActiveSoilPatch`, `ActiveSoilPersistentField`,
+`LooseSoilFluxSolver`, or the semantic full-surface classifier. The release
+default remains `point_brush_v1` until the human Forward+ digging gate accepts
+v3.
+
+### 2. Signatures
+
+```text
+ArcadeExcavationStamp.configure(state: TerrainState,
+  scheduler: TerrainCommitScheduler, contract: Dictionary) -> bool
+ArcadeExcavationStamp.step_fixed(delta: float, pose_snapshot: Dictionary,
+  tick: int) -> Dictionary
+ArcadeExcavationStamp.build_proposals(pose_snapshot: Dictionary,
+  terrain_snapshot: Dictionary, was_engaged: bool) -> Dictionary
+ArcadeBucketLoadState.credit_accepted_cut(removed_volume_m3: float,
+  tick: int, patch_hash: String, fill_gain: float = 1.0) -> Dictionary
+ArcadeBucketLoadState.dump_visual_load(release_world: Vector3,
+  tick: int) -> Dictionary
+TerrainState.minimum_stable_height_for_index(index: int) -> float
+SoilEffects.apply_visual_snapshot_for_test(status: Dictionary) -> void
+```
+
+### 3. Contracts
+
+- Only accepted previous/current `cutting_edge` transforms, model contract,
+  opening orientation, generation identity and the synchronous cell-patch read
+  view enter the v3 hot path. Invalid history, movement below `0.002 m`, travel
+  above `2 m`, and an edge outside the hysteretic terrain work band emit no
+  terrain target.
+- The projected cutting edge is widened by `1.25`, interpolated at no more than
+  half-cell travel, rasterized as swept quads plus a bounded support radius, and
+  stores at most one latest-minimum absolute target per terrain index. Width and
+  interpolation deliberately favor eliminating gaps and residual spikes.
+- Pending targets coalesce for `100 ms`. A flush emits one sorted
+  `soil-cell-patch-v2`, removes at least `0.18 m` where allowed, caps one flush
+  at `0.45 m`, and respects `minimum_stable_height_for_index()`. The scheduler
+  remains the sole TerrainState/collider/presentation revision writer.
+- Pending targets are cleared only when they are obsolete/no-op or their exact
+  transfer ID is committed. Queue, collider or TerrainState rejection retains
+  them so the next 100 ms window rebuilds originals from the latest revision
+  and retries. Rejected work never credits bucket fill.
+- `ArcadeBucketLoadState` is presentation/payload compatibility state, not a
+  material ledger. Accepted changed volume increases one bounded scalar fill;
+  dumping clears it and publishes one generation-scoped event with
+  `accepted_dump_event_id`, `dump_release_world`, and
+  `dump_released_fill_ratio`. Removed terrain need not be restored.
+- `SoilEffects` maps each new dump event to a shared-mesh, non-colliding visual
+  mound. The bounded pool recycles oldest entries and clears on material/world
+  generation reset. Duplicate event IDs do not spawn twice; emission disable
+  may stop particles but does not erase already placed mounds.
+- Solver selection stays generation-bound. v3 owns the existing `active_patch`
+  product-writer slot but resets and bypasses all v2 runtime objects. Enabling
+  the diagnostic active-soil prototype while v3 is selected must not construct
+  an `ActiveSoilPatch`. Bucket pass-through remains the first early exit and
+  clears v3 scalar/presentation state through the ordinary generation boundary.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Invalid/non-finite pose, stationary edge, above-band edge | No proposal, no fill, no revision |
+| Pose travel exceeds `2 m` | Clear engagement for that sample; do not bridge the teleport |
+| Duplicate cell offers within/between fixed ticks | Keep one lowest pending target |
+| Queue/collider/TerrainState commit rejection | Retain targets for retry; do not credit visual load |
+| Target below terrain safety floor | Clamp to the per-index minimum before patch validation |
+| Dump with empty load, invalid pose/orientation or outside terrain | No dump event and no mound |
+| Repeated dump event ID | Preserve the existing mound count |
+| Mound pool at capacity | Recycle oldest mesh; never create a collision object |
+| Model/world/material generation change | Clear pending stamp, scalar load, dump identity and mound pool |
+| v2 prototype toggle during selected v3 | Keep `ActiveSoilPatch` and lifecycle authority absent |
+
+### 5. Good / Base / Bad Cases
+
+- Good: moving edge in terrain band -> gap-free coalesced stamp -> one accepted
+  terrain revision -> scalar visual fill -> dump event -> pooled visual mound.
+- Base: `point_brush_v1` remains unchanged and selected by default before human
+  acceptance; v2 remains available only as an unaccepted diagnostic path.
+- Bad: invoke the semantic surface classifier/loose flux each frame, clear a
+  rejected target, credit fill before commit, or add physics to a visual mound.
+
+### 6. Tests Required
+
+- `arcade_excavation_stamp_test.gd`: SY205/SY135 width, slow/fast sweeps,
+  connected 5 m coverage, stationary/above/teleport guards, exactly one 100 ms
+  commit, accepted-only fill, injected apply rejection and next-window retry.
+- `arcade_excavation_world_test.gd`: clean generation selection, selected scalar
+  payload, absence of v2 authority/patch, and prototype-toggle isolation.
+- `soil_effects_visual_mound_test.gd`: event de-duplication, bounded recycling,
+  generation clear, and absence of collision nodes in the mound pool.
+- Human Forward+ acceptance owns cleanliness, responsiveness, material look and
+  perceived stutter for both models. Run it only after focused Agent tests are
+  stable; do not replace it with long automated visual soaks.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: every physics tick -> full semantic classifier -> active material/flux -> forced terrain commit
+Correct: cutting-edge pose -> bounded swept stamp -> 100 ms latest-minimum coalescer -> one patch
+
+Wrong: clear pending rows before scheduler acceptance
+Correct: clear only committed/no-op rows; retain rejected targets for retry
+
+Wrong: dump visual load -> authoritative loose soil or Jolt mound collision
+Correct: clear scalar load -> generation-scoped event -> pooled non-colliding mesh
 ```
 
 ## Scenario: Game-feel digging response

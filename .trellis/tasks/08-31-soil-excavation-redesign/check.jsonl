@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Godot client quality checklist"}
+{"file": ".trellis/spec/frontend/client-boundary.md", "reason": "Authority, identity, conservation and Jolt/Terrain3D review contract"}
+{"file": ".trellis/spec/frontend/validation-budget.md", "reason": "Risk-based final verification scope and rerun limits"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Review every cell-patch and derivative boundary"}
+{"file": ".trellis/tasks/08-31-soil-excavation-redesign/research/current-system-findings.md", "reason": "Verify implementation resolves evidenced current failure modes"}

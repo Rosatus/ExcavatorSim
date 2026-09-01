@@ -36,12 +36,15 @@ func _run() -> void:
 	var active_repeated := _run_repeated_cycles("sy205", 20, "active_patch")
 	if not bool(active_repeated.get("passed", false)):
 		return _fail("active 20-cycle lifecycle failed: %s" % active_repeated.get("reason", "unknown"))
+	var boundary_drain := _run_journey("sy205", "balanced", "active_patch", true)
+	if not bool(boundary_drain.get("passed", false)):
+		return _fail("ordinary authority boundary leaked material: %s" % boundary_drain.get("reason", "unknown"))
 
 	print("soil_interaction_authority_test: PASS")
 	quit(0)
 
 
-func _run_journey(model_id: String, quality: String, mode: String = "shadow") -> Dictionary:
+func _run_journey(model_id: String, quality: String, mode: String = "shadow", drain_at_boundary: bool = false) -> Dictionary:
 	var descriptor := SoilContractDescriptor.load_for_model(model_id)
 	if descriptor == null or not descriptor.is_valid_for(model_id):
 		return {"passed": false, "reason": "contract_unavailable"}
@@ -94,6 +97,25 @@ func _run_journey(model_id: String, quality: String, mode: String = "shadow") ->
 		return {"passed": false, "reason": "opening_flux_zero"}
 	if not _journal_has_kind(authority.get_journal_snapshot(), "bucket_entry"):
 		return {"passed": false, "reason": "entry_transaction_missing"}
+	if drain_at_boundary:
+		var drain := authority.settle_all_for_boundary(patch, 3, cut_point)
+		if not bool(drain.get("drained", false)):
+			return {"passed": false, "reason": "boundary_%s" % String(drain.get("reason", "drain_failed"))}
+		var drained_status := authority.get_status_snapshot()
+		var drained_compartments := drained_status["compartments_m3"] as Dictionary
+		for transient in ["active", "bucket", "released"]:
+			if absf(float(drained_compartments[transient])) > 0.000001:
+				return {"passed": false, "reason": "boundary_retained_%s" % transient}
+		if absf(float(drained_status["conservation_drift_m3"])) > 0.00001:
+			return {"passed": false, "reason": "boundary_ledger_drift"}
+		if int(drained_status["invariant_failure_count"]) != 0:
+			return {"passed": false, "reason": "boundary_invariant_failure"}
+		return {
+			"passed": true,
+			"cut_volume_m3": cut_volume,
+			"peak_bucket_volume_m3": peak_bucket,
+			"final_status": drained_status,
+		}
 
 	var opening_local_normal := _region_normal(identity_snapshot, "opening")
 	var dump_basis := Basis(Quaternion(opening_local_normal, Vector3.DOWN))

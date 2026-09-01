@@ -7,6 +7,7 @@ extends RefCounted
 
 const SCHEMA_VERSION := "soil-authority-mode-controller-v1"
 const MODES := ["legacy", "shadow", "active_patch"]
+const SOLVER_MODES := ["point_brush_v1", "surface_patch_v2_shadow", "surface_patch_v2", "arcade_stamp_v3"]
 const STAGES := ["cut", "bucket_entry", "release", "settle"]
 const PRODUCT_OWNER_BY_MODE := {
 	"legacy": "legacy",
@@ -16,6 +17,8 @@ const PRODUCT_OWNER_BY_MODE := {
 
 var requested_mode := "legacy"
 var selected_mode := ""
+var requested_solver_mode := "point_brush_v1"
+var selected_solver_mode := ""
 var generation_key := ""
 var locked := false
 var writes_paused := false
@@ -33,11 +36,19 @@ func set_requested_mode(value: String) -> bool:
 	return true
 
 
+func set_requested_solver_mode(value: String) -> bool:
+	if value not in SOLVER_MODES:
+		return false
+	requested_solver_mode = value
+	return true
+
+
 func begin_generation(key: String) -> bool:
 	if key.is_empty() or requested_mode not in MODES:
 		return false
 	generation_key = key
 	selected_mode = requested_mode
+	selected_solver_mode = requested_solver_mode
 	locked = true
 	writes_paused = false
 	runtime_failure_reason = ""
@@ -52,6 +63,8 @@ func fallback_initialization_to_legacy(reason: String) -> bool:
 		return false
 	selected_mode = "legacy"
 	requested_mode = "legacy"
+	selected_solver_mode = "point_brush_v1"
+	requested_solver_mode = "point_brush_v1"
 	initialization_fallback_reason = reason
 	writes_paused = false
 	writer_configuration_valid = bind_product_writers(true, false)
@@ -64,6 +77,7 @@ func report_runtime_failure(reason: String) -> bool:
 	writes_paused = true
 	runtime_failure_reason = reason
 	requested_mode = "legacy"
+	requested_solver_mode = "point_brush_v1"
 	return true
 
 
@@ -109,6 +123,8 @@ func get_status_snapshot() -> Dictionary:
 		"schema_version": SCHEMA_VERSION,
 		"requested_mode": requested_mode,
 		"selected_mode": selected_mode,
+		"requested_solver_mode": requested_solver_mode,
+		"selected_solver_mode": selected_solver_mode,
 		"generation_key": generation_key,
 		"locked": locked,
 		"writes_paused": writes_paused,

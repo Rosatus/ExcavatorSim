@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Godot client package entrypoint and pre-development checklist"}
+{"file": ".trellis/spec/frontend/client-boundary.md", "reason": "Terrain, Jolt, full-bucket and soil-ledger authority contracts"}
+{"file": ".trellis/spec/frontend/godot-mcp.md", "reason": "Required MCP-assisted Godot development boundaries"}
+{"file": ".trellis/spec/frontend/validation-budget.md", "reason": "Focused automated and human visual validation budget"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Cross-layer patch, ledger, collider and renderer contract design"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Reuse existing terrain identity, scheduling and transaction owners"}
+{"file": ".trellis/tasks/08-31-soil-excavation-redesign/research/current-system-findings.md", "reason": "Current root-cause and compatibility evidence"}

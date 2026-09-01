@@ -36,6 +36,7 @@ var _dirty_revision := -1
 var _dirty_rect_cells := Rect2i()
 var _dirty_rect_with_halo := Rect2i()
 var _last_apply_changed := false
+var _fail_next_cell_patch_apply_for_test := false
 
 
 func _init(seed_value: int = DEFAULT_SEED, requested_rows: int = DEFAULT_ROWS, requested_columns: int = DEFAULT_COLUMNS, requested_spacing_m: float = DEFAULT_SPACING_M) -> void:
@@ -91,11 +92,12 @@ static func from_surface_snapshot(snapshot: Dictionary) -> TerrainState:
 
 
 func enqueue_brush(sequence: int, center_xz: Vector2, radius_m: float, delta_m: float, normalize_center := false) -> bool:
-	if sequence <= _last_enqueued_sequence or radius_m <= 0.0:
+	if sequence <= _last_enqueued_sequence or radius_m <= 0.0 or _has_pending_cell_patch():
 		return false
 	if not _is_finite(center_xz.x) or not _is_finite(center_xz.y) or not _is_finite(radius_m) or not _is_finite(delta_m):
 		return false
 	_pending_brushes.append({
+		"kind": "brush",
 		"sequence": sequence,
 		"center_xz": center_xz,
 		"radius_m": radius_m,
@@ -104,6 +106,80 @@ func enqueue_brush(sequence: int, center_xz: Vector2, radius_m: float, delta_m: 
 	})
 	_last_enqueued_sequence = sequence
 	return true
+
+
+## Queues one already-canonical absolute layer patch. Cell patches are isolated
+## from legacy brushes so their base revision and original-value precondition
+## cannot be invalidated inside a mixed batch.
+func enqueue_cell_patch(sequence: int, patch: Dictionary) -> bool:
+	if sequence <= _last_enqueued_sequence or not _pending_brushes.is_empty():
+		return false
+	var snapshot := cell_patch_read_snapshot()
+	var validation := SoilCellPatch.validate_for_snapshot(patch, snapshot)
+	if not bool(validation.get("valid", false)) or not _validate_cell_patch_safety(patch):
+		return false
+	_pending_brushes.append({
+		"kind": "cell_patch",
+		"sequence": sequence,
+		"patch": patch.duplicate(true),
+	})
+	_last_enqueued_sequence = sequence
+	return true
+
+
+func validate_cell_patch(patch: Dictionary) -> Dictionary:
+	var validation := SoilCellPatch.validate_for_snapshot(patch, cell_patch_read_snapshot())
+	if not bool(validation.get("valid", false)):
+		return validation
+	if not _validate_cell_patch_safety(patch):
+		return {"valid": false, "reason": "safety_floor_invalid"}
+	return {"valid": true, "reason": "ok"}
+
+
+## Builds the exact immutable post-commit snapshot without mutating authority.
+## TerrainCollider uses this during the cell-patch preparation phase.
+func preview_cell_patch(patch: Dictionary) -> Dictionary:
+	var validation := validate_cell_patch(patch)
+	if not bool(validation.get("valid", false)):
+		return {}
+	var candidate_stable := stable_heights.duplicate()
+	var candidate_loose := loose_depth.duplicate()
+	for value in patch.get("rows", []):
+		var row := value as Dictionary
+		var index := int(row["index"])
+		candidate_stable[index] = float(row["target_stable_height"])
+		candidate_loose[index] = float(row["target_loose_depth"])
+	var surface := PackedFloat32Array()
+	surface.resize(candidate_stable.size())
+	for index in surface.size():
+		surface[index] = candidate_stable[index] + candidate_loose[index]
+	var dirty := SoilCellPatch.dirty_rect(patch.get("rows", []) as Array, columns)
+	var dirty_min := dirty.position
+	var dirty_max := dirty.position + dirty.size - Vector2i.ONE
+	var halo_min := Vector2i(maxi(dirty_min.x - DIRTY_HALO_CELLS, 0), maxi(dirty_min.y - DIRTY_HALO_CELLS, 0))
+	var halo_max := Vector2i(mini(dirty_max.x + DIRTY_HALO_CELLS, columns - 1), mini(dirty_max.y + DIRTY_HALO_CELLS, rows - 1))
+	var candidate_revision := terrain_revision + 1
+	var bytes := surface_to_bytes(surface)
+	return {
+		"algorithm_version": ALGORITHM_VERSION,
+		"seed": seed,
+		"rows": rows,
+		"columns": columns,
+		"spacing_m": spacing_m,
+		"origin_xz": origin_xz,
+		"terrain_epoch": terrain_epoch,
+		"terrain_revision": candidate_revision,
+		"world_generation": world_generation,
+		"full_refresh": false,
+		"dirty_rect_cells": dirty,
+		"dirty_rect_with_halo": Rect2i(halo_min, halo_max - halo_min + Vector2i.ONE),
+		"dirty_revision": candidate_revision,
+		"surface": surface,
+		"stable_heights": candidate_stable,
+		"loose_depth": candidate_loose,
+		"surface_bytes": bytes,
+		"snapshot_sha256": _sha256(bytes),
+	}
 
 
 func next_brush_sequence() -> int:
@@ -118,7 +194,14 @@ func step_fixed() -> bool:
 	var batch_min := Vector2i(2147483647, 2147483647)
 	var batch_max := Vector2i(-2147483648, -2147483648)
 	for command in _pending_brushes:
-		var brush_rect := _apply_brush(command)
+		var brush_rect := Rect2i()
+		if String(command.get("kind", "brush")) == "cell_patch" and _fail_next_cell_patch_apply_for_test:
+			_fail_next_cell_patch_apply_for_test = false
+			_last_apply_changed = false
+		elif String(command.get("kind", "brush")) == "cell_patch":
+			brush_rect = _apply_cell_patch(command["patch"] as Dictionary)
+		else:
+			brush_rect = _apply_brush(command)
 		if brush_rect.size.x > 0 and brush_rect.size.y > 0:
 			batch_min = batch_min.min(brush_rect.position)
 			batch_max = batch_max.max(brush_rect.position + brush_rect.size - Vector2i.ONE)
@@ -131,6 +214,10 @@ func step_fixed() -> bool:
 		terrain_revision += 1
 		_publish_dirty_bounds(batch_min, batch_max)
 	return changed
+
+
+func fail_next_cell_patch_apply_for_test() -> void:
+	_fail_next_cell_patch_apply_for_test = true
 
 
 func reset() -> void:
@@ -171,6 +258,27 @@ func surface_snapshot() -> Dictionary:
 	}
 
 
+## Lightweight synchronous view for the pure sweep and cell-patch validator.
+## Packed arrays are copy-on-write; the caller may read them only inside the
+## current fixed-step transaction and must never retain or mutate them. Unlike
+## a presentation snapshot this performs no full surface synthesis, byte
+## encoding, layer duplication or SHA-256 pass.
+func cell_patch_read_snapshot() -> Dictionary:
+	return {
+		"algorithm_version": ALGORITHM_VERSION,
+		"seed": seed,
+		"rows": rows,
+		"columns": columns,
+		"spacing_m": spacing_m,
+		"origin_xz": origin_xz,
+		"terrain_epoch": terrain_epoch,
+		"terrain_revision": terrain_revision,
+		"world_generation": world_generation,
+		"stable_heights": stable_heights,
+		"loose_depth": loose_depth,
+	}
+
+
 func get_surface() -> PackedFloat32Array:
 	var result := PackedFloat32Array()
 	result.resize(stable_heights.size())
@@ -192,6 +300,15 @@ func get_dirty_rect_cells() -> Rect2i:
 
 func get_dirty_rect_with_halo() -> Rect2i:
 	return _dirty_rect_with_halo
+
+
+## Public safety-floor query for bounded absolute-target terrain writers. The
+## baseline remains private; callers receive only the permitted minimum for one
+## validated cell and cannot mutate the stored baseline.
+func minimum_stable_height_for_index(index: int) -> float:
+	if index < 0 or index >= _baseline_stable.size():
+		return NAN
+	return _baseline_stable[index] - 3.0
 
 
 func is_inside_grid(world_xz: Vector2) -> bool:
@@ -377,6 +494,44 @@ func _apply_brush(command: Dictionary) -> Rect2i:
 						stable_heights[index] = lowered
 						_last_apply_changed = true
 	return bounds
+
+
+func _apply_cell_patch(patch: Dictionary) -> Rect2i:
+	_last_apply_changed = false
+	var validation := SoilCellPatch.validate_for_snapshot(patch, cell_patch_read_snapshot())
+	if not bool(validation.get("valid", false)) or not _validate_cell_patch_safety(patch):
+		return Rect2i()
+	var patch_rows := patch.get("rows", []) as Array
+	for value in patch_rows:
+		var row := value as Dictionary
+		var index := int(row["index"])
+		var target_stable := float(row["target_stable_height"])
+		var target_loose := float(row["target_loose_depth"])
+		if stable_heights[index] != target_stable or loose_depth[index] != target_loose:
+			stable_heights[index] = target_stable
+			loose_depth[index] = target_loose
+			_last_apply_changed = true
+	return SoilCellPatch.dirty_rect(patch_rows, columns)
+
+
+func _validate_cell_patch_safety(patch: Dictionary) -> bool:
+	for value in patch.get("rows", []):
+		if not value is Dictionary:
+			return false
+		var row := value as Dictionary
+		var index := int(row.get("index", -1))
+		if index < 0 or index >= _baseline_stable.size():
+			return false
+		if float(row.get("target_stable_height", NAN)) < _baseline_stable[index] - 3.0:
+			return false
+	return true
+
+
+func _has_pending_cell_patch() -> bool:
+	for command in _pending_brushes:
+		if String(command.get("kind", "brush")) == "cell_patch":
+			return true
+	return false
 
 
 ## Clamped grid-cell bounding rectangle for a circular brush. Grid space is

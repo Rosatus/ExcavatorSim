@@ -19,6 +19,10 @@ const SOIL_PROXY_ORDER := ["cutting_edge", "opening", "cavity", "shell", "rear_s
 @export var active_soil_patch_prototype_enabled := false
 @export_enum("loose", "compact", "sand", "damp") var active_soil_material_preset := "loose"
 @export_enum("legacy", "shadow", "active_patch") var soil_material_lifecycle_mode := "active_patch"
+## Keep the existing product writer selected until the v2 release candidate has
+## completed its manual digging gate. Shadow/owner requests apply only at a
+## clean material-generation boundary through the setter below.
+@export_enum("point_brush_v1", "surface_patch_v2_shadow", "surface_patch_v2", "arcade_stamp_v3") var soil_surface_solver_mode := "point_brush_v1"
 @export_enum("low", "balanced", "high") var feedback_quality := "balanced"
 @export var local_tooth_offset := Vector3(0.0, -0.55, 0.0)
 
@@ -46,10 +50,12 @@ var _consumed_batch_keys: Dictionary = {}
 var _consumed_batch_order: Array[String] = []
 var _parcel_pool: SoilParcelPool
 var _soil_tool_classifier := BucketSoilTool.new()
+var _bucket_surface_sweep := BucketSurfaceSweep.new()
 var _active_soil_patch: ActiveSoilPatch
 var _active_soil_presenter: ActiveSoilPatchPresenter
 var _active_soil_event_sequence := 0
 var _soil_interaction_authority: SoilInteractionAuthority
+var _arcade_stamp: ArcadeExcavationStamp
 var _soil_lifecycle_tick := -1
 var _soil_authority_modes := SoilAuthorityModeController.new()
 var _bucket_ground_mode := BucketGroundInteractionMode.NORMAL
@@ -105,6 +111,7 @@ func _initialize() -> void:
 		terrain_world.world_reset.connect(_on_world_reset)
 	_initialized = true
 	_soil_authority_modes.set_requested_mode(soil_material_lifecycle_mode)
+	_soil_authority_modes.set_requested_solver_mode(soil_surface_solver_mode)
 	_begin_soil_authority_generation("initialize")
 	excavation_changed.emit(get_status_snapshot())
 
@@ -126,11 +133,10 @@ func _physics_process(delta: float) -> void:
 	if _selected_soil_mode() == "active_patch":
 		_soil_steps_executed += 1
 		var active_result := _step_active_soil_patch({}, delta)
-		var active_status := _soil_interaction_authority.get_status_snapshot() if _soil_interaction_authority != null else {}
-		var transaction := active_status.get("last_transaction", {}) as Dictionary
-		_last_flow_volume_m3 = float(transaction.get("accepted_volume_m3", 0.0)) if bool(active_result.get("changed", false)) else 0.0
+		_last_flow_volume_m3 = float(active_result.get("flow_volume_m3", 0.0))
+		_last_interaction = String(active_result.get("interaction_state", _last_interaction))
 		_queue_backend_feedback()
-		if bool(active_result.get("changed", false)):
+		if bool(active_result.get("changed", false)) or bool(active_result.get("visual_changed", false)):
 			excavation_changed.emit(get_status_snapshot())
 		return
 	_soil_steps_executed += 1
@@ -308,9 +314,9 @@ func set_active_soil_patch_prototype_enabled(value: bool) -> void:
 	if active_soil_patch_prototype_enabled == value:
 		return
 	active_soil_patch_prototype_enabled = value
-	if value:
+	if value and not _is_arcade_stamp_selected():
 		_ensure_active_soil_patch()
-	elif _selected_soil_mode() not in ["shadow", "active_patch"]:
+	elif not value and (_is_arcade_stamp_selected() or _selected_soil_mode() not in ["shadow", "active_patch"]):
 		_reset_active_soil_patch(false)
 	excavation_changed.emit(get_status_snapshot())
 
@@ -325,10 +331,32 @@ func set_soil_material_lifecycle_mode(value: String) -> bool:
 	return true
 
 
+func set_soil_surface_solver_mode(value: String) -> bool:
+	if value not in SoilAuthorityModeController.SOLVER_MODES:
+		return false
+	if value == soil_surface_solver_mode and (not _initialized or _selected_soil_solver_mode() == value):
+		return true
+	soil_surface_solver_mode = value
+	if not _soil_authority_modes.set_requested_solver_mode(value):
+		return false
+	# Solver ownership is generation-bound. A public runtime change must not
+	# report success while silently leaving the old selected writer active;
+	# drain ordinary material, clear pose history and begin one clean generation.
+	if _initialized and _selected_soil_solver_mode() != value:
+		return _clear_local_material("solver_mode_change")
+	excavation_changed.emit(get_status_snapshot())
+	return true
+
+
 func get_status_snapshot() -> Dictionary:
 	var legacy_status := soil_state.get_status_snapshot() if soil_state != null else {"bucket_volume_m3": 0.0, "world_generation": -1}
 	var lifecycle_status := _soil_interaction_authority.get_status_snapshot() if _soil_interaction_authority != null else {"configured": false}
-	var status := lifecycle_status.duplicate(true) if _selected_soil_mode() == "active_patch" and bool(lifecycle_status.get("configured", false)) else legacy_status.duplicate(true)
+	var arcade_status := _arcade_stamp.get_status_snapshot() if _arcade_stamp != null else {"configured": false}
+	var status := legacy_status.duplicate(true)
+	if _is_arcade_stamp_selected() and bool(arcade_status.get("configured", false)):
+		status = arcade_status.duplicate(true)
+	elif _selected_soil_mode() == "active_patch" and bool(lifecycle_status.get("configured", false)):
+		status = lifecycle_status.duplicate(true)
 	var selected_payload := get_selected_soil_payload_snapshot()
 	status["world_generation"] = terrain_world.terrain_state.world_generation if terrain_world != null and terrain_world.terrain_state != null else int(status.get("world_generation", -1))
 	status["authority_generation"] = authority_generation
@@ -340,14 +368,21 @@ func get_status_snapshot() -> Dictionary:
 	status["active_soil_patch_prototype_enabled"] = active_soil_patch_prototype_enabled
 	status["soil_material_lifecycle_mode"] = _selected_soil_mode()
 	status["requested_soil_material_lifecycle_mode"] = soil_material_lifecycle_mode
-	status["soil_authority_mode"] = {
-		"shadow": "conservative_shadow",
-		"active_patch": "conservative_active_patch",
-	}.get(_selected_soil_mode(), "legacy_analytic_parcel")
+	status["soil_surface_solver_mode"] = _selected_soil_solver_mode()
+	status["requested_soil_surface_solver_mode"] = soil_surface_solver_mode
+	status["soil_authority_mode"] = (
+		"visual_first_arcade_stamp"
+		if _is_arcade_stamp_selected()
+		else {
+			"shadow": "conservative_shadow",
+			"active_patch": "conservative_active_patch",
+		}.get(_selected_soil_mode(), "legacy_analytic_parcel")
+	)
 	status["soil_authority_selection"] = _soil_authority_modes.get_status_snapshot()
+	status["arcade_stamp"] = arcade_status
 	status["active_soil_patch"] = _active_soil_patch.get_status_snapshot() if _active_soil_patch != null else {"configured": false}
 	status["soil_lifecycle_shadow"] = lifecycle_status.duplicate(true) if _selected_soil_mode() == "shadow" else {"configured": false, "mode": "legacy"}
-	status["soil_lifecycle_active"] = lifecycle_status.duplicate(true) if _selected_soil_mode() == "active_patch" else {"configured": false, "mode": "legacy"}
+	status["soil_lifecycle_active"] = lifecycle_status.duplicate(true) if _selected_soil_mode() == "active_patch" and not _is_arcade_stamp_selected() else {"configured": false, "mode": "legacy"}
 	status["legacy_soil_status"] = legacy_status
 	status["selected_soil_payload"] = selected_payload
 	status["selected_soil_ledger_identity"] = String(selected_payload.get("ledger_identity", "legacy:unavailable"))
@@ -385,6 +420,20 @@ func get_status_snapshot() -> Dictionary:
 
 
 func get_selected_soil_payload_snapshot() -> Dictionary:
+	if _is_arcade_stamp_selected() and _arcade_stamp != null:
+		var arcade := _arcade_stamp.get_status_snapshot()
+		if bool(arcade.get("configured", false)):
+			return {
+				"source": "arcade_stamp_v3",
+				"ledger_identity": String(arcade.get("ledger_identity", "arcade:unavailable")),
+				"world_generation": terrain_world.terrain_state.world_generation if terrain_world != null and terrain_world.terrain_state != null else int(arcade.get("generation", -1)),
+				"bucket_volume_m3": float(arcade.get("bucket_volume_m3", 0.0)),
+				"payload_mass_kg": float(arcade.get("payload_mass_kg", 0.0)),
+				"fill_ratio": float(arcade.get("fill_ratio", 0.0)),
+				"center_of_mass_local": arcade.get("center_of_mass_local", Vector3.ZERO),
+				"fill_profile": arcade.get("fill_profile", PackedFloat32Array()),
+				"cell_grid": arcade.get("cell_grid", [1, 1, 1]),
+			}
 	if _selected_soil_mode() == "active_patch" and _soil_interaction_authority != null:
 		var active := _soil_interaction_authority.get_status_snapshot()
 		if bool(active.get("configured", false)):
@@ -500,8 +549,10 @@ func _bucket_tooth_world() -> Variant:
 func get_soil_visual_snapshot() -> Dictionary:
 	var status := get_selected_soil_payload_snapshot()
 	var lifecycle_shadow := _soil_interaction_authority.get_status_snapshot() if _soil_interaction_authority != null else {}
+	var arcade_status := _arcade_stamp.get_status_snapshot() if _arcade_stamp != null else {}
 	var chassis_status := _tracked_chassis_controller.get_status_snapshot() if _tracked_chassis_controller != null else {}
-	var last_transaction := lifecycle_shadow.get("last_transaction", {}) as Dictionary
+	var visual_source := arcade_status if _is_arcade_stamp_selected() else lifecycle_shadow
+	var last_transaction := visual_source.get("last_transaction", {}) as Dictionary
 	return {
 		"world_generation": int(status.get("world_generation", -1)),
 		"authority_generation": authority_generation,
@@ -521,6 +572,9 @@ func get_soil_visual_snapshot() -> Dictionary:
 		"interaction_penetration_m": float(_last_interaction_batch.get("analytic_penetration_m", 0.0)),
 		"transaction_queued": bool(_last_interaction_batch.get("transaction_queued", false)),
 		"last_transaction": last_transaction.duplicate(true),
+		"accepted_dump_event_id": String(visual_source.get("accepted_dump_event_id", "")),
+		"dump_release_world": visual_source.get("dump_release_world", Vector3.ZERO),
+		"dump_released_fill_ratio": float(visual_source.get("dump_released_fill_ratio", 0.0)),
 		"hero_clods_enabled": hero_clods_enabled,
 		"bucket_pose": _last_pose_snapshot.duplicate(true),
 		"soil_material_lifecycle_mode": _selected_soil_mode(),
@@ -551,6 +605,18 @@ func _process_bucket_snapshot(snapshot: Dictionary, delta: float) -> void:
 	var contract: Dictionary = snapshot["contract"]
 	var interaction: Dictionary = contract.get("interaction", {})
 	_update_support_contact(snapshot, current, contract)
+	if _is_arcade_stamp_selected():
+		_last_interaction_batch = {
+			"key": String(snapshot.get("identity", "arcade")),
+			"physics_tick": Engine.get_physics_frames(),
+			"terrain_generation": terrain_world.terrain_state.world_generation,
+			"terrain_revision": terrain_world.terrain_state.terrain_revision,
+			"eligible": true,
+			"operation": "arcade_stamp",
+			"transaction_queued": false,
+		}
+		_last_interaction = "arcade_stamp"
+		return
 	var batch := _build_interaction_batch(snapshot)
 	if not bool(batch.get("eligible", false)):
 		_last_interaction = "blocked"
@@ -623,6 +689,7 @@ func _build_interaction_batch(snapshot: Dictionary) -> Dictionary:
 	var classifications := _classify_interaction_records(snapshot, contacts, hybrid, identity_valid, physics_tick, motion_sequence, analytic)
 	var operation := _reduce_soil_operation(classifications)
 	var soil_tool_shadow := {}
+	var surface_sweep := {}
 	var lifecycle_selected := _selected_soil_mode() in ["shadow", "active_patch"]
 	if soil_tool_shadow_enabled or lifecycle_selected:
 		var soil_status := (
@@ -636,6 +703,21 @@ func _build_interaction_batch(snapshot: Dictionary) -> Dictionary:
 			float(soil_status.get("fill_ratio", 0.0)),
 			(snapshot.get("contract", {}) as Dictionary).get("interaction", {}) as Dictionary,
 		)
+		if _selected_soil_solver_mode() in ["surface_patch_v2_shadow", "surface_patch_v2"]:
+			var snapshot_started_us := Time.get_ticks_usec()
+			var sweep_terrain_snapshot := terrain_world.terrain_state.cell_patch_read_snapshot()
+			if _active_soil_patch != null and _active_soil_patch.generation == terrain_world.terrain_state.world_generation:
+				sweep_terrain_snapshot["soil_compaction"] = _active_soil_patch.persistent_field.compaction_read_view()
+			var snapshot_finished_us := Time.get_ticks_usec()
+			surface_sweep = _bucket_surface_sweep.build_patch(
+				snapshot.get("soil_tool", {}) as Dictionary,
+				soil_tool_shadow,
+				sweep_terrain_snapshot,
+				(snapshot.get("contract", {}) as Dictionary).get("interaction", {}) as Dictionary,
+				physics_tick,
+			)
+			surface_sweep["input_snapshot_us"] = snapshot_finished_us - snapshot_started_us
+			surface_sweep["build_us"] = Time.get_ticks_usec() - snapshot_finished_us
 	var consumed_contact_ids: Array[String] = []
 	for record in classifications:
 		if String(record.get("classification", "blocked")) != "blocked":
@@ -662,6 +744,8 @@ func _build_interaction_batch(snapshot: Dictionary) -> Dictionary:
 	if soil_tool_shadow_enabled or lifecycle_selected:
 		batch["soil_tool_shadow"] = soil_tool_shadow.duplicate(true)
 		batch["soil_tool_classification"] = soil_tool_shadow.duplicate(true)
+	if not surface_sweep.is_empty():
+		batch["surface_sweep"] = surface_sweep.duplicate(true)
 	if bool(batch["duplicate"]):
 		batch["eligible"] = false
 	_last_interaction_batch = batch.duplicate(true)
@@ -944,7 +1028,7 @@ func _ensure_active_soil_patch() -> bool:
 	if _active_soil_patch != null:
 		var status := _active_soil_patch.get_status_snapshot()
 		if (
-			int(status.get("generation", -1)) == _material_generation
+			int(status.get("generation", -1)) == terrain_world.terrain_state.world_generation
 			and String(status.get("material_preset", "")) == active_soil_material_preset
 		):
 			_active_soil_patch.set_quality_profile(feedback_quality)
@@ -986,6 +1070,12 @@ func _step_active_soil_patch(soil_result: Dictionary, delta: float) -> Dictionar
 		return {"changed": false, "reason": "disabled"}
 	if _selected_soil_mode() == "active_patch" and not _soil_authority_modes.can_product_owner_write("active_patch"):
 		return {"changed": false, "reason": "active_writes_paused"}
+	if _is_arcade_stamp_selected():
+		if not _ensure_arcade_stamp():
+			_report_active_runtime_failure("arcade_stamp_unavailable")
+			return {"changed": false, "reason": "arcade_stamp_unavailable"}
+		_soil_lifecycle_tick = maxi(Engine.get_physics_frames(), _soil_lifecycle_tick + 1)
+		return _arcade_stamp.step_fixed(delta, _last_pose_snapshot, _soil_lifecycle_tick)
 	if not _ensure_active_soil_patch():
 		_report_active_runtime_failure("active_patch_unavailable")
 		return {"changed": false, "reason": "active_patch_unavailable"}
@@ -1019,6 +1109,9 @@ func _step_active_soil_patch(soil_result: Dictionary, delta: float) -> Dictionar
 			_last_interaction_batch.get("soil_tool_classification", _last_interaction_batch.get("soil_tool_shadow", {})) as Dictionary,
 			_active_soil_patch,
 			focus,
+			_last_interaction_batch.get("surface_sweep", {}) as Dictionary,
+			terrain_scheduler,
+			_selected_soil_solver_mode(),
 		)
 	else:
 		step_result = _active_soil_patch.step_fixed(delta, focus, soil_tool_snapshot)
@@ -1034,6 +1127,39 @@ func _reset_active_soil_patch(settle_active: bool) -> void:
 	_active_soil_event_sequence = 0
 	if _active_soil_presenter != null:
 		_active_soil_presenter.clear()
+
+
+func _ensure_arcade_stamp() -> bool:
+	if (
+		not _is_arcade_stamp_selected()
+		or terrain_world == null
+		or terrain_world.terrain_state == null
+		or terrain_scheduler == null
+		or _presentation == null
+	):
+		return false
+	var contract := _presentation.get_soil_contract()
+	if contract.is_empty():
+		return false
+	if (
+		_arcade_stamp != null
+		and _arcade_stamp.configured
+		and _arcade_stamp.generation == terrain_world.terrain_state.world_generation
+		and _arcade_stamp.model_id == String(contract.get("model_id", ""))
+	):
+		return true
+	_reset_arcade_stamp()
+	_arcade_stamp = ArcadeExcavationStamp.new()
+	if not _arcade_stamp.configure(terrain_world.terrain_state, terrain_scheduler, contract):
+		_arcade_stamp = null
+		return false
+	return true
+
+
+func _reset_arcade_stamp() -> void:
+	if _arcade_stamp != null:
+		_arcade_stamp.clear()
+	_arcade_stamp = null
 
 
 func _ensure_soil_interaction_authority() -> bool:
@@ -1198,7 +1324,8 @@ func _settled_deposit_center(opening_world: Vector3) -> Variant:
 
 func _on_pose_cleared(generation: int, _reason: String) -> void:
 	authority_generation = maxi(authority_generation, generation)
-	_clear_local_material("pose_cleared")
+	if not _clear_local_material("pose_cleared"):
+		return
 
 
 func _on_authority_changed(_session_id: String, _simulation_epoch: String, generation: int) -> void:
@@ -1206,6 +1333,8 @@ func _on_authority_changed(_session_id: String, _simulation_epoch: String, gener
 
 
 func _on_model_activated(_model_id: String, _asset_root: Node3D) -> void:
+	if not _clear_local_material("model_activated"):
+		return
 	var contract := _presentation.get_soil_contract()
 	_sync_local_tooth_offset(contract)
 	_soil_tool_classifier.configure(contract)
@@ -1213,7 +1342,6 @@ func _on_model_activated(_model_id: String, _asset_root: Node3D) -> void:
 		soil_state.configure_contract(contract)
 	if _parcel_pool != null:
 		_parcel_pool.configure_barrier_extents(_cavity_extents_from_contract(contract))
-	_clear_local_material("model_activated")
 
 
 func _sync_local_tooth_offset(contract: Dictionary) -> void:
@@ -1249,11 +1377,22 @@ func _on_world_reset(generation: int) -> void:
 		_presentation.clear_bucket_pose_history()
 	_reset_soil_interaction_authority()
 	_reset_active_soil_patch(false)
+	_reset_arcade_stamp()
 	_begin_soil_authority_generation("world_reset")
 	excavation_changed.emit(get_status_snapshot())
 
 
-func _clear_local_material(reason: String) -> void:
+func _clear_local_material(reason: String) -> bool:
+	if _soil_interaction_authority != null and _active_soil_patch != null:
+		var boundary_tick := maxi(Engine.get_physics_frames(), _soil_lifecycle_tick + 1)
+		var drain := _soil_interaction_authority.settle_all_for_boundary(
+			_active_soil_patch,
+			boundary_tick,
+			_boundary_material_origin(),
+		)
+		if not bool(drain.get("drained", false)):
+			_report_active_runtime_failure("material_boundary_%s" % String(drain.get("reason", "drain_failed")))
+			return false
 	if terrain_world != null and terrain_world.terrain_state != null:
 		if terrain_scheduler != null:
 			terrain_scheduler.reset_for_generation(terrain_world.terrain_state.world_generation)
@@ -1279,13 +1418,34 @@ func _clear_local_material(reason: String) -> void:
 		_presentation.clear_bucket_pose_history()
 	_reset_soil_interaction_authority()
 	_reset_active_soil_patch(false)
+	_reset_arcade_stamp()
 	_begin_soil_authority_generation(reason)
 	excavation_changed.emit(get_status_snapshot())
+	return true
+
+
+func _boundary_material_origin() -> Vector3:
+	var current := _last_pose_snapshot.get("current", {}) as Dictionary
+	for key in ["opening", "cutting_edge"]:
+		if current.has(key):
+			return (current[key] as Transform3D).origin
+	if _active_soil_patch != null:
+		return _active_soil_patch.get_status_snapshot().get("focus_world", Vector3.ZERO) as Vector3
+	return Vector3.ZERO
 
 
 func _selected_soil_mode() -> String:
 	var selected := _soil_authority_modes.selected_mode
 	return selected if selected in SoilAuthorityModeController.MODES else "legacy"
+
+
+func _selected_soil_solver_mode() -> String:
+	var selected := _soil_authority_modes.selected_solver_mode
+	return selected if selected in SoilAuthorityModeController.SOLVER_MODES else "point_brush_v1"
+
+
+func _is_arcade_stamp_selected() -> bool:
+	return _selected_soil_mode() == "active_patch" and _selected_soil_solver_mode() == "arcade_stamp_v3"
 
 
 func _bucket_ground_bypassed() -> bool:
@@ -1329,26 +1489,36 @@ func _begin_soil_authority_generation(reason: String) -> bool:
 	if not _soil_authority_modes.set_requested_mode(soil_material_lifecycle_mode):
 		soil_material_lifecycle_mode = "legacy"
 		_soil_authority_modes.set_requested_mode("legacy")
+	if not _soil_authority_modes.set_requested_solver_mode(soil_surface_solver_mode):
+		soil_surface_solver_mode = "point_brush_v1"
+		_soil_authority_modes.set_requested_solver_mode("point_brush_v1")
 	if not _soil_authority_modes.begin_generation(_soil_generation_key(reason)):
 		return false
 	var selected := _selected_soil_mode()
 	if selected in ["shadow", "active_patch"]:
-		if not _ensure_active_soil_patch() or not _ensure_soil_interaction_authority():
+		var initialized := _ensure_arcade_stamp() if _is_arcade_stamp_selected() else (_ensure_active_soil_patch() and _ensure_soil_interaction_authority())
+		if not initialized:
 			_reset_soil_interaction_authority()
 			_reset_active_soil_patch(false)
+			_reset_arcade_stamp()
 			_soil_authority_modes.fallback_initialization_to_legacy("%s_initialization_failed" % selected)
 			soil_material_lifecycle_mode = "legacy"
+			soil_surface_solver_mode = "point_brush_v1"
 			selected = "legacy"
 	if selected == "legacy" and active_soil_patch_prototype_enabled:
 		_ensure_active_soil_patch()
 	if selected == "active_patch" and _parcel_pool != null:
 		_parcel_pool.clear_all()
+	if _is_arcade_stamp_selected():
+		_reset_soil_interaction_authority()
+		_reset_active_soil_patch(false)
 	return _soil_authority_modes.has_single_product_owner()
 
 
 func _report_active_runtime_failure(reason: String) -> void:
 	if _soil_authority_modes.report_runtime_failure(reason):
 		soil_material_lifecycle_mode = "legacy"
+		soil_surface_solver_mode = "point_brush_v1"
 		_last_interaction = "soil_authority_fault"
 		if _motion_client != null:
 			_motion_client.clear_bucket_load_feedback()

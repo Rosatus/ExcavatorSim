@@ -5,6 +5,7 @@ extends Node3D
 @export var max_particles := 5000
 @export var emission_enabled := true
 @export var max_clods := 48
+@export var max_visual_mounds := 24
 
 var _flow_particles: GPUParticles3D
 var _flow_material: ParticleProcessMaterial
@@ -27,6 +28,9 @@ var _bucket_ground_mode := BucketGroundInteractionMode.NORMAL
 var _update_executed_count := 0
 var _update_bypassed_count := 0
 var _last_clear_reason := ""
+var _visual_mounds: Array[MeshInstance3D] = []
+var _visual_mound_cursor := 0
+var _last_visual_mound_event_id := ""
 
 
 func _ready() -> void:
@@ -34,6 +38,7 @@ func _ready() -> void:
 	_build_particles()
 	_build_dust_particles()
 	_build_clod_pool()
+	_build_visual_mound_pool()
 	_connect_excavation()
 
 
@@ -102,6 +107,7 @@ func clear_for_generation(generation: int) -> void:
 	_last_cavity_size = Vector3.ZERO
 	for clod in _clods:
 		_deactivate_clod(clod)
+	_clear_visual_mounds()
 
 
 func get_effect_snapshot() -> Dictionary:
@@ -116,6 +122,9 @@ func get_effect_snapshot() -> Dictionary:
 		"fill_visible": _fill_mesh != null and _fill_mesh.visible,
 		"active_clods": _active_clod_count(),
 		"clod_cap": _active_clod_cap,
+		"active_visual_mounds": _active_visual_mound_count(),
+		"visual_mound_cap": _visual_mounds.size(),
+		"last_visual_mound_event_id": _last_visual_mound_event_id,
 		"bucket_ground_mode": _bucket_ground_mode,
 		"update_executed": _update_executed_count,
 		"update_bypassed": _update_bypassed_count,
@@ -231,7 +240,30 @@ func _build_clod_pool() -> void:
 		_clods.append(body)
 
 
+func _build_visual_mound_pool() -> void:
+	var mound_mesh := SphereMesh.new()
+	mound_mesh.radius = 0.5
+	mound_mesh.height = 1.0
+	mound_mesh.radial_segments = 12
+	mound_mesh.rings = 6
+	var mound_material := StandardMaterial3D.new()
+	mound_material.albedo_color = Color("#765537")
+	mound_material.roughness = 1.0
+	mound_material.metallic = 0.0
+	mound_mesh.material = mound_material
+	for index in maxi(max_visual_mounds, 0):
+		var mound := MeshInstance3D.new()
+		mound.name = "VisualSoilMound%02d" % index
+		mound.mesh = mound_mesh
+		mound.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		mound.visible = false
+		add_child(mound)
+		_visual_mounds.append(mound)
+
+
 func _connect_excavation() -> void:
+	if excavation_world_path.is_empty():
+		return
 	_excavation = get_node_or_null(excavation_world_path) as ExcavationWorld
 	if _excavation == null or _excavation.soil_state == null:
 		call_deferred("_connect_excavation")
@@ -266,6 +298,11 @@ func _apply_visual_snapshot(status: Dictionary) -> void:
 	_update_fill(status, current, contract)
 	_update_flow(status, current, pose)
 	_update_dust(status, current)
+	_update_visual_mound(status)
+
+
+func apply_visual_snapshot_for_test(status: Dictionary) -> void:
+	_apply_visual_snapshot(status)
 
 
 func _update_fill(status: Dictionary, current: Dictionary, contract: Dictionary) -> void:
@@ -414,6 +451,40 @@ func _active_clod_count() -> int:
 	var count := 0
 	for clod in _clods:
 		if not clod.freeze:
+			count += 1
+	return count
+
+
+func _update_visual_mound(status: Dictionary) -> void:
+	var event_id := String(status.get("accepted_dump_event_id", ""))
+	if event_id.is_empty() or event_id == _last_visual_mound_event_id or _visual_mounds.is_empty():
+		return
+	var release_world := status.get("dump_release_world", Vector3.ZERO) as Vector3
+	var released_ratio := clampf(float(status.get("dump_released_fill_ratio", 0.0)), 0.0, 1.0)
+	if not release_world.is_finite() or released_ratio <= 0.001:
+		return
+	var mound := _visual_mounds[_visual_mound_cursor]
+	_visual_mound_cursor = (_visual_mound_cursor + 1) % _visual_mounds.size()
+	var footprint := lerpf(0.65, 1.65, sqrt(released_ratio))
+	var height := lerpf(0.18, 0.62, pow(released_ratio, 0.72))
+	mound.global_position = release_world + Vector3(0.0, height * 0.42, 0.0)
+	mound.scale = Vector3(footprint, height, footprint * 0.86)
+	mound.rotation.y = float(_visual_mound_cursor) * 0.731
+	mound.visible = true
+	_last_visual_mound_event_id = event_id
+
+
+func _clear_visual_mounds() -> void:
+	for mound in _visual_mounds:
+		mound.visible = false
+	_visual_mound_cursor = 0
+	_last_visual_mound_event_id = ""
+
+
+func _active_visual_mound_count() -> int:
+	var count := 0
+	for mound in _visual_mounds:
+		if mound.visible:
 			count += 1
 	return count
 

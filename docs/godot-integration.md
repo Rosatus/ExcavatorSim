@@ -101,6 +101,25 @@ product `TerrainState` only through its `TerrainCommitScheduler`. `legacy` keeps
 `BucketSoilState` plus parcel transport as an explicit compatibility fallback;
 `shadow` runs the conservative chain against an isolated clone while legacy
 remains selected.
+The surface solver is separately generation-locked. `point_brush_v1` remains
+the release default until the focused both-model gates and manual digging pass
+are accepted; `surface_patch_v2_shadow` is the zero-mutation comparison mode,
+and `surface_patch_v2` then replaces point brushes with one
+continuous, sorted, unique absolute-target patch per physics tick, while
+`point_brush_v1` remains the release rollback.
+`arcade_stamp_v3` is the current visual-first candidate after v2 failed manual
+cleanliness and frame-time acceptance. It consumes only the accepted swept
+cutting edge, coalesces one latest-minimum target per cell for 100 ms, and then
+submits one absolute-target patch. It deliberately bypasses the semantic
+full-surface classifier, active-material lifecycle and loose-flux solver.
+Accepted removed volume drives only a bounded scalar bucket-fill estimate;
+dumping clears that estimate and creates a pooled, non-colliding visual mound,
+not authoritative loose soil. Rejected terrain commits retain pending targets
+for retry and never credit fill. The product default remains v1 until human
+Forward+ acceptance explicitly promotes v3.
+In shadow comparison, `point_brush_v1` continues as the product writer; only the
+v2 observer is zero-mutation, and its presence must not change the v1 terrain or
+ledger outcome.
 In authoritative hybrid mode, query-only cutting/opening/cavity/shell/rear
 proxies sweep previous-to-candidate bucket FK against the exact applied terrain
 collider revision. They own no scene body and cannot inject an uncapped impulse.
@@ -121,6 +140,22 @@ accepted `bucket_link` frame and publishes candidates for cut, side cut, scrape,
 push, grade, containment, entry, spill, and dump. Inner/opening regions have no
 stable-terrain role. The classifier remains read-only; the generation-selected
 authority alone may turn candidates into material transactions.
+Eligible teeth, side, floor, and outer surfaces are rasterized continuously and
+merged before mutation, so a cell is debited at most once even when several
+faces overlap. Diagonal floor/back contract normals orient the actual box face;
+product-grid coverage treats each 0.5 m sample as a square support cell. A
+sparse classifier `none` result can therefore be recovered by semantic
+role/motion and continuous overlap, while explicit active/non-stable, resting,
+separating, inner, and opening candidates still fail closed.
+Push/back-drag/compact bias the bounded loose-soil flux and never fall back to
+unconditional stable-terrain deletion. Rotation sampling uses the farthest
+semantic point rather than only bucket-link origin motion.
+
+The sweep and repeated cell-patch validation use a synchronous copy-on-write
+stable/loose read view. They do not synthesize, duplicate, encode, or hash the
+whole 129x129 presentation surface on every physics tick. Full immutable
+snapshots are created only for collider preparation and the committed renderer
+revision; the project collider uses 16-cell chunks to bound live rebuild cost.
 
 `legacy`, `shadow`, and `active_patch` requests never hot-switch a live bucket.
 Reset, model activation, or an authority/material-generation boundary applies
@@ -129,6 +164,15 @@ the clean generation begins; runtime failure pauses material writes and requests
 legacy for the next reset. In active mode all legacy parcel material callbacks
 are disabled and patch representatives are presentation plus conservative
 transport, not a second owner.
+Before an ordinary model, pose, or authority boundary clears product state, all
+active/released aggregates and bucket cells are synchronously settled into the
+persistent loose layer. A failed drain retains the current generation and pauses
+writes. World reset and the explicitly user-approved Bucket Pass transition are
+the only destructive material boundaries.
+The public surface-solver setter creates that ordinary drain/pose-history
+boundary itself, so a successful return means requested and selected solver
+already agree. UI/status reads during replacement publish an empty transitional
+bucket fill profile rather than indexing cleared cell storage.
 
 The canonical authoritative truth keeps that bucket-query identity structured
 as `authority_epoch`, `physics_tick`, terrain generation/revision, and motion
@@ -272,6 +316,16 @@ map import, or material setup is unavailable, the synchronized custom mesh
 continues to provide the visible fallback. Setting `TerrainWorld.terrain_backend`
 to `soil_shader` is the explicit low-risk rollback; it changes presentation only
 and requires no terrain or soil-state migration.
+
+For `soil-cell-patch-v2`, the scheduler derives exact stable/loose volume from
+quantized rows, prepares all affected project-collider chunks, installs that
+candidate, commits `TerrainState` once, and publishes the same immutable
+revision to Terrain3D/fallback. Prepare/install rejection changes no terrain;
+the post-install invariant branch restores the previous collider snapshot.
+Settlement uses the same typed cell-patch path. Logical mobile aggregates own
+material volume independently of quality-dependent visual representatives, and
+the retained local loose frontier applies conservative repose/compaction/tool-
+impulse flow over bounded work each tick.
 
 Terrain3D 1.0.2 performs native setup on enter-tree. The adapter assigns
 non-null assets/material before adding the node, then assigns `region_size=128`

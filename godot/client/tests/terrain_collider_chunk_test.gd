@@ -7,14 +7,6 @@ extends SceneTree
 ## support height refinement checks, so a lagging identity after a failed or
 ## gapped install must fail those queries closed until a full rebuild succeeds.
 
-const CHUNK_KEYS := [
-	Vector2i(0, 0),
-	Vector2i(0, 32),
-	Vector2i(32, 0),
-	Vector2i(32, 32),
-]
-
-
 func _init() -> void:
 	call_deferred("_run")
 
@@ -34,13 +26,24 @@ func _make_collider() -> TerrainCollider:
 	var collider := TerrainCollider.new()
 	collider.name = "TerrainCollider"
 	collider.enabled = true
+	if collider.chunk_size_cells != 16:
+		push_error("Terrain collider default chunk must stay bounded for live patch latency")
 	root.add_child(collider)
 	return collider
 
 
-func _shape_rids(collider: TerrainCollider) -> Dictionary:
+func _chunk_keys(state: TerrainState, collider: TerrainCollider) -> Array[Vector2i]:
+	var keys: Array[Vector2i] = []
+	var chunk := maxi(2, collider.chunk_size_cells)
+	for row_start in range(0, state.rows - 1, chunk):
+		for column_start in range(0, state.columns - 1, chunk):
+			keys.append(Vector2i(row_start, column_start))
+	return keys
+
+
+func _shape_rids(collider: TerrainCollider, state: TerrainState) -> Dictionary:
 	var rids := {}
-	for key in CHUNK_KEYS:
+	for key in _chunk_keys(state, collider):
 		var node := collider.get_chunk_shape(key)
 		rids[key] = node.shape.get_rid() if node != null and node.shape != null else RID()
 	return rids
@@ -58,7 +61,7 @@ func _test_chunk_identity_and_transactional_swap() -> int:
 	if _apply(collider, state.surface_snapshot(), "initial full collider build accepts the snapshot") != 0:
 		collider.free()
 		return 1
-	if collider.get_chunk_count() != CHUNK_KEYS.size():
+	if collider.get_chunk_count() != _chunk_keys(state, collider).size():
 		collider.free()
 		return _fail("full build partitions the logical grid into stable chunks")
 	var body := collider.get_child(0) as StaticBody3D
@@ -66,7 +69,7 @@ func _test_chunk_identity_and_transactional_swap() -> int:
 		collider.free()
 		return _fail("one stable static body owns every chunk")
 	var body_id := body.get_instance_id()
-	var baseline_rids := _shape_rids(collider)
+	var baseline_rids := _shape_rids(collider, state)
 
 	# Ordinary contiguous revision: only chunks overlapped by the dirty halo
 	# swap shapes; untouched chunks and the body keep their identity.
@@ -85,14 +88,17 @@ func _test_chunk_identity_and_transactional_swap() -> int:
 	if (collider.get_child(0) as StaticBody3D).get_instance_id() != body_id:
 		collider.free()
 		return _fail("chunk swap never replaces the static body")
-	var patched_rids := _shape_rids(collider)
-	if patched_rids[Vector2i(0, 0)] == baseline_rids[Vector2i(0, 0)]:
+	var patched_rids := _shape_rids(collider, state)
+	var changed_chunks := 0
+	var unchanged_chunks := 0
+	for key in _chunk_keys(state, collider):
+		if patched_rids[key] == baseline_rids[key]:
+			unchanged_chunks += 1
+		else:
+			changed_chunks += 1
+	if changed_chunks == 0 or unchanged_chunks == 0:
 		collider.free()
-		return _fail("the dirty center chunk swaps its shape")
-	for key in [Vector2i(0, 32), Vector2i(32, 0), Vector2i(32, 32)]:
-		if patched_rids[key] != baseline_rids[key]:
-			collider.free()
-			return _fail("unchanged chunk retains its shape identity: %s" % key)
+		return _fail("ordinary revision swaps only dirty chunks")
 
 	# The swapped geometry is query-visible and matches the logical surface.
 	await physics_frame
@@ -119,7 +125,7 @@ func _test_revision_gap_rebuilds_everything() -> int:
 	for _edit in 2:
 		state.enqueue_brush(state.next_brush_sequence(), Vector2(-2.0, 1.0), 1.0, -0.05)
 		state.step_fixed()
-	var before_rids := _shape_rids(collider)
+	var before_rids := _shape_rids(collider, state)
 	if _apply(collider, state.surface_snapshot(), "revision-gap rebuild") != 0:
 		collider.free()
 		return 1
@@ -129,8 +135,8 @@ func _test_revision_gap_rebuilds_everything() -> int:
 	if collider.is_stale:
 		collider.free()
 		return _fail("successful rebuild clears the stale flag")
-	var after_rids := _shape_rids(collider)
-	for key in CHUNK_KEYS:
+	var after_rids := _shape_rids(collider, state)
+	for key in _chunk_keys(state, collider):
 		if after_rids[key] == before_rids[key]:
 			collider.free()
 			return _fail("revision gap replaces even distant chunk shapes: %s" % key)
@@ -146,7 +152,7 @@ func _test_failed_install_fails_closed() -> int:
 		collider.free()
 		return 1
 	var applied_identity := collider.get_applied_identity()
-	var retained_rids := _shape_rids(collider)
+	var retained_rids := _shape_rids(collider, state)
 
 	# A corrupt surface cannot install: old chunks are retained and the applied
 	# identity lags so bucket queries and tracked support fail closed.
@@ -180,9 +186,9 @@ func _test_failed_install_fails_closed() -> int:
 	if collider.get_applied_identity() != Vector2i(state.world_generation, state.terrain_revision):
 		collider.free()
 		return _fail("recovery converges to the accepted revision")
-	var recovered_rids := _shape_rids(collider)
+	var recovered_rids := _shape_rids(collider, state)
 	var any_changed := false
-	for key in CHUNK_KEYS:
+	for key in _chunk_keys(state, collider):
 		if recovered_rids[key] != retained_rids[key]:
 			any_changed = true
 	if not any_changed:

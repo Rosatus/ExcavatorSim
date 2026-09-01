@@ -52,6 +52,8 @@ func compose_snapshot(
 		"identity": identity,
 		"tool_schema_version": String(_tool.get("schema_version", "")),
 		"sweep_sample_count": 0,
+		"sweep_required_sample_count": 0,
+		"sweep_discontinuous": false,
 		"regions": [],
 	}
 	if not configured or identity.is_empty() or not current_bucket_frame.is_finite():
@@ -59,7 +61,8 @@ func compose_snapshot(
 	if not has_previous or not previous_bucket_frame.is_finite():
 		base["reason"] = "history_unavailable"
 		return base
-	var sample_count := _sample_count(previous_bucket_frame, current_bucket_frame)
+	var sweep_sampling := _sweep_sampling(previous_bucket_frame, current_bucket_frame)
+	var sample_count := int(sweep_sampling["sample_count"])
 	var composed: Array[Dictionary] = []
 	for order in _regions.size():
 		var region := _regions[order]
@@ -105,6 +108,8 @@ func compose_snapshot(
 	base["valid"] = true
 	base["reason"] = "ok"
 	base["sweep_sample_count"] = sample_count
+	base["sweep_required_sample_count"] = int(sweep_sampling["required_sample_count"])
+	base["sweep_discontinuous"] = bool(sweep_sampling["discontinuous"])
 	base["regions"] = composed
 	return base
 
@@ -267,14 +272,28 @@ func _stable_classification(
 
 
 func _sample_count(previous: Transform3D, current: Transform3D) -> int:
+	return int(_sweep_sampling(previous, current)["sample_count"])
+
+
+func _sweep_sampling(previous: Transform3D, current: Transform3D) -> Dictionary:
 	var sweep := _tool.get("sweep", {}) as Dictionary
 	var translation_step := float(sweep.get("maximum_translation_step_m", 0.08))
 	var rotation_step := deg_to_rad(float(sweep.get("maximum_rotation_step_degrees", 4.0)))
 	var maximum_samples := int(sweep.get("maximum_samples", 12))
 	var distance_segments := ceili(previous.origin.distance_to(current.origin) / translation_step)
 	var rotation := previous.basis.get_rotation_quaternion().angle_to(current.basis.get_rotation_quaternion())
+	# Rotation about bucket_link can move the teeth/floor much farther than the
+	# frame origin. Bound the most distant semantic point as well so a four-degree
+	# bucket rotation cannot jump across the terrain working band between samples.
+	var semantic_arc := 2.0 * _maximum_semantic_radius_m() * sin(rotation * 0.5)
+	distance_segments = maxi(distance_segments, ceili(semantic_arc / translation_step))
 	var rotation_segments := ceili(rotation / rotation_step)
-	return clampi(maxi(1, maxi(distance_segments, rotation_segments)) + 1, 2, maximum_samples)
+	var required_sample_count := maxi(1, maxi(distance_segments, rotation_segments)) + 1
+	return {
+		"sample_count": clampi(required_sample_count, 2, maximum_samples),
+		"required_sample_count": required_sample_count,
+		"discontinuous": required_sample_count > maximum_samples,
+	}
 
 
 func _local_sample_points(region: Dictionary) -> Array[Vector3]:
@@ -297,11 +316,12 @@ func _local_sample_points(region: Dictionary) -> Array[Vector3]:
 		_:
 			var raw_size := shape.get("size_m", [0.1, 0.1, 0.1]) as Array
 			var half := Vector3(float(raw_size[0]), float(raw_size[1]), float(raw_size[2])) * 0.5
-			points.append(center)
+			var local_transform := _debug_local_transform(region)
+			points.append(local_transform.origin)
 			for x_sign in [-1.0, 1.0]:
 				for y_sign in [-1.0, 1.0]:
 					for z_sign in [-1.0, 1.0]:
-						points.append(center + Vector3(half.x * x_sign, half.y * y_sign, half.z * z_sign))
+						points.append(local_transform * Vector3(half.x * x_sign, half.y * y_sign, half.z * z_sign))
 	return points
 
 
@@ -318,7 +338,31 @@ func _debug_local_transform(region: Dictionary) -> Transform3D:
 		var width := _vector3(shape["width_axis_godot"])
 		var height := _vector3(shape["height_axis_godot"])
 		basis = Basis(width, width.cross(height).normalized(), height).orthonormalized()
+	elif shape.get("kind") == "box":
+		# Contract boxes store their thickness in the dominant outward axis. The
+		# floor/back normals are intentionally diagonal, so leaving Basis.IDENTITY
+		# turns their real sloped plates into horizontal bucket-link boxes.
+		if absf(outward.x) > maxf(absf(outward.y), absf(outward.z)):
+			var axis_x := outward.normalized()
+			var axis_y := Vector3.UP
+			if absf(axis_x.dot(axis_y)) > 0.95:
+				axis_y = Vector3.FORWARD
+			axis_y = (axis_y - axis_x * axis_x.dot(axis_y)).normalized()
+			basis = Basis(axis_x, axis_y, axis_x.cross(axis_y).normalized()).orthonormalized()
+		else:
+			var axis_x := Vector3.RIGHT
+			axis_x = (axis_x - outward * outward.dot(axis_x)).normalized()
+			var axis_y := outward.normalized()
+			basis = Basis(axis_x, axis_y, axis_x.cross(axis_y).normalized()).orthonormalized()
 	return Transform3D(basis, center)
+
+
+func _maximum_semantic_radius_m() -> float:
+	var maximum_radius := 0.0
+	for region in _regions:
+		for point in _local_sample_points(region):
+			maximum_radius = maxf(maximum_radius, point.length())
+	return maximum_radius
 
 
 func _bounds_for_points(points: Array[Vector3]) -> AABB:

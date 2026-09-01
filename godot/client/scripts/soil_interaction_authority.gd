@@ -43,6 +43,9 @@ var _accepted_moved_volume_m3 := 0.0
 var _rejected_volume_m3 := 0.0
 var _invariant_failure_count := 0
 var _overflow_volume_m3 := 0.0
+var _last_surface_patch: Dictionary = {}
+var _surface_patch_commits := 0
+var _surface_patch_rejections := 0
 
 
 func configure(
@@ -116,6 +119,9 @@ func clear() -> void:
 	_rejected_volume_m3 = 0.0
 	_invariant_failure_count = 0
 	_overflow_volume_m3 = 0.0
+	_last_surface_patch.clear()
+	_surface_patch_commits = 0
+	_surface_patch_rejections = 0
 
 
 func step_fixed(
@@ -124,7 +130,10 @@ func step_fixed(
 	tool_snapshot: Dictionary,
 	tool_classification: Dictionary,
 	patch: ActiveSoilPatch,
-	focus_world: Vector3
+	focus_world: Vector3,
+	surface_sweep_result: Dictionary = {},
+	terrain_scheduler: TerrainCommitScheduler = null,
+	solver_mode: String = "point_brush_v1"
 ) -> Dictionary:
 	if not configured or patch == null or patch.generation < 0:
 		return {"changed": false, "reason": "authority_unavailable"}
@@ -142,19 +151,66 @@ func step_fixed(
 	_capture_contained_soil(patch, tick)
 	_overflow_volume_m3 = maxf(0.0, float(patch.get_status_snapshot().get("contained_volume_m3", 0.0)))
 	_release_bucket_soil(delta, tick, tool_snapshot, patch)
-	_activate_full_tool_displacement(delta, tick, tool_snapshot, tool_classification, patch)
+	var surface_commit := {"changed": false, "reason": "solver_not_selected"}
+	if solver_mode == "point_brush_v1":
+		_activate_full_tool_displacement(delta, tick, tool_snapshot, tool_classification, patch)
+	elif solver_mode == "surface_patch_v2_shadow":
+		_observe_surface_patch(surface_sweep_result)
+		_activate_full_tool_displacement(delta, tick, tool_snapshot, tool_classification, patch)
+		surface_commit["reason"] = "shadow_observed"
+	elif solver_mode == "surface_patch_v2":
+		surface_commit = _activate_surface_patch(delta, tick, tool_snapshot, surface_sweep_result, patch, terrain_scheduler)
+		_schedule_classified_loose_flux(delta, tool_snapshot, tool_classification, patch)
 	_capture_scoop_flux(tick, tool_snapshot, tool_classification, patch)
 	_settle_bucket_cells(tool_snapshot, delta)
 	patch.step_fixed(delta, focus_world, tool_snapshot)
 	_consume_patch_settlements(patch, tick)
 	_capture_contained_soil(patch, tick)
 	_overflow_volume_m3 = maxf(0.0, float(patch.get_status_snapshot().get("contained_volume_m3", 0.0)))
-	return {
+	var result := {
 		"changed": _transaction_sequence != before_sequence,
 		"reason": "stepped",
 		"transactions": _transaction_sequence - before_sequence,
 		"ledger_identity": _ledger_identity(),
 	}
+	result["surface_patch_commit"] = surface_commit
+	return result
+
+
+func _schedule_classified_loose_flux(
+	delta: float,
+	tool_snapshot: Dictionary,
+	classification: Dictionary,
+	patch: ActiveSoilPatch,
+) -> void:
+	var state := patch.persistent_field.terrain_state
+	if state == null:
+		return
+	for candidate_value in classification.get("candidates", []):
+		var candidate := candidate_value as Dictionary
+		var action := String(candidate.get("classification", "none"))
+		if action not in ["push", "back_drag", "grade"] or String(candidate.get("role_scope", "none")) != "stable":
+			continue
+		var region := _find_region(tool_snapshot.get("regions", []) as Array, String(candidate.get("region_id", "")))
+		if region.is_empty():
+			continue
+		var motion := region.get("motion_world", Vector3.ZERO) as Vector3
+		var impulse := Vector2(motion.x, motion.z) / maxf(delta, 0.0001)
+		if impulse.length_squared() <= 0.000001:
+			continue
+		var minimum := Vector2(INF, INF)
+		var maximum := Vector2(-INF, -INF)
+		for point_value in region.get("swept_points", []):
+			var point := point_value as Vector3
+			minimum = minimum.min(Vector2(point.x, point.z))
+			maximum = maximum.max(Vector2(point.x, point.z))
+		if not minimum.is_finite() or not maximum.is_finite():
+			continue
+		var min_column := clampi(floori((minimum.x - state.origin_xz.x) / state.spacing_m), 0, state.columns - 1)
+		var max_column := clampi(ceili((maximum.x - state.origin_xz.x) / state.spacing_m), 0, state.columns - 1)
+		var min_row := clampi(floori((minimum.y - state.origin_xz.y) / state.spacing_m), 0, state.rows - 1)
+		var max_row := clampi(ceili((maximum.y - state.origin_xz.y) / state.spacing_m), 0, state.rows - 1)
+		patch.schedule_loose_flux(Rect2i(min_column, min_row, max_column - min_column + 1, max_row - min_row + 1), impulse)
 
 
 func get_status_snapshot() -> Dictionary:
@@ -193,6 +249,9 @@ func get_status_snapshot() -> Dictionary:
 		"journal_size": _journal.size(),
 		"last_transaction": latest,
 		"snapshot_sha256": _snapshot_hash(),
+		"surface_patch_commits": _surface_patch_commits,
+		"surface_patch_rejections": _surface_patch_rejections,
+		"last_surface_patch": _last_surface_patch.duplicate(true),
 	}
 
 
@@ -201,6 +260,68 @@ func get_journal_snapshot() -> Array[Dictionary]:
 	for row in _journal:
 		result.append(row.duplicate(true))
 	return result
+
+
+## Converts every transient compartment into persistent loose terrain before
+## an ordinary model/pose authority boundary. A world reset is separately
+## destructive and does not call this path.
+func settle_all_for_boundary(patch: ActiveSoilPatch, tick: int, origin_world: Vector3) -> Dictionary:
+	if not configured or patch == null or patch.generation != generation:
+		return {"drained": false, "reason": "authority_unavailable"}
+	patch.flush_all()
+	_consume_patch_settlements(patch, tick)
+	var bucket_volume := float(_compartment_volume["bucket"])
+	if bucket_volume > EPSILON_M3:
+		var transfer_hint := "%d:%d:boundary-release" % [generation, tick]
+		var release_event := {
+			"center": Vector2(origin_world.x, origin_world.z),
+			"tooth_world": origin_world,
+			"tooth_velocity": Vector3.ZERO,
+			"volume_m3": bucket_volume,
+		}
+		var reservation := patch.reserve_predebited_volume(release_event, transfer_hint, "released")
+		if not bool(reservation.get("accepted", false)):
+			return {"drained": false, "reason": String(reservation.get("reason", "reservation_rejected"))}
+		var debited := _remove_bucket_volume(bucket_volume)
+		if absf(debited - bucket_volume) > _transaction_tolerance(bucket_volume):
+			patch.cancel_predebited_volume(transfer_hint)
+			if debited > EPSILON_M3:
+				_add_bucket_volume(debited)
+			_invariant_failure_count += 1
+			return {"drained": false, "reason": "bucket_debit_invariant"}
+		var injection := patch.commit_predebited_volume(transfer_hint)
+		if not bool(injection.get("accepted", false)):
+			_add_bucket_volume(debited)
+			_invariant_failure_count += 1
+			return {"drained": false, "reason": String(injection.get("reason", "release_commit_failed"))}
+		var injected := float(injection.get("volume_m3", 0.0))
+		if absf(injected - debited) > _transaction_tolerance(debited):
+			_invariant_failure_count += 1
+			return {"drained": false, "reason": "release_volume_invariant"}
+		_record_transaction(tick, "boundary_release", "bucket", "released", bucket_volume, debited, origin_world, Vector3.ZERO, {
+			"aggregate_id": String(injection.get("aggregate_id", "")),
+		})
+	patch.flush_all()
+	_consume_patch_settlements(patch, tick)
+	var patch_status := patch.get_status_snapshot()
+	var remaining_mobile := float(patch_status.get("active_volume_m3", 0.0))
+	var remaining_bucket := float(_compartment_volume["bucket"])
+	var remaining_active := float(_compartment_volume["active"])
+	var remaining_released := float(_compartment_volume["released"])
+	var drained := (
+		remaining_mobile <= EPSILON_M3
+		and remaining_bucket <= EPSILON_M3
+		and remaining_active <= EPSILON_M3
+		and remaining_released <= EPSILON_M3
+	)
+	return {
+		"drained": drained,
+		"reason": "drained" if drained else "transient_material_remaining",
+		"remaining_mobile_m3": remaining_mobile,
+		"remaining_bucket_m3": remaining_bucket,
+		"remaining_active_m3": remaining_active,
+		"remaining_released_m3": remaining_released,
+	}
 
 
 func _activate_full_tool_displacement(
@@ -256,6 +377,8 @@ func _activate_full_tool_displacement(
 			"region_id": String(candidate.get("region_id", "")),
 			"reason": String(injection.get("reason", "patch_rejected")),
 		})
+
+
 		return
 	var accepted := float(injection.get("volume_m3", 0.0))
 	var stable_source := float(injection.get("stable_source_volume_m3", 0.0))
@@ -284,8 +407,107 @@ func _activate_full_tool_displacement(
 		})
 
 
+func _observe_surface_patch(surface_sweep_result: Dictionary) -> void:
+	_last_surface_patch = {
+		"valid": bool(surface_sweep_result.get("valid", false)),
+		"reason": String(surface_sweep_result.get("reason", "unavailable")),
+		"patch_hash": String(surface_sweep_result.get("patch_hash", "")),
+		"changed_cell_count": int(surface_sweep_result.get("changed_cell_count", 0)),
+		"removed_stable_m3": float(surface_sweep_result.get("removed_stable_m3", 0.0)),
+		"removed_loose_m3": float(surface_sweep_result.get("removed_loose_m3", 0.0)),
+	}
+
+
+func _activate_surface_patch(
+	delta: float,
+	tick: int,
+	tool_snapshot: Dictionary,
+	surface_sweep_result: Dictionary,
+	active_patch: ActiveSoilPatch,
+	terrain_scheduler: TerrainCommitScheduler
+) -> Dictionary:
+	_observe_surface_patch(surface_sweep_result)
+	if not bool(surface_sweep_result.get("valid", false)):
+		return {"changed": false, "reason": String(surface_sweep_result.get("reason", "surface_patch_unavailable"))}
+	if terrain_scheduler == null or terrain_scheduler.terrain_state == null:
+		_surface_patch_rejections += 1
+		return {"changed": false, "reason": "terrain_scheduler_unavailable"}
+	var cell_patch := surface_sweep_result.get("patch", {}) as Dictionary
+	var validation := terrain_scheduler.terrain_state.validate_cell_patch(cell_patch)
+	if not bool(validation.get("valid", false)):
+		_surface_patch_rejections += 1
+		return {"changed": false, "reason": "terrain_%s" % String(validation.get("reason", "patch_rejected"))}
+	var metrics := SoilCellPatch.volume_metrics(cell_patch, terrain_scheduler.terrain_state.cell_patch_read_snapshot())
+	var stable_volume := float(metrics.get("stable_removed_m3", 0.0))
+	var loose_volume := float(metrics.get("loose_removed_m3", 0.0))
+	var requested := stable_volume + loose_volume
+	if requested <= EPSILON_M3:
+		return {"changed": false, "reason": "empty_surface_patch"}
+	var dirty := cell_patch.get("dirty_rect_cells", Rect2i()) as Rect2i
+	var state := terrain_scheduler.terrain_state
+	var center_xz := Vector2(
+		state.origin_xz.x + (float(dirty.position.x) + float(dirty.size.x - 1) * 0.5) * state.spacing_m,
+		state.origin_xz.y + (float(dirty.position.y) + float(dirty.size.y - 1) * 0.5) * state.spacing_m,
+	)
+	var surface_y := state.sample_surface_bilinear_at(center_xz)
+	var origin := Vector3(center_xz.x, surface_y if is_finite(surface_y) else 0.0, center_xz.y)
+	var velocity := Vector3.ZERO
+	var contributing_regions: Array[String] = []
+	for row_value in cell_patch.get("rows", []):
+		var row := row_value as Dictionary
+		for region_value in row.get("contributing_region_ids", []):
+			var region_id := String(region_value)
+			if not contributing_regions.has(region_id):
+				contributing_regions.append(region_id)
+	contributing_regions.sort()
+	for region_id in contributing_regions:
+		var region := _find_region(tool_snapshot.get("regions", []) as Array, region_id)
+		if not region.is_empty():
+			velocity = region.get("motion_world", Vector3.ZERO) as Vector3 / maxf(delta, 0.0001)
+			break
+	var patch_hash := String(cell_patch.get("patch_hash", ""))
+	var reservation := active_patch.reserve_predebited_tool_volume({
+		"center": center_xz,
+		"tooth_world": origin,
+		"tooth_velocity": velocity,
+		"volume_m3": requested,
+	}, patch_hash)
+	if not bool(reservation.get("accepted", false)):
+		_surface_patch_rejections += 1
+		return {"changed": false, "reason": String(reservation.get("reason", "active_capacity_rejected"))}
+	if not terrain_scheduler.queue_cell_patch(tick, cell_patch, generation, patch_hash):
+		active_patch.cancel_predebited_tool_volume(patch_hash)
+		_surface_patch_rejections += 1
+		return {"changed": false, "reason": "terrain_queue_rejected"}
+	var terrain_commit := terrain_scheduler.step_fixed(0.0, true)
+	if not bool(terrain_commit.get("changed", false)):
+		active_patch.cancel_predebited_tool_volume(patch_hash)
+		_surface_patch_rejections += 1
+		return {"changed": false, "reason": "terrain_commit_rejected", "terrain_commit": terrain_commit}
+	var activation := active_patch.commit_predebited_tool_volume(patch_hash)
+	if not bool(activation.get("accepted", false)):
+		# This path is guarded by the reservation and therefore indicates an
+		# internal invariant failure after the authoritative terrain write.
+		_invariant_failure_count += 1
+		_surface_patch_rejections += 1
+		return {"changed": true, "reason": "post_commit_activation_invariant", "terrain_commit": terrain_commit}
+	var metadata := {
+		"patch_hash": patch_hash,
+		"changed_cell_count": int(surface_sweep_result.get("changed_cell_count", 0)),
+		"contributing_region_ids": contributing_regions,
+		"aggregate_id": String(activation.get("aggregate_id", "")),
+	}
+	if stable_volume > EPSILON_M3:
+		_record_transaction(tick, "surface_cut", "persistent_stable", "active", stable_volume, stable_volume, origin, velocity, metadata)
+	if loose_volume > EPSILON_M3:
+		_record_transaction(tick, "surface_cut", "persistent_loose", "active", loose_volume, loose_volume, origin, velocity, metadata)
+	active_patch.schedule_loose_flux(dirty, Vector2(velocity.x, velocity.z))
+	_surface_patch_commits += 1
+	return {"changed": true, "reason": "surface_patch_committed", "terrain_commit": terrain_commit, "patch_hash": patch_hash}
+
+
 func _capture_contained_soil(patch: ActiveSoilPatch, tick: int) -> void:
-	var available := maxf(0.0, bucket_capacity_m3 - float(_compartment_volume["bucket"]))
+	var available := _bucket_available_volume()
 	if available <= EPSILON_M3:
 		return
 	var extraction := patch.extract_contained_volume(available)
@@ -295,6 +517,9 @@ func _capture_contained_soil(patch: ActiveSoilPatch, tick: int) -> void:
 	var accepted := _add_bucket_volume(requested)
 	if absf(accepted - requested) > _transaction_tolerance(requested):
 		_invariant_failure_count += 1
+		var restored := patch.restore_extracted_volume(extraction, requested - accepted, "%d:%d:contained-rollback" % [generation, tick])
+		if not restored:
+			_invariant_failure_count += 1
 	_record_transaction(
 		tick,
 		"bucket_entry",
@@ -316,7 +541,7 @@ func _capture_scoop_flux(
 ) -> void:
 	if not bool(tool_snapshot.get("valid", false)) or not bool(classification.get("valid", false)):
 		return
-	var available := maxf(0.0, bucket_capacity_m3 - float(_compartment_volume["bucket"]))
+	var available := _bucket_available_volume()
 	var active_volume := maxf(0.0, float(_compartment_volume["active"]))
 	if available <= EPSILON_M3 or active_volume <= EPSILON_M3:
 		return
@@ -355,6 +580,11 @@ func _capture_scoop_flux(
 		return
 	var moved := float(extraction.get("volume_m3", 0.0))
 	var accepted := _add_bucket_volume(moved)
+	if absf(accepted - moved) > _transaction_tolerance(moved):
+		_invariant_failure_count += 1
+		var restored := patch.restore_extracted_volume(extraction, moved - accepted, "%d:%d:scoop-rollback" % [generation, tick])
+		if not restored:
+			_invariant_failure_count += 1
 	_record_transaction(
 		tick,
 		"bucket_entry",
@@ -391,20 +621,35 @@ func _release_bucket_soil(delta: float, tick: int, tool_snapshot: Dictionary, pa
 	var velocity := (opening.get("motion_world", Vector3.ZERO) as Vector3) / maxf(delta, 0.0001)
 	velocity += Vector3.DOWN * lerpf(0.15, 0.8, exposure)
 	var transfer_hint := "%d:%d:release" % [generation, tick]
-	var injection := patch.inject_released_volume({
+	var release_event := {
 		"center": Vector2(origin.x, origin.z),
 		"tooth_world": origin,
 		"tooth_velocity": velocity,
 		"volume_m3": requested,
-	}, transfer_hint)
-	if not bool(injection.get("accepted", false)):
+	}
+	var reservation := patch.reserve_predebited_volume(release_event, transfer_hint, "released")
+	if not bool(reservation.get("accepted", false)):
 		_record_transaction(tick, "spill_or_dump", "bucket", "released", requested, 0.0, origin, velocity, {
-			"reason": String(injection.get("reason", "patch_rejected")),
+			"reason": String(reservation.get("reason", "patch_rejected")),
+		})
+		return
+	var debited := _remove_bucket_volume(requested)
+	if absf(debited - requested) > _transaction_tolerance(requested):
+		_invariant_failure_count += 1
+		patch.cancel_predebited_volume(transfer_hint)
+		if debited > EPSILON_M3:
+			_add_bucket_volume(debited)
+		return
+	var injection := patch.commit_predebited_volume(transfer_hint)
+	if not bool(injection.get("accepted", false)):
+		_invariant_failure_count += 1
+		_add_bucket_volume(debited)
+		_record_transaction(tick, "spill_or_dump", "bucket", "released", requested, 0.0, origin, velocity, {
+			"reason": String(injection.get("reason", "post_debit_commit_failed")),
 		})
 		return
 	var accepted := float(injection.get("volume_m3", 0.0))
-	var debited := _remove_bucket_volume(accepted)
-	if absf(debited - accepted) > _transaction_tolerance(accepted):
+	if absf(accepted - debited) > _transaction_tolerance(debited):
 		_invariant_failure_count += 1
 	_record_transaction(tick, "dump" if opening_down_dot > dump_opening_down_dot else "spill", "bucket", "released", requested, debited, origin, velocity, {
 		"opening_down_dot": opening_down_dot,
@@ -421,9 +666,10 @@ func _consume_patch_settlements(patch: ActiveSoilPatch, tick: int) -> void:
 		if volume <= EPSILON_M3:
 			continue
 		var available := float(_compartment_volume[source])
+		var accepted := volume
 		if volume > available + _transaction_tolerance(volume):
 			_invariant_failure_count += 1
-		var accepted := minf(volume, maxf(available, 0.0))
+			accepted = minf(volume, maxf(available, 0.0))
 		_record_transaction(
 			tick,
 			"settle",
@@ -529,6 +775,14 @@ func _add_bucket_volume(requested: float) -> float:
 	return accepted - remaining
 
 
+func _bucket_available_volume() -> float:
+	var ledger_free := maxf(0.0, bucket_capacity_m3 - float(_compartment_volume["bucket"]))
+	var cell_free := 0.0
+	for fill in _cell_fill:
+		cell_free += maxf(0.0, 1.0 - float(fill)) * _cell_capacity_m3
+	return minf(ledger_free, cell_free)
+
+
 func _remove_bucket_volume(requested: float) -> float:
 	var remaining := minf(maxf(requested, 0.0), float(_compartment_volume["bucket"]))
 	var removed := remaining
@@ -591,6 +845,13 @@ func _occupied_cell_count() -> int:
 
 func _build_fill_profile() -> PackedFloat32Array:
 	var profile := PackedFloat32Array()
+	var expected_cell_count := _grid_dimensions.x * _grid_dimensions.y * _grid_dimensions.z
+	# Status can be queried re-entrantly by ProductSession/UI while a clean
+	# generation boundary clears and replaces this authority. A transitional or
+	# unconfigured object must publish an empty profile, never index stale grid
+	# dimensions into an already-cleared cell array.
+	if not configured or expected_cell_count <= 0 or _cell_fill.size() != expected_cell_count:
+		return profile
 	profile.resize(_grid_dimensions.x * _grid_dimensions.z)
 	for z in _grid_dimensions.z:
 		for x in _grid_dimensions.x:

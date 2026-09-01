@@ -9,6 +9,7 @@ const SCHEMA_VERSION := "active-soil-patch-v1"
 const MIN_VOLUME_M3 := 0.000001
 const GRAVITY_M_S2 := 9.81
 const MAX_TICK_SAMPLES := 240
+const MAX_LOGICAL_AGGREGATES := 256
 const QUALITY_PROFILES := {
 	"low": {
 		"window_m": 3.0,
@@ -88,7 +89,12 @@ var generation := -1
 
 var _profile: Dictionary = QUALITY_PROFILES["balanced"]
 var _material: Dictionary = MATERIAL_RESPONSE["loose"]
+## Authoritative, quality-independent mobile soil aggregates. Their volume,
+## compartment and trajectory are material truth.
 var _representatives: Array[Dictionary] = []
+## Disposable visual samples derived from logical aggregates. Quality changes
+## may rebuild or remove these without changing any material volume.
+var _visual_representatives: Array[Dictionary] = []
 var _aggregate_volume: Dictionary = {}
 var _aggregate_sequence := 0
 var _representative_sequence := 0
@@ -102,6 +108,7 @@ var _settled_volume_m3 := 0.0
 var _rejected_volume_m3 := 0.0
 var _evicted_representatives := 0
 var _settlement_events: Array[Dictionary] = []
+var _predebited_reservations: Dictionary = {}
 
 
 func configure(source_snapshot: Dictionary, requested_quality: String = "balanced", requested_material: String = "loose") -> bool:
@@ -141,6 +148,7 @@ func clear(settle_active: bool = false) -> void:
 	if settle_active and persistent_field.terrain_state != null:
 		flush_all()
 	_representatives.clear()
+	_visual_representatives.clear()
 	_aggregate_volume.clear()
 	_aggregate_sequence = 0
 	_representative_sequence = 0
@@ -154,6 +162,7 @@ func clear(settle_active: bool = false) -> void:
 	_rejected_volume_m3 = 0.0
 	_evicted_representatives = 0
 	_settlement_events.clear()
+	_predebited_reservations.clear()
 	generation = -1
 	persistent_field.clear()
 
@@ -163,10 +172,7 @@ func set_quality_profile(requested_quality: String) -> bool:
 		return false
 	quality_profile = requested_quality
 	_profile = (QUALITY_PROFILES[quality_profile] as Dictionary).duplicate(true)
-	# Quality may reduce visual representatives, but never discards material.
-	while _representatives.size() > int(_profile["max_representatives"]):
-		if not _merge_last_representative():
-			break
+	_rebuild_visual_representatives()
 	return true
 
 
@@ -182,14 +188,66 @@ func inject_released_volume(event: Dictionary, aggregate_hint: String = "") -> D
 	return _inject_volume(event, aggregate_hint, false, "released")
 
 
+## Reserves logical aggregate capacity before the source authority is debited.
+## The reservation owns no soil volume and can be cancelled without rollback.
+func reserve_predebited_volume(event: Dictionary, aggregate_hint: String, compartment: String = "active") -> Dictionary:
+	var requested_volume := float(event.get("volume_m3", 0.0))
+	var tooth_world := event.get("tooth_world", Vector3.ZERO) as Vector3
+	if (
+		generation < 0
+		or aggregate_hint.is_empty()
+		or compartment not in ["active", "released"]
+		or requested_volume <= MIN_VOLUME_M3
+		or not tooth_world.is_finite()
+		or _aggregate_volume.has(aggregate_hint)
+		or _predebited_reservations.has(aggregate_hint)
+		or not can_accept_volume(requested_volume)
+	):
+		return {"accepted": false, "reason": "reservation_rejected"}
+	_predebited_reservations[aggregate_hint] = {
+		"event": event.duplicate(true),
+		"compartment": compartment,
+	}
+	return {"accepted": true, "reason": "reserved", "reservation_id": aggregate_hint, "volume_m3": requested_volume}
+
+
+func reserve_predebited_tool_volume(event: Dictionary, aggregate_hint: String) -> Dictionary:
+	return reserve_predebited_volume(event, aggregate_hint, "active")
+
+
+func cancel_predebited_volume(reservation_id: String) -> bool:
+	return _predebited_reservations.erase(reservation_id)
+
+
+func cancel_predebited_tool_volume(reservation_id: String) -> bool:
+	return cancel_predebited_volume(reservation_id)
+
+
+func commit_predebited_volume(reservation_id: String) -> Dictionary:
+	if not _predebited_reservations.has(reservation_id):
+		return {"accepted": false, "volume_m3": 0.0, "reason": "reservation_missing"}
+	var reservation := (_predebited_reservations[reservation_id] as Dictionary).duplicate(true)
+	_predebited_reservations.erase(reservation_id)
+	var event := (reservation.get("event", {}) as Dictionary).duplicate(true)
+	var compartment := String(reservation.get("compartment", "active"))
+	var result := _inject_volume(event, reservation_id, false, compartment, true)
+	if bool(result.get("accepted", false)) and compartment == "active":
+		var committed := float(result.get("volume_m3", 0.0))
+		_received_released_volume_m3 = maxf(0.0, _received_released_volume_m3 - committed)
+		_injected_volume_m3 += committed
+		result["reason"] = "predebited_activated"
+	return result
+
+
+func commit_predebited_tool_volume(reservation_id: String) -> Dictionary:
+	return commit_predebited_volume(reservation_id)
+
+
 func can_accept_volume(requested_volume_m3: float) -> bool:
 	return (
 		generation >= 0
 		and requested_volume_m3 > MIN_VOLUME_M3
-		and (
-			_representatives.size() < int(_profile["max_representatives"])
-			or _representatives.size() >= 2
-		)
+		and _representatives.size() + _predebited_reservations.size() < MAX_LOGICAL_AGGREGATES
 	)
 
 
@@ -219,6 +277,7 @@ func extract_contained_volume(maximum_volume_m3: float) -> Dictionary:
 			var aggregate_id := String(rep["aggregate_id"])
 			_aggregate_volume[aggregate_id] = maxf(0.0, float(_aggregate_volume.get(aggregate_id, available)) - moved)
 	_exported_bucket_volume_m3 += extracted
+	_rebuild_visual_representatives()
 	return {
 		"accepted": extracted > MIN_VOLUME_M3,
 		"volume_m3": extracted,
@@ -277,6 +336,7 @@ func extract_scoop_volume(
 			)
 			_representatives[index] = rep
 	_exported_bucket_volume_m3 += extracted
+	_rebuild_visual_representatives()
 	return {
 		"accepted": extracted > MIN_VOLUME_M3,
 		"volume_m3": extracted,
@@ -284,6 +344,43 @@ func extract_scoop_volume(
 		"velocity_world": weighted_velocity / extracted if extracted > MIN_VOLUME_M3 else Vector3.ZERO,
 		"reason": "scoop_flux" if extracted > MIN_VOLUME_M3 else "no_local_active_volume",
 	}
+
+
+## Failure-only compensation for a bucket destination that accepted less than
+## its preflight amount. It restores exact logical volume without touching the
+## persistent heightfield or producing a visual authority event.
+func restore_extracted_volume(extraction: Dictionary, restored_volume_m3: float, aggregate_hint: String) -> bool:
+	var restored := maxf(restored_volume_m3, 0.0)
+	if restored <= MIN_VOLUME_M3:
+		return true
+	var origin := extraction.get("origin_world", Vector3.ZERO) as Vector3
+	var velocity := extraction.get("velocity_world", Vector3.ZERO) as Vector3
+	var injection := _inject_volume({
+		"center": Vector2(origin.x, origin.z),
+		"tooth_world": origin,
+		"tooth_velocity": velocity,
+		"volume_m3": restored,
+	}, aggregate_hint, false, "active")
+	if bool(injection.get("accepted", false)):
+		var committed := float(injection.get("volume_m3", 0.0))
+		_received_released_volume_m3 = maxf(0.0, _received_released_volume_m3 - committed)
+		_exported_bucket_volume_m3 = maxf(0.0, _exported_bucket_volume_m3 - committed)
+		return absf(committed - restored) <= MIN_VOLUME_M3
+	# A partial extraction can leave the logical store at its hard count limit.
+	# Merge back into an existing active aggregate in that exceptional case.
+	for index in range(_representatives.size() - 1, -1, -1):
+		var rep := _representatives[index]
+		if String(rep.get("compartment", "active")) != "active":
+			continue
+		var aggregate_id := String(rep["aggregate_id"])
+		rep["volume_m3"] = float(rep["volume_m3"]) + restored
+		rep["radius_m"] = _radius_for_volume(float(rep["volume_m3"]))
+		_representatives[index] = rep
+		_aggregate_volume[aggregate_id] = float(_aggregate_volume.get(aggregate_id, 0.0)) + restored
+		_exported_bucket_volume_m3 = maxf(0.0, _exported_bucket_volume_m3 - restored)
+		_rebuild_visual_representatives()
+		return true
+	return false
 
 
 func consume_settlement_events() -> Array[Dictionary]:
@@ -294,7 +391,7 @@ func consume_settlement_events() -> Array[Dictionary]:
 	return result
 
 
-func _inject_volume(event: Dictionary, aggregate_hint: String, debit_persistent: bool, compartment: String) -> Dictionary:
+func _inject_volume(event: Dictionary, aggregate_hint: String, debit_persistent: bool, compartment: String, reserved_slot: bool = false) -> Dictionary:
 	var requested_volume := float(event.get("volume_m3", 0.0))
 	var tooth_world := event.get("tooth_world", Vector3.ZERO) as Vector3
 	var center_xz_value: Variant = event.get("center", Vector2(tooth_world.x, tooth_world.z))
@@ -303,12 +400,8 @@ func _inject_volume(event: Dictionary, aggregate_hint: String, debit_persistent:
 	if generation < 0 or requested_volume <= MIN_VOLUME_M3 or not tooth_world.is_finite():
 		_rejected_volume_m3 += maxf(requested_volume, 0.0)
 		return rejected
-	var available := int(_profile["max_representatives"]) - _representatives.size()
-	if available <= 0 and _representatives.size() >= 2:
-		_merge_last_representative()
-		available = int(_profile["max_representatives"]) - _representatives.size()
-	if available <= 0:
-		rejected["reason"] = "representative_budget"
+	if not reserved_slot and _representatives.size() >= MAX_LOGICAL_AGGREGATES:
+		rejected["reason"] = "logical_aggregate_budget"
 		_rejected_volume_m3 += requested_volume
 		return rejected
 	var aggregate_id := aggregate_hint
@@ -332,36 +425,31 @@ func _inject_volume(event: Dictionary, aggregate_hint: String, debit_persistent:
 		committed_volume = float(activation.get("committed_volume_m3", 0.0))
 		stable_source_volume = float(activation.get("stable_volume_m3", 0.0))
 		loose_source_volume = float(activation.get("loose_volume_m3", 0.0))
-	var desired_count := maxi(1, ceili(committed_volume / float(_profile["target_volume_m3"])))
-	var representative_count := mini(available, desired_count)
-	var volume_per_rep := committed_volume / float(representative_count)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("%s|%s|%d" % [aggregate_id, material_preset, generation])
-	var base_radius := _radius_for_volume(volume_per_rep)
+	var base_radius := _radius_for_volume(committed_volume)
 	var surface := persistent_field.sample_surface_at(center_xz)
 	var start_y := maxf(tooth_world.y, surface + base_radius) if not is_nan(surface) else tooth_world.y
 	var source_velocity := event.get("tooth_velocity", Vector3.ZERO) as Vector3
 	if source_velocity.length() > 4.0:
 		source_velocity = source_velocity.normalized() * 4.0
-	for index in representative_count:
-		var angle := rng.randf_range(0.0, TAU)
-		var radial := sqrt(rng.randf()) * activation_radius * 0.42
-		var jitter := Vector3(cos(angle) * radial, rng.randf_range(0.0, base_radius * 1.7), sin(angle) * radial)
-		_representatives.append({
-			"id": _representative_sequence,
-			"aggregate_id": aggregate_id,
-			"position": Vector3(center_xz.x, start_y, center_xz.y) + jitter,
-			"velocity": source_velocity * 0.28 + Vector3(rng.randf_range(-0.12, 0.12), rng.randf_range(0.02, 0.18), rng.randf_range(-0.12, 0.12)),
-			"volume_m3": volume_per_rep,
-			"radius_m": base_radius * rng.randf_range(0.88, 1.12),
-			"sleep_s": 0.0,
-			"sleeping": false,
-			"contained": false,
-			"compartment": compartment,
-			"age_s": 0.0,
-		})
-		_representative_sequence += 1
+	_representatives.append({
+		"id": _representative_sequence,
+		"aggregate_id": aggregate_id,
+		"position": Vector3(center_xz.x, start_y, center_xz.y),
+		"velocity": source_velocity * 0.28 + Vector3(rng.randf_range(-0.12, 0.12), rng.randf_range(0.02, 0.18), rng.randf_range(-0.12, 0.12)),
+		"volume_m3": committed_volume,
+		"radius_m": base_radius,
+		"sleep_s": 0.0,
+		"sleeping": false,
+		"contained": false,
+		"compartment": compartment,
+		"age_s": 0.0,
+	})
+	_representative_sequence += 1
 	_aggregate_volume[aggregate_id] = committed_volume
+	_rebuild_visual_representatives()
+	var representative_count := _visual_count_for_aggregate(aggregate_id)
 	if debit_persistent:
 		_injected_volume_m3 += committed_volume
 	else:
@@ -381,6 +469,7 @@ func step_fixed(delta: float, focus_world: Vector3, soil_tool_snapshot: Dictiona
 	if generation < 0:
 		return {"changed": false, "reason": "unconfigured"}
 	var started_us := Time.get_ticks_usec()
+	persistent_field.step_pending_flux()
 	_focus_world = focus_world
 	var bounded_delta := clampf(delta, 0.0, 0.05)
 	var substeps := maxi(1, int(_profile["substeps"]))
@@ -389,11 +478,16 @@ func step_fixed(delta: float, focus_world: Vector3, soil_tool_snapshot: Dictiona
 		_integrate_representatives(sub_delta, soil_tool_snapshot)
 		_resolve_neighbors(sub_delta)
 	_settle_ready_representatives()
+	_rebuild_visual_representatives()
 	_last_tick_us = Time.get_ticks_usec() - started_us
 	_tick_samples_us.append(_last_tick_us)
 	if _tick_samples_us.size() > MAX_TICK_SAMPLES:
 		_tick_samples_us.remove_at(0)
 	return {"changed": not _representatives.is_empty(), "reason": "stepped", "tick_us": _last_tick_us}
+
+
+func schedule_loose_flux(dirty_rect_cells: Rect2i, horizontal_impulse_xz: Vector2) -> bool:
+	return persistent_field.schedule_tool_flux(dirty_rect_cells, horizontal_impulse_xz)
 
 
 func flush_all() -> Dictionary:
@@ -417,20 +511,22 @@ func flush_all() -> Dictionary:
 				"velocity_world": rep.get("velocity", Vector3.ZERO),
 				"aggregate_id": String(rep.get("aggregate_id", "")),
 			})
-			_remove_representative(index)
+			_debit_representative(index, committed)
 	_settled_volume_m3 += settled
+	_rebuild_visual_representatives()
 	return {"settled_volume_m3": settled, "remaining_representatives": _representatives.size()}
 
 
 func get_visual_snapshot() -> Dictionary:
+	_rebuild_visual_representatives()
 	var positions := PackedVector3Array()
 	var radii := PackedFloat32Array()
 	var states := PackedByteArray()
-	positions.resize(_representatives.size())
-	radii.resize(_representatives.size())
-	states.resize(_representatives.size())
-	for index in _representatives.size():
-		var rep := _representatives[index]
+	positions.resize(_visual_representatives.size())
+	radii.resize(_visual_representatives.size())
+	states.resize(_visual_representatives.size())
+	for index in _visual_representatives.size():
+		var rep := _visual_representatives[index]
 		positions[index] = rep["position"] as Vector3
 		radii[index] = float(rep["radius_m"])
 		states[index] = 2 if bool(rep["contained"]) else (1 if bool(rep["sleeping"]) else 0)
@@ -446,6 +542,7 @@ func get_visual_snapshot() -> Dictionary:
 
 
 func get_status_snapshot() -> Dictionary:
+	_rebuild_visual_representatives()
 	var active_volume := 0.0
 	var displaced_active_volume := 0.0
 	var released_volume := 0.0
@@ -468,7 +565,7 @@ func get_status_snapshot() -> Dictionary:
 	if not sorted_ticks.is_empty():
 		p95_us = int(sorted_ticks[clampi(ceili(float(sorted_ticks.size()) * 0.95) - 1, 0, sorted_ticks.size() - 1)])
 	var field_status := persistent_field.get_status_snapshot()
-	var estimated_memory := int(field_status.get("estimated_memory_bytes", 0)) + _representatives.size() * 160
+	var estimated_memory := int(field_status.get("estimated_memory_bytes", 0)) + _representatives.size() * 192 + _visual_representatives.size() * 96
 	return {
 		"schema_version": SCHEMA_VERSION,
 		"configured": generation >= 0,
@@ -478,8 +575,10 @@ func get_status_snapshot() -> Dictionary:
 		"angle_of_repose_degrees": float(_material["angle_of_repose_degrees"]),
 		"focus_world": _focus_world,
 		"window_m": float(_profile["window_m"]),
-		"representative_count": _representatives.size(),
+		"representative_count": _visual_representatives.size(),
 		"max_representatives": int(_profile["max_representatives"]),
+		"logical_aggregate_count": _representatives.size(),
+		"max_logical_aggregates": MAX_LOGICAL_AGGREGATES,
 		"sleeping_count": sleeping_count,
 		"contained_count": contained_count,
 		"contained_volume_m3": contained_volume,
@@ -494,6 +593,7 @@ func get_status_snapshot() -> Dictionary:
 		"rejected_volume_m3": _rejected_volume_m3,
 		"conservation_error_m3": _injected_volume_m3 + _received_released_volume_m3 - active_volume - _settled_volume_m3 - _exported_bucket_volume_m3,
 		"evicted_representatives": _evicted_representatives,
+		"predebited_reservation_count": _predebited_reservations.size(),
 		"last_tick_ms": float(_last_tick_us) / 1000.0,
 		"p95_tick_ms": float(p95_us) / 1000.0,
 		"estimated_memory_bytes": estimated_memory,
@@ -648,7 +748,7 @@ func _settle_ready_representatives() -> void:
 			"velocity_world": rep.get("velocity", Vector3.ZERO),
 			"aggregate_id": String(rep.get("aggregate_id", "")),
 		})
-		_remove_representative(index)
+		_debit_representative(index, committed)
 		settled_this_tick += 1
 
 
@@ -749,39 +849,64 @@ func _remove_representative(index: int) -> void:
 	_representatives.remove_at(index)
 
 
-func _merge_last_representative() -> bool:
-	if _representatives.size() < 2:
-		return false
-	var last_index := _representatives.size() - 1
-	var last := _representatives[last_index] as Dictionary
-	var target_index := -1
-	for candidate_index in range(last_index - 1, -1, -1):
-		var candidate := _representatives[candidate_index] as Dictionary
-		if String(candidate.get("compartment", "active")) == String(last.get("compartment", "active")):
-			target_index = candidate_index
+func _debit_representative(index: int, amount_m3: float) -> void:
+	if index < 0 or index >= _representatives.size() or amount_m3 <= MIN_VOLUME_M3:
+		return
+	var rep := _representatives[index]
+	var available := float(rep.get("volume_m3", 0.0))
+	var debited := minf(available, amount_m3)
+	if debited >= available - MIN_VOLUME_M3:
+		_remove_representative(index)
+		return
+	var aggregate_id := String(rep.get("aggregate_id", ""))
+	rep["volume_m3"] = available - debited
+	rep["radius_m"] = _radius_for_volume(float(rep["volume_m3"]))
+	_representatives[index] = rep
+	_aggregate_volume[aggregate_id] = maxf(0.0, float(_aggregate_volume.get(aggregate_id, available)) - debited)
+
+
+func _rebuild_visual_representatives() -> void:
+	_visual_representatives.clear()
+	if _representatives.is_empty():
+		return
+	var remaining_budget := int(_profile["max_representatives"])
+	for logical_value in _representatives:
+		if remaining_budget <= 0:
 			break
-	if target_index < 0:
-		return false
-	_representatives.remove_at(last_index)
-	var target := _representatives[target_index]
-	var last_aggregate := String(last["aggregate_id"])
-	var target_aggregate := String(target["aggregate_id"])
-	var target_volume := float(target["volume_m3"])
-	var last_volume := float(last["volume_m3"])
-	var combined := target_volume + last_volume
-	if last_aggregate != target_aggregate:
-		var last_remaining := maxf(0.0, float(_aggregate_volume.get(last_aggregate, 0.0)) - last_volume)
-		if last_remaining <= MIN_VOLUME_M3:
-			_aggregate_volume.erase(last_aggregate)
-		else:
-			_aggregate_volume[last_aggregate] = last_remaining
-		_aggregate_volume[target_aggregate] = float(_aggregate_volume.get(target_aggregate, target_volume)) + last_volume
-	target["position"] = ((target["position"] as Vector3) * target_volume + (last["position"] as Vector3) * last_volume) / combined
-	target["velocity"] = ((target["velocity"] as Vector3) * target_volume + (last["velocity"] as Vector3) * last_volume) / combined
-	target["volume_m3"] = combined
-	target["radius_m"] = _radius_for_volume(combined)
-	_representatives[target_index] = target
-	return true
+		var logical := logical_value as Dictionary
+		var aggregate_id := String(logical.get("aggregate_id", ""))
+		var volume := float(logical.get("volume_m3", 0.0))
+		if aggregate_id.is_empty() or volume <= MIN_VOLUME_M3:
+			continue
+		var desired := maxi(1, ceili(volume / float(_profile["target_volume_m3"])))
+		var count := mini(desired, remaining_budget)
+		var sample_volume := volume / float(count)
+		var sample_radius := _radius_for_volume(sample_volume)
+		var logical_radius := float(logical.get("radius_m", sample_radius))
+		var rng := RandomNumberGenerator.new()
+		rng.seed = hash("visual|%s|%s|%d" % [aggregate_id, material_preset, generation])
+		for sample_index in count:
+			var angle := rng.randf_range(0.0, TAU)
+			var radial := sqrt(rng.randf()) * logical_radius * 0.55
+			var jitter := Vector3(cos(angle) * radial, rng.randf_range(0.0, sample_radius * 0.7), sin(angle) * radial)
+			_visual_representatives.append({
+				"id": "%s:%d" % [aggregate_id, sample_index],
+				"aggregate_id": aggregate_id,
+				"position": (logical.get("position", Vector3.ZERO) as Vector3) + jitter,
+				"velocity": logical.get("velocity", Vector3.ZERO),
+				"radius_m": sample_radius * rng.randf_range(0.88, 1.12),
+				"sleeping": bool(logical.get("sleeping", false)),
+				"contained": bool(logical.get("contained", false)),
+			})
+		remaining_budget -= count
+
+
+func _visual_count_for_aggregate(aggregate_id: String) -> int:
+	var count := 0
+	for visual in _visual_representatives:
+		if String(visual.get("aggregate_id", "")) == aggregate_id:
+			count += 1
+	return count
 
 
 func _clamp_to_field(world_xz: Vector2) -> Vector2:
