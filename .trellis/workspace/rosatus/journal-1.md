@@ -1957,3 +1957,36 @@ Completed the realtime Gateway Web CAN console, incorporated final authority and
 ### Next Steps
 
 - None - task complete
+
+
+## Session 53: Visual-first arcade soil excavation
+
+**Date**: 2026-09-01
+**Task**: Visual-first arcade soil excavation
+**Branch**: `main`
+
+### Summary
+
+Implemented and validated opt-in arcade_stamp_v3 with continuous cutting-edge sweep, 100 ms retry-safe terrain coalescing, scalar bucket load, pooled non-colliding visual spoil mounds, v2 isolation, focused regression tests, MCP editor verification, and updated Godot/Trellis contracts. Kept point_brush_v1 as the product default and skipped release builds per user direction.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6ba88bb` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 52
-- **Last Active**: 2026-08-31
+- **Total Sessions**: 53
+- **Last Active**: 2026-09-01
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1959 | Active |
+| `journal-1.md` | ~1992 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 53 | 2026-09-01 | Visual-first arcade soil excavation | `6ba88bb` | `main` |
 | 52 | 2026-08-31 | Gateway Web CAN console and Linux release | `5e8e05b1faaa93f4b6ae1aa25f9d1341a821f068`, `9386c929bde6ef2c6c17340fefa3b3f8fd46e1c0` | `main` |
 | 51 | 2026-08-31 | Fix writable run compatibility and formalize release builds | `2c69c99`, `ab216ff`, `d212439`, `d029cf2` | `main` |
 | 50 | 2026-08-30 | Bucket pass-through performance mode | `f17f0f9`, `a21fe55`, `f90e074` | `main` |
