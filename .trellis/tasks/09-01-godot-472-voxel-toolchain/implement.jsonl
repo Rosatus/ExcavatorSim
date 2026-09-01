@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Defines the current Godot/Jolt/Terrain3D authority baseline that the toolchain migration must preserve."}
+{"file":".trellis/spec/frontend/godot-mcp.md","reason":"Defines MCP session targeting, read-first inspection, objective editor checks, and runtime-launch boundaries."}
+{"file":".trellis/spec/frontend/validation-budget.md","reason":"Requires focused checks first, stable-then-once heavy gates, and human ownership of subjective visual acceptance."}
+{"file":".trellis/tasks/09-01-godot-472-voxel-toolchain/research/toolchain-evidence.md","reason":"Pins observed local binaries, official release digests, active affected entry points, and the recovered release-chain decision."}

@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/validation-budget.md","reason":"Review must enforce focused automation, one final matrix/export gate, no soak, and explicit pending human review."}
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Review must verify TerrainState, Terrain3D fallback, Jolt, collision, and soil authority contracts remain unchanged."}
+{"file":".trellis/spec/frontend/godot-mcp.md","reason":"Review uses the connected 4.7.2 custom editor for structural checks without turning MCP into runtime authority."}
+{"file":".trellis/tasks/09-01-godot-472-voxel-toolchain/research/toolchain-evidence.md","reason":"Review compares actual engine/template identity and hashes to the pinned v1.7 evidence."}

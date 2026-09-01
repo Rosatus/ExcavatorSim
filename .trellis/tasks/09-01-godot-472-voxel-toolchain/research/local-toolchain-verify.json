@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "root": "E:\\applications\\godot_voxel",
+  "release": {
+    "url": "https://github.com/Zylann/godot_voxel/releases/tag/v1.7",
+    "download_base_url": "https://github.com/Zylann/godot_voxel/releases/download/v1.7",
+    "tag": "v1.7",
+    "release_commit": "2ac9f5f",
+    "voxel_tools_version": "1.7",
+    "godot_version": "4.7.2.stable.custom_build.ed1daf0bf",
+    "engine_commit": "ed1daf0bf"
+  },
+  "components": {
+    "windows_editor": {
+      "component": "windows_editor",
+      "path": "E:\\applications\\godot_voxel\\godot.windows.editor.x86_64.exe",
+      "filename": "godot.windows.editor.x86_64.exe",
+      "archive_filename": "godot.windows.editor.x86_64.exe.zip",
+      "archive_sha256": "e2292adb0b671508ab220fce5bcd052b1c20674a3385d89c6b38601e6e1f956b",
+      "binary_sha256": "4aa32de020ef9aea9fd9bf5a3a22fa72bb55db3dac6bd1cf8ac45b775d7749c3",
+      "binary_size_bytes": 189793792,
+      "platform": "windows",
+      "kind": "editor",
+      "variant": "standard",
+      "version": "4.7.2.stable.custom_build.ed1daf0bf"
+    },
+    "windows_release_template": {
+      "component": "windows_release_template",
+      "path": "E:\\applications\\godot_voxel\\godot.windows.template_release.x86_64.exe",
+      "filename": "godot.windows.template_release.x86_64.exe",
+      "archive_filename": "godot.windows.template_release.x86_64.exe.zip",
+      "archive_sha256": "86fe371ed80948ccb4b4ac78a0e62e2917bc257890bdaa62b4f6e7aa402f0775",
+      "binary_sha256": "21229489a7078eabf26e910044ec2defe19fcd49143df6e8c545948515d98d8c",
+      "binary_size_bytes": 88506368,
+      "platform": "windows",
+      "kind": "release_template",
+      "variant": "standard",
+      "version": "4.7.2.stable.custom_build.ed1daf0bf"
+    },
+    "linux_editor": {
+      "component": "linux_editor",
+      "path": "E:\\applications\\godot_voxel\\godot.linuxbsd.editor.x86_64",
+      "filename": "godot.linuxbsd.editor.x86_64",
+      "archive_filename": "godot.linuxbsd.editor.x86_64.zip",
+      "archive_sha256": "35c92e9f2209d1edbf6ebd57dfa52af060ec5d9ee2aade105a084e5911415dea",
+      "binary_sha256": "bbec8c1c5af9c61b6acbdfc85214404ca3037d0758dc567d0c4a2c68e475453f",
+      "binary_size_bytes": 147992016,
+      "platform": "linux",
+      "kind": "editor",
+      "variant": "standard",
+      "version": "4.7.2.stable.custom_build.ed1daf0bf"
+    },
+    "linux_release_template": {
+      "component": "linux_release_template",
+      "path": "E:\\applications\\godot_voxel\\godot.linuxbsd.template_release.x86_64",
+      "filename": "godot.linuxbsd.template_release.x86_64",
+      "archive_filename": "godot.linuxbsd.template_release.x86_64.zip",
+      "archive_sha256": "d26c2ddfca6bb8323c1380bc0cc8322405db1f7ef359df23dd97664fad4366ec",
+      "binary_sha256": "eb21c5d7b85d281db68c3b315237c6e6ceacf65067c7e5c595b2b94aa3e40b7e",
+      "binary_size_bytes": 77362520,
+      "platform": "linux",
+      "kind": "release_template",
+      "variant": "standard",
+      "version": "4.7.2.stable.custom_build.ed1daf0bf"
+    }
+  },
+  "build_toolchain": {
+    "release_url": "https://github.com/Zylann/godot_voxel/releases/tag/v1.7",
+    "tag": "v1.7",
+    "release_commit": "2ac9f5f",
+    "voxel_tools_version": "1.7",
+    "godot_version": "4.7.2.stable.custom_build.ed1daf0bf",
+    "engine_commit": "ed1daf0bf",
+    "components": [
+      {
+        "component": "windows_editor",
+        "filename": "godot.windows.editor.x86_64.exe",
+        "binary_sha256": "4aa32de020ef9aea9fd9bf5a3a22fa72bb55db3dac6bd1cf8ac45b775d7749c3",
+        "binary_size_bytes": 189793792,
+        "archive_filename": "godot.windows.editor.x86_64.exe.zip",
+        "archive_sha256": "e2292adb0b671508ab220fce5bcd052b1c20674a3385d89c6b38601e6e1f956b"
+      },
+      {
+        "component": "windows_release_template",
+        "filename": "godot.windows.template_release.x86_64.exe",
+        "binary_sha256": "21229489a7078eabf26e910044ec2defe19fcd49143df6e8c545948515d98d8c",
+        "binary_size_bytes": 88506368,
+        "archive_filename": "godot.windows.template_release.x86_64.exe.zip",
+        "archive_sha256": "86fe371ed80948ccb4b4ac78a0e62e2917bc257890bdaa62b4f6e7aa402f0775"
+      },
+      {
+        "component": "linux_editor",
+        "filename": "godot.linuxbsd.editor.x86_64",
+        "binary_sha256": "bbec8c1c5af9c61b6acbdfc85214404ca3037d0758dc567d0c4a2c68e475453f",
+        "binary_size_bytes": 147992016,
+        "archive_filename": "godot.linuxbsd.editor.x86_64.zip",
+        "archive_sha256": "35c92e9f2209d1edbf6ebd57dfa52af060ec5d9ee2aade105a084e5911415dea"
+      },
+      {
+        "component": "linux_release_template",
+        "filename": "godot.linuxbsd.template_release.x86_64",
+        "binary_sha256": "eb21c5d7b85d281db68c3b315237c6e6ceacf65067c7e5c595b2b94aa3e40b7e",
+        "binary_size_bytes": 77362520,
+        "archive_filename": "godot.linuxbsd.template_release.x86_64.zip",
+        "archive_sha256": "d26c2ddfca6bb8323c1380bc0cc8322405db1f7ef359df23dd97664fad4366ec"
+      }
+    ]
+  }
+}
