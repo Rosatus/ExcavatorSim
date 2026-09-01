@@ -2,12 +2,17 @@
 
 Deterministic fixtures and focused Godot-side checks belong here. Tests should cover scene contracts, motion decoding, generation guards and world-state repeatability as those milestones land.
 
-Run the complete standalone matrix from PowerShell (replace the executable
-with the installed Godot 4.7 binary when `godot` is not on `PATH`):
+Run the complete standalone matrix from PowerShell. It resolves the pinned
+Godot 4.7.2 custom editor + Voxel Tools 1.7 from
+`tools/godot_voxel_toolchain.json` and verifies its hash/version before launch:
 
 ```powershell
-.\tests\run_standalone_matrix.ps1 -GodotExe "E:\applications\Godot_v4.7.1-stable_mono_win64\Godot_v4.7.1-stable_mono_win64_console.exe"
+.\tests\run_standalone_matrix.ps1
 ```
+
+Use `GODOT_VOXEL_ROOT` or `-ToolchainRoot` when the four pinned binaries are
+installed outside the lock's default root. `-GodotExe` is retained for an
+explicit editor path but does not bypass the pinned hash/version checks.
 
 For one focused contract, run the same executable from `godot/client/`:
 
@@ -30,6 +35,7 @@ are written under `output/terrain3d_phase4/`.
 The release-candidate matrix is:
 
 ```text
+voxel_module_smoke.gd
 foundation_scene_test.gd
 operator_ui_test.gd
 camera_workflow_test.gd

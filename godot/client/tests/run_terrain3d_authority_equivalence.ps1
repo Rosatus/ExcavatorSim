@@ -1,7 +1,10 @@
 [CmdletBinding()]
 param(
     [Parameter()]
-    [string]$GodotExe = "E:\applications\Godot_v4.7.1-stable_mono_win64\Godot_v4.7.1-stable_mono_win64_console.exe",
+    [string]$GodotExe = "",
+
+    [Parameter()]
+    [string]$ToolchainRoot = "",
 
     [Parameter()]
     [string]$OutputDir = ""
@@ -9,11 +12,12 @@ param(
 
 $ErrorActionPreference = "Stop"
 $projectDir = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-if (-not (Test-Path -LiteralPath $GodotExe -PathType Leaf)) {
-    throw "Godot executable not found: $GodotExe"
-}
+$repoRoot = (Resolve-Path (Join-Path $projectDir "..\..")).Path
+. (Join-Path $repoRoot "tools\godot_voxel_toolchain.ps1")
+$toolchain = Get-GodotVoxelToolchain -GodotExe $GodotExe `
+    -ToolchainRoot $ToolchainRoot -Components @("windows_editor")
+$GodotExe = [string]$toolchain.components.windows_editor.path
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
-    $repoRoot = (Resolve-Path (Join-Path $projectDir "..\..")).Path
     $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
     $OutputDir = Join-Path $repoRoot "output\terrain3d_phase3\$stamp"
 }

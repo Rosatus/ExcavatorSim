@@ -35,16 +35,24 @@ one explicit human gate; automated screenshots do not approve those judgments.
 
 ## Reproducible release evidence
 
-Run the following from the repository root. The standalone runner accepts an
-explicit Godot 4.7 executable, so it does not depend on a user profile PATH:
+Run the following from the repository root. The runners resolve and verify the
+pinned Godot 4.7.2 custom build with Voxel Tools 1.7, so they do not depend on a
+user profile PATH:
 
 ```powershell
-.\godot\client\tests\run_standalone_matrix.ps1 `
-  -GodotExe "E:\applications\Godot_v4.7.1-stable_mono_win64\Godot_v4.7.1-stable_mono_win64.exe"
+.\godot\client\tests\run_standalone_matrix.ps1
 .\godot\client\tests\run_terrain3d_release_validation.ps1
 pixi run backend-smoke
 pixi run verify
 ```
+
+`tools/godot_voxel_toolchain.json` locks the upstream `v1.7` assets, archive
+and extracted-binary SHA-256 values, engine commit, and default toolchain root
+`E:/applications/godot_voxel`. A machine may override that root with
+`GODOT_VOXEL_ROOT` or `-ToolchainRoot`; `-GodotExe` remains available as the
+highest-priority editor override. Every selected binary is still checked
+against the lock before Godot starts; standard builds only are accepted, not
+`double` or `tracy` variants.
 
 After the implementation and focused checks are stable, build the distributable
 Windows and Linux packages once from the repository root:
@@ -53,11 +61,16 @@ Windows and Linux packages once from the repository root:
 .\tools\build_release_dist.ps1
 ```
 
-The builder rebuilds both Gateway targets, exports both Godot presets into a
-staging directory, places the platform Gateway beside the corresponding Godot
-executable, stages notices, and only then replaces `godot/dist/windows` and
-`godot/dist/linux`. Each platform package and each standalone Gateway package
-contains `build-manifest.json`. The sidecar records the source commit, dirty-tree
+The builder rebuilds both Gateway targets, creates an isolated copy of the
+Godot project, injects the pinned Windows/Linux custom release-template paths
+only into that copy, exports both presets into a staging directory, places the
+platform Gateway beside the corresponding Godot executable, stages notices,
+and only then replaces `godot/dist/windows` and `godot/dist/linux`. The tracked
+`export_presets.cfg` therefore keeps both debug templates and release templates
+empty. Each platform package and each standalone Gateway package contains
+`build-manifest.json`. The Godot package sidecars additionally record the
+verified editor/template version, upstream release, engine commit, and input
+hashes under `build_toolchain`; all sidecars retain source commit, dirty-tree
 state, software version, and raw-byte SHA-256 of every shipped file except the
 manifest itself. A formal release should be built from a clean tree; a dirty
 development build remains usable but is labelled `git_tree_dirty: true`.
@@ -69,9 +82,10 @@ is never copied into the new release.
 The Terrain3D release runner keeps the production entry scene unchanged. It
 exports an isolated Windows smoke entry, proves native-default/material and
 source/export lifecycle parity, exercises the explicit `soil_shader` rollback,
-verifies the native DLL against its vendored release binary, and stages license
-and provenance files beside the package. The rollback does not migrate authority
-data.
+verifies the native DLL against its vendored release binary, proves the Voxel
+module is present in both editor and exported template, and stages Terrain3D,
+Sky3D, and Voxel Tools license/provenance files beside the package. The rollback
+does not migrate authority data.
 
 Rendered Jolt product soak is a conditional final gate, not an iterative
 development loop. Run it only when the current release explicitly changes the

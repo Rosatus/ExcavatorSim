@@ -93,7 +93,7 @@ shadow stream so the diagnostic cannot silently splice two terrain histories.
 - Explicit assertion that an otherwise valid `jolt_authoritative` snapshot is
   rejected by the profile gate before its one-body/four-frame schema shape can
   enter the latest-value slot.
-- Godot 4.7.1 Jolt API/contact/direct-state/cleanup probe and live Godot MCP smoke
+- Pinned Godot 4.7.2 custom-build Jolt API/contact/direct-state/cleanup probe and live Godot MCP smoke
   for both model identities.
 
 ## 7. Wrong vs Correct

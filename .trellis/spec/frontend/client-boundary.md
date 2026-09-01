@@ -494,7 +494,7 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
 
 ### 6. Tests Required
 
-- Real Godot 4.7.1/Jolt tests cover both models settling, straight travel,
+- Real pinned Godot 4.7.2 custom-build/Jolt tests cover both models settling, straight travel,
   braking, reversing, pivoting, bounded slope/mound traversal, speed/energy
   bounds, stale terrain rejection, model switch, and teardown.
 - Contact tests assert left/right probe points lie on the corresponding visual

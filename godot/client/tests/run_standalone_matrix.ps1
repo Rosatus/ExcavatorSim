@@ -1,12 +1,21 @@
 ﻿[CmdletBinding()]
 param(
     [Parameter()]
-    [string]$GodotExe = "godot"
+    [string]$GodotExe = "",
+
+    [Parameter()]
+    [string]$ToolchainRoot = ""
 )
 
 $ErrorActionPreference = "Stop"
 $projectDir = (Resolve-Path (Join-Path $PSScriptRoot ".." )).Path
+$repoRoot = (Resolve-Path (Join-Path $projectDir "..\..")).Path
+. (Join-Path $repoRoot "tools\godot_voxel_toolchain.ps1")
+$toolchain = Get-GodotVoxelToolchain -GodotExe $GodotExe `
+    -ToolchainRoot $ToolchainRoot -Components @("windows_editor")
+$GodotExe = [string]$toolchain.components.windows_editor.path
 $tests = @(
+    "voxel_module_smoke.gd",
     "foundation_scene_test.gd",
     "equipment_command_mapper_test.gd",
     "control_input_hud_test.gd",

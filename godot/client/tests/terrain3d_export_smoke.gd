@@ -3,6 +3,7 @@ extends Node
 const MAIN_SCENE := "res://scenes/main.tscn"
 const WORKSITE_MATERIAL := "res://assets/terrain/terrain3d_worksite_material.tres"
 const MISSING_MATERIAL := "res://tests/__missing_terrain3d_material__.tres"
+const VoxelModuleSmoke = preload("res://tests/voxel_module_smoke.gd")
 
 var _failures: Array[String] = []
 
@@ -12,6 +13,10 @@ func _ready() -> void:
 
 
 func _run() -> void:
+	_failures.append_array(VoxelModuleSmoke.validate())
+	if not _failures.is_empty():
+		_finish({"voxel_module": VoxelModuleSmoke.identity()})
+		return
 	var packed := load(MAIN_SCENE) as PackedScene
 	if packed == null:
 		_finish({"reason": "main_scene_unavailable"})
@@ -153,6 +158,7 @@ func _run() -> void:
 	_expect_single_surface(final_status, "post_reset")
 
 	_finish({
+		"voxel_module": VoxelModuleSmoke.identity(),
 		"startup": startup,
 		"cut_revision": int(cut.get("terrain_revision", -1)),
 		"deposit_revision": int(deposit.get("terrain_revision", -1)),

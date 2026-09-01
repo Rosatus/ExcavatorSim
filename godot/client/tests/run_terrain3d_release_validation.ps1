@@ -1,7 +1,10 @@
 [CmdletBinding()]
 param(
     [Parameter()]
-    [string]$GodotExe = "E:\applications\Godot_v4.7.1-stable_mono_win64\Godot_v4.7.1-stable_mono_win64_console.exe",
+    [string]$GodotExe = "",
+
+    [Parameter()]
+    [string]$ToolchainRoot = "",
 
     [Parameter()]
     [string]$OutputDir = ""
@@ -10,9 +13,7 @@ param(
 $ErrorActionPreference = "Stop"
 $sourceProject = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $repoRoot = (Resolve-Path (Join-Path $sourceProject "..\..")).Path
-if (-not (Test-Path -LiteralPath $GodotExe -PathType Leaf)) {
-    throw "Godot executable not found: $GodotExe"
-}
+. (Join-Path $repoRoot "tools\godot_voxel_toolchain.ps1")
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
     $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
     $OutputDir = Join-Path $repoRoot "output\terrain3d_phase4\$stamp"
@@ -23,7 +24,6 @@ New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 $tempBase = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
 $isolateRoot = Join-Path $tempBase ("ExcavatorSim-terrain3d-release-" + [guid]::NewGuid().ToString("N"))
 $isolatedProject = Join-Path $isolateRoot "client"
-New-Item -ItemType Directory -Path $isolatedProject -Force | Out-Null
 
 function Invoke-CheckedProcess {
     param(
@@ -67,7 +67,34 @@ function Invoke-CheckedProcess {
     }
 }
 
+function Copy-ReleaseNotices {
+    param([Parameter(Mandatory)][string]$Destination)
+    Copy-Item -LiteralPath (Join-Path $repoRoot "LICENSE") -Destination $Destination -Force
+    Copy-Item -LiteralPath (Join-Path $repoRoot "NOTICE.md") -Destination $Destination -Force
+    $thirdPartyDir = Join-Path $Destination "THIRD_PARTY"
+    New-Item -ItemType Directory -Path $thirdPartyDir -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $sourceProject "addons\terrain_3d\LICENSE.txt") `
+        -Destination (Join-Path $thirdPartyDir "Terrain3D-LICENSE.txt") -Force
+    Copy-Item -LiteralPath (Join-Path $sourceProject "addons\sky_3d\LICENSE.txt") `
+        -Destination (Join-Path $thirdPartyDir "Sky3D-LICENSE.txt") -Force
+    Copy-Item -LiteralPath (Join-Path $sourceProject "addons\sky_3d\EXCAVATORSIM-PROVENANCE.md") `
+        -Destination (Join-Path $thirdPartyDir "Sky3D-PROVENANCE.md") -Force
+    Copy-Item -LiteralPath (Join-Path $repoRoot "assets\licenses\VoxelTools-LICENSE.txt") `
+        -Destination (Join-Path $thirdPartyDir "VoxelTools-LICENSE.txt") -Force
+    Copy-Item -LiteralPath (Join-Path $repoRoot "assets\licenses\VoxelTools-PROVENANCE.md") `
+        -Destination (Join-Path $thirdPartyDir "VoxelTools-PROVENANCE.md") -Force
+}
+
 try {
+    $toolchain = New-GodotVoxelExportProject -Source $sourceProject `
+        -Destination $isolatedProject -GodotExe $GodotExe -ToolchainRoot $ToolchainRoot
+    $GodotExe = [string]$toolchain.components.windows_editor.path
+
+    Invoke-CheckedProcess -FilePath $GodotExe -Name "source-voxel-module" -Arguments @(
+        "--headless", "--path", $sourceProject,
+        "--script", "res://tests/voxel_module_smoke.gd"
+    )
+
     $editorEvidence = Join-Path $OutputDir "editor-smoke.json"
     Invoke-CheckedProcess -FilePath $GodotExe -Name "editor-smoke" -Arguments @(
         "--headless", "--path", $sourceProject,
@@ -75,9 +102,6 @@ try {
         "--", "--output-file", $editorEvidence
     )
 
-    Get-ChildItem -LiteralPath $sourceProject -Force |
-        Where-Object { $_.Name -notin @(".godot", "output") } |
-        Copy-Item -Destination $isolatedProject -Recurse -Force
     $projectFile = Join-Path $isolatedProject "project.godot"
     $projectText = [IO.File]::ReadAllText($projectFile)
     $projectText = $projectText.Replace(
@@ -101,6 +125,14 @@ try {
         "--export-release", "ExcavatorSim", $exportExe
     )
 
+    $linuxPackageDir = Join-Path $OutputDir "package\linux"
+    New-Item -ItemType Directory -Path $linuxPackageDir -Force | Out-Null
+    $linuxExport = Join-Path $linuxPackageDir "ExcavatorSim.x86_64"
+    Invoke-CheckedProcess -FilePath $GodotExe -Name "linux-export" -TimeoutSeconds 300 -Arguments @(
+        "--headless", "--path", $isolatedProject,
+        "--export-release", "Linux", $linuxExport
+    )
+
     $terrainDll = Join-Path $packageDir "libterrain.windows.release.x86_64.dll"
     if (-not (Test-Path -LiteralPath $terrainDll -PathType Leaf)) {
         throw "Windows export omitted the Terrain3D release DLL"
@@ -111,24 +143,41 @@ try {
     if ($sourceTerrainHash -ne $packageTerrainHash) {
         throw "Windows export Terrain3D DLL does not match the vendored release binary"
     }
-    Copy-Item -LiteralPath (Join-Path $repoRoot "LICENSE") -Destination $packageDir -Force
-    Copy-Item -LiteralPath (Join-Path $repoRoot "NOTICE.md") -Destination $packageDir -Force
-    $thirdPartyDir = Join-Path $packageDir "THIRD_PARTY"
-    New-Item -ItemType Directory -Path $thirdPartyDir -Force | Out-Null
-    Copy-Item -LiteralPath (Join-Path $sourceProject "addons\terrain_3d\LICENSE.txt") `
-        -Destination (Join-Path $thirdPartyDir "Terrain3D-LICENSE.txt") -Force
-    Copy-Item -LiteralPath (Join-Path $sourceProject "addons\sky_3d\LICENSE.txt") `
-        -Destination (Join-Path $thirdPartyDir "Sky3D-LICENSE.txt") -Force
-    Copy-Item -LiteralPath (Join-Path $sourceProject "addons\sky_3d\EXCAVATORSIM-PROVENANCE.md") `
-        -Destination (Join-Path $thirdPartyDir "Sky3D-PROVENANCE.md") -Force
+    $linuxTerrainSo = Join-Path $linuxPackageDir "libterrain.linux.release.x86_64.so"
+    if (-not (Test-Path -LiteralPath $linuxTerrainSo -PathType Leaf)) {
+        throw "Linux export omitted the Terrain3D release SO"
+    }
+    $sourceTerrainSo = Join-Path $sourceProject "addons\terrain_3d\bin\libterrain.linux.release.x86_64.so"
+    $sourceTerrainSoHash = (Get-FileHash -LiteralPath $sourceTerrainSo -Algorithm SHA256).Hash
+    $packageTerrainSoHash = (Get-FileHash -LiteralPath $linuxTerrainSo -Algorithm SHA256).Hash
+    if ($sourceTerrainSoHash -ne $packageTerrainSoHash) {
+        throw "Linux export Terrain3D SO does not match the vendored release binary"
+    }
+    Copy-ReleaseNotices -Destination $packageDir
+    Copy-ReleaseNotices -Destination $linuxPackageDir
 
     $exportEvidence = Join-Path $OutputDir "export-smoke.json"
     Invoke-CheckedProcess -FilePath $exportExe -Name "export-smoke" -Arguments @(
         "--headless", "--", "--output-file", $exportEvidence
     )
+    $wslLinuxExport = (& wsl.exe wslpath -a $linuxExport.Replace("\", "/")).Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($wslLinuxExport)) {
+        throw "Unable to resolve the Linux validation executable inside WSL"
+    }
+    $linuxExportEvidence = Join-Path $OutputDir "linux-export-smoke.json"
+    $wslLinuxEvidence = (& wsl.exe wslpath -a $linuxExportEvidence.Replace("\", "/")).Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($wslLinuxEvidence)) {
+        throw "Unable to resolve the Linux validation evidence path inside WSL"
+    }
+    Invoke-CheckedProcess -FilePath "wsl.exe" -Name "linux-export-smoke" -Arguments @(
+        "--exec", "sh", "-c",
+        'chmod +x "$1" && "$1" --headless -- --output-file "$2"',
+        "sh", $wslLinuxExport, $wslLinuxEvidence
+    )
 
     $editor = Get-Content -LiteralPath $editorEvidence -Raw | ConvertFrom-Json
     $exported = Get-Content -LiteralPath $exportEvidence -Raw | ConvertFrom-Json
+    $linuxExported = Get-Content -LiteralPath $linuxExportEvidence -Raw | ConvertFrom-Json
     $parity = [ordered]@{
         configured_backend = ($editor.details.startup.configured_backend -eq $exported.details.startup.configured_backend)
         active_backend = ($editor.details.startup.active_backend -eq $exported.details.startup.active_backend)
@@ -157,11 +206,13 @@ try {
     )
     $summary = [ordered]@{
         schema_version = "terrain3d-release-validation-v1"
-        passed = ([bool]$editor.passed -and [bool]$exported.passed -and
+        passed = ([bool]$editor.passed -and [bool]$exported.passed -and [bool]$linuxExported.passed -and
             -not ($parity.Values -contains $false) -and $fatalLogMatches.Count -eq 0)
         editor_evidence = $editorEvidence
         export_evidence = $exportEvidence
+        linux_export_evidence = $linuxExportEvidence
         package_dir = $packageDir
+        linux_package_dir = $linuxPackageDir
         package_files = @(
             Get-ChildItem -LiteralPath $packageDir -Recurse -File | ForEach-Object {
                 [ordered]@{
@@ -171,8 +222,19 @@ try {
                 }
             }
         )
+        linux_package_files = @(
+            Get-ChildItem -LiteralPath $linuxPackageDir -Recurse -File | ForEach-Object {
+                [ordered]@{
+                    path = [IO.Path]::GetRelativePath($linuxPackageDir, $_.FullName)
+                    size = $_.Length
+                    sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+                }
+            }
+        )
         parity = $parity
         terrain3d_release_sha256 = $packageTerrainHash.ToLowerInvariant()
+        linux_terrain3d_release_sha256 = $packageTerrainSoHash.ToLowerInvariant()
+        build_toolchain = $toolchain.build_toolchain
         fatal_log_matches = $fatalLogMatches
     }
     $summaryPath = Join-Path $OutputDir "run-summary.json"
