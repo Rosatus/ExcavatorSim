@@ -41,7 +41,7 @@ Godot: tests/can_gateway_e2e_test.gd                     # 进程监督+录制�
 `--open-browser`、`--imu-hz/--slew-hz/--rtk-hz/--travel-hz`、
 `--rtk-byteorder little`、`--dbc-dir DIR`（可重复）、
 `--compat-profile PATH|builtin:qml-sy135-ground-truth`、
-`--qml-calibration PATH`、`--sink {csv,socketcan,vcan,tcp}`（默认 csv）、
+`--qml-calibration PATH`、`--sink {csv,socketcan,vcan,tcp}`（两平台默认 tcp）、
 `--interface can0`。`vcan` / `--setup-vcan` 仅保留为开发兼容入口。
 
 ## Web CAN 后台
@@ -52,15 +52,17 @@ Godot 以 `--mode godot-managed` 拉起时，持续遥测 ID 默认使用“仿�
 已就绪但 PC001 尚未握手或暂时断连，逐 ID authority 仍保持可编辑；离线帧由 TCP sink
 丢弃且不在重连后重放。托管模式仍拒绝
 传输重配、DBC reload、全局 arm 和配置导入/导出。独立启动（默认 `standalone`）时，
-Windows 页面可重配本机 PC001 TCP 服务端，
-Linux 页面可在二次确认后重启并复核 `can0`；不同平台不会暴露另一平台的传输控制。
+Windows 与 Linux 页面都可重配当前 PC001 TCP 服务端；只有显式 SocketCAN
+低延时模式才提供二次确认后的 `can0` 重启。
 
 主表按 CAN ID 展示最近一次成功 transport-egress payload、目标频率、最近 10 次成功
 egress 平均得到的实际频率和实时新鲜度；这里的 egress 是本地 SocketCAN `send()` 或
 TCP `sendall()` 成功，不表示物理 CAN ACK。展开行显示该真实 payload 对应的物理量。
 编辑窗口支持物理值与 exact-DLC payload 双向预览，`1..100 Hz` 整数频率和显式保存。
-DBC 报文继续使用 strict codec；回转 `0x18FFF000` 与行走 `0x256` 直接复用既有专用
-encoder/decoder。timed CAN `0x18FFF100` 不进入三态控制，仍保持显式触发、50 Hz、10 秒。
+DBC 报文继续使用 strict codec；回转 `0x18FFF000` 由新版 CAN3 DBC 编码。
+仅行走 `0x256` 和 timed CAN `0x18FFF100` 位于 DBC 外。timed row 进入同一三态控制：
+仿真权威下仍由原 CTNC 命令触发固定 50 Hz、10 秒 burst，自定义权威下则按页面
+保存的 payload 与整数频率连续发送。
 
 独立模式保存逐 ID 的关闭/自定义选择、payload 和频率到 `can-console.json`，但全局
 “开始自定义发送”永不持久化，进程重启不会自动发包。页面可导入/导出完整、带 catalog
@@ -73,10 +75,11 @@ fingerprint 的 `excavatorsim-can-console` JSON；它不包含 TCP endpoint、ca
 内嵌与外置文件内容完全一致时会静默合并为一份 DBC，但保留全部来源路径；
 文件优先按 UTF-8（含 BOM）严格解码，仅在失败时用 CP1252 兼容解码并显示提示。
 
-## Linux / SocketCAN（物理 can0 直发）
+## Linux / SocketCAN 低延时模式（显式启用、暂时停止维护）
 
-Linux 游戏启动参数自动选择 `--sink socketcan --interface can0`。点击
-**连接 ICT** 后，Gateway 检查物理 `can0`：已满足 250 kbit/s、
+Linux 默认与 Windows 一样启动 PC001 TCP Server，不会检查、配置或打开 `can0`。
+只有显式运行 `--sink socketcan --interface can0` 时，点击 **连接 ICT** 后，
+Gateway 才检查物理 `can0`：已满足 250 kbit/s、
 `restart-ms=100`、`txqueuelen=10` 且状态可用时直接绑定；否则通过受限
 helper 自动配置并复核。CAN 帧构造和 CSV 录制不受此流程影响。
 
@@ -100,7 +103,7 @@ cd tools/can_gateway && ./dist_linux.sh        # 优先 uv，缺 uv 时回退 ve
 cd dist/can_gateway_linux
 sudo ./install_can0_helper.sh                   # 也可显式追加运行游戏的用户名
 
-# 正常运行无需 root 或手工 setup；游戏内点击 [连接 ICT]
+# 仅显式低延时模式需要安装 helper；默认 TCP 模式不需要 sudo
 # 卸载授权（不 down/delete can0，不卸载驱动）
 sudo ./uninstall_can0_helper.sh
 ```
@@ -129,9 +132,9 @@ Linux 正式交付请使用 `godot/dist/ExcavatorSim-linux-x86_64.tar.gz`，该�
 旧包目录中的运行日志，会将其移到 `output/release-build-residue`，不会发布或删除。
 正式发布前应先提交计划纳入发布的源码，使 `git_tree_dirty` 为 `false`。
 
-## Windows / PC001 TCP（ICT 直连）
+## Windows / Linux PC001 TCP（默认 ICT 传输）
 
-Windows 无 SocketCAN，改用 can_replay 的 PC001 TCP transport：
+两平台默认均使用 can_replay 的 PC001 TCP transport：
 gateway 作 **TCP 服务端**（默认 `0.0.0.0:5678`），ICT 侧运行现成的
 `socket_client_to_vcan.sh` 桥接到 vcan——**对端零改动**。
 
@@ -145,15 +148,27 @@ ExcavatorSim gateway.exe (--sink tcp)          ICT 侧 (LinuxPC)
 - 游戏 AdvancedPanel 的 **ICT IP / ICT 端口** 输入框配置监听地址
   （持久化 user://ict_config.cfg，spawn 时经 argv 注入）；
   [连接 ICT] 在 Windows/Linux 网关下均可用。
-- 手动运行：`gateway.exe --sink tcp --tcp-host 0.0.0.0 --tcp-port 5678`
+- 手动运行：`gateway[.exe] --sink tcp --tcp-host 0.0.0.0 --tcp-port 5678`
 - 对端：`python3 -m tools.can_replay bridge --host <本机IP> --port 5678 --interface vcan0`
+
+本机开发测试可使用仓库内独立的 PySide6 监视器，无需安装正式 PC001 对端：
+
+```powershell
+cd tools/pc001_test_client
+uv run --python 3.12 python -m pc001_test_client
+```
+
+它默认连接 `127.0.0.1:5678`，显示每帧 CAN ID、EFF/SFF、DLC、payload、
+channel、实际接收频率和新鲜度。该工具只接收，不参与 Gateway/Godot 正式发行。
 - 未完成 PC001 握手、队列已满或断线时帧会被丢弃并计数；断线自动重等连接，
   旧会话帧不会重放给新客户端。
 - 批帧 ≤100 帧（MAX_BATCH_FRAMES），握手超时 10s，语义与参考实现一致。
+- CSV 的 `CAN通道` 与 PC001 frame 尾部 i32 使用同一映射：CAN3 DBC 和
+  `0x18FFF100` 为 `ch3`/3，CAN4 DBC 为 `ch2`/2，`0x256` 为 `ch0`/0。
 
 ## 关键约定
 
-- **RTK A000-A900 与四个 IMU 角度帧的编码权威 = 随包的批准 DBC**。
+- **随包 CAN3/CAN4 的全部 30 个报文（含 `0x18FFF000`）编码权威 = 批准 DBC**。
   Godot 遥测与 Web 编辑值都调用同一个 hash 绑定的 strict `cantools` codec；
   per-ID authority gate 保证同一 ID 不会交错使用仿真和自定义来源。
 - A800 的 `VelE/VelN/VelU/Vel` 现在和 DBC 一致，固定为小端；QML profile

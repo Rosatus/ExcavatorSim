@@ -11,13 +11,14 @@ import { Switch } from "./components/ui/switch";
 import type { CanConsoleSnapshot, GatewayEvent, GatewayStatus } from "./types";
 import {
   applyCanConsoleRuntimeDelta,
+  applyGatewayRuntimeStatusDelta,
   decodeCanConsoleRuntimeDelta,
   decodeGatewaySocketMessage,
   GatewayApiError,
 } from "./types";
 
 const MAX_VISIBLE_EVENTS = 200;
-const SNAPSHOT_EVENTS = new Set(["transport_reconfigured", "transport_error", "can_console_started", "can_console_stopped", "can_console_message_updated", "can_console_authority_updated", "can_console_profile_imported", "pc001_connected", "pc001_disconnected"]);
+const SNAPSHOT_EVENTS = new Set(["transport_reconfigured", "transport_error", "can_console_started", "can_console_stopped", "can_console_message_updated", "can_console_authority_updated", "can_console_authority_bulk_updated", "can_console_profile_imported", "pc001_connected", "pc001_disconnected"]);
 
 function useTheme(): ["light" | "dark", () => void] {
   const [theme, setTheme] = useState<"light" | "dark">(() => {
@@ -51,10 +52,10 @@ function TransportControl({ status, busy, mutate }: { status: GatewayStatus; bus
   const [port, setPort] = useState(String(status.tcp_port));
   const [confirm, setConfirm] = useState(false);
   useEffect(() => { setHost(status.tcp_host); setPort(String(status.tcp_port)); }, [status.tcp_host, status.tcp_port]);
-  if (status.platform === "windows") {
+  if (status.transport_kind === "tcp") {
     const numericPort = Number(port);
     const valid = host.trim().length > 0 && Number.isInteger(numericPort) && numericPort >= 1 && numericPort <= 65535;
-    return <Card><CardHeader><CardTitle className="flex items-center gap-2"><Router className="h-4 w-4" /> Windows PC001 Server</CardTitle><CardDescription>平台传输配置不会进入可移植 CAN console 配置。</CardDescription></CardHeader><CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end"><label className="flex-1 text-xs text-muted-foreground">监听地址<Input className="mt-1" value={host} onChange={(event) => setHost(event.target.value)} /></label><label className="w-full text-xs text-muted-foreground sm:w-36">端口<Input className="mt-1" type="number" value={port} onChange={(event) => setPort(event.target.value)} /></label><Button disabled={!valid || busy} onClick={() => mutate(() => updateTcp(status, host, numericPort))}><Cable className="h-4 w-4" /> 应用端点</Button></CardContent></Card>;
+    return <Card><CardHeader><CardTitle className="flex items-center gap-2"><Router className="h-4 w-4" /> PC001 TCP Server</CardTitle><CardDescription>Windows / Linux 默认一致；平台传输配置不会进入可移植 CAN console 配置。</CardDescription></CardHeader><CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end"><label className="flex-1 text-xs text-muted-foreground">监听地址<Input className="mt-1" value={host} onChange={(event) => setHost(event.target.value)} /></label><label className="w-full text-xs text-muted-foreground sm:w-36">端口<Input className="mt-1" type="number" value={port} onChange={(event) => setPort(event.target.value)} /></label><Button disabled={!valid || busy} onClick={() => mutate(() => updateTcp(status, host, numericPort))}><Cable className="h-4 w-4" /> 应用端点</Button></CardContent></Card>;
   }
   return <Card><CardHeader><CardTitle className="flex items-center gap-2"><Router className="h-4 w-4" /> Linux can0</CardTitle><CardDescription>固定重配 250 kbit/s、restart-ms=100、txqueuelen=10。</CardDescription></CardHeader><CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><Switch checked={confirm} onChange={setConfirm} label="确认停发并重启 can0" /><Button variant="destructive" disabled={!confirm || busy} onClick={() => mutate(async () => { await restartCan0(status); setConfirm(false); })}><RefreshCw className="h-4 w-4" /> 重启 can0</Button></CardContent></Card>;
 }
@@ -100,6 +101,8 @@ export default function App() {
           const delta = decodeCanConsoleRuntimeDelta(event);
           if (!delta) { void refresh(); return; }
           setConsoleSnapshot((current) => current ? applyCanConsoleRuntimeDelta(current, delta) : current);
+          const runtimeStatus = delta.status;
+          if (runtimeStatus) setStatus((current) => current ? applyGatewayRuntimeStatusDelta(current, runtimeStatus) : current);
         }
         else if (SNAPSHOT_EVENTS.has(event.kind)) void refresh();
       };
@@ -115,7 +118,7 @@ export default function App() {
 
   if (!status || !consoleSnapshot) return <main className="grid min-h-screen place-items-center bg-background text-foreground"><div className="flex items-center gap-3 text-sm text-muted-foreground"><LoaderCircle className="h-5 w-5 animate-spin" /> 正在连接本机 Gateway…</div></main>;
   return <main className="min-h-screen bg-background text-foreground"><div className="mx-auto max-w-[1700px] space-y-5 px-4 py-6 md:px-8">
-    <header className="flex flex-col gap-4 border-b pb-5 md:flex-row md:items-end md:justify-between"><div><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary"><Gauge className="h-4 w-4" /> ExcavatorSim / CAN Gateway</div><h1 className="mt-3 text-3xl font-semibold">本机 CAN 实时控制台</h1><p className="mt-2 text-sm text-muted-foreground">逐 ID 单一发送权威 · 共享编码核心 · TCP / can0 平台固定传输</p></div><div className="flex flex-wrap items-center gap-2"><Badge>{online ? "事件流在线" : "事件流重连"}</Badge><Badge>{status.mode === "standalone" ? "独立启动" : "Godot 托管"}</Badge><Badge>{status.platform}</Badge><Badge>rev {status.revision}</Badge><Button variant="outline" size="icon" onClick={toggleTheme} aria-label="切换明暗主题">{theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</Button></div></header>
+    <header className="flex flex-col gap-4 border-b pb-5 md:flex-row md:items-end md:justify-between"><div><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary"><Gauge className="h-4 w-4" /> ExcavatorSim / CAN Gateway</div><h1 className="mt-3 text-3xl font-semibold">本机 CAN 实时控制台</h1><p className="mt-2 text-sm text-muted-foreground">逐 ID 单一发送权威 · 共享编码核心 · 按当前传输能力控制 TCP / can0</p></div><div className="flex flex-wrap items-center gap-2"><Badge>{online ? "事件流在线" : "事件流重连"}</Badge><Badge>{status.mode === "standalone" ? "独立启动" : "Godot 托管"}</Badge><Badge>{status.platform}</Badge><Badge>rev {status.revision}</Badge><Button variant="outline" size="icon" onClick={toggleTheme} aria-label="切换明暗主题">{theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</Button></div></header>
     {error && <div role="alert" className="flex gap-3 rounded-lg border border-red-500/35 bg-red-500/10 p-4 text-sm text-red-600 dark:text-red-200"><AlertTriangle className="h-5 w-5 shrink-0" /><div><strong>操作未完成</strong><div className="mt-1 font-mono text-xs">{error}</div></div></div>}
     {status.mode === "godot-managed" && <div className="rounded-lg border border-primary/30 bg-primary/10 p-4 text-sm"><strong>Godot 托管会话</strong><p className="mt-1 text-xs text-muted-foreground">可仿真报文默认处于“仿真”。本页允许逐 ID 临时切换关闭或自定义；传输、导入导出和全局 arm 仍由服务端禁止。</p></div>}
     <RuntimeSummary status={status} />

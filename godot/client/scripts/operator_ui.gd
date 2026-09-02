@@ -442,10 +442,9 @@ func _refresh_can_status() -> void:
 		_set_ict_handshake_indicator("unavailable")
 		_timed_can_button.disabled = true
 		return
-	var linux_gw: bool = bridge.is_linux_gateway()
-	if linux_gw:
-		_set_ict_handshake_indicator("not_applicable")
-	elif bridge.is_ict_handshake_connected():
+	# Godot-managed Gateway uses PC001 TCP on Windows and Linux alike.
+	var linux_gw := false
+	if bridge.is_ict_handshake_connected():
 		_set_ict_handshake_indicator("connected")
 	else:
 		_set_ict_handshake_indicator("waiting" if bridge.is_gateway_online() else "offline")
@@ -477,15 +476,14 @@ func _refresh_can_status() -> void:
 			_timed_can_button.disabled = false
 
 
-func _set_ict_button(online: bool, linux_gateway: bool, active: bool, disabled_reason: String) -> void:
+func _set_ict_button(online: bool, _linux_gateway: bool, active: bool, disabled_reason: String) -> void:
 	var usable := online
 	var bridge := _can_bridge()
 	var connecting: bool = bridge != null and bridge.has_method("is_ict_connecting") \
 		and bridge.is_ict_connecting()
 	_ict_button.disabled = not usable
 	_ict_button.tooltip_text = disabled_reason if not usable else (
-		"Linux 网关：自动准备并直发物理 can0" if linux_gateway
-		else "Windows 网关：PC001 TCP %s:%s（对端用 socket_client_to_vcan 桥接）"
+		"PC001 TCP %s:%s（Windows/Linux 默认一致；对端用 socket_client_to_vcan 桥接）"
 			% [_ict_host_edit.text.strip_edges() if not _ict_host_edit.text.strip_edges().is_empty() else "0.0.0.0",
 				_ict_port_edit.text.strip_edges() if not _ict_port_edit.text.strip_edges().is_empty() else "5678"]
 	)

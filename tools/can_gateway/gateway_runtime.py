@@ -354,6 +354,7 @@ class GatewayRuntimeCore:
         self._egress: dict[str, dict[str, Any]] = {}
         self._egress_dirty: set[str] = set()
         self._last_egress_event_s = time.monotonic()
+        self._last_runtime_status_event = self._runtime_status_projection(self._status)
         self._wakeup_read, self._wakeup_write = socket.socketpair()
         self._wakeup_read.setblocking(False)
         self._wakeup_write.setblocking(False)
@@ -540,12 +541,17 @@ class GatewayRuntimeCore:
 
     def flush_console_runtime(self, now_s: float | None = None) -> None:
         current = time.monotonic() if now_s is None else now_s
+        if current < self._last_egress_event_s + 0.05:
+            return
+        status = self.snapshot()
+        status_projection = self._runtime_status_projection(status)
         with self._egress_lock:
-            if current - self._last_egress_event_s < 0.05 or not self._egress_dirty:
+            if not self._egress_dirty and status_projection == self._last_runtime_status_event:
                 return
             dirty = sorted(self._egress_dirty)
             self._egress_dirty.clear()
             self._last_egress_event_s = current
+            self._last_runtime_status_event = status_projection
             rows = {
                 key: self._egress_projection(self._egress[key])
                 for key in dirty
@@ -556,7 +562,30 @@ class GatewayRuntimeCore:
             "transport",
             server_monotonic_s=current,
             rows=rows,
+            status=status_projection,
         )
+
+    @staticmethod
+    def _runtime_status_projection(status: GatewayStatus) -> dict[str, Any]:
+        return {
+            "transport_state": status.transport_state,
+            "transport_detail": status.transport_detail,
+            "recording": status.recording,
+            "timed_can_active": status.timed_can_active,
+            "ict_active": status.ict_active,
+            "periodic_armed": status.periodic_armed,
+            "pc001_handshake": status.pc001_handshake,
+            "pc001_queued_frames": status.pc001_queued_frames,
+            "pc001_sent_frames": status.pc001_sent_frames,
+            "pc001_dropped_frames": status.pc001_dropped_frames,
+            "socketcan_submitted": status.socketcan_submitted,
+            "socketcan_sent": status.socketcan_sent,
+            "socketcan_congestion_dropped": status.socketcan_congestion_dropped,
+            "socketcan_coalesced": status.socketcan_coalesced,
+            "socketcan_terminal_errors": status.socketcan_terminal_errors,
+            "socketcan_pending": status.socketcan_pending,
+            "log_dropped_records": status.log_dropped_records,
+        }
 
     def emit_event(self, kind: str, source: str, **detail: Any) -> GatewayEvent:
         return self.events.append(kind, source, detail)

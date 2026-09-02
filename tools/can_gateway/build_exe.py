@@ -6,17 +6,25 @@ Requires: uv tool run pyinstaller (or pip install pyinstaller in a venv).
 
 from __future__ import annotations
 
+import hashlib
 import subprocess
 import sys
 from pathlib import Path
-from shutil import copy2
-from shutil import which
+from shutil import copy2, which
 
 ROOT = Path(__file__).resolve().parents[2]
 GW_DIR = ROOT / "tools" / "can_gateway"
 DIST = ROOT / "dist" / "can_gateway"
 WEB_DIR = GW_DIR / "web"
 WEB_OUTPUT = GW_DIR / "resources" / "web"
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def build_web() -> bool:
@@ -83,7 +91,12 @@ def main() -> int:
     adjacent_dbc = DIST / "dbc"
     adjacent_dbc.mkdir(parents=True, exist_ok=True)
     for source in sorted((GW_DIR / "resources" / "dbc").glob("*.dbc")):
-        copy2(source, adjacent_dbc / source.name)
+        destination = adjacent_dbc / source.name
+        # A running packaged gateway or scanner may hold an adjacent DBC open
+        # on Windows. An already byte-identical file needs no replacement.
+        if destination.is_file() and _sha256(source) == _sha256(destination):
+            continue
+        copy2(source, destination)
     print(f"\nbuilt: {DIST / 'gateway.exe'}")
     return 0
 

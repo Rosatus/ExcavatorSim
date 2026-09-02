@@ -23,6 +23,7 @@ from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
 
+from can_channel import CanChannel, channel_number
 from sinks import pack_can_frame
 
 CAN_FRAME_SIZE = 16
@@ -118,14 +119,19 @@ class TcpPc001Sink:
                 dropped_disconnect=self._dropped_disconnect,
             )
 
-    def append(self, can_id: int, payload: bytes) -> None:
-        self.submit(can_id, payload, source="unknown", family="unknown")
+    def append(
+        self, can_id: int, payload: bytes, channel: CanChannel = "ch0"
+    ) -> None:
+        self.submit(
+            can_id, payload, channel=channel, source="unknown", family="unknown"
+        )
 
     def submit(
         self,
         can_id: int,
         payload: bytes,
         *,
+        channel: CanChannel = "ch0",
         source: str,
         family: str,
         is_extended: bool | None = None,
@@ -145,7 +151,7 @@ class TcpPc001Sink:
                 return
             self._pending.append(
                 _PendingFrame(
-                    frame + CHANNEL_STRUCT.pack(0),
+                    frame + CHANNEL_STRUCT.pack(channel_number(channel)),
                     source,
                     family,
                     raw_id,

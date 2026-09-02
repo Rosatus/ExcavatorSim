@@ -1,7 +1,5 @@
 VERSION ""
-
-
-NS_ : 
+NS_ :
 	NS_DESC_
 	CM_
 	BA_DEF_
@@ -22,7 +20,6 @@ NS_ :
 	SIG_GROUP_
 	SIG_VALTYPE_
 	SIGTYPE_VALTYPE_
-	BO_TX_BU_
 	BA_DEF_REL_
 	BA_REL_
 	BA_DEF_DEF_REL_
@@ -33,91 +30,114 @@ NS_ :
 
 BS_:
 
-BU_: IMU_BODY P_Box IMU_BOOM IMU_ARM IMU_BUCKET
-
+BU_: IMU_BODY P_Box IMU_BOOM IMU_ARM IMU_BUCKET Controller IMU_ROTATE IMU_SWING IMU_BOOM2
 
 BO_ 2566863360 MSG_18FF3A00: 8 IMU_BODY
- SG_ reversed_56 : 56|8@1+ (1,0) [0|255] ""  P_Box
- SG_ reversed : 48|8@1+ (1,-75) [-75|180] "℃/摄氏度"  P_Box
- SG_ Yaw_Angle : 32|16@1+ (0.01,-180.0) [-180.0|475.35] "°/度"  P_Box
- SG_ Roll_Angle : 16|16@1+ (0.01,-180.0) [-180.0|475.35] "°/度"  P_Box
- SG_ Pitch_Angle : 0|16@1+ (0.01,-180.0) [-180.0|475.35] "°/度"  P_Box
+ SG_ reversed_56 : 56|8@1+ (1,0) [0|255] "" Controller
+ SG_ temp : 48|8@1+ (1,-75) [-75|180] "℃/摄氏度" Controller
+ SG_ Yaw_Angle : 32|16@1+ (0.01,-180) [-180|475.35] "°/度" Controller
+ SG_ Roll_Angle : 16|16@1+ (0.01,-180) [-180|475.35] "°/度" Controller
+ SG_ Pitch_Angle : 0|16@1+ (0.01,-180) [-180|475.35] "°/度" Controller
 
 BO_ 2566859264 MSG_18FF2A00: 8 IMU_BODY
- SG_ reversed : 56|8@1+ (1,0) [0|255] ""  P_Box
- SG_ Acc_Z : 32|16@1+ (0.001,-32.0) [-32.0|33.535] "g/重力加速度"  P_Box
- SG_ Acc_Y : 16|16@1+ (0.001,-32.0) [-32.0|33.535] "g/重力加速度"  P_Box
- SG_ Acc_X : 0|16@1+ (0.001,-32.0) [-32.0|33.535] "g/重力加速度"  P_Box
+ SG_ reversed : 56|8@1+ (1,0) [0|255] "" Controller
+ SG_ Acc_Z : 32|16@1+ (0.001,-32) [-32|33.535] "g/重力加速度" Controller
+ SG_ Acc_Y : 16|16@1+ (0.001,-32) [-32|33.535] "g/重力加速度" Controller
+ SG_ Acc_X : 0|16@1+ (0.001,-32) [-32|33.535] "g/重力加速度" Controller
+ SG_ temp : 48|8@1+ (1,0) [0|255] "℃/摄氏度" Controller
 
 BO_ 2566855168 MSG_18FF1A00: 8 IMU_BODY
- SG_ reversed : 56|8@1+ (1,0) [0|255] ""  P_Box
- SG_ Gyro_Z : 32|16@1+ (0.01,-320.0) [-320.0|335.35] "度/秒 °/S"  P_Box
- SG_ Gyro_Y : 16|16@1+ (0.01,-320.0) [-320.0|335.35] "度/秒 °/S"  P_Box
- SG_ Gyro_X : 0|16@1+ (0.01,-320.0) [-320.0|335.35] "度/秒 °/S"  P_Box
+ SG_ reversed : 56|8@1+ (1,0) [0|255] "" Controller
+ SG_ Gyro_Z : 32|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S" Controller
+ SG_ Gyro_Y : 16|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S" Controller
+ SG_ Gyro_X : 0|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S" Controller
+ SG_ temp : 48|8@1+ (1,0) [0|255] "℃/摄氏度" Controller
 
 BO_ 2566863616 MSG_18FF3B00: 8 IMU_BOOM
- SG_ reversed_56 : 56|8@1+ (1,0) [0|255] ""  P_Box
- SG_ reversed : 48|8@1+ (1,-75) [-75|180] "℃/摄氏度"  P_Box
- SG_ Yaw_Angle : 32|16@1+ (0.01,-180.0) [-180.0|475.35] "°/度"  P_Box
- SG_ Roll_Angle : 16|16@1+ (0.01,-180.0) [-180.0|475.35] "°/度"  P_Box
- SG_ Pitch_Angle : 0|16@1+ (0.01,-180.0) [-180.0|475.35] "°/度"  P_Box
+ SG_ reversed_56 : 56|8@1+ (1,0) [0|255] "" Controller
+ SG_ temp : 48|8@1+ (1,-75) [-75|180] "℃/摄氏度" Controller
+ SG_ Yaw_Angle : 32|16@1+ (0.01,-180) [-180|475.35] "°/度" Controller
+ SG_ Roll_Angle : 16|16@1+ (0.01,-180) [-180|475.35] "°/度" Controller
+ SG_ Pitch_Angle : 0|16@1+ (0.01,-180) [-180|475.35] "°/度" Controller
 
 BO_ 2566859520 MSG_18FF2B00: 8 IMU_BOOM
- SG_ reversed : 56|8@1+ (1,0) [0|255] ""  P_Box
- SG_ Acc_Z : 32|16@1+ (0.001,-32.0) [-32.0|33.535] "g/重力加速度"  P_Box
- SG_ Acc_Y : 16|16@1+ (0.001,-32.0) [-32.0|33.535] "g/重力加速度"  P_Box
- SG_ Acc_X : 0|16@1+ (0.001,-32.0) [-32.0|33.535] "g/重力加速度"  P_Box
+ SG_ reversed : 56|8@1+ (1,0) [0|255] "" Controller
+ SG_ Acc_Z : 32|16@1+ (0.001,-32) [-32|33.535] "g/重力加速度" Controller
+ SG_ Acc_Y : 16|16@1+ (0.001,-32) [-32|33.535] "g/重力加速度" Controller
+ SG_ Acc_X : 0|16@1+ (0.001,-32) [-32|33.535] "g/重力加速度" Controller
+ SG_ temp : 48|8@1+ (1,0) [0|255] "℃/摄氏度" Controller
 
 BO_ 2566855424 MSG_18FF1B00: 8 IMU_BOOM
- SG_ reversed : 56|8@1+ (1,0) [0|255] ""  P_Box
- SG_ Gyro_Z : 32|16@1+ (0.01,-320.0) [-320.0|335.35] "度/秒 °/S"  P_Box
- SG_ Gyro_Y : 16|16@1+ (0.01,-320.0) [-320.0|335.35] "度/秒 °/S"  P_Box
- SG_ Gyro_X : 0|16@1+ (0.01,-320.0) [-320.0|335.35] "度/秒 °/S"  P_Box
+ SG_ reversed : 56|8@1+ (1,0) [0|255] "" Controller
+ SG_ Gyro_Z : 32|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S" Controller
+ SG_ Gyro_Y : 16|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S" Controller
+ SG_ Gyro_X : 0|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S" Controller
+ SG_ temp : 48|8@1+ (1,0) [0|255] "℃/摄氏度" Controller
 
 BO_ 2566863872 MSG_18FF3C00: 8 IMU_ARM
- SG_ reversed_56 : 56|8@1+ (1,0) [0|255] ""  P_Box
- SG_ reversed : 48|8@1+ (1,-75) [-75|180] "℃/摄氏度"  P_Box
- SG_ Yaw_Angle : 32|16@1+ (0.01,-180.0) [-180.0|475.35] "°/度"  P_Box
- SG_ Roll_Angle : 16|16@1+ (0.01,-180.0) [-180.0|475.35] "°/度"  P_Box
- SG_ Pitch_Angle : 0|16@1+ (0.01,-180.0) [-180.0|475.35] "°/度"  P_Box
+ SG_ reversed_56 : 56|8@1+ (1,0) [0|255] "" Controller
+ SG_ temp : 48|8@1+ (1,-75) [-75|180] "℃/摄氏度" Controller
+ SG_ Yaw_Angle : 32|16@1+ (0.01,-180) [-180|475.35] "°/度" Controller
+ SG_ Roll_Angle : 16|16@1+ (0.01,-180) [-180|475.35] "°/度" Controller
+ SG_ Pitch_Angle : 0|16@1+ (0.01,-180) [-180|475.35] "°/度" Controller
 
 BO_ 2566859776 MSG_18FF2C00: 8 IMU_ARM
- SG_ reversed : 56|8@1+ (1,0) [0|255] ""  P_Box
- SG_ Acc_Z : 32|16@1+ (0.001,-32.0) [-32.0|33.535] "g/重力加速度"  P_Box
- SG_ Acc_Y : 16|16@1+ (0.001,-32.0) [-32.0|33.535] "g/重力加速度"  P_Box
- SG_ Acc_X : 0|16@1+ (0.001,-32.0) [-32.0|33.535] "g/重力加速度"  P_Box
+ SG_ reversed : 56|8@1+ (1,0) [0|255] "" Controller
+ SG_ Acc_Z : 32|16@1+ (0.001,-32) [-32|33.535] "g/重力加速度" Controller
+ SG_ Acc_Y : 16|16@1+ (0.001,-32) [-32|33.535] "g/重力加速度" Controller
+ SG_ Acc_X : 0|16@1+ (0.001,-32) [-32|33.535] "g/重力加速度" Controller
+ SG_ temp : 48|8@1+ (1,0) [0|255] "℃/摄氏度" Controller
 
 BO_ 2566855680 MSG_18FF1C00: 8 IMU_ARM
- SG_ reversed : 56|8@1+ (1,0) [0|255] ""  P_Box
- SG_ Gyro_Z : 32|16@1+ (0.01,-320.0) [-320.0|335.35] "度/秒 °/S"  P_Box
- SG_ Gyro_Y : 16|16@1+ (0.01,-320.0) [-320.0|335.35] "度/秒 °/S"  P_Box
- SG_ Gyro_X : 0|16@1+ (0.01,-320.0) [-320.0|335.35] "度/秒 °/S"  P_Box
+ SG_ reversed : 56|8@1+ (1,0) [0|255] "" Controller
+ SG_ Gyro_Z : 32|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S" Controller
+ SG_ Gyro_Y : 16|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S" Controller
+ SG_ Gyro_X : 0|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S" Controller
+ SG_ temp : 48|8@1+ (1,0) [0|255] "℃/摄氏度" Controller
 
 BO_ 2566864128 MSG_18FF3D00: 8 IMU_BUCKET
- SG_ reversed_56 : 56|8@1+ (1,0) [0|255] ""  P_Box
- SG_ reversed : 48|8@1+ (1,-75) [-75|180] "℃/摄氏度"  P_Box
- SG_ Yaw_Angle : 32|16@1+ (0.01,-180.0) [-180.0|475.35] "°/度"  P_Box
- SG_ Roll_Angle : 16|16@1+ (0.01,-180.0) [-180.0|475.35] "°/度"  P_Box
- SG_ Pitch_Angle : 0|16@1+ (0.01,-180.0) [-180.0|475.35] "°/度"  P_Box
+ SG_ reversed_56 : 56|8@1+ (1,0) [0|255] "" Controller
+ SG_ temp : 48|8@1+ (1,-75) [-75|180] "℃/摄氏度" Controller
+ SG_ Yaw_Angle : 32|16@1+ (0.01,-180) [-180|475.35] "°/度" Controller
+ SG_ Roll_Angle : 16|16@1+ (0.01,-180) [-180|475.35] "°/度" Controller
+ SG_ Pitch_Angle : 0|16@1+ (0.01,-180) [-180|475.35] "°/度" Controller
 
 BO_ 2566860032 MSG_18FF2D00: 8 IMU_BUCKET
- SG_ reversed : 56|8@1+ (1,0) [0|255] ""  P_Box
- SG_ Acc_Z : 32|16@1+ (0.001,-32.0) [-32.0|33.535] "g/重力加速度"  P_Box
- SG_ Acc_Y : 16|16@1+ (0.001,-32.0) [-32.0|33.535] "g/重力加速度"  P_Box
- SG_ Acc_X : 0|16@1+ (0.001,-32.0) [-32.0|33.535] "g/重力加速度"  P_Box
+ SG_ reversed : 56|8@1+ (1,0) [0|255] "" Controller
+ SG_ Acc_Z : 32|16@1+ (0.001,-32) [-32|33.535] "g/重力加速度" Controller
+ SG_ Acc_Y : 16|16@1+ (0.001,-32) [-32|33.535] "g/重力加速度" Controller
+ SG_ Acc_X : 0|16@1+ (0.001,-32) [-32|33.535] "g/重力加速度" Controller
+ SG_ temp : 48|8@1+ (1,0) [0|255] "℃/摄氏度" Controller
 
 BO_ 2566855936 MSG_18FF1D00: 8 IMU_BUCKET
- SG_ reversed : 56|8@1+ (1,0) [0|255] ""  P_Box
- SG_ Gyro_Z : 32|16@1+ (0.01,-320.0) [-320.0|335.35] "度/秒 °/S"  P_Box
- SG_ Gyro_Y : 16|16@1+ (0.01,-320.0) [-320.0|335.35] "度/秒 °/S"  P_Box
- SG_ Gyro_X : 0|16@1+ (0.01,-320.0) [-320.0|335.35] "度/秒 °/S"  P_Box
+ SG_ reversed : 56|8@1+ (1,0) [0|255] "" P_Box
+ SG_ Gyro_Z : 32|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S" Controller
+ SG_ Gyro_Y : 16|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S" Controller
+ SG_ Gyro_X : 0|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S" Controller
+ SG_ temp : 48|8@1+ (1,0) [0|255] "℃/摄氏度" Controller
 
+BO_ 2566909952 MSG_18FFF000: 8 IMU_ROTATE
+ SG_ ROTATE : 0|16@1+ (0.0054931640625,0) [0|359.9945068359375] "°/度" Controller
 
+BO_ 2566864384 MSG_18FF3E00: 8 IMU_SWING
+ SG_ SWING : 0|16@1- (0.01,0) [-327.68|327.67] "°/度" Controller
 
+BO_ 2566864640 MSG_18FF3F00: 8 IMU_BOOM2
+ SG_ Gyro_X : 0|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S" Controller
+ SG_ Gyro_Y : 16|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S" Controller
+ SG_ Gyro_Z : 32|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S" Controller
+ SG_ Reserved_Temperature : 48|8@1+ (1,0) [0|255] "raw" Controller
+
+CM_ BO_ 2566909952 "回转传感器；CAN ID=0x18FFF000；按旧协议 DLC=2；顺时针方向角度增大。";
+CM_ SG_ 2566909952 ROTATE "回转角；物理值=raw×360/65536。";
+CM_ BO_ 2566864384 "偏摆传感器；CAN ID=0x18FF3E00；按旧协议 DLC=2；右偏为正、左偏为负。";
+CM_ SG_ 2566864384 SWING "有符号偏摆角；物理值=int16(raw)×0.01。";
+CM_ BO_ 2566864640 "双节臂 IMU；CAN ID=0x18FF3F00，当前业务不解析。";
+CM_ SG_ 2566864640 Reserved_Temperature "温度换算关系未定义，仅保留原始字节。";
 
 CM_ BO_ 2566863360 "channel=can3";
 CM_ SG_ 2566863360 reversed_56 "状态标志位（Flag）预留 b1b0=00：角度帧；b3b2=00：自检成功 / 双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
-CM_ SG_ 2566863360 reversed "温度值预留";
+CM_ SG_ 2566863360 temp "温度值预留";
 CM_ SG_ 2566863360 Yaw_Angle "Z 轴（YAW 方位角）";
 CM_ SG_ 2566863360 Roll_Angle "X 轴（ROLL 横滚角）";
 CM_ SG_ 2566863360 Pitch_Angle "Y 轴（PITCH 俯仰角）";
@@ -176,10 +196,3 @@ CM_ SG_ 2566855936 reversed "b1b0=00：陀螺帧；b3b2=00：自检成功 /，�
 CM_ SG_ 2566855936 Gyro_Z "Z轴陀螺大小";
 CM_ SG_ 2566855936 Gyro_Y "Y轴陀螺大小";
 CM_ SG_ 2566855936 Gyro_X "X 轴陀螺大小";
-
-
-
-
-
-
-

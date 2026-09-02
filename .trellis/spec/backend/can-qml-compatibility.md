@@ -43,9 +43,9 @@ must remain byte-compatible.
   `(boomPhi, armPhi + 180 degrees, bktPhi + 180 degrees)`. Therefore the SY135
   Godot neutral relations `(+35, -90, -50)` require QML neutral targets
   `(+35, +90, +130)` before joint deltas are added.
-- QML profile frames use the reference parser's mixed endian contract: A800
-  velocity components are signed big-endian; the remaining supported RTK and
-  IMU/work-equipment payload fields retain their documented byte order.
+- QML profile math owns physical projection, but the approved DBC owns wire
+  layout in every profile. A800 `VelE/VelN/VelU/Vel` are signed little-endian;
+  there is no compatibility-profile byte-order exception.
 - Raw CAN IDs above `0x7ff` are packed with `CAN_EFF_FLAG`; standard IDs such as
   travel `0x256` remain standard. Already flagged valid extended IDs are
   preserved.
@@ -94,8 +94,8 @@ or work-equipment family.
   rotation with the corresponding Godot adjacent-frame relation. A
   `Sensor2Ang` inverse/forward round-trip alone is insufficient because it can
   prove a wrong neutral alignment self-consistent.
-- Encoder tests decode payload bytes using the reference `ProtocolParser`
-  endianness, including an explicit A800 signed big-endian assertion.
+- Encoder tests compare against strict cantools encoding from the approved DBC,
+  including an explicit A800 signed little-endian assertion in profile mode.
 - SocketCAN and PC001 tests cover extended IDs A900 and the four Ruifen IDs plus
   standard travel ID `0x256`.
 - Godot headless tests compare authoritative post-step transforms,
@@ -112,9 +112,9 @@ convention, or compare only decoded CAN numbers. Correct: trace the entire QML
 parser/service/calibration/kinematics composition and implement its mathematical
 inverse.
 
-Wrong: treat all Sinan RTK payloads as one byte order. Correct: encode A800 as
-signed big-endian in QML profile mode while preserving the field-specific order
-of the other frames and all legacy behavior.
+Wrong: let the compatibility mapper override A800 byte order. Correct: the
+mapper projects physical values and the shared DBC codec alone encodes the
+little-endian A800 wire payload.
 
 Wrong: emit frames as each field is calculated and silently recover with legacy
 values. Correct: validate and pre-encode the whole due family, then append it

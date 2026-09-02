@@ -449,9 +449,11 @@ selected authority, expected frequency, capabilities, and runtime egress project
 - The tracker keeps last payload/decoded values and at most 10 successful monotonic
   timestamps per canonical ID. Actual Hz is null before two samples, otherwise
   `(n-1)/(last-first)`. Authority change clears rate samples but retains last payload.
-- Dirty row runtime state is emitted in one typed `can_console_runtime` batch at most every
-  50 ms over the existing sequence/gap-aware WebSocket. React uses one shared 50 ms ticker
-  to advance freshness; components do not create per-row timers or parse raw event fields.
+- Dirty row runtime state and changed Gateway runtime counters are emitted in one typed
+  `can_console_runtime` batch at most every 50 ms over the existing sequence/gap-aware
+  WebSocket. React applies its typed status projection to the runtime summary and uses one
+  shared 50 ms ticker to advance freshness; components do not create per-row timers, add
+  high-frequency HTTP polling, or parse raw event fields.
 - Portable import is full-profile replacement. It requires exact top-level/message field
   allowlists, format/schema/catalog/descriptor fingerprints, all catalog keys, exact DLC,
   off/custom authority and integer frequency. Candidate validation and atomic persistence
@@ -516,4 +518,113 @@ Correct: SocketCAN send() / TCP sendall() returns -> egress tracker -> bounded W
 
 Wrong: managed mode hides buttons in React but accepts forbidden server mutations
 Correct: React reflects capability -> HTTP allowlist rejects forbidden endpoints -> owner loop mutates rows only
+```
+
+## Scenario: DBC-v2 channel projection and cross-platform TCP default
+
+This scenario supersedes older clauses in this file that described Linux
+SocketCAN as the product default, treated `0x18FFF000` as native, let timed CAN
+bypass authority, or named console schemas 3/1.
+
+### 1. Scope / Trigger
+
+Use this contract when changing the approved DBC bundle, CAN occurrence metadata,
+CSV/PC001 sinks, CLI/Godot transport selection, console authority, persistence, or
+the React bulk controls. It prevents one payload from acquiring different channel,
+authority, or transport semantics in different layers.
+
+### 2. Signatures
+
+```text
+CanChannel = ch0 | ch2 | ch3
+append_frame(sink, can_id, payload, *, channel, source, family, generation?, is_extended?)
+
+PUT /api/v1/can-console/authority
+body = {authority: off|custom|simulation, expected_revision: int, request_id?: string}
+result = {authority: string, forced_off: string[], status: GatewayStatus}
+
+portable format = excavatorsim-can-console, schema_version=2
+internal store = can-console.json, schema_version=4
+```
+
+CLI default is `--sink tcp` on Windows and Linux. Linux direct CAN exists only as
+explicit `--sink socketcan --interface can0` low-latency compatibility mode and is
+temporarily unmaintained.
+
+### 3. Contracts
+
+- The hash-bound approved CAN3/CAN4 bundle contains 30 DBC identities. All of
+  them, including `0x18FFF000`, use `DbcCodec`; only `0x18FFF100` and `0x256`
+  have native descriptors.
+- Channel is one narrow value carried from descriptor/producer into every sink:
+  CAN3 and `0x18FFF100`=`ch3`, CAN4=`ch2`, `0x256`=`ch0`. CSV writes the text;
+  PC001 writes trailing little-endian i32 `3/2/0`. PC001 handshake, batch prefix,
+  16-byte CAN frame, EFF, DLC and payload bytes do not change.
+- A DBC message must provide one non-conflicting CAN3/CAN4 family indication.
+  Missing/conflicting evidence fails catalog parsing; code must not guess a
+  channel from arbitration-ID ranges.
+- Web transport mutations are gated by active `transport_kind`, never host OS.
+  TCP rebind is available for standalone TCP on both platforms; can0 restart is
+  available only in standalone explicit SocketCAN mode. Default Linux startup
+  must not inspect/configure can0 or invoke its helper.
+- `0x18FFF100` is a channel-ch3 EFF/DLC-8 row with no physical signals. Off
+  rejects CTNC command 6 and custom scheduling; custom continuously schedules
+  the saved exact-DLC payload at integer 1..100 Hz; simulation admits the fixed
+  payload 50 Hz / 10 second / at-most-500 burst with replacement retrigger and
+  no catch-up.
+- The bulk endpoint is one owner-loop transaction: one revision check, one
+  schedule rebuild/purge, one persistence, one event/revision. Managed
+  all-simulation sets capable rows including `0x18FFF100` to simulation and
+  returns unsupported rows in `forced_off`; standalone all-simulation fails
+  before mutation.
+- Schema-3 internal and schema-1 explicitly imported portable records migrate
+  only when descriptor compatibility is proven. New/incompatible rows use mode
+  defaults and emit an aggregate migrated/reset/added/removed notice. Legacy
+  operator `dbc-config.json` remains schema 2 and safely misses SHA-bound keys.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| DBC source has missing/conflicting CAN family evidence | catalog parse failure; no sendable row |
+| Unknown logical channel | reject before CSV/PC001 projection |
+| Standalone single/bulk simulation | `409 console_simulation_unavailable`; zero mutation |
+| Timed command while row is off/custom | ignore with stable aggregate diagnostic; emit zero timed frames |
+| Bulk revision stale or persistence fails | zero partial row changes; preserve previous schedule |
+| TCP endpoint called for SocketCAN, or can0 endpoint called for TCP | `409 capability_unavailable` |
+| Schema/descriptor incompatible | safe mode default plus aggregate reset notice |
+
+### 5. Good / Base / Bad Cases
+
+- Good: one mixed PC001 batch contains a CAN3 frame with channel 3, CAN4 with 2,
+  and travel with 0 while each CAN frame's original bytes remain unchanged.
+- Base: Linux starts without special parameters, binds PC001 TCP, and executes no
+  can0 readiness/helper code.
+- Good: managed “all simulation” includes timed CAN but closes unsupported DBC
+  rows and reports their keys once.
+- Bad: React loops per-row mutations, a sink infers channel from ID, or command 6
+  emits timed CAN while the row is custom/off.
+
+### 6. Tests Required
+
+- DBC/hash tests assert exact approved hashes, 30 messages, channel evidence,
+  duplicate collapse, `0x18FFF000` DLC-8 little-endian and A800 little-endian.
+- Sink tests assert CSV channel text and PC001 i32 `0/2/3` in single and mixed
+  batches while CAN-frame bytes and EFF remain byte-exact.
+- CLI/process and Godot argv tests assert both platforms default TCP and spy that
+  default Linux performs zero can0/helper calls; explicit SocketCAN remains.
+- Console/API tests cover timed three-state gating, bulk atomicity/forced-off,
+  schema 3/1 migration, schema 4/2 round trips and persistence rollback.
+- Frontend tests cover channel column, three bulk buttons, forced-off summary and
+  raw-only timed editing. Run fast code checks during development; run the full
+  Python/React/Godot matrix once after implementation stabilizes.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: OS -> transport controls; CAN ID -> guessed channel; timed -> bypass gate
+Correct: active sink -> capability; descriptor -> channel; authority -> every producer
+
+Wrong: one React request per row -> partial bulk state and many revisions
+Correct: one bulk API -> one owner transaction -> one snapshot event
 ```

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import cantools
+from can_channel import CanChannel, dbc_channel
 from cantools.database.errors import DecodeError, EncodeError
 from gateway_runtime import GatewayRuntimeError
 from platformdirs import user_config_path
@@ -25,8 +26,8 @@ MAX_FREQUENCY_HZ = 100
 CAN_BITRATE = 250_000
 DBC_CONFIG_SCHEMA = 2
 PROTOCOL_DBC_HASHES = {
-    "can3.sy135c.dbc": "c589bcaeda9b58a87e7b0ed920b7fbb55b86942341f4126d44f7f5017a7c4a44",
-    "can4.sy135c.dbc": "cb71e5bec346940e84f1a24e7e3c6d6ef7191545e8f7b1dbba10a241174234f7",
+    "can3.sy135c.dbc": "dc48542fda0ad369a3a30d0d13e74df1cdcc4c9bab71f01e9be3e56df99e7b58",
+    "can4.sy135c.dbc": "fe7dd152c256b8c3d1999792fad66e8872d08d1053c56c51a2272f2978a5e3c1",
 }
 RTK_FRAME_IDS = tuple(0x0CFDA000 + offset * 0x100 for offset in range(10))
 IMU_ANGLE_FRAME_IDS = (0x18FF3A00, 0x18FF3B00, 0x18FF3C00, 0x18FF3D00)
@@ -72,6 +73,7 @@ class DbcMessageDefinition:
     frame_id: int
     is_extended: bool
     length: int
+    channel: CanChannel
     signals: tuple[DbcSignalDefinition, ...]
 
     @property
@@ -162,7 +164,9 @@ def _signal_definition(signal: Any) -> DbcSignalDefinition:
     )
 
 
-def _message_definition(message: Any, content_hash: str) -> DbcMessageDefinition:
+def _message_definition(
+    message: Any, content_hash: str, source_name: str
+) -> DbcMessageDefinition:
     signals = tuple(_signal_definition(signal) for signal in message.signals)
     layout = json.dumps(
         {
@@ -184,6 +188,7 @@ def _message_definition(message: Any, content_hash: str) -> DbcMessageDefinition
         frame_id=message.frame_id,
         is_extended=message.is_extended_frame,
         length=message.length,
+        channel=dbc_channel(message.comment, source_name),
         signals=signals,
     )
 
@@ -260,7 +265,8 @@ class DbcCatalog:
                 text, encoding = _decode_dbc_text(content_bytes[digest])
                 database = cantools.database.load_string(text, database_format="dbc", strict=True)
                 message_pairs = [
-                    (_message_definition(message, digest), message) for message in database.messages
+                    (_message_definition(message, digest, Path(sources[0]).name), message)
+                    for message in database.messages
                 ]
                 message_pairs.sort(
                     key=lambda pair: (
@@ -1003,7 +1009,7 @@ def encode_godot_imu(codec: DbcCodec, frame_id: int, slot_counts: Iterable[int])
         "Pitch_Angle": counts[0] * 0.01 - 180.0,
         "Roll_Angle": counts[1] * 0.01 - 180.0,
         "Yaw_Angle": counts[2] * 0.01 - 180.0,
-        "reversed": -75.0,
+        "temp": 0.0,
         "reversed_56": 0.0,
     }
     return codec.encode_frame(frame_id, values)

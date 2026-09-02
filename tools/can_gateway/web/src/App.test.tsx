@@ -62,6 +62,7 @@ const row: CanConsoleMessage = {
     frame_id_hex: "0xCFDA800",
     is_extended: true,
     length: 8,
+    channel: "ch2",
     signals: [signal],
     descriptor_fingerprint: "fingerprint",
     kind: "dbc",
@@ -90,6 +91,7 @@ const consoleSnapshot: CanConsoleSnapshot = {
   custom_armed: false,
   server_monotonic_s: 100,
   messages: [row],
+  notices: [],
   load: { bitrate: 250000, estimated_bits_per_second: 8000, percent: 72, level: "yellow", warning: true, caveat: "informational" },
 };
 
@@ -197,6 +199,17 @@ describe("CAN console", () => {
     const fetchCount = vi.mocked(fetch).mock.calls.length;
     MockWebSocket.instances.at(-1)!.emit({ type: "event", event: { sequence: 1, timestamp: "2026-08-31T00:00:00", monotonic_s: 101, kind: "can_console_runtime", source: "transport", detail: { server_monotonic_s: 101, rows: { [row.key]: { ...row.runtime, actual_frequency_hz: 25, last_egress_monotonic_s: 101 } } } } });
     expect(await screen.findByText("25.000 Hz")).toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls).toHaveLength(fetchCount);
+  });
+
+  it("updates the runtime summary from the realtime status delta", async () => {
+    installFetch();
+    render(<App />);
+    await screen.findByText("12 / 0");
+    const fetchCount = vi.mocked(fetch).mock.calls.length;
+    MockWebSocket.instances.at(-1)!.emit({ type: "event", event: { sequence: 1, timestamp: "2026-08-31T00:00:00", monotonic_s: 101, kind: "can_console_runtime", source: "transport", detail: { server_monotonic_s: 101, rows: {}, status: { transport_state: "ready", transport_detail: "tcp:127.0.0.1:5678", recording: false, timed_can_active: false, ict_active: true, periodic_armed: false, pc001_handshake: false, pc001_queued_frames: 0, pc001_sent_frames: 13, pc001_dropped_frames: 456823, socketcan_submitted: 0, socketcan_sent: 0, socketcan_congestion_dropped: 0, socketcan_coalesced: 0, socketcan_terminal_errors: 0, socketcan_pending: 0, log_dropped_records: 0 } } } });
+    expect(await screen.findByText("13 / 456823")).toBeInTheDocument();
+    expect(screen.getByText("等待客户端")).toBeInTheDocument();
     expect(vi.mocked(fetch).mock.calls).toHaveLength(fetchCount);
   });
 

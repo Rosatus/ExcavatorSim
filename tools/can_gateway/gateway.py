@@ -20,7 +20,15 @@ from collections.abc import Callable
 from pathlib import Path
 
 from can0_setup import CAN_INTERFACE, Can0SetupError, prepare_can0, restart_can0
+from can_channel import CanChannel
 from can_console import CanConsoleRuntime, canonical_can_key
+from can_special_frames import (
+    TIMED_CAN_CHANNEL,
+    TIMED_CAN_FREQUENCY_HZ,
+    TIMED_CAN_ID,
+    TIMED_CAN_PAYLOAD,
+    TRAVEL_CAN_CHANNEL,
+)
 from control_protocol import (
     CMD_ICT_START,
     CMD_ICT_STOP,
@@ -58,7 +66,6 @@ from dbc_engine import (
     encode_godot_rtk,
     load_protocol_codec,
 )
-from encoders.dxg_slew import encode_slew_frame
 from encoders.ruifen_imu import RUFINEN_IDS
 from encoders.travel_pilot import encode_travel_frame
 from gateway_runtime import (
@@ -78,9 +85,7 @@ from vcan_setup import VcanSetupError, ensure_vcan_interface
 PACKET_MAGIC = 0x314E5443
 HEARTBEAT_INTERVAL_S = 0.5
 RECEIVE_POLL_LIMIT_S = 0.05
-TIMED_CAN_ID = 0x18FFF100
-TIMED_CAN_PAYLOAD = bytes.fromhex("01 00 00 00 00 00 00 00")
-TIMED_CAN_PERIOD_S = 1.0 / 50.0
+TIMED_CAN_PERIOD_S = 1.0 / TIMED_CAN_FREQUENCY_HZ
 TIMED_CAN_DURATION_S = 10.0
 TIMED_CAN_FRAME_COUNT = 500
 _PROTOCOL_CODEC: DbcCodec | None = None
@@ -98,6 +103,7 @@ def append_frame(
     can_id: int,
     payload: bytes,
     *,
+    channel: CanChannel,
     source: str,
     family: str,
     generation: int | None = None,
@@ -107,6 +113,7 @@ def append_frame(
         sink.submit(
             can_id,
             payload,
+            channel=channel,
             source=source,
             family=family,
             generation=generation,
@@ -116,12 +123,13 @@ def append_frame(
         sink.submit(
             can_id,
             payload,
+            channel=channel,
             source=source,
             family=family,
             is_extended=is_extended,
         )
     else:
-        sink.append(can_id, payload)
+        sink.append(can_id, payload, channel)
 
 
 class FrameScheduler:
@@ -196,6 +204,7 @@ class TimedCanBurst:
                 sink,
                 TIMED_CAN_ID,
                 TIMED_CAN_PAYLOAD,
+                channel=TIMED_CAN_CHANNEL,
                 source="timed",
                 family="timed",
                 generation=self._generation,
@@ -280,6 +289,7 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
             **{can_id: float(args.rtk_hz) for can_id in range(0x0CFDA000, 0x0CFDAA00, 0x100)},
             0x18FFF000: float(args.slew_hz),
             0x256: float(args.travel_hz),
+            TIMED_CAN_ID: float(TIMED_CAN_FREQUENCY_HZ),
         }
         can_console = CanConsoleRuntime(
             operator_dbc,
@@ -520,8 +530,15 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
             ict_sink,
             can_id,
             payload,
+            channel=console_entry.channel
+            if console_entry is not None
+            else operator_dbc.codec.messages[_key].channel,
             source="web",
-            family="dbc",
+            family=(
+                "dbc"
+                if console_entry is None or console_entry.dbc_key is not None
+                else "native"
+            ),
             is_extended=is_extended,
         )
         observe_web(can_id, payload)
@@ -763,6 +780,11 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                     can_console.entries.get(key).authority if key in can_console.entries else None
                 )
                 updated = can_console.set_authority(key, command.payload.get("authority"))
+                if (
+                    updated["message"]["frame_id"] == TIMED_CAN_ID
+                    and updated["authority"] != "simulation"
+                ):
+                    stop_timed("authority_change")
                 if isinstance(ict_sink, SocketCanSink):
                     ict_sink.purge(
                         can_id=updated["message"]["frame_id"],
@@ -779,6 +801,36 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                     authority=updated["authority"],
                 )
                 core.complete(command, {"message": updated, "status": core.snapshot().to_dict()})
+                return
+            if command.kind == "console_authority_bulk_update":
+                authority = command.payload.get("authority")
+                result = can_console.set_all_authority(authority)
+                # Do not mutate the legacy scheduler until the console's
+                # candidate state has persisted successfully. This preserves
+                # zero-side-effect failure semantics for the bulk transaction.
+                operator_dbc.stop()
+                publish_operator_dbc()
+                if authority != "simulation":
+                    stop_timed("bulk_authority_change")
+                if isinstance(ict_sink, SocketCanSink):
+                    ict_sink.purge(reason="bulk_authority_change")
+                for key in can_console.entries:
+                    core.reset_egress_rate(key)
+                publish_can_console(mutate_revision=True)
+                core.emit_event(
+                    "can_console_authority_bulk_updated",
+                    "web",
+                    authority=authority,
+                    forced_off=result["forced_off"],
+                )
+                core.complete(
+                    command,
+                    {
+                        "authority": authority,
+                        "forced_off": result["forced_off"],
+                        "status": core.snapshot().to_dict(),
+                    },
+                )
                 return
             if command.kind == "console_message_update":
                 operator_dbc.stop()
@@ -886,8 +938,8 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                 purge_socketcan_timed(timed_generation, "completed")
             retire_failed_socketcan()
             core.flush_transmission_aggregates(monotonic_s)
-            core.flush_console_runtime(monotonic_s)
             refresh_runtime_status()
+            core.flush_console_runtime(monotonic_s)
             now_s = time.time()
             if now_s - last_heartbeat_s >= HEARTBEAT_INTERVAL_S:
                 ict_handshake = (
@@ -1018,6 +1070,14 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                     print("shutdown requested")
                     break
                 elif cmd == CMD_TIMED_CAN_START:
+                    if not can_console.allows("timed", TIMED_CAN_ID, True):
+                        core.emit_event(
+                            "timed_can_ignored",
+                            "godot",
+                            can_id="0x18FFF100",
+                            reason="authority_not_simulation",
+                        )
+                        continue
                     stop_timed("retrigger")
                     timed_can.trigger(time.monotonic())
                     timed_can.service(time.monotonic(), active_sinks(), observe_timed)
@@ -1128,7 +1188,7 @@ def emit_frames(
     state = MachineState(sample, model=model)
     projection = qml_mapper.project(sample) if qml_mapper is not None else None
     tick = float(sample.tick_ms)
-    pending: list[tuple[str, int, bool, bytes]] = []
+    pending: list[tuple[str, int, bool, CanChannel, bytes]] = []
 
     if scheduler.due("imu", tick):
         for link in ("body", "boom", "arm", "bucket"):
@@ -1138,14 +1198,32 @@ def emit_frames(
                 roll, pitch, yaw = projection.imu_rpy_deg[link]
             slots = state.sensor_slots(roll, pitch, yaw)
             can_id = RUFINEN_IDS[link]
-            pending.append(("imu", can_id, True, encode_godot_imu(codec, can_id, slots)))
+            definition = codec.unique_message_by_frame(can_id, is_extended=True)
+            pending.append(
+                ("imu", can_id, True, definition.channel, encode_godot_imu(codec, can_id, slots))
+            )
 
     if scheduler.due("slew", tick):
-        pending.append(("slew", 0x18FFF000, True, encode_slew_frame(state.slew_degrees())))
+        definition = codec.unique_message_by_frame(0x18FFF000, is_extended=True)
+        pending.append(
+            (
+                "slew",
+                0x18FFF000,
+                True,
+                definition.channel,
+                codec.encode_frame(
+                    0x18FFF000,
+                    {"ROTATE": state.slew_degrees()},
+                    is_extended=True,
+                ),
+            )
+        )
 
     if scheduler.due("travel", tick):
         left, right = state.travel_pressures()
-        pending.append(("travel", 0x256, False, encode_travel_frame(left, right)))
+        pending.append(
+            ("travel", 0x256, False, TRAVEL_CAN_CHANNEL, encode_travel_frame(left, right))
+        )
 
     if scheduler.due("rtk", tick):
         rtk_state = state if projection is None else QmlRtkState(projection)
@@ -1155,11 +1233,12 @@ def emit_frames(
             rtk_state,
             satellite_status=satellite_status,
         ).items():
-            pending.append(("rtk", can_id, True, payload))
+            definition = codec.unique_message_by_frame(can_id, is_extended=True)
+            pending.append(("rtk", can_id, True, definition.channel, payload))
 
     # Finish all profile math and encoding before exposing any frame. A bad
     # telemetry sample must never produce a partial CAN family.
-    for family, can_id, is_extended, payload in pending:
+    for family, can_id, is_extended, channel, payload in pending:
         if authority_allows is not None and not authority_allows("godot", can_id, is_extended):
             continue
         for sink in sinks:
@@ -1167,6 +1246,7 @@ def emit_frames(
                 sink,
                 can_id,
                 payload,
+                channel=channel,
                 source="godot",
                 family=family,
                 is_extended=is_extended,
@@ -1234,7 +1314,10 @@ def main(argv: list[str] | None = None) -> int:
         "--sink",
         choices=("csv", "socketcan", "vcan", "tcp"),
         default=None,
-        help="frame output override; standalone defaults to Windows TCP or Linux can0",
+        help=(
+            "frame output override; defaults to TCP on every platform; "
+            "socketcan is an explicit low-latency mode and is temporarily unmaintained"
+        ),
     )
     parser.add_argument(
         "--interface", default="can0", help="SocketCAN interface (physical ICT is fixed to can0)"
@@ -1256,10 +1339,9 @@ def main(argv: list[str] | None = None) -> int:
     if not 1 <= args.web_port <= 65_535:
         parser.error("--web-port must be in 1..65535")
     if args.sink is None:
-        args.sink = "tcp" if sys.platform == "win32" else "socketcan"
+        args.sink = "tcp"
     if (
         args.mode == "standalone"
-        and sys.platform == "win32"
         and args.sink == "tcp"
         and args.tcp_host == "0.0.0.0"
         and args.tcp_port == 5678

@@ -46,22 +46,22 @@
   ],
   "user_supplied_assets": [
     {
-      "source_path": "E:/projects/dev_arch2.0_36b5586c/GuideSystem/assets/dbc/can3.sy135c.dbc",
+      "source_path": "E:/projects/temp/GuideSystem/GuideSystem/services/can/dbc/can3.sy135c.dbc",
       "destination_path": "tools/can_gateway/resources/dbc/can3.sy135c.dbc",
-      "byte_size": 8569,
-      "sha256": "c589bcaeda9b58a87e7b0ed920b7fbb55b86942341f4126d44f7f5017a7c4a44",
+      "byte_size": 10236,
+      "sha256": "dc48542fda0ad369a3a30d0d13e74df1cdcc4c9bab71f01e9be3e56df99e7b58",
       "hash_mode": "raw",
       "relationship": "project-owner-approved-can-protocol-dbc",
-      "imported_at": "2026-08-28"
+      "imported_at": "2026-09-01"
     },
     {
-      "source_path": "E:/projects/dev_arch2.0_36b5586c/GuideSystem/assets/dbc/can4.sy135c.dbc",
+      "source_path": "E:/projects/temp/GuideSystem/GuideSystem/services/can/dbc/can4.sy135c.dbc",
       "destination_path": "tools/can_gateway/resources/dbc/can4.sy135c.dbc",
-      "byte_size": 5812,
-      "sha256": "cb71e5bec346940e84f1a24e7e3c6d6ef7191545e8f7b1dbba10a241174234f7",
+      "byte_size": 5876,
+      "sha256": "fe7dd152c256b8c3d1999792fad66e8872d08d1053c56c51a2272f2978a5e3c1",
       "hash_mode": "raw",
       "relationship": "project-owner-approved-can-protocol-dbc",
-      "imported_at": "2026-08-28"
+      "imported_at": "2026-09-01"
     },
     {
       "source_path": "E:/projects/blender/Excavator/SY135/export/godot/SY135_excavator_godot.glb",

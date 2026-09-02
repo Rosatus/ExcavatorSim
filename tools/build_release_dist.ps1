@@ -288,8 +288,12 @@ try {
     if ($wslRepoRoot.Contains("'")) {
         throw "WSL repository path contains an unsupported quote: $wslRepoRoot"
     }
+    $linuxGatewayCommand = @"
+export PATH="`$HOME/.local/share/fnm/aliases/default/bin:`$HOME/.local/bin:`$PATH"
+cd '$wslRepoRoot/tools/can_gateway' && ./dist_linux.sh
+"@
     Invoke-NativeChecked -FilePath "wsl.exe" -Name "Linux Gateway build" -Arguments @(
-        "bash", "-lc", "cd '$wslRepoRoot/tools/can_gateway' && ./dist_linux.sh"
+        "bash", "-lc", $linuxGatewayCommand
     )
 
     Move-GatewayRuntimeResidue -PackageRoot $gatewayWindows -Platform "gateway-windows"

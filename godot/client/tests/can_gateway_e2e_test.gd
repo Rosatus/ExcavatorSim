@@ -53,14 +53,30 @@ func _run() -> void:
 	var linux_arguments: PackedStringArray = bridge.call(
 		"_gateway_arguments_for_platform", "Linux"
 	)
+	var windows_arguments: PackedStringArray = bridge.call(
+		"_gateway_arguments_for_platform", "Windows"
+	)
 	_check(
 		linux_arguments.has("--mode") and linux_arguments.has("godot-managed"),
 		"gateway command selects explicit Godot-managed mode"
 	)
 	_check(
-		linux_arguments.has("--sink") and linux_arguments.has("socketcan")
-		and linux_arguments.has("--interface") and linux_arguments.has("can0"),
-		"Linux gateway command selects physical SocketCAN can0"
+		linux_arguments.has("--sink") and linux_arguments.has("tcp")
+		and linux_arguments.has("--tcp-host")
+		and linux_arguments.has("127.0.0.1")
+		and linux_arguments.has("--tcp-port")
+		and linux_arguments.has(str(TEST_ICT_PORT))
+		and not linux_arguments.has("socketcan")
+		and not linux_arguments.has("--interface"),
+		"Linux gateway command defaults to the shared PC001 TCP endpoint"
+	)
+	_check(
+		windows_arguments.has("--sink") and windows_arguments.has("tcp")
+		and windows_arguments.has("--tcp-host")
+		and windows_arguments.has("127.0.0.1")
+		and windows_arguments.has("--tcp-port")
+		and windows_arguments.has(str(TEST_ICT_PORT)),
+		"Windows gateway command defaults to the shared PC001 TCP endpoint"
 	)
 	if OS.get_name() == "Windows":
 		_check(gateway_command.has("--sink") and gateway_command.has("tcp")

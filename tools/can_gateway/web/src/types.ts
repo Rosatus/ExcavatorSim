@@ -1,4 +1,5 @@
 export type GatewayMode = "standalone" | "godot-managed";
+export type CanChannel = "ch0" | "ch2" | "ch3";
 
 export interface GatewayStatus {
   revision: number;
@@ -62,6 +63,7 @@ export interface DbcMessageDefinition {
   frame_id_hex: string;
   is_extended: boolean;
   length: number;
+  channel: CanChannel;
   signals: DbcSignal[];
 }
 
@@ -150,6 +152,7 @@ export interface CanConsoleSnapshot {
   custom_armed: boolean;
   server_monotonic_s: number;
   messages: CanConsoleMessage[];
+  notices: Array<Record<string, unknown>>;
   load: LoadEstimate;
 }
 
@@ -190,6 +193,62 @@ export function decodeGatewaySocketMessage(value: unknown): GatewaySocketMessage
 export interface CanConsoleRuntimeDelta {
   server_monotonic_s: number;
   rows: Record<string, CanConsoleRuntime>;
+  status: GatewayRuntimeStatusDelta | null;
+}
+
+export type GatewayRuntimeStatusDelta = Pick<GatewayStatus,
+  | "transport_state"
+  | "transport_detail"
+  | "recording"
+  | "timed_can_active"
+  | "ict_active"
+  | "periodic_armed"
+  | "pc001_handshake"
+  | "pc001_queued_frames"
+  | "pc001_sent_frames"
+  | "pc001_dropped_frames"
+  | "socketcan_submitted"
+  | "socketcan_sent"
+  | "socketcan_congestion_dropped"
+  | "socketcan_coalesced"
+  | "socketcan_terminal_errors"
+  | "socketcan_pending"
+  | "log_dropped_records"
+>;
+
+function decodeRuntimeStatus(value: unknown): GatewayRuntimeStatusDelta | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const candidate = value as Record<string, unknown>;
+  const stringFields = ["transport_state", "transport_detail"] as const;
+  const booleanFields = ["recording", "timed_can_active", "ict_active", "periodic_armed", "pc001_handshake"] as const;
+  const counterFields = [
+    "pc001_queued_frames", "pc001_sent_frames", "pc001_dropped_frames",
+    "socketcan_submitted", "socketcan_sent", "socketcan_congestion_dropped",
+    "socketcan_coalesced", "socketcan_terminal_errors", "socketcan_pending",
+    "log_dropped_records",
+  ] as const;
+  if (stringFields.some((key) => typeof candidate[key] !== "string")) return null;
+  if (booleanFields.some((key) => typeof candidate[key] !== "boolean")) return null;
+  if (counterFields.some((key) => !Number.isInteger(candidate[key]) || (candidate[key] as number) < 0)) return null;
+  return {
+    transport_state: candidate.transport_state as string,
+    transport_detail: candidate.transport_detail as string,
+    recording: candidate.recording as boolean,
+    timed_can_active: candidate.timed_can_active as boolean,
+    ict_active: candidate.ict_active as boolean,
+    periodic_armed: candidate.periodic_armed as boolean,
+    pc001_handshake: candidate.pc001_handshake as boolean,
+    pc001_queued_frames: candidate.pc001_queued_frames as number,
+    pc001_sent_frames: candidate.pc001_sent_frames as number,
+    pc001_dropped_frames: candidate.pc001_dropped_frames as number,
+    socketcan_submitted: candidate.socketcan_submitted as number,
+    socketcan_sent: candidate.socketcan_sent as number,
+    socketcan_congestion_dropped: candidate.socketcan_congestion_dropped as number,
+    socketcan_coalesced: candidate.socketcan_coalesced as number,
+    socketcan_terminal_errors: candidate.socketcan_terminal_errors as number,
+    socketcan_pending: candidate.socketcan_pending as number,
+    log_dropped_records: candidate.log_dropped_records as number,
+  };
 }
 
 function finiteNumberOrNull(value: unknown): value is number | null {
@@ -233,6 +292,7 @@ export function decodeCanConsoleRuntimeDelta(
 ): CanConsoleRuntimeDelta | null {
   if (event.kind !== "can_console_runtime") return null;
   const rows = event.detail.rows;
+  const status = event.detail.status === undefined ? null : decodeRuntimeStatus(event.detail.status);
   const serverMonotonic = event.detail.server_monotonic_s;
   if (
     !rows
@@ -240,6 +300,7 @@ export function decodeCanConsoleRuntimeDelta(
     || Array.isArray(rows)
     || typeof serverMonotonic !== "number"
     || !Number.isFinite(serverMonotonic)
+    || (event.detail.status !== undefined && !status)
   ) return null;
   const runtimeByKey: Record<string, CanConsoleRuntime> = {};
   for (const [key, value] of Object.entries(rows)) {
@@ -247,7 +308,14 @@ export function decodeCanConsoleRuntimeDelta(
     if (!runtime) return null;
     runtimeByKey[key] = runtime;
   }
-  return { server_monotonic_s: serverMonotonic, rows: runtimeByKey };
+  return { server_monotonic_s: serverMonotonic, rows: runtimeByKey, status };
+}
+
+export function applyGatewayRuntimeStatusDelta(
+  status: GatewayStatus,
+  delta: GatewayRuntimeStatusDelta,
+): GatewayStatus {
+  return { ...status, ...delta };
 }
 
 export function applyCanConsoleRuntimeDelta(

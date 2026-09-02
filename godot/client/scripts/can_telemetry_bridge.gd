@@ -289,7 +289,7 @@ func _gateway_arguments() -> PackedStringArray:
 	return _gateway_arguments_for_platform(OS.get_name())
 
 
-func _gateway_arguments_for_platform(platform_name: String) -> PackedStringArray:
+func _gateway_arguments_for_platform(_platform_name: String) -> PackedStringArray:
 	var argv := PackedStringArray([
 		"--host", remote_host,
 		"--port", str(remote_port),
@@ -298,17 +298,11 @@ func _gateway_arguments_for_platform(platform_name: String) -> PackedStringArray
 		"--model", model_id,
 		"--mode", "godot-managed",
 	])
-	if platform_name == "Windows":
-		argv.append_array(PackedStringArray([
-			"--sink", "tcp",
-			"--tcp-host", tcp_host,
-			"--tcp-port", str(tcp_port),
-		]))
-	else:
-		argv.append_array(PackedStringArray([
-			"--sink", "socketcan",
-			"--interface", "can0",
-		]))
+	argv.append_array(PackedStringArray([
+		"--sink", "tcp",
+		"--tcp-host", tcp_host,
+		"--tcp-port", str(tcp_port),
+	]))
 	return argv
 
 

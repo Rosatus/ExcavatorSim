@@ -146,6 +146,7 @@ class GatewayWebServer:
         app.router.add_put(
             "/api/v1/can-console/messages/{message_key}/authority", self._console_authority
         )
+        app.router.add_put("/api/v1/can-console/authority", self._console_authority_bulk)
         app.router.add_post("/api/v1/can-console/start", self._console_start)
         app.router.add_post("/api/v1/can-console/stop", self._console_stop)
         app.router.add_post("/api/v1/can-console/export", self._console_export)
@@ -302,6 +303,21 @@ class GatewayWebServer:
             body,
         )
 
+    async def _console_authority_bulk(self, request: web.Request) -> web.Response:
+        body = await _read_json_object(request)
+        self._require_fields(body, {"authority", "expected_revision", "request_id"})
+        authority = body.get("authority")
+        if authority not in ("off", "custom", "simulation"):
+            raise GatewayRuntimeError(
+                "console_authority_invalid", "authority must be off/custom/simulation"
+            )
+        return await self._submit(
+            request,
+            "console_authority_bulk_update",
+            {"authority": authority},
+            body,
+        )
+
     async def _console_start(self, request: web.Request) -> web.Response:
         self._require_standalone()
         body = await _read_json_object(request)
@@ -396,7 +412,7 @@ class GatewayWebServer:
         return archive_path
 
     async def _tcp_transport(self, request: web.Request) -> web.Response:
-        self._require_mutation("windows")
+        self._require_transport("tcp")
         body = await _read_json_object(request)
         host = body.get("host")
         port = body.get("port")
@@ -407,18 +423,18 @@ class GatewayWebServer:
         return await self._submit(request, "tcp_rebind", {"host": host, "port": port}, body)
 
     async def _restart_can0(self, request: web.Request) -> web.Response:
-        self._require_mutation("linux")
+        self._require_transport("socketcan")
         body = await _read_json_object(request)
         if body.get("confirm") is not True:
             raise GatewayRuntimeError("confirmation_required", "can0 restart requires confirm=true")
         return await self._submit(request, "can0_restart", {"confirm": True}, body)
 
-    def _require_mutation(self, platform: str) -> None:
+    def _require_transport(self, transport_kind: str) -> None:
         self._require_standalone()
-        if self.core.platform != platform:
+        if self.core.snapshot().transport_kind != transport_kind:
             raise GatewayRuntimeError(
                 "capability_unavailable",
-                f"transport control is unavailable on {self.core.platform}",
+                f"transport control is unavailable for {self.core.snapshot().transport_kind}",
                 status=409,
             )
 

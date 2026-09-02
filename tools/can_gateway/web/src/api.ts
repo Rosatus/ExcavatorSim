@@ -71,6 +71,21 @@ export async function updateCanAuthority(status: GatewayStatus, key: string, aut
   });
 }
 
+export async function updateAllCanAuthorities(
+  status: GatewayStatus,
+  authority: CanAuthority,
+): Promise<string[]> {
+  const response = await mutation<{ result: { forced_off: string[] } }>(
+    "./api/v1/can-console/authority",
+    "PUT",
+    {
+    authority,
+    expected_revision: status.revision,
+    },
+  );
+  return response.result.forced_off;
+}
+
 export async function canConsoleAction(action: "start" | "stop", status: GatewayStatus): Promise<void> {
   await mutation(`./api/v1/can-console/${action}`, "POST", { expected_revision: status.revision });
 }

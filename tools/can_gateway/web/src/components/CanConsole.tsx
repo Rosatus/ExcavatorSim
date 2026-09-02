@@ -18,6 +18,7 @@ import {
   importCanConsoleProfile,
   previewCanConsoleMessage,
   updateCanAuthority,
+  updateAllCanAuthorities,
   updateCanConsoleMessage,
 } from "../api";
 import type {
@@ -191,6 +192,11 @@ function MessageDialog({
         </div>
 
         <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {row.message.signals.length === 0 && (
+            <div className="sm:col-span-2 lg:col-span-3 rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+              此报文没有 DBC 物理量定义，请直接编辑 Payload。
+            </div>
+          )}
           {row.message.signals.filter((signal) => signal.name in values).map((signal) => (
             <label key={signal.key} className="text-xs text-muted-foreground">
               <span className="flex justify-between gap-2"><strong className="text-foreground">{signal.name}</strong><span>{signal.unit || "—"}</span></span>
@@ -287,6 +293,7 @@ export function CanConsole({
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [editing, setEditing] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [batchNotice, setBatchNotice] = useState("");
   const [tick, setTick] = useState(0);
   const anchor = useRef({ server: consoleSnapshot.server_monotonic_s, client: performance.now() });
   const fileInput = useRef<HTMLInputElement>(null);
@@ -331,6 +338,9 @@ export function CanConsole({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <label className="relative min-w-56 flex-1 lg:flex-none"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input className="pl-8" placeholder="搜索 CAN ID / 报文 / 信号" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => mutate(async () => { await updateAllCanAuthorities(status, "off"); setBatchNotice("全部报文已关闭。"); })}>全部关闭</Button>
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => mutate(async () => { await updateAllCanAuthorities(status, "custom"); setBatchNotice("全部报文已切换为自定义。"); })}>全部自定义</Button>
+          <Button size="sm" variant="outline" disabled={busy || status.mode !== "godot-managed"} title={status.mode === "godot-managed" ? "支持的报文切换到仿真，其余自动关闭" : "独立启动模式不提供仿真生产者"} onClick={() => mutate(async () => { const forced = await updateAllCanAuthorities(status, "simulation"); setBatchNotice(forced.length > 0 ? `已切换为仿真；${forced.length} 个无仿真生产者的报文自动关闭。` : "全部报文已切换为仿真。"); })}>全部仿真</Button>
           {status.mode === "standalone" && <>
             {consoleSnapshot.custom_armed
               ? <Button variant="destructive" disabled={busy} onClick={() => mutate(() => canConsoleAction("stop", status))}><Square className="h-4 w-4" /> 停止自定义发送</Button>
@@ -342,11 +352,13 @@ export function CanConsole({
         </div>
       </div>
 
+      {batchNotice && <div className="border-b bg-muted/35 px-4 py-2 text-xs text-muted-foreground">{batchNotice}</div>}
+
       {consoleSnapshot.load.warning && <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-200">估算总线负载 {consoleSnapshot.load.percent.toFixed(2)}%，负载较高但不会阻止发送。</div>}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1180px] border-collapse text-sm">
+        <table className="w-full min-w-[1260px] border-collapse text-sm">
           <thead className="sticky top-0 z-10 bg-muted/90 text-left text-[11px] uppercase tracking-wider text-muted-foreground backdrop-blur">
-            <tr><th className="w-10 px-3 py-3" /><th className="px-3 py-3">CAN ID</th><th className="px-3 py-3">最近发送 Payload</th><th className="px-3 py-3">编辑</th><th className="px-3 py-3">发送权威</th><th className="px-3 py-3">预期频率</th><th className="px-3 py-3">实际频率</th><th className="px-3 py-3">新鲜度</th></tr>
+            <tr><th className="w-10 px-3 py-3" /><th className="px-3 py-3">CAN ID</th><th className="px-3 py-3">Channel</th><th className="px-3 py-3">最近发送 Payload</th><th className="px-3 py-3">编辑</th><th className="px-3 py-3">发送权威</th><th className="px-3 py-3">预期频率</th><th className="px-3 py-3">实际频率</th><th className="px-3 py-3">新鲜度</th></tr>
           </thead>
           <tbody>
             {rows.map((row) => {
@@ -357,6 +369,7 @@ export function CanConsole({
                 <tr key={row.key} className="border-t hover:bg-muted/25">
                   <td className="px-3 py-3"><button className="rounded p-1 hover:bg-muted" aria-label={open ? "收起物理量" : "展开物理量"} onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(row.key)) next.delete(row.key); else next.add(row.key); return next; })}>{open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button></td>
                   <td className="px-3 py-3"><div className="font-mono font-semibold">{row.message.frame_id_hex}</div><div className="mt-1 max-w-52 truncate text-xs text-muted-foreground">{row.message.name}</div></td>
+                  <td className="px-3 py-3"><Badge className="font-mono font-normal">{row.message.channel}</Badge></td>
                   <td className="px-3 py-3"><code className="whitespace-nowrap rounded bg-muted px-2 py-1 text-xs">{row.runtime.last_payload_hex ? row.runtime.last_payload_hex.match(/.{2}/g)?.join(" ") : "尚未发送"}</code></td>
                   <td className="px-3 py-3"><Button variant="outline" size="sm" disabled={row.authority !== "custom"} onClick={() => setEditing(row.key)}><Edit3 className="h-3.5 w-3.5" /> 编辑</Button></td>
                   <td className="px-3 py-3"><AuthorityControl row={row} status={status} busy={busy} mutate={mutate} /></td>
@@ -364,8 +377,8 @@ export function CanConsole({
                   <td className="px-3 py-3 font-mono">{formatFrequency(row.runtime.actual_frequency_hz)}</td>
                   <td className={`px-3 py-3 font-mono font-semibold ${fresh.tone}`}>{fresh.text}</td>
                 </tr>,
-                open && <tr key={`${row.key}-detail`} className="border-t bg-muted/15"><td /><td colSpan={7} className="px-3 py-4">
-                  {physical ? <div className="flex flex-wrap gap-2">{Object.entries(physical).map(([name, value]) => <Badge key={name} className="font-normal"><span className="mr-2 text-muted-foreground">{name}</span><span className="font-mono">{Number(value).toFixed(6)}</span></Badge>)}</div> : <span className="text-xs text-muted-foreground">尚无成功发送，暂无真实 payload 对应的物理量。</span>}
+                open && <tr key={`${row.key}-detail`} className="border-t bg-muted/15"><td /><td colSpan={8} className="px-3 py-4">
+                  {row.message.signals.length === 0 ? <span className="text-xs text-muted-foreground">该报文没有 DBC 物理量定义，仅展示原始 Payload。</span> : physical ? <div className="flex flex-wrap gap-2">{Object.entries(physical).map(([name, value]) => <Badge key={name} className="font-normal"><span className="mr-2 text-muted-foreground">{name}</span><span className="font-mono">{Number(value).toFixed(6)}</span></Badge>)}</div> : <span className="text-xs text-muted-foreground">尚无成功发送，暂无真实 payload 对应的物理量。</span>}
                 </td></tr>,
               ];
             })}

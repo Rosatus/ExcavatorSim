@@ -51,6 +51,9 @@ BO_ 291 Mixed: 8 ECU
 
 BO_ 2147483939 Extended: 2 ECU
  SG_ Signed : 0|16@1- (0.1,0) [-3276.8|3276.7] "" ECU
+
+CM_ BO_ 291 "channel=can3";
+CM_ BO_ 2147483939 "channel=can4";
 """
 
 
@@ -84,7 +87,7 @@ class ProtocolCodecTest(unittest.TestCase):
             self.assertEqual(
                 hashlib.sha256((RESOURCE_DBC / name).read_bytes()).hexdigest(), expected
             )
-        self.assertEqual(len(self.codec.messages), 27)
+        self.assertEqual(len(self.codec.messages), 30)
 
     def test_all_imu_angle_frames_match_manual_encoder(self) -> None:
         cases = (
@@ -97,7 +100,7 @@ class ProtocolCodecTest(unittest.TestCase):
             for counts in cases:
                 self.assertEqual(
                     encode_godot_imu(self.codec, frame_id, counts),
-                    encode_ruifen_frame(counts),
+                    encode_ruifen_frame(counts)[:6] + b"\x4B\x00",
                 )
 
     def test_rtk_family_matches_manual_little_endian_encoder(self) -> None:
@@ -166,7 +169,10 @@ class CatalogAndStrictCodecTest(unittest.TestCase):
             (root_a / "same.dbc").write_text(SYNTHETIC_DBC, encoding="utf-8")
             (root_b / "copy.dbc").write_text(SYNTHETIC_DBC, encoding="utf-8")
             (root_b / "same.dbc").write_text(
-                SYNTHETIC_DBC.replace("BO_ 291 Mixed", "BO_ 292 Mixed"), encoding="utf-8"
+                SYNTHETIC_DBC.replace("BO_ 291 Mixed", "BO_ 292 Mixed").replace(
+                    "CM_ BO_ 291", "CM_ BO_ 292"
+                ),
+                encoding="utf-8",
             )
             (root_a / "broken.dbc").write_text("broken", encoding="utf-8")
             catalog = DbcCatalog.discover([root_b, root_a])
@@ -397,7 +403,9 @@ class OperatorRuntimeTest(unittest.TestCase):
             runtime = OperatorDbcRuntime([root], store=DbcConfigStore(Path(tmp, "config.json")))
             count = len(runtime.codec.messages)
             path.write_text(
-                SYNTHETIC_DBC + '\nBO_ 400 Later: 1 ECU\n SG_ X : 0|8@1+ (1,0) [0|255] "" ECU\n',
+                SYNTHETIC_DBC
+                + '\nBO_ 400 Later: 1 ECU\n SG_ X : 0|8@1+ (1,0) [0|255] "" ECU\n'
+                + 'CM_ BO_ 400 "channel=can3";\n',
                 encoding="utf-8",
             )
             self.assertEqual(len(runtime.codec.messages), count)

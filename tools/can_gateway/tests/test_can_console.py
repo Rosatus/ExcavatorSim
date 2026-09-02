@@ -14,6 +14,7 @@ if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
 from can_console import CanConsoleRuntime, canonical_can_key  # noqa: E402
+from can_special_frames import TIMED_CAN_FREQUENCY_HZ, TIMED_CAN_ID  # noqa: E402
 from dbc_engine import DbcConfigStore, GatewayRuntimeError, OperatorDbcRuntime  # noqa: E402
 from encoders.dxg_slew import SLEW_CAN_ID  # noqa: E402
 from encoders.travel_pilot import TRAVEL_CAN_ID  # noqa: E402
@@ -24,6 +25,12 @@ BS_:
 BU_: ECU
 BO_ 2147483939 Extended: 2 ECU
  SG_ Signed : 0|16@1- (0.1,0) [-3276.8|3276.7] "m/s" ECU
+
+BO_ 2566909952 MSG_18FFF000: 8 ECU
+ SG_ ROTATE : 0|16@1+ (0.0054931640625,0) [0|359.9945068359375] "degree" ECU
+
+CM_ BO_ 2147483939 "channel=can3";
+CM_ BO_ 2566909952 "channel=can3";
 """
 
 RELOADED_DBC = """VERSION "console-reloaded"
@@ -32,6 +39,7 @@ BS_:
 BU_: ECU
 BO_ 2147483940 Reloaded: 2 ECU
  SG_ Unsigned : 0|16@1+ (1,0) [0|65535] "" ECU
+CM_ BO_ 2147483940 "channel=can3";
 """
 
 
@@ -47,7 +55,12 @@ class CanConsoleRuntimeTest(unittest.TestCase):
         return CanConsoleRuntime(
             operator,
             mode=mode,  # type: ignore[arg-type]
-            simulation_rates={0x123: 20, SLEW_CAN_ID: 100, TRAVEL_CAN_ID: 10},
+            simulation_rates={
+                0x123: 20,
+                SLEW_CAN_ID: 100,
+                TRAVEL_CAN_ID: 10,
+                TIMED_CAN_ID: TIMED_CAN_FREQUENCY_HZ,
+            },
         )
 
     def test_identity_distinguishes_sff_and_eff(self) -> None:
@@ -74,17 +87,20 @@ class CanConsoleRuntimeTest(unittest.TestCase):
             self.assertEqual(row["values"]["Signed"], -4.5)
             self.assertFalse(restored.armed)
 
-    def test_native_adapters_reuse_exact_payload_layouts(self) -> None:
+    def test_dbc_slew_and_native_adapters_reuse_exact_payload_layouts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             runtime = self.make_runtime(Path(tmp))
             slew = canonical_can_key(SLEW_CAN_ID)
             travel = canonical_can_key(TRAVEL_CAN_ID)
+            timed = canonical_can_key(TIMED_CAN_ID)
             runtime.set_authority(slew, "custom")
             runtime.set_authority(travel, "custom")
             self.assertEqual(
-                runtime.preview(slew, values={"angle_degrees": 90, "status": 7})["payload_hex"],
-                "00 40 07 00 00 00 00 00",
+                runtime.preview(slew, values={"ROTATE": 90})["payload_hex"],
+                "00 40 00 00 00 00 00 00",
             )
+            self.assertEqual(runtime.entries[slew].definition_dict()["kind"], "dbc")
+            self.assertEqual(runtime.entries[slew].channel, "ch3")
             self.assertEqual(
                 runtime.preview(
                     travel,
@@ -92,13 +108,13 @@ class CanConsoleRuntimeTest(unittest.TestCase):
                 )["payload_hex"],
                 "00 00 00 00 0C 00 22 00",
             )
-            for key, values in (
-                (slew, {"status": 1.5}),
-                (travel, {"left_pressure": 12.5}),
-            ):
-                with self.subTest(key=key), self.assertRaises(GatewayRuntimeError) as error:
-                    runtime.preview(key, values=values)
-                self.assertEqual(error.exception.code, "dbc_value_invalid")
+            self.assertEqual(runtime.entries[travel].definition_dict()["kind"], "native")
+            self.assertEqual(runtime.entries[travel].channel, "ch0")
+            self.assertEqual(runtime.entries[timed].definition_dict()["kind"], "native")
+            self.assertEqual(runtime.entries[timed].channel, "ch3")
+            with self.assertRaises(GatewayRuntimeError) as error:
+                runtime.preview(travel, values={"left_pressure": 12.5})
+            self.assertEqual(error.exception.code, "dbc_value_invalid")
 
     def test_console_rebuild_after_operator_reload_uses_new_catalog(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -111,7 +127,12 @@ class CanConsoleRuntimeTest(unittest.TestCase):
             rebuilt = CanConsoleRuntime(
                 runtime.operator,
                 mode="standalone",
-                simulation_rates={0x124: 20, SLEW_CAN_ID: 100, TRAVEL_CAN_ID: 10},
+                simulation_rates={
+                    0x124: 20,
+                    SLEW_CAN_ID: 100,
+                    TRAVEL_CAN_ID: 10,
+                    TIMED_CAN_ID: TIMED_CAN_FREQUENCY_HZ,
+                },
             )
             self.assertNotIn(old_key, rebuilt.entries)
             self.assertIn(canonical_can_key(0x124, True), rebuilt.entries)

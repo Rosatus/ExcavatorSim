@@ -16,6 +16,7 @@ if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
 import gateway  # noqa: E402
+from can_special_frames import TIMED_CAN_CHANNEL  # noqa: E402
 from control_protocol import (  # noqa: E402
     CMD_ICT_START,
     CMD_ICT_STOP,
@@ -356,10 +357,10 @@ class ControlProtocolTest(unittest.TestCase):
 
 class _CaptureSink:
     def __init__(self) -> None:
-        self.frames: list[tuple[int, bytes]] = []
+        self.frames: list[tuple[int, bytes, str]] = []
 
-    def append(self, can_id: int, payload: bytes) -> None:
-        self.frames.append((can_id, payload))
+    def append(self, can_id: int, payload: bytes, channel: str) -> None:
+        self.frames.append((can_id, payload, channel))
 
     def close(self) -> None:
         pass
@@ -418,7 +419,10 @@ class TimedCanBurstTest(unittest.TestCase):
             self.assertTrue(burst.service(now_s, [sink]))
         self.assertFalse(burst.active)
         self.assertEqual(len(sink.frames), TIMED_CAN_FRAME_COUNT)
-        self.assertEqual(set(sink.frames), {(TIMED_CAN_ID, TIMED_CAN_PAYLOAD)})
+        self.assertEqual(
+            set(sink.frames),
+            {(TIMED_CAN_ID, TIMED_CAN_PAYLOAD, TIMED_CAN_CHANNEL)},
+        )
 
     def test_retrigger_replaces_remaining_window_without_overlap(self) -> None:
         burst = TimedCanBurst()
@@ -439,7 +443,7 @@ class TimedCanBurstTest(unittest.TestCase):
         ict = _CaptureSink()
         burst.trigger(0.0)
         self.assertTrue(burst.service(0.0, [recording, ict]))
-        expected = [(TIMED_CAN_ID, TIMED_CAN_PAYLOAD)]
+        expected = [(TIMED_CAN_ID, TIMED_CAN_PAYLOAD, TIMED_CAN_CHANNEL)]
         self.assertEqual(recording.frames, expected)
         self.assertEqual(ict.frames, expected)
 

@@ -1,7 +1,7 @@
 VERSION ""
 
 
-NS_ : 
+NS_ :
 	NS_DESC_
 	CM_
 	BA_DEF_
@@ -128,10 +128,10 @@ CM_ SG_ 2365433344 Latitude1 "副天线纬度";
 CM_ BO_ 2365433600 "channel=can4";
 CM_ SG_ 2365433600 Alt1 "副天线高度";
 CM_ BO_ 2365433856 "channel=can4";
-CM_ SG_ 2365433856 Vel "载体速度";
-CM_ SG_ 2365433856 VelU "天向速度";
-CM_ SG_ 2365433856 VelN "北向速度";
-CM_ SG_ 2365433856 VelE "东向速度";
+CM_ SG_ 2365433856 Vel "载体速度；双字节小端";
+CM_ SG_ 2365433856 VelU "天向速度；双字节小端";
+CM_ SG_ 2365433856 VelN "北向速度；双字节小端";
+CM_ SG_ 2365433856 VelE "东向速度；双字节小端";
 CM_ BO_ 2365434112 "channel=can4";
 CM_ SG_ 2365434112 Heading "航向角";
 CM_ BO_ 2365434368 "channel=can4";
@@ -152,10 +152,3 @@ CM_ BO_ 2331877376 "channel=can4";
 CM_ SG_ 2331877376 Baud "高位在前低位在后 支持 100/250/500/1000kbps";
 CM_ BO_ 2331878144 "channel=can4";
 CM_ SG_ 2331878144 Frec "支持0.1HZ~10HZ 发送(1~100)";
-
-
-
-
-
-
-

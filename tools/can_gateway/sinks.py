@@ -16,6 +16,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 from typing import Literal, Protocol
 
+from can_channel import CanChannel
 from csv_writer import CanapeCsvWriter
 
 CAN_FRAME_STRUCT = struct.Struct("<IBBBB8s")
@@ -70,7 +71,9 @@ class _PendingSocketCanFrame:
 
 
 class FrameSink(Protocol):
-    def append(self, can_id: int, payload: bytes) -> None: ...
+    def append(
+        self, can_id: int, payload: bytes, channel: CanChannel = "ch0"
+    ) -> None: ...
 
     def close(self) -> None: ...
 
@@ -103,8 +106,10 @@ class CsvFrameSink:
     def path(self):
         return self._writer.path
 
-    def append(self, can_id: int, payload: bytes) -> None:
-        self._writer.append(can_id, payload)
+    def append(
+        self, can_id: int, payload: bytes, channel: CanChannel = "ch0"
+    ) -> None:
+        self._writer.append(can_id, payload, channel)
 
     def close(self) -> None:
         self._writer.close()
@@ -150,19 +155,29 @@ class SocketCanSink:
     def set_outcome_observer(self, observer: Callable[[SocketCanDelta], None] | None) -> None:
         self._observer = observer
 
-    def append(self, can_id: int, payload: bytes) -> None:
-        self.submit(can_id, payload, source="unspecified", family="other")
+    def append(
+        self, can_id: int, payload: bytes, channel: CanChannel = "ch0"
+    ) -> None:
+        self.submit(
+            can_id,
+            payload,
+            channel=channel,
+            source="unspecified",
+            family="other",
+        )
 
     def submit(
         self,
         can_id: int,
         payload: bytes,
         *,
+        channel: CanChannel = "ch0",
         source: str,
         family: str,
         generation: int | None = None,
         is_extended: bool | None = None,
     ) -> None:
+        del channel
         if self.last_send_error is not None:
             return
         raw_id = can_id & CAN_EFF_MASK

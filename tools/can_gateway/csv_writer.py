@@ -10,6 +10,8 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+from can_channel import CanChannel
+
 
 class CanapeCsvWriter:
     def __init__(self, path: Path) -> None:
@@ -18,7 +20,18 @@ class CanapeCsvWriter:
         self._sequence = 0
         self._fp = self._path.open("w", encoding="utf-8-sig", newline="", buffering=1)
         header = ",".join(
-            ["序号", "系统时间", "时间标识", "CAN通道", "传输方向", "ID号", "帧类型", "帧格式", "长度", "数据"]
+            [
+                "序号",
+                "系统时间",
+                "时间标识",
+                "CAN通道",
+                "传输方向",
+                "ID号",
+                "帧类型",
+                "帧格式",
+                "长度",
+                "数据",
+            ]
         )
         self._fp.write(header + "\r\n")
 
@@ -30,23 +43,21 @@ class CanapeCsvWriter:
     def row_count(self) -> int:
         return self._row_count
 
-    def append(self, can_id: int, payload: bytes) -> None:
+    def append(self, can_id: int, payload: bytes, channel: CanChannel = "ch0") -> None:
         if len(payload) != 8:
             raise ValueError(f"CAN payload must be 8 bytes, got {len(payload)}")
         extended = can_id > 0x7FF
         now = time.localtime()
-        system_time = '="%02d:%02d:%02d.%03d"' % (
-            now.tm_hour,
-            now.tm_min,
-            now.tm_sec,
-            int(time.time() * 1000) % 1000,
+        milliseconds = int(time.time() * 1000) % 1000
+        system_time = (
+            f'="{now.tm_hour:02d}:{now.tm_min:02d}:{now.tm_sec:02d}.{milliseconds:03d}"'
         )
         row = ",".join(
             [
                 f"{self._sequence:05d}",
                 system_time,
                 hex(self._sequence),
-                "ch3",
+                channel,
                 "接收",
                 f"0x{can_id:08X}" if extended else f"0x{can_id:03X}",
                 "数据帧",

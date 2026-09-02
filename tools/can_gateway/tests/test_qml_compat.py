@@ -234,10 +234,10 @@ class QmlPoseMappingTest(unittest.TestCase):
 
 class _CollectingSink:
     def __init__(self) -> None:
-        self.frames: list[tuple[int, bytes]] = []
+        self.frames: list[tuple[int, bytes, str]] = []
 
-    def append(self, can_id: int, payload: bytes) -> None:
-        self.frames.append((can_id, payload))
+    def append(self, can_id: int, payload: bytes, channel: str) -> None:
+        self.frames.append((can_id, payload, channel))
 
     def close(self) -> None:
         pass
@@ -253,11 +253,13 @@ class QmlGatewayIntegrationTest(unittest.TestCase):
         sink = _CollectingSink()
         scheduler = FrameScheduler({"imu": 100.0, "slew": 100.0, "rtk": 10.0, "travel": 10.0})
         emit_frames([sink], scheduler, sample, qml_mapper=QmlCanMapper(self.profile))
-        frames = dict(sink.frames)
+        frames = {can_id: payload for can_id, payload, _channel in sink.frames}
+        channels = {can_id: channel for can_id, _payload, channel in sink.frames}
 
         decoded_rpy = {}
         for link, can_id in RUFINEN_IDS.items():
             actual_rpy = reported_rpy(frames[can_id])
+            self.assertEqual(channels[can_id], "ch3")
             decoded_rpy[link] = actual_rpy
             for actual, wanted in zip(actual_rpy, expected.imu_rpy_deg[link], strict=True):
                 self.assertAlmostEqual(actual, wanted, delta=0.011)
@@ -278,6 +280,9 @@ class QmlGatewayIntegrationTest(unittest.TestCase):
             self.assertAlmostEqual(actual, wanted, delta=0.04)
 
         self.assertEqual(decode_status(frames[RTK_IDS_ORDERED[1]])["satelliteStatus"], 4)
+        self.assertTrue(all(channels[can_id] == "ch2" for can_id in RTK_IDS_ORDERED))
+        self.assertEqual(channels[0x18FFF000], "ch3")
+        self.assertEqual(channels[0x256], "ch0")
         self.assertAlmostEqual(
             decode_heading(frames[RTK_IDS_ORDERED[9]]),
             expected.wire_heading_deg,
@@ -336,7 +341,11 @@ class QmlGatewayIntegrationTest(unittest.TestCase):
         moved = TelemetrySample(second.tick_ms, bodies, 0.0, 0.0, 0.0)
         sink.frames.clear()
         emit_frames([sink], scheduler, moved, qml_mapper=mapper)
-        payload = dict(sink.frames)[RTK_IDS_ORDERED[8]]
+        payload = next(
+            payload
+            for can_id, payload, channel in sink.frames
+            if can_id == RTK_IDS_ORDERED[8] and channel == "ch2"
+        )
         reference_values = tuple(
             int.from_bytes(payload[index : index + 2], "little", signed=True) * 0.01
             for index in range(0, 8, 2)

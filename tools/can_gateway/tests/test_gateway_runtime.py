@@ -193,6 +193,19 @@ class GatewayRuntimeCoreTest(unittest.TestCase):
         events, _gap = self.events.events_after(0)
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0].kind, "can_console_runtime")
+        self.assertIn("status", events[0].detail)
+
+    def test_console_runtime_event_carries_status_without_egress_rows(self) -> None:
+        self.core.publish(pc001_dropped_frames=42)
+        self.core.flush_console_runtime(self.core._last_egress_event_s + 0.05)
+        events, _gap = self.events.events_after(0)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].detail["rows"], {})
+        self.assertEqual(events[0].detail["status"]["pc001_dropped_frames"], 42)
+
+        self.core.flush_console_runtime(self.core._last_egress_event_s + 0.05)
+        events, _gap = self.events.events_after(0)
+        self.assertEqual(len(events), 1)
 
 
 class GatewayConfigStoreTest(unittest.TestCase):
