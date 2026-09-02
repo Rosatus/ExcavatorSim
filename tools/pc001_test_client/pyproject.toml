@@ -1,0 +1,32 @@
+[project]
+name = "excavatorsim-pc001-test-client"
+version = "0.1.0"
+description = "Local PC001 TCP monitor for the ExcavatorSim Gateway"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pyside6>=6.8,<6.9",
+]
+
+[dependency-groups]
+dev = [
+    "aiohttp>=3.12,<4",
+    "cantools>=40,<41",
+    "mypy>=1.17,<2",
+    "platformdirs>=4.4,<5",
+    "pyinstaller>=6.16,<7",
+    "ruff>=0.12,<1",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["pc001_test_client", "tests", "build_windows.py"]
+mypy_path = ".."
+warn_unused_configs = true
