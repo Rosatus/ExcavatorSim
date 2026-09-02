@@ -1,0 +1,11 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend pre-development and package quality entry point."}
+{"file":".trellis/spec/backend/can-gateway-control.md","reason":"Owning Gateway, DBC, timed CAN, authority, transport, Web API, packaging, and ICT contracts."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Focused regression, provenance, and final verification requirements."}
+{"file":".trellis/spec/backend/can-qml-compatibility.md","reason":"Existing A800 compatibility-profile endian contract that must be reconciled with the approved DBC authority."}
+{"file":".trellis/spec/frontend/validation-budget.md","reason":"Requires focused automated Godot checks and one human-owned interactive review rather than repeated visual runs."}
+{"file":".trellis/tasks/09-01-gateway-dbc-tcp-unification/research/dbc-delta.md","reason":"Exact new/old DBC hashes, message changes, and 0x18FFF000 migration evidence."}
+{"file":".trellis/tasks/09-01-gateway-dbc-tcp-unification/research/gateway-dataflow.md","reason":"Current producer, sink, platform-default, channel, packaging, and persistence impact map."}
+{"file":".trellis/tasks/09-01-gateway-dbc-tcp-unification/research/web-and-authority.md","reason":"Current React/API contracts, batch mutation design constraints, and timed CAN lifecycle."}
+{"file":".trellis/tasks/09-01-gateway-dbc-tcp-unification/research/channel-contract.md","reason":"Separates logical CSV/Web channel labels from unchanged PC001 wire channel zero."}
+{"file":".trellis/tasks/09-01-gateway-dbc-tcp-unification/research/validation-scope.md","reason":"Focused automated and human validation split plus release impact."}
+{"file":".trellis/tasks/09-01-gateway-dbc-tcp-unification/research/frame-inventory.md","reason":"Authoritative current/planned producer inventory and PC001 channel framing boundary."}

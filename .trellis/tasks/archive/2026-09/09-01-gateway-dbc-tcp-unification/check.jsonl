@@ -1,0 +1,8 @@
+{"file":".trellis/spec/backend/can-gateway-control.md","reason":"Primary cross-layer compliance and regression checklist."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Required focused/full backend checks and provenance validation."}
+{"file":".trellis/spec/backend/can-qml-compatibility.md","reason":"Verify the task intentionally and consistently updates the stale A800 endian rule."}
+{"file":".trellis/spec/frontend/validation-budget.md","reason":"Keep Godot/UI validation proportionate and human-own visual interaction acceptance."}
+{"file":".trellis/tasks/09-01-gateway-dbc-tcp-unification/research/dbc-delta.md","reason":"Check DBC assets and encoding behavior against exact source evidence."}
+{"file":".trellis/tasks/09-01-gateway-dbc-tcp-unification/research/channel-contract.md","reason":"Prevent accidental PC001 wire protocol drift while adding logical channels."}
+{"file":".trellis/tasks/09-01-gateway-dbc-tcp-unification/research/validation-scope.md","reason":"Check all affected test and packaging boundaries without redundant heavy runs."}
+{"file":".trellis/tasks/09-01-gateway-dbc-tcp-unification/research/frame-inventory.md","reason":"Verify no hidden native CAN producer remains and PC001 metadata matches the approved decision."}
