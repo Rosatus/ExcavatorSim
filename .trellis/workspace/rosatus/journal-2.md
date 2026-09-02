@@ -73,3 +73,36 @@ Decoupled Godot-managed per-ID custom authority from transient PC001 handshake a
 ### Next Steps
 
 - None - task complete
+
+
+## Session 56: Gateway restart status and stable Web layout
+
+**Date**: 2026-09-02
+**Task**: Gateway restart status and stable Web layout
+**Branch**: `main`
+
+### Summary
+
+Replaced the misleading ICT toggle with owned Gateway lifecycle control, added realtime Godot telemetry liveness, stabilized the CAN table layout, rebuilt verified Windows/Linux Gateway test distributions, and archived the Trellis task.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `af69a0d` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
