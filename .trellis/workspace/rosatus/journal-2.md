@@ -39,3 +39,37 @@ Decoupled Godot-managed per-ID custom authority from transient PC001 handshake a
 ### Next Steps
 
 - None - task complete
+
+
+## Session 55: Gateway DBC TCP 统一与 PC001 测试客户端
+
+**Date**: 2026-09-02
+**Task**: Gateway DBC TCP 统一与 PC001 测试客户端
+**Branch**: `main`
+
+### Summary
+
+统一 Windows/Linux Gateway 默认 PC001 TCP 与新版 DBC channel 路由，完成 Web authority/runtime 更新、跨平台发行验证，并新增独立 PySide6 PC001 TCP 监视客户端及 Windows 包。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a7b01c1` | (see git log) |
+| `070dfe7` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

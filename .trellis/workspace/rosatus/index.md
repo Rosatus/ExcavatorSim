@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 54
-- **Last Active**: 2026-09-01
+- **Total Sessions**: 55
+- **Last Active**: 2026-09-02
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~41 | Active |
+| `journal-2.md` | ~75 | Active |
 | `journal-1.md` | ~1992 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 55 | 2026-09-02 | Gateway DBC TCP 统一与 PC001 测试客户端 | `a7b01c1`, `070dfe7` | `main` |
 | 54 | 2026-09-01 | Fix managed Gateway offline custom authority | `17487c2`, `c5118ad` | `main` |
 | 53 | 2026-09-01 | Visual-first arcade soil excavation | `6ba88bb` | `main` |
 | 52 | 2026-08-31 | Gateway Web CAN console and Linux release | `5e8e05b1faaa93f4b6ae1aa25f9d1341a821f068`, `9386c929bde6ef2c6c17340fefa3b3f8fd46e1c0` | `main` |
