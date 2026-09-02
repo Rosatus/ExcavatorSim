@@ -78,8 +78,8 @@ fingerprint 的 `excavatorsim-can-console` JSON；它不包含 TCP endpoint、ca
 ## Linux / SocketCAN 低延时模式（显式启用、暂时停止维护）
 
 Linux 默认与 Windows 一样启动 PC001 TCP Server，不会检查、配置或打开 `can0`。
-只有显式运行 `--sink socketcan --interface can0` 时，点击 **连接 ICT** 后，
-Gateway 才检查物理 `can0`：已满足 250 kbit/s、
+只有显式运行 `--sink socketcan --interface can0` 时，Gateway 才会在启动时检查物理
+`can0`：已满足 250 kbit/s、
 `restart-ms=100`、`txqueuelen=10` 且状态可用时直接绑定；否则通过受限
 helper 自动配置并复核。CAN 帧构造和 CSV 录制不受此流程影响。
 
@@ -145,9 +145,10 @@ ExcavatorSim gateway.exe (--sink tcp)          ICT 侧 (LinuxPC)
   ◄─ [u16 count] + count×[can_frame16B+i32 channel] ──► 写入 vcan0
 ```
 
-- 游戏 AdvancedPanel 的 **ICT IP / ICT 端口** 输入框配置监听地址
-  （持久化 user://ict_config.cfg，spawn 时经 argv 注入）；
-  [连接 ICT] 在 Windows/Linux 网关下均可用。
+- 游戏 AdvancedPanel 的 **Gateway TCP 地址 / 端口** 输入框配置监听地址
+  （兼容性持久化路径仍为 `user://ict_config.cfg`，spawn 时经 argv 注入）。
+  **启动/重启 Gateway** 只管理当前 Godot 实例创建的 Gateway 子进程；PC001 是否
+  已握手由旁边的独立状态灯显示。
 - 手动运行：`gateway[.exe] --sink tcp --tcp-host 0.0.0.0 --tcp-port 5678`
 - 对端：`python3 -m tools.can_replay bridge --host <本机IP> --port 5678 --interface vcan0`
 

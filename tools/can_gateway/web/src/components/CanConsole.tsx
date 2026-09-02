@@ -21,6 +21,7 @@ import {
   updateAllCanAuthorities,
   updateCanConsoleMessage,
 } from "../api";
+import { formatFreshness } from "../freshness";
 import type {
   CanAuthority,
   CanConsoleMessage,
@@ -270,15 +271,6 @@ function formatFrequency(value: number | null): string {
   return value === null ? "—" : `${value.toFixed(3)} Hz`;
 }
 
-function freshness(row: CanConsoleMessage, serverNow: number): { text: string; tone: string } {
-  const sentAt = row.runtime.last_egress_monotonic_s;
-  if (sentAt === null) return { text: "—", tone: "text-muted-foreground" };
-  const ageMs = Math.max(0, (serverNow - sentAt) * 1000);
-  if (ageMs > 999_000) return { text: ">999s", tone: "text-red-500" };
-  const text = ageMs < 1000 ? `${ageMs.toFixed(3)} ms` : `${(ageMs / 1000).toFixed(3)} s`;
-  return { text, tone: ageMs < 100 ? "text-emerald-500" : ageMs < 1000 ? "text-amber-500" : "text-red-500" };
-}
-
 export function CanConsole({
   status,
   consoleSnapshot,
@@ -356,14 +348,25 @@ export function CanConsole({
 
       {consoleSnapshot.load.warning && <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-200">估算总线负载 {consoleSnapshot.load.percent.toFixed(2)}%，负载较高但不会阻止发送。</div>}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1260px] border-collapse text-sm">
+        <table className="table-fixed w-full min-w-[1326px] border-collapse text-sm">
+          <colgroup data-testid="can-console-columns">
+            <col className="w-[48px]" />
+            <col className="w-[190px]" />
+            <col className="w-[88px]" />
+            <col className="w-[250px]" />
+            <col className="w-[100px]" />
+            <col className="w-[250px]" />
+            <col className="w-[120px]" />
+            <col className="w-[140px]" />
+            <col className="w-[140px]" />
+          </colgroup>
           <thead className="sticky top-0 z-10 bg-muted/90 text-left text-[11px] uppercase tracking-wider text-muted-foreground backdrop-blur">
             <tr><th className="w-10 px-3 py-3" /><th className="px-3 py-3">CAN ID</th><th className="px-3 py-3">Channel</th><th className="px-3 py-3">最近发送 Payload</th><th className="px-3 py-3">编辑</th><th className="px-3 py-3">发送权威</th><th className="px-3 py-3">预期频率</th><th className="px-3 py-3">实际频率</th><th className="px-3 py-3">新鲜度</th></tr>
           </thead>
           <tbody>
             {rows.map((row) => {
               const open = expanded.has(row.key);
-              const fresh = freshness(row, serverNow);
+              const fresh = formatFreshness(row, serverNow);
               const physical = row.runtime.values ?? null;
               return [
                 <tr key={row.key} className="border-t hover:bg-muted/25">
@@ -373,9 +376,9 @@ export function CanConsole({
                   <td className="px-3 py-3"><code className="whitespace-nowrap rounded bg-muted px-2 py-1 text-xs">{row.runtime.last_payload_hex ? row.runtime.last_payload_hex.match(/.{2}/g)?.join(" ") : "尚未发送"}</code></td>
                   <td className="px-3 py-3"><Button variant="outline" size="sm" disabled={row.authority !== "custom"} onClick={() => setEditing(row.key)}><Edit3 className="h-3.5 w-3.5" /> 编辑</Button></td>
                   <td className="px-3 py-3"><AuthorityControl row={row} status={status} busy={busy} mutate={mutate} /></td>
-                  <td className="px-3 py-3 font-mono">{row.expected_frequency_hz ? `${row.expected_frequency_hz} Hz` : "关闭"}</td>
-                  <td className="px-3 py-3 font-mono">{formatFrequency(row.runtime.actual_frequency_hz)}</td>
-                  <td className={`px-3 py-3 font-mono font-semibold ${fresh.tone}`}>{fresh.text}</td>
+                  <td className="whitespace-nowrap px-3 py-3 font-mono tabular-nums">{row.expected_frequency_hz ? `${row.expected_frequency_hz} Hz` : "关闭"}</td>
+                  <td className="whitespace-nowrap px-3 py-3 font-mono tabular-nums">{formatFrequency(row.runtime.actual_frequency_hz)}</td>
+                  <td className={`whitespace-nowrap px-3 py-3 font-mono font-semibold tabular-nums ${fresh.tone}`}>{fresh.text}</td>
                 </tr>,
                 open && <tr key={`${row.key}-detail`} className="border-t bg-muted/15"><td /><td colSpan={8} className="px-3 py-4">
                   {row.message.signals.length === 0 ? <span className="text-xs text-muted-foreground">该报文没有 DBC 物理量定义，仅展示原始 Payload。</span> : physical ? <div className="flex flex-wrap gap-2">{Object.entries(physical).map(([name, value]) => <Badge key={name} className="font-normal"><span className="mr-2 text-muted-foreground">{name}</span><span className="font-mono">{Number(value).toFixed(6)}</span></Badge>)}</div> : <span className="text-xs text-muted-foreground">尚无成功发送，暂无真实 payload 对应的物理量。</span>}

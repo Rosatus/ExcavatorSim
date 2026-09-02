@@ -59,6 +59,7 @@ class GatewayStatus:
     recording: bool
     timed_can_active: bool
     ict_active: bool
+    godot_connected: bool | None
     periodic_armed: bool
     tcp_host: str
     tcp_port: int
@@ -312,6 +313,7 @@ class GatewayRuntimeCore:
             recording=False,
             timed_can_active=False,
             ict_active=False,
+            godot_connected=False if mode == "godot-managed" else None,
             periodic_armed=False,
             tcp_host=tcp_host,
             tcp_port=tcp_port,
@@ -573,6 +575,7 @@ class GatewayRuntimeCore:
             "recording": status.recording,
             "timed_can_active": status.timed_can_active,
             "ict_active": status.ict_active,
+            "godot_connected": status.godot_connected,
             "periodic_armed": status.periodic_armed,
             "pc001_handshake": status.pc001_handshake,
             "pc001_queued_frames": status.pc001_queued_frames,

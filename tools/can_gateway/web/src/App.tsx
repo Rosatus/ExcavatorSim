@@ -33,8 +33,9 @@ function useTheme(): ["light" | "dark", () => void] {
   return [theme, () => setTheme((value) => value === "dark" ? "light" : "dark")];
 }
 
-function StatusItem({ label, value, ok = true }: { label: string; value: string; ok?: boolean }) {
-  return <div className="rounded-lg border bg-background/60 p-3"><div className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div><div className="mt-2 flex items-center gap-2 text-sm font-medium"><span className={`h-2 w-2 rounded-full ${ok ? "bg-emerald-500" : "bg-amber-500"}`} /><span className="truncate">{value}</span></div></div>;
+function StatusItem({ label, value, ok = true, neutral = false }: { label: string; value: string; ok?: boolean; neutral?: boolean }) {
+  const indicator = neutral ? "bg-muted-foreground" : ok ? "bg-emerald-500" : "bg-amber-500";
+  return <div className="rounded-lg border bg-background/60 p-3"><div className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div><div className="mt-2 flex items-center gap-2 text-sm font-medium"><span className={`h-2 w-2 rounded-full ${indicator}`} /><span className="truncate">{value}</span></div></div>;
 }
 
 function RuntimeSummary({ status }: { status: GatewayStatus }) {
@@ -42,7 +43,7 @@ function RuntimeSummary({ status }: { status: GatewayStatus }) {
   return <Card><CardHeader><CardTitle>运行状态</CardTitle><CardDescription>状态、累计计数和平台传输来自 Gateway 原子快照。</CardDescription></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
     <StatusItem label="传输" value={`${status.transport_kind} · ${status.transport_state}`} ok={status.transport_state === "ready"} />
     <StatusItem label={status.transport_kind === "tcp" ? "PC001" : "接口"} value={status.transport_kind === "tcp" ? (status.pc001_handshake ? "已握手" : "等待客户端") : status.can_interface} ok={status.transport_kind !== "tcp" || status.pc001_handshake} />
-    <StatusItem label="ICT" value={status.ict_active ? "已连接" : "未连接"} ok={status.ict_active} />
+    <StatusItem label="Godot" value={status.godot_connected === null ? "不适用（独立启动）" : status.godot_connected ? "已连接" : "未连接"} ok={status.godot_connected === true} neutral={status.godot_connected === null} />
     {socketcan ? <><StatusItem label="提交 / 发送" value={`${status.socketcan_submitted} / ${status.socketcan_sent}`} /><StatusItem label="拥塞丢弃 / 合并" value={`${status.socketcan_congestion_dropped} / ${status.socketcan_coalesced}`} ok={status.socketcan_congestion_dropped === 0} /><StatusItem label="终端错误" value={`${status.socketcan_terminal_errors}`} ok={status.socketcan_terminal_errors === 0} /></> : <><StatusItem label="PC001 队列" value={`${status.pc001_queued_frames}`} /><StatusItem label="发送 / 丢弃" value={`${status.pc001_sent_frames} / ${status.pc001_dropped_frames}`} ok={status.pc001_dropped_frames === 0} /><StatusItem label="日志丢弃" value={`${status.log_dropped_records}`} ok={status.log_dropped_records === 0} /></>}
   </CardContent></Card>;
 }

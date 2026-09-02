@@ -9,6 +9,7 @@ signal ict_link_status_changed(handshake_connected: bool, platform_linux: bool)
 
 const DEFAULT_PORT := 29764
 const DEFAULT_ACK_PORT := 29765
+const DEFAULT_WEB_PORT := 29777
 const EMIT_HZ := 50.0
 const TELEMETRY_MAGIC := 0x314E5443  # "CTN1"
 const CONTROL_MAGIC := 0x43544E43  # "CTNC"
@@ -37,6 +38,7 @@ enum GatewayLifecycle { IDLE, STARTING, STOPPING, FAILED }
 @export var remote_host := "127.0.0.1"
 @export var remote_port := DEFAULT_PORT
 @export var ack_port := DEFAULT_ACK_PORT
+@export var web_port := DEFAULT_WEB_PORT
 @export var auto_spawn := true
 @export var python_command := "python"
 ## Machine model selecting the gateway IMU mount-compensation table.
@@ -65,7 +67,7 @@ var _ict_requested := false
 var _ict_pending_seq := -1
 var _ict_active_seq := -1
 var _ict_result_deadline_ms := -1
-## PC001 TCP endpoint for Windows ICT (injected into gateway spawn argv).
+## Cross-platform PC001 TCP listener endpoint injected into Gateway spawn argv.
 var tcp_host := "0.0.0.0"
 var tcp_port := 5678
 var _spawned_tcp_host := ""
@@ -178,17 +180,17 @@ func set_tcp_endpoint(host: String, port_text: String) -> bool:
 	if trimmed_host.to_lower() != "localhost" and (
 		not trimmed_host.is_valid_ip_address() or ":" in trimmed_host
 	):
-		_last_gateway_error = "ICT host must be an IPv4 listener address or localhost"
+		_last_gateway_error = "Gateway TCP host must be an IPv4 listener address or localhost"
 		return false
 	var trimmed_port := port_text.strip_edges()
 	var parsed_port := 5678
 	if not trimmed_port.is_empty():
 		if not trimmed_port.is_valid_int():
-			_last_gateway_error = "ICT port must be an integer from 1 to 65535"
+			_last_gateway_error = "Gateway TCP port must be an integer from 1 to 65535"
 			return false
 		parsed_port = trimmed_port.to_int()
 	if parsed_port < 1 or parsed_port > 65535:
-		_last_gateway_error = "ICT port must be an integer from 1 to 65535"
+		_last_gateway_error = "Gateway TCP port must be an integer from 1 to 65535"
 		return false
 	tcp_host = trimmed_host.to_lower()
 	tcp_port = parsed_port
@@ -251,6 +253,10 @@ func respawn_gateway() -> bool:
 		_restart_after_stop = true
 		return true
 	if _gateway_lifecycle == GatewayLifecycle.FAILED:
+		if _gateway_pid <= 0 or not OS.is_process_running(_gateway_pid):
+			_gateway_pid = -1
+			_gateway_lifecycle = GatewayLifecycle.IDLE
+			return spawn_gateway()
 		_begin_gateway_restart()
 		return true
 	if _gateway_pid > 0 and OS.is_process_running(_gateway_pid):
@@ -258,6 +264,22 @@ func respawn_gateway() -> bool:
 		return true
 	_gateway_pid = -1
 	return spawn_gateway()
+
+
+func get_gateway_lifecycle_state() -> String:
+	match _gateway_lifecycle:
+		GatewayLifecycle.STARTING:
+			return "starting"
+		GatewayLifecycle.STOPPING:
+			return "stopping"
+		GatewayLifecycle.FAILED:
+			return "failed"
+		_:
+			return "idle"
+
+
+func is_gateway_restart_pending() -> bool:
+	return _gateway_lifecycle == GatewayLifecycle.STOPPING and _restart_after_stop
 
 
 ## --- process supervision ---
@@ -294,6 +316,7 @@ func _gateway_arguments_for_platform(_platform_name: String) -> PackedStringArra
 		"--host", remote_host,
 		"--port", str(remote_port),
 		"--ack-port", str(ack_port),
+		"--web-port", str(web_port),
 		"--out", _resolve_output_dir(),
 		"--model", model_id,
 		"--mode", "godot-managed",
@@ -327,10 +350,12 @@ func spawn_gateway() -> bool:
 	if argv.is_empty():
 		_set_gateway_error("CanTelemetryBridge: no gateway executable/script found")
 		_gateway_pid = -1
+		_gateway_lifecycle = GatewayLifecycle.FAILED
 		return false
 	_gateway_pid = OS.create_process(argv[0], argv.slice(1))
 	if _gateway_pid <= 0:
 		_set_gateway_error("CanTelemetryBridge: failed to spawn '%s'" % argv[0])
+		_gateway_lifecycle = GatewayLifecycle.FAILED
 		return false
 	_spawned_tcp_host = tcp_host
 	_spawned_tcp_port = tcp_port
@@ -359,11 +384,16 @@ func _service_gateway_lifecycle() -> void:
 	if _gateway_lifecycle == GatewayLifecycle.STARTING:
 		if _gateway_pid <= 0 or not OS.is_process_running(_gateway_pid):
 			_gateway_pid = -1
-			_gateway_lifecycle = GatewayLifecycle.IDLE
+			_gateway_lifecycle = GatewayLifecycle.FAILED
 			_ict_requested = false
 			_ict_active = false
 			_set_ict_link_state(false, false)
-			_set_gateway_error("CAN gateway exited before its first heartbeat")
+			_set_gateway_error(
+				(
+					"CAN gateway exited before its first heartbeat; verify TCP endpoint %s:%s "
+					+ "is available (external port owners are not terminated)"
+				) % [tcp_host, tcp_port]
+			)
 		elif now_ms >= _gateway_deadline_ms:
 			OS.kill(_gateway_pid)
 			_ict_requested = false

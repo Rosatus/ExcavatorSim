@@ -23,7 +23,8 @@ TOOLS_DIR = Path(__file__).resolve().parents[1]
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
-from control_protocol import CMD_SHUTDOWN, build_control  # noqa: E402
+from control_protocol import CMD_RECORD_STOP, CMD_SHUTDOWN, build_control  # noqa: E402
+from conventions import PACKET_MAGIC  # noqa: E402
 from pc001_sink import BATCH_PREFIX_STRUCT, SINGLE_FRAME_SIZE  # noqa: E402
 
 
@@ -56,6 +57,13 @@ def recv_exact(client: socket.socket, size: int) -> bytes:
             raise ConnectionError("PC001 connection closed")
         result += chunk
     return result
+
+
+def make_telemetry_packet(tick_ms: int) -> bytes:
+    raw = struct.pack("<IBBHQ", PACKET_MAGIC, 1, 0, 0, tick_ms)
+    for index in range(5):
+        raw += struct.pack("<4f3f", 0.0, 0.0, 0.0, 1.0, float(index), 0.0, 0.0)
+    return raw + struct.pack("<5f", 0.0, 0.0, 0.0, 0.0, 0.0)
 
 
 async def mutate_and_wait_event(
@@ -204,10 +212,21 @@ class GatewayStandaloneDbcProcessTest(unittest.TestCase):
                     {"expected_revision": revision},
                 )
                 self.assertTrue(started["result"]["status"]["periodic_armed"])
-                (count,) = BATCH_PREFIX_STRUCT.unpack(recv_exact(client, BATCH_PREFIX_STRUCT.size))
-                body = recv_exact(client, count * SINGLE_FRAME_SIZE)
-                self.assertEqual(struct.unpack("<I", body[:4])[0] & 0x1FFFFFFF, 0x0CFDA800)
-                self.assertEqual(body[8:16].hex(), "7b00c7ff00008700")
+                target_frame: bytes | None = None
+                deadline = time.time() + 3.0
+                while target_frame is None and time.time() < deadline:
+                    (count,) = BATCH_PREFIX_STRUCT.unpack(
+                        recv_exact(client, BATCH_PREFIX_STRUCT.size)
+                    )
+                    body = recv_exact(client, count * SINGLE_FRAME_SIZE)
+                    for offset in range(0, len(body), SINGLE_FRAME_SIZE):
+                        frame = body[offset : offset + SINGLE_FRAME_SIZE]
+                        if struct.unpack("<I", frame[:4])[0] & 0x1FFFFFFF == 0x0CFDA800:
+                            target_frame = frame
+                            break
+                self.assertIsNotNone(target_frame)
+                assert target_frame is not None
+                self.assertEqual(target_frame[8:16].hex(), "7b00c7ff00008700")
 
                 revision = started["result"]["status"]["revision"]
                 stopped = request_json(
@@ -230,6 +249,105 @@ class GatewayStandaloneDbcProcessTest(unittest.TestCase):
                 if client is not None:
                     client.close()
                 sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                sender.sendto(build_control(CMD_SHUTDOWN), ("127.0.0.1", udp_port))
+                sender.close()
+                try:
+                    process.wait(timeout=5.0)
+                except subprocess.TimeoutExpired:
+                    process.terminate()
+                    process.wait(timeout=3.0)
+                self.assertEqual(process.returncode, 0)
+
+
+class GatewayGodotActivityProcessTest(unittest.TestCase):
+    def test_only_valid_telemetry_drives_managed_godot_connection(self) -> None:
+        udp_port = free_port(udp=True)
+        ack_port = free_port(udp=True)
+        tcp_port = free_port()
+        web_port = free_port()
+        with tempfile.TemporaryDirectory() as tmp:
+            environment = dict(os.environ)
+            environment["LOCALAPPDATA"] = str(Path(tmp, "local"))
+            environment["XDG_CONFIG_HOME"] = str(Path(tmp, "config"))
+            environment["XDG_STATE_HOME"] = str(Path(tmp, "state"))
+            process = subprocess.Popen(
+                [
+                    sys.executable,
+                    str(TOOLS_DIR / "gateway.py"),
+                    "--mode",
+                    "godot-managed",
+                    "--sink",
+                    "tcp",
+                    "--host",
+                    "127.0.0.1",
+                    "--port",
+                    str(udp_port),
+                    "--ack-port",
+                    str(ack_port),
+                    "--tcp-host",
+                    "127.0.0.1",
+                    "--tcp-port",
+                    str(tcp_port),
+                    "--web-port",
+                    str(web_port),
+                    "--out",
+                    str(Path(tmp, "output")),
+                ],
+                cwd=TOOLS_DIR.parents[1],
+                env=environment,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            base = f"http://127.0.0.1:{web_port}"
+            sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                deadline = time.time() + 8.0
+                while True:
+                    try:
+                        status = request_json(f"{base}/api/v1/status")["status"]
+                        break
+                    except (OSError, urllib.error.URLError):
+                        if time.time() >= deadline:
+                            self.fail("managed Gateway Web API did not become ready")
+                        time.sleep(0.05)
+                self.assertFalse(status["godot_connected"])
+
+                sender.sendto(build_control(CMD_RECORD_STOP), ("127.0.0.1", udp_port))
+                sender.sendto(b"not-telemetry", ("127.0.0.1", udp_port))
+                time.sleep(0.1)
+                self.assertFalse(
+                    request_json(f"{base}/api/v1/status")["status"]["godot_connected"]
+                )
+
+                sender.sendto(make_telemetry_packet(1), ("127.0.0.1", udp_port))
+                deadline = time.time() + 2.0
+                while time.time() < deadline:
+                    if request_json(f"{base}/api/v1/status")["status"]["godot_connected"]:
+                        break
+                    time.sleep(0.05)
+                self.assertTrue(
+                    request_json(f"{base}/api/v1/status")["status"]["godot_connected"]
+                )
+
+                deadline = time.time() + 3.5
+                while time.time() < deadline:
+                    if not request_json(f"{base}/api/v1/status")["status"]["godot_connected"]:
+                        break
+                    time.sleep(0.05)
+                self.assertFalse(
+                    request_json(f"{base}/api/v1/status")["status"]["godot_connected"]
+                )
+
+                sender.sendto(make_telemetry_packet(2), ("127.0.0.1", udp_port))
+                deadline = time.time() + 2.0
+                while time.time() < deadline:
+                    if request_json(f"{base}/api/v1/status")["status"]["godot_connected"]:
+                        break
+                    time.sleep(0.05)
+                self.assertTrue(
+                    request_json(f"{base}/api/v1/status")["status"]["godot_connected"]
+                )
+            finally:
                 sender.sendto(build_control(CMD_SHUTDOWN), ("127.0.0.1", udp_port))
                 sender.close()
                 try:

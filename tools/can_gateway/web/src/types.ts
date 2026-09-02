@@ -12,6 +12,7 @@ export interface GatewayStatus {
   recording: boolean;
   timed_can_active: boolean;
   ict_active: boolean;
+  godot_connected: boolean | null;
   periodic_armed: boolean;
   tcp_host: string;
   tcp_port: number;
@@ -202,6 +203,7 @@ export type GatewayRuntimeStatusDelta = Pick<GatewayStatus,
   | "recording"
   | "timed_can_active"
   | "ict_active"
+  | "godot_connected"
   | "periodic_armed"
   | "pc001_handshake"
   | "pc001_queued_frames"
@@ -229,6 +231,7 @@ function decodeRuntimeStatus(value: unknown): GatewayRuntimeStatusDelta | null {
   ] as const;
   if (stringFields.some((key) => typeof candidate[key] !== "string")) return null;
   if (booleanFields.some((key) => typeof candidate[key] !== "boolean")) return null;
+  if (!(candidate.godot_connected === null || typeof candidate.godot_connected === "boolean")) return null;
   if (counterFields.some((key) => !Number.isInteger(candidate[key]) || (candidate[key] as number) < 0)) return null;
   return {
     transport_state: candidate.transport_state as string,
@@ -236,6 +239,7 @@ function decodeRuntimeStatus(value: unknown): GatewayRuntimeStatusDelta | null {
     recording: candidate.recording as boolean,
     timed_can_active: candidate.timed_can_active as boolean,
     ict_active: candidate.ict_active as boolean,
+    godot_connected: candidate.godot_connected as boolean | null,
     periodic_armed: candidate.periodic_armed as boolean,
     pc001_handshake: candidate.pc001_handshake as boolean,
     pc001_queued_frames: candidate.pc001_queued_frames as number,

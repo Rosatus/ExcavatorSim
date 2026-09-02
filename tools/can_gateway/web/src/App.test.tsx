@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
+import { formatFreshness } from "./freshness";
 import type { CanConsoleMessage, CanConsoleSnapshot, GatewayStatus } from "./types";
 
 const status: GatewayStatus = {
@@ -16,6 +17,7 @@ const status: GatewayStatus = {
   recording: false,
   timed_can_active: false,
   ict_active: true,
+  godot_connected: null,
   periodic_armed: false,
   tcp_host: "127.0.0.1",
   tcp_port: 5678,
@@ -133,13 +135,32 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("CAN console", () => {
+  it("keeps freshness formatting bounded across color and unit thresholds", () => {
+    const atAge = (ageSeconds: number) => formatFreshness({
+      ...row,
+      runtime: { ...row.runtime, last_egress_monotonic_s: 100 - ageSeconds },
+    }, 100);
+    expect(atAge(0.05)).toEqual({ text: "50.000 ms", tone: "text-emerald-500" });
+    expect(atAge(0.1)).toEqual({ text: "100.000 ms", tone: "text-emerald-500" });
+    expect(atAge(0.101)).toEqual({ text: "101.000 ms", tone: "text-amber-500" });
+    expect(atAge(0.999)).toEqual({ text: "999.000 ms", tone: "text-amber-500" });
+    expect(atAge(1)).toEqual({ text: "1.000 s", tone: "text-red-500" });
+    expect(atAge(999)).toEqual({ text: "999.000 s", tone: "text-red-500" });
+    expect(atAge(999.001)).toEqual({ text: ">999s", tone: "text-red-500" });
+  });
+
   it("renders egress payload, frequency, freshness and expanded physical values", async () => {
     installFetch();
     render(<App />);
     expect(await screen.findByText("0xCFDA800")).toBeInTheDocument();
+    expect(screen.getByText("不适用（独立启动）")).toBeInTheDocument();
     expect(screen.getByText("7B 00 00 00 00 00 00 00")).toBeInTheDocument();
     expect(screen.getByText("49.875 Hz")).toBeInTheDocument();
     expect(screen.getByText(/ms$/)).toHaveClass("text-emerald-500");
+    const table = screen.getByRole("table");
+    expect(table).toHaveClass("table-fixed", "min-w-[1326px]");
+    expect(screen.getByTestId("can-console-columns").children).toHaveLength(9);
+    expect(screen.getByText(/ms$/)).toHaveClass("whitespace-nowrap", "tabular-nums");
     await userEvent.click(screen.getByRole("button", { name: "展开物理量" }));
     expect(screen.getByText("1.230000")).toBeInTheDocument();
   });
@@ -180,11 +201,13 @@ describe("CAN console", () => {
 
   it("keeps managed row overrides while hiding standalone-only controls", async () => {
     installFetch(
-      { ...status, mode: "godot-managed", pc001_handshake: false, pc001_dropped_frames: 456822 },
+      { ...status, mode: "godot-managed", godot_connected: false, pc001_handshake: false, pc001_dropped_frames: 456822 },
       { ...consoleSnapshot, messages: [{ ...row, authority: "simulation", simulation_available: true }] },
     );
     render(<App />);
     expect(await screen.findByText("Godot 托管会话")).toBeInTheDocument();
+    expect(screen.getByText("未连接")).toBeInTheDocument();
+    expect(screen.queryByText("ICT")).not.toBeInTheDocument();
     expect(screen.queryByText("Windows PC001 Server")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /导出/ })).not.toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "自定义" })).toBeEnabled();
@@ -203,13 +226,20 @@ describe("CAN console", () => {
   });
 
   it("updates the runtime summary from the realtime status delta", async () => {
-    installFetch();
+    installFetch({ ...status, mode: "godot-managed", godot_connected: false });
     render(<App />);
     await screen.findByText("12 / 0");
+    expect(screen.getByText("未连接")).toBeInTheDocument();
     const fetchCount = vi.mocked(fetch).mock.calls.length;
-    MockWebSocket.instances.at(-1)!.emit({ type: "event", event: { sequence: 1, timestamp: "2026-08-31T00:00:00", monotonic_s: 101, kind: "can_console_runtime", source: "transport", detail: { server_monotonic_s: 101, rows: {}, status: { transport_state: "ready", transport_detail: "tcp:127.0.0.1:5678", recording: false, timed_can_active: false, ict_active: true, periodic_armed: false, pc001_handshake: false, pc001_queued_frames: 0, pc001_sent_frames: 13, pc001_dropped_frames: 456823, socketcan_submitted: 0, socketcan_sent: 0, socketcan_congestion_dropped: 0, socketcan_coalesced: 0, socketcan_terminal_errors: 0, socketcan_pending: 0, log_dropped_records: 0 } } } });
+    const emitStatus = (sequence: number, godotConnected: boolean) => MockWebSocket.instances.at(-1)!.emit({ type: "event", event: { sequence, timestamp: "2026-08-31T00:00:00", monotonic_s: 100 + sequence, kind: "can_console_runtime", source: "transport", detail: { server_monotonic_s: 100 + sequence, rows: {}, status: { transport_state: "ready", transport_detail: "tcp:127.0.0.1:5678", recording: false, timed_can_active: false, ict_active: true, godot_connected: godotConnected, periodic_armed: false, pc001_handshake: false, pc001_queued_frames: 0, pc001_sent_frames: 13, pc001_dropped_frames: 456823, socketcan_submitted: 0, socketcan_sent: 0, socketcan_congestion_dropped: 0, socketcan_coalesced: 0, socketcan_terminal_errors: 0, socketcan_pending: 0, log_dropped_records: 0 } } } });
+    emitStatus(1, true);
     expect(await screen.findByText("13 / 456823")).toBeInTheDocument();
     expect(screen.getByText("等待客户端")).toBeInTheDocument();
+    expect(screen.getByText("已连接")).toBeInTheDocument();
+    emitStatus(2, false);
+    expect(await screen.findByText("未连接")).toBeInTheDocument();
+    emitStatus(3, true);
+    expect(await screen.findByText("已连接")).toBeInTheDocument();
     expect(vi.mocked(fetch).mock.calls).toHaveLength(fetchCount);
   });
 

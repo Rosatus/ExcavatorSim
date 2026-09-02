@@ -85,9 +85,24 @@ from vcan_setup import VcanSetupError, ensure_vcan_interface
 PACKET_MAGIC = 0x314E5443
 HEARTBEAT_INTERVAL_S = 0.5
 RECEIVE_POLL_LIMIT_S = 0.05
+GODOT_ACTIVITY_TIMEOUT_S = 2.5
 TIMED_CAN_PERIOD_S = 1.0 / TIMED_CAN_FREQUENCY_HZ
 TIMED_CAN_DURATION_S = 10.0
 TIMED_CAN_FRAME_COUNT = 500
+
+
+def godot_connection_state(
+    mode: str,
+    last_telemetry_s: float | None,
+    now_s: float,
+) -> bool | None:
+    """Project recent valid Godot telemetry without coupling it to any sink."""
+    if mode != "godot-managed":
+        return None
+    return (
+        last_telemetry_s is not None
+        and now_s - last_telemetry_s <= GODOT_ACTIVITY_TIMEOUT_S
+    )
 _PROTOCOL_CODEC: DbcCodec | None = None
 
 
@@ -361,6 +376,7 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
         "terminal_error": 0,
     }
     last_pc001_handshake = False
+    last_godot_telemetry_s: float | None = None
     platform_linux = platform_name == "linux"
     initial_transport_state = "ready" if ict_sink is not None else "stopped"
     core.publish(
@@ -580,7 +596,7 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
             ict_sink = None
             active_ict_seq = None
 
-    def refresh_runtime_status() -> None:
+    def refresh_runtime_status(monotonic_s: float) -> None:
         nonlocal last_pc001_handshake
         pc001 = ict_sink.status_snapshot() if isinstance(ict_sink, TcpPc001Sink) else None
         socketcan = ict_sink.stats if isinstance(ict_sink, SocketCanSink) else None
@@ -611,6 +627,11 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
             timed_can_active=timed_can.active,
             ict_active=active_ict_seq is not None
             or (args.mode == "standalone" and ict_sink is not None),
+            godot_connected=godot_connection_state(
+                args.mode,
+                last_godot_telemetry_s,
+                monotonic_s,
+            ),
             pc001_handshake=handshake_connected,
             pc001_queued_frames=pc001.queued_frames if pc001 is not None else 0,
             pc001_sent_frames=pc001.sent_frames if pc001 is not None else 0,
@@ -938,7 +959,7 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                 purge_socketcan_timed(timed_generation, "completed")
             retire_failed_socketcan()
             core.flush_transmission_aggregates(monotonic_s)
-            refresh_runtime_status()
+            refresh_runtime_status(monotonic_s)
             core.flush_console_runtime(monotonic_s)
             now_s = time.time()
             if now_s - last_heartbeat_s >= HEARTBEAT_INTERVAL_S:
@@ -1090,6 +1111,7 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
             if sample is None:
                 print("bad packet (magic/version/size), dropped", file=sys.stderr)
                 continue
+            last_godot_telemetry_s = time.monotonic()
             sinks = active_sinks()
             if sinks:
                 try:

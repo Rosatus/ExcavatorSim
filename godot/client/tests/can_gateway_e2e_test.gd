@@ -10,6 +10,7 @@ const TEST_GATEWAY_PORT := 39764
 const TEST_ACK_PORT := 39765
 const TEST_ICT_PORT := 39774
 const TEST_ICT_RESTART_PORT := 39775
+const TEST_WEB_PORT := 39777
 
 
 var _failures := 0
@@ -29,6 +30,11 @@ func _run() -> void:
 		print("FAIL: CanTelemetryBridge autoload missing")
 		quit(1)
 		return
+	var gateway_python := ProjectSettings.globalize_path(
+		"res://../../.pixi/envs/gateway/python.exe"
+	)
+	if OS.get_name() == "Windows" and FileAccess.file_exists(gateway_python):
+		bridge.python_command = gateway_python
 	# Avoid colliding with a running packaged product on the production ports.
 	bridge.remote_port = TEST_GATEWAY_PORT
 	var existing_ack := bridge.get("_ack") as PacketPeerUDP
@@ -36,12 +42,13 @@ func _run() -> void:
 		existing_ack.close()
 	bridge.set("_ack_bound", false)
 	bridge.ack_port = TEST_ACK_PORT
+	bridge.web_port = TEST_WEB_PORT
 	_check(bool(bridge.call("_ensure_ack_bound")),
 		"headless E2E binds the isolated gateway heartbeat port")
 	var default_endpoint := bridge.get_desired_tcp_endpoint_for_test() as Dictionary
 	_check(not bridge.set_tcp_endpoint("not a listener", "5678")
 		and bridge.get_desired_tcp_endpoint_for_test() == default_endpoint,
-		"invalid ICT host does not mutate the running endpoint")
+		"invalid Gateway TCP host does not mutate the running endpoint")
 	_check(bridge.set_tcp_endpoint("127.0.0.1", str(TEST_ICT_PORT)),
 		"test ICT endpoint is valid")
 	var gateway_command: PackedStringArray = bridge.call("_resolve_gateway_command")
@@ -59,6 +66,11 @@ func _run() -> void:
 	_check(
 		linux_arguments.has("--mode") and linux_arguments.has("godot-managed"),
 		"gateway command selects explicit Godot-managed mode"
+	)
+	_check(
+		linux_arguments.has("--web-port")
+		and linux_arguments.has(str(TEST_WEB_PORT)),
+		"gateway command carries the isolated Web console port"
 	)
 	_check(
 		linux_arguments.has("--sink") and linux_arguments.has("tcp")
@@ -197,10 +209,10 @@ func _run() -> void:
 				"accepted PC001 socket reaches the Godot heartbeat state")
 			await process_frame
 			var ict_status_label := scene.get_node_or_null(
-				"OperatorUI/StatusPanel/Margin/VBox/Tools/ICTHandshakeStatus/Label"
+				"OperatorUI/StatusPanel/Margin/VBox/Tools/PC001HandshakeStatus/Label"
 			) as Label
 			var ict_status_lamp := scene.get_node_or_null(
-				"OperatorUI/StatusPanel/Margin/VBox/Tools/ICTHandshakeStatus/Lamp"
+				"OperatorUI/StatusPanel/Margin/VBox/Tools/PC001HandshakeStatus/Lamp"
 			) as Panel
 			_check(
 				ict_status_label != null and ict_status_label.text == "已握手"

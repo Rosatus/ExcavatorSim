@@ -55,14 +55,14 @@ var _ignore_quality_toggle := false
 @onready var _diagnostics_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/Diagnostics
 @onready var _can_status_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/CANStatus
 @onready var _can_output_button: Button = $StatusPanel/Margin/VBox/Tools/CANOutputToggle
-@onready var _ict_button: Button = $StatusPanel/Margin/VBox/Tools/ICTConnectToggle
-@onready var _ict_handshake_lamp: Panel = $StatusPanel/Margin/VBox/Tools/ICTHandshakeStatus/Lamp
-@onready var _ict_handshake_label: Label = $StatusPanel/Margin/VBox/Tools/ICTHandshakeStatus/Label
+@onready var _gateway_button: Button = $StatusPanel/Margin/VBox/Tools/GatewayRestartButton
+@onready var _pc001_handshake_lamp: Panel = $StatusPanel/Margin/VBox/Tools/PC001HandshakeStatus/Lamp
+@onready var _pc001_handshake_label: Label = $StatusPanel/Margin/VBox/Tools/PC001HandshakeStatus/Label
 @onready var _timed_can_button: Button = $StatusPanel/Margin/VBox/Tools/TimedCANTrigger
-@onready var _ict_host_edit: LineEdit = $StatusPanel/Margin/VBox/AdvancedPanel/ICTHost
-@onready var _ict_port_edit: LineEdit = $StatusPanel/Margin/VBox/AdvancedPanel/ICTPort
+@onready var _gateway_host_edit: LineEdit = $StatusPanel/Margin/VBox/AdvancedPanel/GatewayHost
+@onready var _gateway_port_edit: LineEdit = $StatusPanel/Margin/VBox/AdvancedPanel/GatewayPort
 
-const ICT_CONFIG_PATH := "user://ict_config.cfg"
+const GATEWAY_CONFIG_PATH := "user://ict_config.cfg"
 @onready var _bucket_volume_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/BucketVolume
 @onready var _advanced_panel: VBoxContainer = $StatusPanel/Margin/VBox/AdvancedPanel
 @onready var _start_button: Button = $StatusPanel/Margin/VBox/Actions/Start
@@ -104,11 +104,9 @@ func _ready() -> void:
 	_test_graphics_button.toggled.connect(_on_test_graphics_toggled)
 	_bucket_passthrough_button.toggled.connect(_on_bucket_passthrough_toggled)
 	_can_output_button.pressed.connect(_on_can_output_pressed)
-	_ict_button.pressed.connect(_on_ict_pressed)
+	_gateway_button.pressed.connect(_on_gateway_restart_pressed)
 	_timed_can_button.pressed.connect(_on_timed_can_pressed)
-	_load_ict_config()
-	_ict_host_edit.text_changed.connect(func(_t: String) -> void: _save_ict_config())
-	_ict_port_edit.text_changed.connect(func(_t: String) -> void: _save_ict_config())
+	_load_gateway_config()
 	_guide_close_button.pressed.connect(_on_guide_closed)
 	_reset_view_button.pressed.connect(_on_reset_view_pressed)
 	_confirmation.confirmed.connect(_on_destructive_confirmed)
@@ -129,7 +127,7 @@ func _ready() -> void:
 		_camera.mode_changed.connect(_on_camera_mode_changed)
 	var can_bridge := _can_bridge()
 	if can_bridge != null and can_bridge.has_signal("ict_link_status_changed"):
-		can_bridge.connect("ict_link_status_changed", _on_ict_link_status_changed)
+		can_bridge.connect("ict_link_status_changed", _on_pc001_link_status_changed)
 	_advanced_panel.visible = false
 	_set_panel_collapsed(false)
 	_sync_test_graphics_toggle()
@@ -389,22 +387,27 @@ func _offer_segment_save(bridge: Node) -> void:
 	dialog.popup_centered(Vector2i(900, 600))
 
 
-func _on_ict_pressed() -> void:
+func _on_gateway_restart_pressed() -> void:
 	var bridge := _can_bridge()
 	if bridge == null:
-		_ict_button.button_pressed = false
+		_completion_label.text = "Gateway is unavailable."
 		return
-	var enable := _ict_button.button_pressed
-	if enable:
-		if not bridge.set_tcp_endpoint(
-			_ict_host_edit.text.strip_edges(), _ict_port_edit.text.strip_edges()
-		):
-			var error := String(bridge.get_last_gateway_error())
-			_completion_label.text = "ICT endpoint invalid: %s" % error
-			push_warning(_completion_label.text)
-			_ict_button.button_pressed = false
-			return
-	bridge.set_ict_connected(enable)
+	if not bridge.set_tcp_endpoint(
+		_gateway_host_edit.text.strip_edges(), _gateway_port_edit.text.strip_edges()
+	):
+		var endpoint_error := String(bridge.get_last_gateway_error())
+		_completion_label.text = "Gateway endpoint invalid: %s" % endpoint_error
+		push_warning(_completion_label.text)
+		return
+	_save_gateway_config()
+	if not bridge.respawn_gateway():
+		var spawn_error := String(bridge.get_last_gateway_error())
+		_completion_label.text = "Gateway failed to start: %s" % (
+			spawn_error if not spawn_error.is_empty() else "restart request was rejected"
+		)
+		push_warning(_completion_label.text)
+	else:
+		_completion_label.text = "Gateway restart requested; waiting for a fresh heartbeat."
 	_refresh_can_status()
 
 
@@ -418,18 +421,18 @@ func _on_timed_can_pressed() -> void:
 	_completion_label.text = "CAN 0x18FFF100: sending at 50 Hz for 10 seconds."
 
 
-func _load_ict_config() -> void:
+func _load_gateway_config() -> void:
 	var cfg := ConfigFile.new()
-	if cfg.load(ICT_CONFIG_PATH) == OK:
-		_ict_host_edit.text = String(cfg.get_value("ict", "host", ""))
-		_ict_port_edit.text = String(cfg.get_value("ict", "port", ""))
+	if cfg.load(GATEWAY_CONFIG_PATH) == OK:
+		_gateway_host_edit.text = String(cfg.get_value("ict", "host", ""))
+		_gateway_port_edit.text = String(cfg.get_value("ict", "port", ""))
 
 
-func _save_ict_config() -> void:
+func _save_gateway_config() -> void:
 	var cfg := ConfigFile.new()
-	cfg.set_value("ict", "host", _ict_host_edit.text.strip_edges())
-	cfg.set_value("ict", "port", _ict_port_edit.text.strip_edges())
-	cfg.save(ICT_CONFIG_PATH)
+	cfg.set_value("ict", "host", _gateway_host_edit.text.strip_edges())
+	cfg.set_value("ict", "port", _gateway_port_edit.text.strip_edges())
+	cfg.save(GATEWAY_CONFIG_PATH)
 
 
 func _refresh_can_status() -> void:
@@ -438,27 +441,30 @@ func _refresh_can_status() -> void:
 		_can_status_label.text = "CAN Gateway: unavailable"
 		_can_output_button.text = "开始记录 CAN"
 		_can_output_button.button_pressed = false
-		_set_ict_button(false, false, false, "CAN 网关不可用")
-		_set_ict_handshake_indicator("unavailable")
+		_set_gateway_button(null)
+		_set_pc001_handshake_indicator("unavailable")
 		_timed_can_button.disabled = true
 		return
-	# Godot-managed Gateway uses PC001 TCP on Windows and Linux alike.
-	var linux_gw := false
 	if bridge.is_ict_handshake_connected():
-		_set_ict_handshake_indicator("connected")
+		_set_pc001_handshake_indicator("connected")
 	else:
-		_set_ict_handshake_indicator("waiting" if bridge.is_gateway_online() else "offline")
+		_set_pc001_handshake_indicator("waiting" if bridge.is_gateway_online() else "offline")
+	_set_gateway_button(bridge)
 	match int(bridge.get_status()):
 		0:
 			var gateway_error := String(bridge.get_last_gateway_error())
-			_can_status_label.text = "CAN Gateway: offline" if gateway_error.is_empty() \
-				else "CAN Gateway: offline (%s)" % gateway_error
+			var lifecycle := String(bridge.get_gateway_lifecycle_state())
+			if lifecycle == "starting":
+				_can_status_label.text = "CAN Gateway: starting"
+			elif lifecycle == "stopping":
+				_can_status_label.text = "CAN Gateway: restarting" \
+					if bridge.is_gateway_restart_pending() else "CAN Gateway: stopping"
+			elif not gateway_error.is_empty():
+				_can_status_label.text = "CAN Gateway: failed (%s)" % gateway_error
+			else:
+				_can_status_label.text = "CAN Gateway: offline"
 			_can_output_button.text = "开始记录 CAN（离线，点击重试）"
 			_can_output_button.button_pressed = false
-			_set_ict_button(
-				false, linux_gw, bridge.is_ict_active(),
-				"网关正在启动或重启" if bridge.is_ict_requested() else "网关离线，连接后重试"
-			)
 			_timed_can_button.disabled = true
 		1:
 			var idle_error := String(bridge.get_last_gateway_error())
@@ -466,64 +472,64 @@ func _refresh_can_status() -> void:
 				else "CAN Gateway: online — %s" % idle_error
 			_can_output_button.text = "开始记录 CAN"
 			_can_output_button.button_pressed = false
-			_set_ict_button(true, linux_gw, bridge.is_ict_active(), "")
 			_timed_can_button.disabled = false
 		2:
 			_can_status_label.text = "CAN Gateway: recording"
 			_can_output_button.text = "停止并保存"
 			_can_output_button.button_pressed = true
-			_set_ict_button(true, linux_gw, bridge.is_ict_active(), "")
 			_timed_can_button.disabled = false
 
 
-func _set_ict_button(online: bool, _linux_gateway: bool, active: bool, disabled_reason: String) -> void:
-	var usable := online
-	var bridge := _can_bridge()
-	var connecting: bool = bridge != null and bridge.has_method("is_ict_connecting") \
-		and bridge.is_ict_connecting()
-	_ict_button.disabled = not usable
-	_ict_button.tooltip_text = disabled_reason if not usable else (
-		"PC001 TCP %s:%s（Windows/Linux 默认一致；对端用 socket_client_to_vcan 桥接）"
-			% [_ict_host_edit.text.strip_edges() if not _ict_host_edit.text.strip_edges().is_empty() else "0.0.0.0",
-				_ict_port_edit.text.strip_edges() if not _ict_port_edit.text.strip_edges().is_empty() else "5678"]
-	)
-	if not usable:
-		_ict_button.text = "ICT 正在重连…" if connecting else "连接 ICT（网关离线）"
-		_ict_button.button_pressed = connecting
-	elif connecting:
-		_ict_button.text = "ICT 正在连接…"
-		_ict_button.button_pressed = true
-		_ict_button.disabled = true
-	elif active:
-		_ict_button.text = "断开 ICT"
-		_ict_button.button_pressed = true
-	else:
-		_ict_button.text = "连接 ICT"
-		_ict_button.button_pressed = false
+func _set_gateway_button(bridge: Node) -> void:
+	if bridge == null:
+		_gateway_button.text = "Gateway 不可用"
+		_gateway_button.disabled = true
+		_gateway_button.tooltip_text = "CAN 网关不可用"
+		return
+	var endpoint := "PC001 TCP %s:%s" % [
+		_gateway_host_edit.text.strip_edges() if not _gateway_host_edit.text.strip_edges().is_empty() else "0.0.0.0",
+		_gateway_port_edit.text.strip_edges() if not _gateway_port_edit.text.strip_edges().is_empty() else "5678",
+	]
+	_gateway_button.tooltip_text = "%s；仅重启本 Godot 实例托管的 Gateway" % endpoint
+	match String(bridge.get_gateway_lifecycle_state()):
+		"starting":
+			_gateway_button.text = "Gateway 启动中…"
+			_gateway_button.disabled = true
+		"stopping":
+			_gateway_button.text = "Gateway 重启中…" \
+				if bridge.is_gateway_restart_pending() else "Gateway 停止中…"
+			_gateway_button.disabled = true
+		"failed":
+			_gateway_button.text = "重试启动 Gateway"
+			_gateway_button.disabled = false
+		_:
+			_gateway_button.text = "重启 Gateway" if bridge.is_gateway_online() \
+				else ("重试启动 Gateway" if not String(bridge.get_last_gateway_error()).is_empty() else "启动 Gateway")
+			_gateway_button.disabled = false
 
 
-func _set_ict_handshake_indicator(state: String) -> void:
+func _set_pc001_handshake_indicator(state: String) -> void:
 	match state:
 		"connected":
-			_ict_handshake_lamp.self_modulate = Color("67dfa0")
-			_ict_handshake_label.text = "已握手"
-			_ict_handshake_label.tooltip_text = "PC001 客户端已完成 who / PC001 握手"
+			_pc001_handshake_lamp.self_modulate = Color("67dfa0")
+			_pc001_handshake_label.text = "已握手"
+			_pc001_handshake_label.tooltip_text = "PC001 客户端已完成 who / PC001 握手"
 		"not_applicable":
-			_ict_handshake_lamp.self_modulate = Color("b8c0c8")
-			_ict_handshake_label.text = "直连"
-			_ict_handshake_label.tooltip_text = "Linux/can0 直连，无需 PC001 TCP 握手"
+			_pc001_handshake_lamp.self_modulate = Color("b8c0c8")
+			_pc001_handshake_label.text = "直连"
+			_pc001_handshake_label.tooltip_text = "Linux/can0 直连，无需 PC001 TCP 握手"
 		"waiting":
-			_ict_handshake_lamp.self_modulate = Color("ef5350")
-			_ict_handshake_label.text = "待握手"
-			_ict_handshake_label.tooltip_text = "Gateway 在线，等待 PC001 客户端完成握手"
+			_pc001_handshake_lamp.self_modulate = Color("ef5350")
+			_pc001_handshake_label.text = "待握手"
+			_pc001_handshake_label.tooltip_text = "Gateway 在线，等待 PC001 客户端完成握手"
 		_:
-			_ict_handshake_lamp.self_modulate = Color("ef5350")
-			_ict_handshake_label.text = "未连接"
-			_ict_handshake_label.tooltip_text = "尚无已完成握手的 PC001 客户端"
-	_ict_handshake_lamp.tooltip_text = _ict_handshake_label.tooltip_text
+			_pc001_handshake_lamp.self_modulate = Color("ef5350")
+			_pc001_handshake_label.text = "未连接"
+			_pc001_handshake_label.tooltip_text = "尚无已完成握手的 PC001 客户端"
+	_pc001_handshake_lamp.tooltip_text = _pc001_handshake_label.tooltip_text
 
 
-func _on_ict_link_status_changed(_connected: bool, _platform_linux: bool) -> void:
+func _on_pc001_link_status_changed(_connected: bool, _platform_linux: bool) -> void:
 	_refresh_can_status()
 
 

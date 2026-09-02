@@ -70,12 +70,14 @@ from encoders.travel_pilot import (  # noqa: E402
     travel_body_moving,
 )
 from gateway import (  # noqa: E402
+    GODOT_ACTIVITY_TIMEOUT_S,
     TIMED_CAN_DURATION_S,
     TIMED_CAN_FRAME_COUNT,
     TIMED_CAN_ID,
     TIMED_CAN_PAYLOAD,
     TIMED_CAN_PERIOD_S,
     TimedCanBurst,
+    godot_connection_state,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures" / "golden_capture.json"
@@ -232,6 +234,24 @@ class TravelSemanticsTest(unittest.TestCase):
 
 
 class PacketAndCsvTest(unittest.TestCase):
+    def test_godot_connection_projection_is_mode_and_timeout_aware(self) -> None:
+        self.assertIsNone(godot_connection_state("standalone", 10.0, 10.1))
+        self.assertFalse(godot_connection_state("godot-managed", None, 10.0))
+        self.assertTrue(
+            godot_connection_state(
+                "godot-managed",
+                10.0,
+                10.0 + GODOT_ACTIVITY_TIMEOUT_S,
+            )
+        )
+        self.assertFalse(
+            godot_connection_state(
+                "godot-managed",
+                10.0,
+                10.0 + GODOT_ACTIVITY_TIMEOUT_S + 0.001,
+            )
+        )
+
     def test_bridge_packet_roundtrip(self) -> None:
         sample = parse_packet(make_packet(12345, swing_rad=0.77, left=0.4))
         self.assertIsNotNone(sample)

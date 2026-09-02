@@ -65,8 +65,10 @@ TCP server currently stores a client accepted after `who` / `PC001`.
 
 - `CanTelemetryBridge` is the only owner of its gateway child PID, desired TCP
   endpoint, spawned endpoint, restart state, and deferred ICT request.
-- The existing ICT toggle remains two-step: ON-to-OFF sends disconnect; the next
-  OFF-to-ON validates the panel endpoint and reconnects.
+- The operator-facing control is a momentary Gateway start/restart action. It
+  validates and persists the TCP endpoint before calling `respawn_gateway()`;
+  the legacy ICT request/active state remains internal compatibility state and
+  must not be presented as process or peer connection truth.
 - An equal desired/spawned endpoint reuses the child. A different endpoint sends
   shutdown, waits until the exact owned PID exits, drains stale ACK packets,
   resets heartbeat freshness, then spawns with the new endpoint.
@@ -76,9 +78,10 @@ TCP server currently stores a client accepted after `who` / `PC001`.
   `OS.create_process`; never scan or kill by process name or port.
 - Windows native and Python-development launch paths share the same gateway
   argument builder and include `--sink tcp --tcp-host HOST --tcp-port PORT`.
-- Linux product launch paths use `--sink socketcan --interface can0`. The
-  retained `--sink vcan` path is development-only compatibility and must
-  prepare the vcan device before binding it.
+- Windows and Linux product launch paths use TCP. Linux SocketCAN is available
+  only through explicit `--sink socketcan --interface can0`; the retained
+  `--sink vcan` path is development-only compatibility and must prepare the
+  vcan device before binding it.
 - Linux ICT_START first inspects driver-created `can0` through detailed
   iproute2 JSON. Ready means kind CAN, netdev UP, bitrate `250000`,
   `restart-ms=100`, `txqueuelen=10`, and a usable controller state. A ready
@@ -142,8 +145,8 @@ TCP server currently stores a client accepted after `who` / `PC001`.
 |---|---|
 | Host is empty | Normalize to listener default `0.0.0.0` |
 | Host is not IPv4/`localhost`, or port is not `1..65535` | Return `false`; do not mutate desired endpoint, child, or ICT state |
-| OFF-to-ON endpoint equals spawned endpoint | Send/reuse ICT start without replacing PID |
-| OFF-to-ON endpoint differs | Stop exact owned PID, wait for release, spawn new argv, await fresh heartbeat, then activate ICT |
+| Valid endpoint submitted through Gateway action | Persist it, stop the exact owned PID if present, spawn new argv, await a fresh heartbeat |
+| Invalid endpoint submitted through Gateway action | Do not persist, mutate desired endpoint, or restart |
 | Child ignores graceful shutdown | Kill only that owned PID after the bounded grace period |
 | Child still exists after termination grace | Enter explicit failed state; do not forget PID or start a competing listener |
 | Child exits or never heartbeats during startup | Keep ICT inactive and expose an actionable gateway error |
@@ -171,11 +174,10 @@ TCP server currently stores a client accepted after `who` / `PC001`.
 
 ### 5. Good / Base / Bad Cases
 
-- Good: edit port while connected, click once to disconnect, click again; the
-  old owned PID exits, a new PID binds the port, a fresh heartbeat arrives, and
-  the unchanged relay performs `who` / `PC001`.
-- Base: reconnect with the same normalized endpoint; PID remains stable and ICT
-  start is sent without a restart.
+- Good: edit a valid port and press the Gateway restart action; the old owned
+  PID exits, a new PID binds the port, a fresh heartbeat arrives, and PC001 is
+  still shown as waiting until the relay performs `who` / `PC001`.
+- Base: invalid endpoint text is rejected without persistence or process change.
 - Good: can0 already proves `250000 / 100 / 10 / UP / usable`; Connect ICT
   binds it without any privileged call or down/up interruption.
 - Good: can0 is present but mismatched; the fixed installed helper configures
@@ -627,4 +629,99 @@ Correct: active sink -> capability; descriptor -> channel; authority -> every pr
 
 Wrong: one React request per row -> partial bulk state and many revisions
 Correct: one bulk API -> one owner transaction -> one snapshot event
+```
+
+## Scenario: Owned Gateway restart, Godot liveness, and stable live table
+
+This scenario supersedes every earlier clause that exposes the legacy ICT
+toggle as a user-facing connection control or derives a displayed connection
+state from `ict_active`.
+
+### 1. Scope / Trigger
+
+Use this contract when changing the Godot Gateway process control, CTN1 receive
+liveness, Gateway status schema/runtime deltas, the Web runtime summary, or live
+CAN table layout.
+
+### 2. Signatures
+
+```text
+GatewayStatus.godot_connected: bool | null
+godot-managed: recent valid CTN1 <= 2.5 s -> true; otherwise false
+standalone: null
+
+Godot operator action:
+validated endpoint -> persist -> respawn_gateway() -> fresh heartbeat readiness
+```
+
+### 3. Contracts
+
+- `CanTelemetryBridge` alone owns the spawned PID. Restart first requests a
+  graceful shutdown and, after its bounded grace period, may terminate only
+  that exact still-owned PID. Never discover or kill a process by port, name,
+  or fuzzy argv; an endpoint held by an unknown owner is a startup failure.
+- The Gateway button is momentary and lifecycle-driven. It does not send
+  `ICT_START`/`ICT_STOP`, does not claim PC001 is connected, and is disabled
+  during start/stop transitions. Invalid host/port input changes neither the
+  saved config nor the desired endpoint or child process.
+- Gateway online means a fresh heartbeat from the newly spawned child. PC001
+  connected means the independent `who` / `PC001` handshake projection.
+- `godot_connected` uses Gateway-local monotonic receive time and changes only
+  after a valid CTN1 telemetry packet or 2.5 seconds without one. Control
+  packets, malformed datagrams, PC001 handshakes, transport readiness and CAN
+  egress do not refresh it. Valid telemetry refreshes it even with no sink or
+  PC001 client.
+- The nullable field is present in the atomic status snapshot and runtime
+  WebSocket projection. React decodes it strictly and displays Godot connected,
+  disconnected, or standalone N/A separately from transport and PC001.
+- The CAN table keeps one shared 50 ms freshness ticker but uses fixed layout
+  and one nine-column width authority. Frequency and freshness cells are
+  non-wrapping tabular/monospace numbers; unit/digit changes cannot resize
+  neighboring columns. Narrow viewports scroll only the table wrapper.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Restart while an owned child is online | graceful shutdown, exact-PID replacement, fresh heartbeat before online |
+| Target port belongs to an unknown process | fail with endpoint guidance; terminate nothing external |
+| Managed startup before first valid CTN1 | `godot_connected=false` |
+| Valid CTN1 received, no PC001 client | `godot_connected=true`, PC001 remains waiting |
+| Only malformed/control packets arrive for 2.5 s | `godot_connected=false` |
+| Standalone Gateway | `godot_connected=null`, neutral N/A in Web |
+| Freshness crosses 100 ms, 1 s, or 999 s | text/tone changes without column reflow |
+
+### 5. Good / Base / Bad Cases
+
+- Good: restart one owned online Gateway, wait for its exact PID to exit, then
+  accept the replacement only after a fresh heartbeat; keep PC001 waiting until
+  a new handshake arrives.
+- Base: a standalone Gateway reports Godot N/A while transport and PC001 remain
+  independently observable; a managed Gateway naturally alternates connected
+  and disconnected as valid CTN1 traffic starts and stops.
+- Bad: derive Godot state from `ict_active`, save an invalid endpoint, kill the
+  process found on a port, or use auto table layout under the 50 ms ticker.
+
+### 6. Tests Required
+
+- Python pure/runtime/process tests cover nullable initialization, valid versus
+  invalid/control input, timeout and recovery, and realtime status projection.
+- React tests cover strict snapshot/delta decoding, no visible ICT summary,
+  three Godot states, nine fixed columns and freshness boundaries.
+- Godot focused tests cover the momentary action, invalid endpoint and PC001
+  indicator paths. After implementation stabilizes, run the owned-PID/fresh-
+  heartbeat Gateway E2E once; leave pixel/no-jitter and real interaction checks
+  to manual acceptance.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: ICT active -> displayed Godot/PC001 connection
+Correct: valid CTN1 -> Godot; who/PC001 -> peer; sink state -> transport
+
+Wrong: port owner discovery -> kill -> retry
+Correct: exact bridge-owned PID -> bounded restart; unknown owner -> diagnostic
+
+Wrong: 50 ms text changes -> auto-layout recomputes every column
+Correct: shared ticker -> fixed colgroup -> stable cells and local horizontal scroll
 ```

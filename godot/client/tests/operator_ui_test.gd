@@ -217,17 +217,22 @@ func _check_can_controls(ui: MotionOperatorUI) -> void:
 		_fail("CAN controls have no bridge autoload")
 		return
 	var before := bridge.get_desired_tcp_endpoint_for_test() as Dictionary
-	var ict := ui.get_node("StatusPanel/Margin/VBox/Tools/ICTConnectToggle") as Button
-	var port := ui.get_node("StatusPanel/Margin/VBox/AdvancedPanel/ICTPort") as LineEdit
+	var gateway_button := ui.get_node(
+		"StatusPanel/Margin/VBox/Tools/GatewayRestartButton"
+	) as Button
+	if gateway_button.toggle_mode:
+		_fail("Gateway restart control must be a momentary action button")
+	if gateway_button.disabled or gateway_button.text != "启动 Gateway":
+		_fail("offline Gateway restart control did not expose the start action")
+	var port := ui.get_node("StatusPanel/Margin/VBox/AdvancedPanel/GatewayPort") as LineEdit
 	port.text = "70000"
-	ict.button_pressed = true
-	ui._on_ict_pressed()
+	ui._on_gateway_restart_pressed()
 	var after := bridge.get_desired_tcp_endpoint_for_test() as Dictionary
-	if ict.button_pressed or before != after:
-		_fail("invalid ICT endpoint mutated gateway state")
+	if before != after:
+		_fail("invalid Gateway endpoint mutated gateway state")
 	var completion := ui.get_node("StatusPanel/Margin/VBox/Completion") as Label
-	if "ICT endpoint invalid" not in completion.text:
-		_fail("invalid ICT endpoint did not produce actionable UI feedback")
+	if "Gateway endpoint invalid" not in completion.text:
+		_fail("invalid Gateway endpoint did not produce actionable UI feedback")
 
 
 func _visible_label_copy(node: Node) -> String:

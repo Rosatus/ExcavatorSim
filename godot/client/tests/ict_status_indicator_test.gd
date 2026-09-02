@@ -1,7 +1,7 @@
 extends SceneTree
 
 const MAIN_SCENE := "res://scenes/main.tscn"
-const INDICATOR_PATH := "OperatorUI/StatusPanel/Margin/VBox/Tools/ICTHandshakeStatus"
+const INDICATOR_PATH := "OperatorUI/StatusPanel/Margin/VBox/Tools/PC001HandshakeStatus"
 
 var failures: Array[String] = []
 
@@ -26,16 +26,16 @@ func _run() -> void:
 	var lamp := scene.get_node_or_null(INDICATOR_PATH + "/Lamp") as Panel
 	var label := scene.get_node_or_null(INDICATOR_PATH + "/Label") as Label
 	if ui == null or indicator == null or lamp == null or label == null:
-		_fail("ICT handshake indicator nodes are missing beside the operator controls")
+		_fail("PC001 handshake indicator nodes are missing beside the operator controls")
 	else:
 		_check_state(ui, lamp, label, "connected", "已握手", Color("67dfa0"))
 		_check_state(ui, lamp, label, "waiting", "待握手", Color("ef5350"))
 		_check_state(ui, lamp, label, "offline", "未连接", Color("ef5350"))
 		_check_state(ui, lamp, label, "not_applicable", "直连", Color("b8c0c8"))
 		if indicator.mouse_filter != Control.MOUSE_FILTER_IGNORE:
-			_fail("ICT handshake indicator intercepts pointer input")
+			_fail("PC001 handshake indicator intercepts pointer input")
 		if lamp.custom_minimum_size.x < 12.0 or lamp.custom_minimum_size.y < 12.0:
-			_fail("ICT handshake lamp is smaller than the 12 px visual contract")
+			_fail("PC001 handshake lamp is smaller than the 12 px visual contract")
 	scene.queue_free()
 	await process_frame
 	_finish()
@@ -49,18 +49,18 @@ func _check_state(
 	expected_text: String,
 	expected_color: Color,
 ) -> void:
-	ui.call("_set_ict_handshake_indicator", state)
+	ui.call("_set_pc001_handshake_indicator", state)
 	if label.text != expected_text:
-		_fail("ICT indicator state %s used text %s" % [state, label.text])
+		_fail("PC001 indicator state %s used text %s" % [state, label.text])
 	if not lamp.self_modulate.is_equal_approx(expected_color):
-		_fail("ICT indicator state %s used color %s" % [state, lamp.self_modulate])
+		_fail("PC001 indicator state %s used color %s" % [state, lamp.self_modulate])
 	if label.tooltip_text.is_empty() or lamp.tooltip_text != label.tooltip_text:
-		_fail("ICT indicator state %s lost its shared tooltip" % state)
+		_fail("PC001 indicator state %s lost its shared tooltip" % state)
 
 
 func _finish() -> void:
 	if failures.is_empty():
-		print("ICT status indicator contract passed.")
+		print("PC001 status indicator contract passed.")
 		quit(0)
 		return
 	for failure in failures:

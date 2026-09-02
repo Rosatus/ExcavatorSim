@@ -3,6 +3,7 @@
     "can_interface",
     "event_earliest_sequence",
     "event_sequence",
+    "godot_connected",
     "ict_active",
     "log_dropped_records",
     "mode",

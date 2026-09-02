@@ -67,6 +67,27 @@ class GatewayRuntimeCoreTest(unittest.TestCase):
             fixture["dbc_root_keys"],
         )
 
+    def test_godot_connection_status_is_nullable_by_runtime_mode(self) -> None:
+        self.assertIsNone(self.core.snapshot().godot_connected)
+        managed = GatewayRuntimeCore(
+            mode="godot-managed",
+            platform="windows",
+            transport_kind="tcp",
+            tcp_host="127.0.0.1",
+            tcp_port=5678,
+            can_interface="can0",
+            event_log=RuntimeEventLog(directory=Path(self.tmp.name) / "managed-logs"),
+            config_store=self.core.config,
+        )
+        try:
+            self.assertFalse(managed.snapshot().godot_connected)
+            managed.publish(godot_connected=True)
+            managed.flush_console_runtime(managed._last_egress_event_s + 0.05)
+            events, _gap = managed.events.events_after(0)
+            self.assertTrue(events[-1].detail["status"]["godot_connected"])
+        finally:
+            managed.close()
+
     def test_request_id_is_idempotent_and_conflict_is_rejected(self) -> None:
         first = self.core.submit(
             kind="tcp_rebind",
