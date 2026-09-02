@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Check sole mutation authority, stale identity rejection, both-model payload, and lifecycle behavior."}
+{"file":".trellis/spec/frontend/validation-budget.md","reason":"Check deterministic evidence and human cut acceptance are separated correctly."}
+{"file":".trellis/tasks/09-02-voxel-excavation-redesign/research/current-system-and-history.md","reason":"Check no old tiny-brush, forced synchronous derivative, or active-particle hot path returned."}

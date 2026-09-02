@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Check single-writer soil, Jolt, Terrain3D, lifecycle, payload, and reset compliance."}
+{"file":".trellis/spec/frontend/validation-budget.md","reason":"Check that automated and manual evidence stays within the approved risk-based budget."}
+{"file":".trellis/tasks/09-02-voxel-excavation-redesign/research/voxel-tools-1.7.md","reason":"Check implementation claims against verified upstream/local Voxel Tools behavior."}
+{"file":".trellis/tasks/09-02-voxel-excavation-redesign/research/current-system-and-history.md","reason":"Check the redesign does not repeat rejected heightfield/synchronous derivative architecture."}

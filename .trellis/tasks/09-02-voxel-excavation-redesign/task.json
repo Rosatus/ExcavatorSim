@@ -1,0 +1,31 @@
+{
+  "id": "voxel-excavation-redesign",
+  "name": "voxel-excavation-redesign",
+  "title": "Voxel excavation terrain redesign",
+  "description": "Replace heightfield excavation with one bounded north-side Voxel Tools SDF work zone, continuous bucket cutting, authoritative dumping/compaction, Jolt traversal, and final legacy cutover.",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "rosatus",
+  "assignee": "rosatus",
+  "createdAt": "2026-09-02",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "09-02-voxel-work-zone-foundation",
+    "09-02-continuous-voxel-bucket-cutting",
+    "09-02-voxel-dumping-soil-cycle",
+    "09-02-voxel-excavation-product-cutover"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

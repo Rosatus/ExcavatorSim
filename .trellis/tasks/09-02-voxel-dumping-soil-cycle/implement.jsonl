@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Defines selected soil ledger, Jolt contact, effect derivation, and generation boundaries."}
+{"file":".trellis/spec/frontend/validation-budget.md","reason":"Keeps mass-cycle tests focused and pile appearance/feel human-owned."}
+{"file":".trellis/tasks/09-02-voxel-excavation-redesign/research/voxel-tools-1.7.md","reason":"Constrains localized SDF deposition and asynchronous collision readiness."}
+{"file":".trellis/tasks/09-02-voxel-excavation-redesign/research/current-system-and-history.md","reason":"Documents why per-particle/loose-flux legacy work must not return to the product hot path."}

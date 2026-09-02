@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Foundation must preserve Godot/Jolt ownership while replacing the mutable terrain seam."}
+{"file":".trellis/spec/frontend/godot-mcp.md","reason":"Use the connected custom editor for safe Voxel Tools scene/resource discovery and authoring."}
+{"file":".trellis/spec/frontend/validation-budget.md","reason":"Run focused probes and one stable benchmark, leaving visual seam judgment to the human milestone."}
+{"file":".trellis/tasks/09-02-voxel-excavation-redesign/research/voxel-tools-1.7.md","reason":"Primary verified API/scale/collision-readiness evidence for the foundation spike."}
+{"file":".trellis/tasks/09-02-voxel-excavation-redesign/research/current-system-and-history.md","reason":"Provides current hard-site ownership and north-side placement evidence."}
