@@ -3,7 +3,7 @@
   "name": "voxel-work-zone-foundation",
   "title": "Voxel work-zone foundation",
   "description": "Validate Voxel Tools 1.7 APIs and establish the bounded VoxelTerrain, Terrain3D seam, material, reset, collision readiness, and performance baseline.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

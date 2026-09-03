@@ -1,6 +1,8 @@
 class_name JoltChassisTrackRuntime
 extends Node3D
 
+const VoxelZone = preload("res://scripts/voxel_work_zone_config.gd")
+
 signal post_step_snapshot_captured(snapshot: Dictionary)
 
 ## Owns one dynamic Jolt chassis plus a bounded kinematic work-equipment chain.
@@ -1178,6 +1180,12 @@ func _track_raycast(local_point: Vector3) -> Dictionary:
 		hit["ray_start"] = ray_start
 		hit["support_source"] = "terrain_collider"
 		return hit
+	if not hit.is_empty() and collider is Node:
+		var voxel_owner := _find_voxel_support_owner(collider as Node)
+		if voxel_owner != null and bool(voxel_owner.call("is_support_ready_at", hit.get("position", center))):
+			hit["ray_start"] = ray_start
+			hit["support_source"] = "voxel_terrain"
+			return hit
 	return _heightfield_support_hit(center, ray_start, ray_end)
 
 
@@ -1186,6 +1194,8 @@ func _heightfield_support_hit(center: Vector3, ray_start: Vector3, ray_end: Vect
 		return {}
 	var state := _terrain_world.terrain_state
 	var world_xz := Vector2(center.x, center.z)
+	if VoxelZone.owns_world_xz(world_xz):
+		return {}
 	if not state.is_inside_grid(world_xz):
 		return {}
 	var height := state.sample_surface_bilinear_at(world_xz)
@@ -1208,6 +1218,16 @@ func _heightfield_support_hit(center: Vector3, ray_start: Vector3, ray_end: Vect
 		"ray_start": ray_start,
 		"support_source": "terrain_state_fallback",
 	}
+
+
+func _find_voxel_support_owner(collider: Node) -> Node:
+	var current: Node = collider
+	while current != null:
+		if current.is_class("VoxelTerrain"):
+			var owner := current.get_parent()
+			return owner if owner != null and owner.has_method("is_support_ready_at") else null
+		current = current.get_parent()
+	return null
 
 
 func _sample_heightfield_clamped(state: TerrainState, world_xz: Vector2) -> float:

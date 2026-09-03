@@ -29,6 +29,8 @@
 [ext_resource type="Script" uid="uid://ctx4iojwvg4k6" path="res://scripts/construction_site_dressing.gd" id="18_site_dressing"]
 [ext_resource type="Script" uid="uid://cce4qy15353ac" path="res://scripts/machine_feedback.gd" id="19_machine_feedback"]
 [ext_resource type="PackedScene" path="res://scenes/control_input_hud.tscn" id="20_control_hud"]
+[ext_resource type="Script" path="res://scripts/voxel_work_zone.gd" id="21_voxel_work_zone"]
+[ext_resource type="Script" path="res://scripts/voxel_work_zone_boundary.gd" id="22_voxel_boundary"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_qkpxi"]
 shader = ExtResource("1_pm3ni")
@@ -294,6 +296,12 @@ script = ExtResource("18_site_dressing")
 
 [node name="TerrainCollider" type="Node3D" parent="TerrainRoot" unique_id=1878975737]
 script = ExtResource("7_terrain_collider")
+
+[node name="VoxelWorkZone" type="Node3D" parent="TerrainRoot"]
+script = ExtResource("21_voxel_work_zone")
+
+[node name="VoxelWorkZoneBoundary" type="Node3D" parent="TerrainRoot"]
+script = ExtResource("22_voxel_boundary")
 
 [node name="ExcavationWorld" type="Node3D" parent="TerrainRoot" unique_id=325026376]
 script = ExtResource("8_excavation_world")

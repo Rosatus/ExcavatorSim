@@ -1,6 +1,8 @@
 class_name TerrainRenderer
 extends MeshInstance3D
 
+const VoxelZone = preload("res://scripts/voxel_work_zone_config.gd")
+
 ## A generation-gated derived mesh owner. It never writes to TerrainState.
 ##
 ## Vertex/index arrays are cached so ordinary revisions update only the dirty
@@ -179,6 +181,12 @@ func _apply_full_mesh(snapshot: Dictionary) -> bool:
 	var write_index := 0
 	for row in range(rows - 1):
 		for column in range(columns - 1):
+			var cell_center := Vector2(
+				origin.x + (float(column) + 0.5) * spacing,
+				origin.y + (float(row) + 0.5) * spacing,
+			)
+			if VoxelZone.owns_hard_surface_cell(cell_center):
+				continue
 			var top_left := row * columns + column
 			var bottom_left := top_left + columns
 			indices[write_index] = top_left
@@ -188,6 +196,7 @@ func _apply_full_mesh(snapshot: Dictionary) -> bool:
 			indices[write_index + 4] = bottom_left + 1
 			indices[write_index + 5] = bottom_left
 			write_index += 6
+	indices.resize(write_index)
 	if not _publish_surface(vertices, normals, uvs, indices):
 		return false
 	_cached_vertices = vertices

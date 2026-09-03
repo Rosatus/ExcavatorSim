@@ -1,6 +1,8 @@
 class_name TerrainCollider
 extends Node3D
 
+const VoxelZone = preload("res://scripts/voxel_work_zone_config.gd")
+
 ## Optional derived collision. It is fail-open and never feeds contact back to
 ## TerrainState or the Python service.
 ##
@@ -336,6 +338,12 @@ func _build_chunk_shape(
 	var column_end := mini(columns - 1, column_start + chunk)
 	for row in range(row_start, row_end):
 		for column in range(column_start, column_end):
+			var cell_center := Vector2(
+				origin.x + (float(column) + 0.5) * spacing,
+				origin.y + (float(row) + 0.5) * spacing,
+			)
+			if VoxelZone.owns_hard_surface_cell(cell_center):
+				continue
 			var top_left := row * columns + column
 			var bottom_left := top_left + columns
 			faces.append(_vertex(origin, spacing, row, column, surface[top_left]))
@@ -344,8 +352,6 @@ func _build_chunk_shape(
 			faces.append(_vertex(origin, spacing, row, column + 1, surface[top_left + 1]))
 			faces.append(_vertex(origin, spacing, row + 1, column, surface[bottom_left]))
 			faces.append(_vertex(origin, spacing, row + 1, column + 1, surface[bottom_left + 1]))
-	if faces.is_empty():
-		return null
 	var shape := ConcavePolygonShape3D.new()
 	shape.backface_collision = true
 	shape.set_faces(faces)

@@ -1,6 +1,8 @@
 class_name ConstructionSiteTerrainProfile
 extends RefCounted
 
+const VoxelZone = preload("res://scripts/voxel_work_zone_config.gd")
+
 ## Deterministic, disposable Terrain3D presentation for a medium earthwork site.
 ##
 ## The complete 64 m site is copied from TerrainState without modification so
@@ -118,12 +120,12 @@ func build_worksite_layout(maps: Dictionary) -> Dictionary:
 		"aggregate": [],
 		"signs": [],
 	}
-	for position in [Vector2(-14.0, -8.0), Vector2(-14.0, 0.0), Vector2(-14.0, 8.0)]:
+	for position in [Vector2(-18.0, -8.0), Vector2(-18.0, 0.0), Vector2(-18.0, 8.0)]:
 		(result["barriers"] as Array).append(_layout_entry(position, maps, 0.0))
-	for x in [-9.0, -4.5, 0.0, 4.5, 9.0]:
-		(result["stakes"] as Array).append(_layout_entry(Vector2(x, -12.5), maps, 0.0))
-		(result["stakes"] as Array).append(_layout_entry(Vector2(x, 12.5), maps, PI))
-	var route_start := Vector2(13.0, 7.0)
+	for z in [12.0, 18.0, 24.0, 30.0, 36.0]:
+		(result["stakes"] as Array).append(_layout_entry(Vector2(-17.5, z), maps, -PI * 0.5))
+		(result["stakes"] as Array).append(_layout_entry(Vector2(17.5, z), maps, PI * 0.5))
+	var route_start := Vector2(20.0, 7.0)
 	var route_end := Vector2(30.0, 19.0)
 	var route_direction := (route_end - route_start).normalized()
 	var route_side := Vector2(-route_direction.y, route_direction.x)
@@ -131,7 +133,7 @@ func build_worksite_layout(maps: Dictionary) -> Dictionary:
 		var center := route_start.lerp(route_end, (float(step) + 0.5) / 4.0)
 		(result["route_markers"] as Array).append(_layout_entry(center + route_side * 4.25, maps, -route_direction.angle()))
 		(result["route_markers"] as Array).append(_layout_entry(center - route_side * 4.25, maps, -route_direction.angle()))
-	for z in [11.5, 13.0, 14.5, 16.0, 17.5, 19.0]:
+	for z in [0.75, 1.75, 2.75, 3.75, 4.75, 5.75]:
 		(result["track_marks"] as Array).append(_layout_entry(Vector2(-1.15, z), maps, 0.0))
 		(result["track_marks"] as Array).append(_layout_entry(Vector2(1.15, z), maps, 0.0))
 	for layer in 2:
@@ -140,7 +142,7 @@ func build_worksite_layout(maps: Dictionary) -> Dictionary:
 			(result["pipes"] as Array).append(_layout_entry(Vector2(-22.0, 18.0) + offset, maps, PI * 0.5))
 	for offset in [Vector2.ZERO, Vector2(1.4, 0.3), Vector2(-1.2, 0.5), Vector2(0.6, 1.2), Vector2(-0.5, 1.4)]:
 		(result["aggregate"] as Array).append(_layout_entry(Vector2(20.5, -18.5) + offset, maps, 0.0))
-	(result["signs"] as Array).append(_layout_entry(Vector2(-14.0, 13.0), maps, PI * 0.5))
+	(result["signs"] as Array).append(_layout_entry(Vector2(-18.0, 13.0), maps, PI * 0.5))
 	return result
 
 
@@ -185,11 +187,12 @@ func _presentation_height(
 	return logical_height + TerrainState.construction_site_baseline_height(position) * context_weight
 
 
-func _control_code(_position: Vector2, _logical_origin: Vector2, _logical_max: Vector2) -> int:
+func _control_code(position: Vector2, _logical_origin: Vector2, _logical_max: Vector2) -> int:
 	# The project-owned shader classifies compacted/loose/damp soil directly
 	# from world height and normal. Terrain3D still requires a control map for
 	# holes, but production presentation no longer selects demo texture zones.
-	return _encode_control(MATERIAL_WORKSITE_SOIL, MATERIAL_WORKSITE_SOIL, 0.0)
+	var control := _encode_control(MATERIAL_WORKSITE_SOIL, MATERIAL_WORKSITE_SOIL, 0.0)
+	return control | 0x4 if VoxelZone.owns_hard_surface_cell(position) else control
 
 
 func _sample_bilinear(surface: PackedFloat32Array, rows: int, columns: int, spacing: float, origin: Vector2, position: Vector2) -> float:

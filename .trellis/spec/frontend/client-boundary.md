@@ -138,7 +138,8 @@ forward × up; it is never hard-coded independently from forward.
   front/rear/left/right support offsets, speed/acceleration/brake/coast values,
   pivot scale, slope limits, slip coefficients, minimum traction, and support
   response rate. An incomplete descriptor rejects that model without fallback.
-- `TerrainState.sample_surface_bilinear_at()` is the support-height authority.
+- Outside the bounded voxel work-zone mask,
+  `TerrainState.sample_surface_bilinear_at()` is the support-height authority.
   A `TerrainCollider` ray hit may refine the same height only when its applied
   `(world_generation, terrain_revision)` exactly matches `TerrainState` and the
   hit belongs to that derived collider. A miss, stale identity, unavailable
@@ -169,8 +170,9 @@ an unattended soak cannot accidentally weaken the product safety behavior.
 |---|---|
 | Missing/invalid model field | Reject model; no cross-model parameter fallback |
 | Height sample outside logical grid | Reject fixed step and stop both tracks |
-| Jolt collider disabled/unavailable | Continue from bilinear heightfield |
-| Collider identity is stale | Ignore raycast and continue from heightfield |
+| Jolt collider disabled/unavailable outside voxel mask | Continue from bilinear heightfield |
+| Collider identity is stale outside voxel mask | Ignore raycast and continue from heightfield |
+| Voxel collider pending/unavailable inside voxel mask | Fail closed; never synthesize heightfield support |
 | Matching derived ray hit | Accept only a bounded height-compatible hint |
 | Focus/reconnect/model/world reset | Clear commands and velocities; reset pose where required |
 | Stale/duplicate runtime gamepad event | Replace it with exactly one canonical joy binding for that action |
@@ -889,7 +891,8 @@ BucketProxySweeper.sweep(...) -> {
 - Production native presentation requires configured and actual collision mode
   `0` and actual native collision layer `0`. `collision_available` remains
   `false`; Terrain3D rendering success does not imply a physics source.
-- Every accepted track ray records `support_source` as `terrain_collider` when
+- Outside the voxel work-zone mask, every accepted track ray records
+  `support_source` as `terrain_collider` when
   the matching collider answers, or `terrain_state_fallback` when that same
   identity-valid collider ray misses/is rejected and the logical heightfield
   supplies the support sample. Per-tick counts are observational diagnostics
@@ -899,8 +902,9 @@ BucketProxySweeper.sweep(...) -> {
   a descendant of the configured, identity-matched `TerrainCollider`; collider
   names, instance IDs, or Terrain3D nodes are not sufficient evidence.
 - Terrain/collider `(world_generation, terrain_revision)` must match before a
-  physics tick or bucket hit is accepted. A matching-collider ray miss may use
-  the logical heightfield for track support; stale, unavailable, or disabled
+  physics tick or bucket hit is accepted. Outside the voxel mask, a
+  matching-collider ray miss may use the logical heightfield for track support;
+  stale, unavailable, or disabled
   collider identity disarms Jolt track forces and bucket evidence until the
   project collider catches up.
 
@@ -1874,6 +1878,93 @@ Correct: stored controller policy -> reapply immediately after every Jolt rebuil
 
 Wrong: accepted performance mode -> rerun paired soak at every release/archive
 Correct: focused contract checks -> preserve archived performance evidence -> no paired soak
+```
+
+## Scenario: Bounded Voxel Tools excavation ownership
+
+### 1. Scope / Trigger
+
+Apply this contract whenever terrain rendering, Jolt track support, work-zone
+layout, reset, or a future soil edit touches the bounded north-side voxel work
+zone. It is the transitional authority seam while legacy excavation remains
+available outside the zone.
+
+### 2. Signatures
+
+```text
+VoxelWorkZoneConfig.owns_world_xz(world_xz: Vector2) -> bool
+VoxelWorkZoneConfig.world_to_voxel(world_position: Vector3, scale_m: float) -> Vector3
+VoxelWorkZoneConfig.voxel_to_world(voxel_position: Vector3, scale_m: float) -> Vector3
+VoxelCollisionReadiness.issue(area_voxels: AABB, purpose: StringName) -> Dictionary
+VoxelCollisionReadiness.mark_meshed(ticket: Dictionary) -> bool
+VoxelCollisionReadiness.acknowledge_query(ticket: Dictionary) -> bool
+VoxelCollisionReadiness.is_point_ready(voxel_position: Vector3) -> bool
+VoxelWorkZone.is_support_ready_at(world_position: Vector3) -> bool
+```
+
+### 3. Contracts
+
+- One centralized half-open mask owns world `X=[-16,16), Z=[8,40)` and the
+  `Y=[-6,4)` volume. Terrain3D control holes, fallback topology and the project
+  hard collider must all consume that exact predicate; local copies are
+  forbidden.
+- Terrain3D and `TerrainCollider` remain immutable hard-ground derivatives
+  outside the mask. Inside it, smooth 16-bit SDF in bounded `VoxelTerrain` is
+  soil truth and generated Voxel Tools collision is the only ground collider.
+- Voxel coordinates are always converted through the configured uniform node
+  scale and origin. The selected foundation scale is `0.125 m`; mesh blocks are
+  16 voxels and the protected edit shell is two voxels.
+- A readiness ticket carries `ticket_id`, `generation`, `revision`, voxel AABB,
+  purpose, meshed state and changed-geometry query acknowledgement. The newest
+  overlapping ticket decides readiness at a point; an unrelated regional edit
+  must not disarm already-ready support elsewhere.
+- `is_area_meshed()` is necessary but not sufficient. Jolt support is published
+  only after a physics query sees the expected newest geometry. Reset advances
+  generation, recreates the terrain and rejects all old tickets.
+- `TerrainState.sample_surface_bilinear_at()` and matching-heightfield fallback
+  remain valid only outside the voxel mask. A ray miss, stale voxel ticket, or
+  collision-pending point inside the mask returns no synthetic heightfield
+  support.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Point outside voxel mask | Terrain3D/fallback/project collider own hard support |
+| Point inside voxel mask, newest ticket ready | Voxel collision may report `support_source=voxel_terrain` |
+| Point inside voxel mask, ticket pending/stale | No heightfield fallback; track support fails closed |
+| Older overlapping mesh/query completion | Reject; never advance readiness |
+| New edit in disjoint region | Preserve ready support at unaffected points |
+| Reset while mesh/collider work is pending | Advance generation and reject every pre-reset completion |
+| Missing Voxel Tools class/resource | Foundation reports a stable error; never restore hard collision inside the mask |
+
+### 5. Good / Base / Bad Cases
+
+- Good: shared ownership mask -> one visible/collidable surface per point ->
+  newest regional mesh plus changed Jolt query -> ready support.
+- Base: local edit pending -> only its affected area is disarmed while the rest
+  of the ready zone and the hard apron remain usable.
+- Bad: Terrain3D hole with an unmasked `TerrainCollider`, or a voxel ray miss
+  silently synthesized from `TerrainState` inside the work zone.
+
+### 6. Tests Required
+
+- `voxel_work_zone_config_test.gd` asserts half-open bounds, coordinate round
+  trips, protected inset, overlapping-ticket supersession and reset rejection.
+- `voxel_work_zone_seam_test.gd` asserts the Terrain3D control hole, fallback
+  triangle omission and hard-collider omission use the same predicate.
+- `voxel_work_zone_scene_test.gd` asserts the main scene creates the zone and
+  entrance boundary, obtains exclusive voxel/hard ray hits and rebuilds safely
+  after reset.
+- `voxel_work_zone_foundation_probe.gd` compares configured scales with one
+  connected bucket-sized removal, raw backlog statistics and changed-geometry
+  collision acknowledgement. Visual seam and traversal quality remain human.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: inside voxel zone -> Voxel collision pending -> TerrainState height fallback
+Correct: inside voxel zone -> newest regional ticket pending -> no support until changed-geometry Jolt acknowledgement
 ```
 
 ## Scenario: Construction-site Terrain3D presentation

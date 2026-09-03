@@ -1,5 +1,7 @@
 extends SceneTree
 
+const VoxelZone = preload("res://scripts/voxel_work_zone_config.gd")
+
 
 func _init() -> void:
 	quit(_run())
@@ -67,13 +69,26 @@ func _check_logical_patch_parity(snapshot: Dictionary, maps: Dictionary) -> Stri
 func _check_material_zones(maps: Dictionary) -> String:
 	var controls := maps["control_bytes"] as PackedByteArray
 	var cell_count := int(maps["rows"]) * int(maps["columns"])
+	var columns := int(maps["columns"])
+	var spacing := float(maps["spacing_m"])
+	var origin := maps["origin_xz"] as Vector2
+	var hole_count := 0
 	for index in cell_count:
 		var code := controls.decode_u32(index * 4)
 		var decoded := ConstructionSiteTerrainProfile.decode_control(code)
 		if int(decoded["base_id"]) != 0 or int(decoded["overlay_id"]) != 0:
 			return "every control-map cell selects project procedural soil"
-		if ((code >> 2) & 0x1) != 0:
-			return "worksite profile does not introduce Terrain3D holes"
+		var position := Vector2(
+			origin.x + float(index % columns) * spacing,
+			origin.y + float(index / columns) * spacing,
+		)
+		var is_hole := ((code >> 2) & 0x1) != 0
+		if is_hole != VoxelZone.owns_hard_surface_cell(position):
+			return "Terrain3D holes match the voxel ownership mask exactly"
+		if is_hole:
+			hole_count += 1
+	if hole_count == 0:
+		return "voxel ownership creates a bounded Terrain3D hole"
 	return ""
 
 
@@ -91,6 +106,8 @@ func _check_dressing(profile: ConstructionSiteTerrainProfile, maps: Dictionary) 
 		if position.x >= logical_minimum.x and position.x <= logical_maximum.x \
 			and position.z >= logical_minimum.y and position.z <= logical_maximum.y:
 			return "site dressing remains outside the logical excavation patch"
+		if VoxelZone.owns_world_xz(Vector2(position.x, position.z)):
+			return "site dressing remains outside voxel soil ownership"
 	return ""
 
 
@@ -108,8 +125,6 @@ func _check_worksite_layout(profile: ConstructionSiteTerrainProfile, maps: Dicti
 	}
 	if first != second:
 		return "code-native worksite layout is deterministic"
-	var logical_minimum := maps["logical_origin_xz"] as Vector2
-	var logical_maximum := maps["logical_max_xz"] as Vector2
 	for key in expected:
 		var entries := first.get(key, []) as Array
 		if entries.size() != int(expected[key]):
@@ -118,9 +133,8 @@ func _check_worksite_layout(profile: ConstructionSiteTerrainProfile, maps: Dicti
 			var position := (entry as Dictionary)["position"] as Vector3
 			if not is_finite(position.y):
 				return "%s samples finite shared presentation height" % key
-			if position.x >= logical_minimum.x and position.x <= logical_maximum.x \
-				and position.z >= logical_minimum.y and position.z <= logical_maximum.y:
-				return "%s remains outside the logical excavation patch" % key
+			if VoxelZone.owns_world_xz(Vector2(position.x, position.z)):
+				return "%s remains outside voxel soil ownership" % key
 	return ""
 
 
