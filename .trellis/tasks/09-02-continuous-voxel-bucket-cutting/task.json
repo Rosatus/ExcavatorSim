@@ -3,7 +3,7 @@
   "name": "continuous-voxel-bucket-cutting",
   "title": "Continuous voxel bucket cutting",
   "description": "Implement the sole voxel excavation authority, swept bucket cutter, coalesced SDF edits, bucket inventory, and both-model deterministic cutting.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

@@ -26,23 +26,30 @@ Implement the sole voxel excavation authority, swept bucket cutter, coalesced SD
   density changes are replayable and auditable.
 - Expose transaction, queue, data/mesh/collision revision, bucket, conservation,
   rejection, and performance diagnostics without per-voxel logs.
+- Keep the complete voxel work zone inside the hard-terrain presentation domain
+  so its ownership hole cannot expose overlapping Terrain3D ground.
+- Provide an explicit developer-only large finite bucket-capacity mode for
+  manual cutting tests, without mutating the hash-bound model capacity contract.
 - Preserve Jolt chassis/track/kinematic equipment authority and existing
   Python/Gateway protocols.
 
 ## Acceptance Criteria
 
-- [ ] Pure geometry tests prove connected, ordered coverage for both models and
+- [x] Pure geometry tests prove connected, ordered coverage for both models and
   slow/fast/translated/curling strokes at the selected scale.
-- [ ] Valid sweeps remove a continuous cavity and no authoritative solid remains
+- [x] Valid sweeps remove a continuous cavity and no authoritative solid remains
   inside the accepted constrained clearance envelope.
-- [ ] All invalid motion cases and duplicate/stale transactions change neither
+- [x] All invalid motion cases and duplicate/stale transactions change neither
   SDF nor bucket inventory.
-- [ ] Capacity clipping ensures accepted terrain mass equals bucket credit within
+- [x] Capacity clipping ensures accepted terrain mass equals bucket credit within
   the declared discretization tolerance, including the full-bucket boundary.
-- [ ] Identical fixed inputs under different render cadences produce identical
+- [x] Identical fixed inputs under different render cadences produce identical
   transaction order, SDF digest, and bucket state.
-- [ ] Queues and dirty work remain bounded in one stable representative runtime
+- [x] Queues and dirty work remain bounded in one stable representative runtime
   performance run.
+- [x] Terrain3D covers the complete voxel ownership domain, deep solid soil is
+  present to `Y=-5.5 m`, and test capacity reports both contract and effective
+  values.
 - [ ] Human Forward+ review accepts clean, responsive, aligned cutting for SY205
   and SY135 before dumping work begins.
 

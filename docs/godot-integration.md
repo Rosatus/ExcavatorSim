@@ -273,7 +273,11 @@ remain unchanged, and disabling the toggle restores the prior product profile.
 
 Terrain3D's optional infinite world background is disabled in this composition;
 its generated cliff shell would otherwise cover the Sky3D horizon. The bounded
-64 m site terrain and logical excavation contracts remain unchanged. Native
+64 x 80 m hard-terrain presentation contains the complete voxel work zone while
+the logical excavation contracts remain unchanged. Terrain3D 1.0.x native
+imports are padded to complete region blocks and use a region-aligned raster
+origin; this prevents its height and ownership-hole maps from shifting away
+from their declared world coordinates. Native
 demo rocks, grass particles, trees, and foliage are disabled; shared project
 worksite cues remain independent siblings.
 

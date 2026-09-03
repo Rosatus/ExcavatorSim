@@ -2504,3 +2504,105 @@ profile for compatibility; removal or deprecation requires a separate approved
 migration decision and client inventory.
 
 Reference: `docs/godot-integration.md`, `protocol/`, and `.trellis/tasks/08-06-excavator-sim-bootstrap/design.md`.
+## Scenario: generation-scoped voxel excavation authority
+
+### 1. Scope / Trigger
+
+- Trigger: excavation inside `VoxelWorkZone` is selected with lifecycle mode
+  `voxel` and solver `voxel_bucket_v1`.
+- `VoxelExcavationAuthority` is the sole owner of work-zone SDF mutation and
+  bucket inventory. TerrainState, active-patch and parcel runtimes must not be
+  constructed or stepped while this generation is selected.
+
+### 2. Signatures
+
+```gdscript
+VoxelExcavationAuthority.configure(zone, soil_contract, generation) -> bool
+VoxelExcavationAuthority.submit_pose(pose_snapshot, identity) -> Dictionary
+VoxelExcavationAuthority.step_fixed(delta) -> Dictionary
+VoxelExcavationAuthority.get_payload_snapshot() -> Dictionary
+```
+
+`identity` contains `generation`, `physics_tick`, `motion_sequence`, and
+`authority_epoch`. Tick and motion sequence must both advance strictly.
+
+### 3. Contracts
+
+- The cutter consumes the hash-bound SY205/SY135 `soil_tool` snapshot and
+  produces typed, immutable capsule proposals in local voxel coordinates.
+- Only adjacent queue-tail proposals may coalesce. Coalescing may never move a
+  later fixed tick ahead of an already queued proposal.
+- Commits occur at a starting 20 Hz cadence, use one localized `VoxelBuffer`
+  paste, and publish one data revision/ticket per accepted transaction.
+- All material-stage validation finishes before SDF paste. The immediately
+  following ledger commit has no remaining conditional failure path.
+- Capacity clipping credits exactly the remaining fixed-point bucket mass;
+  represented SDF mass may differ only within one voxel-cell mass tolerance.
+- A developer-only capacity override may replace the effective voxel ledger
+  capacity at a clean authority generation boundary. It must be finite and
+  positive, must not mutate the hash-bound model contract, and status must
+  expose contract capacity, override provenance, and effective capacity.
+- Terrain3D remains hard-ground presentation outside the voxel zone. Its
+  presentation domain must contain the complete half-open voxel X/Z ownership
+  domain before applying the shared hole mask; no owned voxel cell may be
+  omitted because the presentation map ends early.
+- Terrain3D 1.0.x `import_images` positions pixels from the beginning of the
+  containing native region, not from an arbitrary sample origin. The adapter
+  must therefore pad semantic presentation maps to complete region blocks and
+  import them from an origin aligned to `region_size * vertex_spacing` on both
+  axes. Source-byte mask parity alone is insufficient evidence.
+- Mesh and collision revisions are derivative readiness projections; they
+  cannot reject or alter an accepted SDF/mass transaction.
+
+### 4. Validation & Error Matrix
+
+- stale generation/epoch identity -> `stale_identity`, no mutation
+- non-increasing physics tick -> `stale_tick`, no mutation
+- non-increasing motion sequence -> `stale_motion_sequence`, no mutation
+- stationary/above-ground/separating/teleported sweep -> named rejection, no mutation
+- protected/out-of-zone area -> `protected_or_out_of_zone`, no mutation
+- full bucket -> `bucket_full`, no SDF deletion
+- staging/capsule/sample budget exceeded -> bounded rejection, no mutation
+- material/SDF mass outside tolerance -> `mass_discretization_tolerance`, no mutation
+
+### 5. Good/Base/Bad Cases
+
+- Good: accepted fixed-tick teeth/side-edge sweep plus constrained trailing
+  clearance becomes one SDF transaction and equal/opposite terrain/bucket mass.
+- Base: several adjacent overlapping 60 Hz inputs coalesce into one ordered
+  20 Hz commit with bounded queue depth.
+- Bad: searching the whole queue for an older overlapping proposal reorders
+  transactions and is forbidden.
+
+### 6. Tests Required
+
+- Pure cutter: both models; slow, fast, translated, curl and rotation-only;
+  connected half-voxel coverage; invalid motion; constrained clearance air.
+- Authority: real VoxelTerrain SDF digest, exact ledger conservation, capacity
+  boundary, stale tick/generation/motion, model reconfigure and no-op rejects.
+- Determinism: identical fixed inputs under different render delta partitions
+  produce identical transaction digest, mass, revision and queue result.
+- Integration: selected owner/payload is voxel; legacy/parcel runtimes absent;
+  legacy terrain and parcel step counters remain zero; reset advances generation;
+  test capacity provenance and deep initial solid soil remain observable.
+- Native ownership: after materialization, query Terrain3D's world-space
+  `get_control_hole`/`get_height` APIs at interior, exterior, and half-open
+  boundary points. Every voxel-owned sample is a native hole and every exterior
+  sample retains finite hard terrain.
+- Performance: run one stable representative coalesced edit after implementation
+  settles; do not replace human Forward+ feel/visual acceptance with soak tests.
+
+### 7. Wrong vs Correct
+
+```gdscript
+# Wrong: can merge a later tick ahead of intervening work.
+for pending in queue:
+	if pending.area.intersects(proposal.area): merge(pending, proposal)
+
+# Correct: preserve fixed-input order by considering only the adjacent tail.
+var pending = queue.back()
+if pending.fixed_tick_end < proposal.fixed_tick_begin and pending.area.intersects(proposal.area):
+	merge(pending, proposal)
+else:
+	queue.push_back(proposal)
+```

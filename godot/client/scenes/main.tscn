@@ -305,6 +305,9 @@ script = ExtResource("22_voxel_boundary")
 
 [node name="ExcavationWorld" type="Node3D" parent="TerrainRoot" unique_id=325026376]
 script = ExtResource("8_excavation_world")
+soil_material_lifecycle_mode = "voxel"
+soil_surface_solver_mode = "voxel_bucket_v1"
+voxel_unlimited_bucket_for_testing = true
 
 [node name="ChassisMotionRoot" type="Node3D" parent="." unique_id=1336743182]
 script = ExtResource("15_track_controller")

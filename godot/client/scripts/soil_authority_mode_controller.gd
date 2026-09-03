@@ -6,13 +6,14 @@ extends RefCounted
 ## and schedule legacy for the next clean generation instead of mixing owners.
 
 const SCHEMA_VERSION := "soil-authority-mode-controller-v1"
-const MODES := ["legacy", "shadow", "active_patch"]
-const SOLVER_MODES := ["point_brush_v1", "surface_patch_v2_shadow", "surface_patch_v2", "arcade_stamp_v3"]
+const MODES := ["legacy", "shadow", "active_patch", "voxel"]
+const SOLVER_MODES := ["point_brush_v1", "surface_patch_v2_shadow", "surface_patch_v2", "arcade_stamp_v3", "voxel_bucket_v1"]
 const STAGES := ["cut", "bucket_entry", "release", "settle"]
 const PRODUCT_OWNER_BY_MODE := {
 	"legacy": "legacy",
 	"shadow": "legacy",
 	"active_patch": "active_patch",
+	"voxel": "voxel",
 }
 
 var requested_mode := "legacy"
@@ -54,7 +55,11 @@ func begin_generation(key: String) -> bool:
 	runtime_failure_reason = ""
 	initialization_fallback_reason = ""
 	selection_sequence += 1
-	writer_configuration_valid = bind_product_writers(selected_mode != "active_patch", selected_mode == "active_patch")
+	writer_configuration_valid = bind_product_writers(
+		product_owner() == "legacy",
+		product_owner() == "active_patch",
+		product_owner() == "voxel",
+	)
 	return has_single_product_owner() and writer_configuration_valid
 
 
@@ -72,7 +77,7 @@ func fallback_initialization_to_legacy(reason: String) -> bool:
 
 
 func report_runtime_failure(reason: String) -> bool:
-	if not locked or selected_mode != "active_patch" or reason.is_empty():
+	if not locked or selected_mode not in ["active_patch", "voxel"] or reason.is_empty():
 		return false
 	writes_paused = true
 	runtime_failure_reason = reason
@@ -89,13 +94,14 @@ func can_product_owner_write(owner: String) -> bool:
 	return locked and writer_configuration_valid and not writes_paused and owner == product_owner()
 
 
-func bind_product_writers(legacy_enabled: bool, active_patch_enabled: bool) -> bool:
-	var enabled_count := (1 if legacy_enabled else 0) + (1 if active_patch_enabled else 0)
+func bind_product_writers(legacy_enabled: bool, active_patch_enabled: bool, voxel_enabled: bool = false) -> bool:
+	var enabled_count := (1 if legacy_enabled else 0) + (1 if active_patch_enabled else 0) + (1 if voxel_enabled else 0)
 	var expected_owner := product_owner()
 	var matches_selection := (
 		enabled_count == 1
 		and legacy_enabled == (expected_owner == "legacy")
 		and active_patch_enabled == (expected_owner == "active_patch")
+		and voxel_enabled == (expected_owner == "voxel")
 	)
 	if not matches_selection:
 		owner_violation_count += 1
@@ -108,7 +114,7 @@ func has_single_product_owner() -> bool:
 	if owner.is_empty():
 		return false
 	for _stage in STAGES:
-		var count := 1 if owner in ["legacy", "active_patch"] else 0
+		var count := 1 if owner in ["legacy", "active_patch", "voxel"] else 0
 		if count != 1:
 			return false
 	return true
@@ -139,4 +145,5 @@ func get_status_snapshot() -> Dictionary:
 		"shadow_observer_enabled": selected_mode == "shadow",
 		"legacy_parcel_material_callbacks_enabled": product_owner() == "legacy",
 		"active_patch_presentation_replaces_hero_parcels": selected_mode == "active_patch",
+		"voxel_authority_replaces_legacy_runtime": selected_mode == "voxel",
 	}

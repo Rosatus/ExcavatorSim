@@ -14,14 +14,17 @@ func _run() -> int:
 	var maps := profile.build_maps(snapshot)
 	if maps.is_empty():
 		return _fail("construction-site maps build from a TerrainState snapshot")
-	if int(maps["rows"]) != 129 or int(maps["columns"]) != 129:
-		return _fail("default construction site is 64 m square at 0.5 m spacing")
+	if int(maps["rows"]) != 161 or int(maps["columns"]) != 129:
+		return _fail("default construction site is 64 x 80 m at 0.5 m spacing")
 	if snapshot["origin_xz"] != Vector2(-32.0, -32.0) or maps["authority_origin_xz"] != snapshot["origin_xz"]:
 		return _fail("visible site and authoritative terrain share the same footprint")
-	if (maps["height_bytes"] as PackedByteArray).size() != 129 * 129 * 4:
+	if (maps["height_bytes"] as PackedByteArray).size() != 129 * 161 * 4:
 		return _fail("presentation height bytes match the site grid")
-	if (maps["control_bytes"] as PackedByteArray).size() != 129 * 129 * 4:
+	if (maps["control_bytes"] as PackedByteArray).size() != 129 * 161 * 4:
 		return _fail("control bytes match the site grid")
+	var coverage_error := _check_voxel_zone_coverage(maps)
+	if coverage_error != "":
+		return _fail(coverage_error)
 	var parity_error := _check_logical_patch_parity(snapshot, maps)
 	if parity_error != "":
 		return _fail(parity_error)
@@ -63,6 +66,23 @@ func _check_logical_patch_parity(snapshot: Dictionary, maps: Dictionary) -> Stri
 			var site_index := site_row * site_columns + site_column
 			if site_surface[site_index] != logical_surface[logical_index]:
 				return "central logical height samples remain exact"
+	return ""
+
+
+func _check_voxel_zone_coverage(maps: Dictionary) -> String:
+	var rows := int(maps["rows"])
+	var columns := int(maps["columns"])
+	var spacing := float(maps["spacing_m"])
+	var origin := maps["origin_xz"] as Vector2
+	var presentation_maximum := origin + Vector2(
+		float(columns - 1) * spacing,
+		float(rows - 1) * spacing,
+	)
+	var zone_minimum := Vector2(VoxelZone.MIN_WORLD.x, VoxelZone.MIN_WORLD.z)
+	var zone_maximum := Vector2(VoxelZone.MAX_WORLD.x, VoxelZone.MAX_WORLD.z)
+	if origin.x > zone_minimum.x or origin.y > zone_minimum.y \
+			or presentation_maximum.x < zone_maximum.x or presentation_maximum.y < zone_maximum.y:
+		return "Terrain3D presentation domain contains the complete voxel work zone"
 	return ""
 
 

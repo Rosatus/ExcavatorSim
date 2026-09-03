@@ -41,6 +41,14 @@ func _run() -> void:
 		return _fail("arcade stamp was not selected at a clean generation boundary")
 	if not modes.can_product_owner_write("active_patch") or modes.can_product_owner_write("legacy"):
 		return _fail("arcade stamp did not retain exclusive product-writer ownership")
+	if not modes.set_requested_mode("voxel") or not modes.set_requested_solver_mode("voxel_bucket_v1"):
+		return _fail("voxel generation request was rejected")
+	if not modes.begin_generation("generation:5") or modes.product_owner() != "voxel":
+		return _fail("voxel product owner was not selected at a clean boundary")
+	if not modes.can_product_owner_write("voxel") or modes.can_product_owner_write("legacy") or modes.can_product_owner_write("active_patch"):
+		return _fail("voxel generation did not enforce a single writer")
+	if not modes.report_runtime_failure("voxel_failure") or not modes.writes_paused or modes.requested_mode != "legacy":
+		return _fail("voxel runtime failure did not schedule a clean legacy fallback")
 
 	var terrain := TerrainState.new(240824, 25, 25, 0.25)
 	var scheduler := TerrainCommitScheduler.new(terrain)

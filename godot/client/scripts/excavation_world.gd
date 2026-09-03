@@ -4,9 +4,12 @@ extends Node3D
 signal excavation_changed(status: Dictionary)
 
 const SOIL_PROXY_ORDER := ["cutting_edge", "opening", "cavity", "shell", "rear_support"]
+const VoxelAuthority = preload("res://scripts/voxel_excavation_authority.gd")
+const TEST_BUCKET_CAPACITY_M3 := 1000.0
 
 @export var terrain_world_path := NodePath("../TerrainWorld")
 @export var terrain_collider_path := NodePath("../TerrainCollider")
+@export var voxel_work_zone_path := NodePath("../VoxelWorkZone")
 @export var motion_presentation_path := NodePath("../../MotionPresentation")
 @export var motion_client_path := NodePath("../../MotionClient")
 @export var tracked_chassis_controller_path := NodePath("../../ChassisMotionRoot")
@@ -17,17 +20,19 @@ const SOIL_PROXY_ORDER := ["cutting_edge", "opening", "cavity", "shell", "rear_s
 @export var backend_feedback_enabled := false
 @export var soil_tool_shadow_enabled := false
 @export var active_soil_patch_prototype_enabled := false
+@export var voxel_unlimited_bucket_for_testing := false
 @export_enum("loose", "compact", "sand", "damp") var active_soil_material_preset := "loose"
-@export_enum("legacy", "shadow", "active_patch") var soil_material_lifecycle_mode := "active_patch"
+@export_enum("legacy", "shadow", "active_patch", "voxel") var soil_material_lifecycle_mode := "active_patch"
 ## Keep the existing product writer selected until the v2 release candidate has
 ## completed its manual digging gate. Shadow/owner requests apply only at a
 ## clean material-generation boundary through the setter below.
-@export_enum("point_brush_v1", "surface_patch_v2_shadow", "surface_patch_v2", "arcade_stamp_v3") var soil_surface_solver_mode := "point_brush_v1"
+@export_enum("point_brush_v1", "surface_patch_v2_shadow", "surface_patch_v2", "arcade_stamp_v3", "voxel_bucket_v1") var soil_surface_solver_mode := "point_brush_v1"
 @export_enum("low", "balanced", "high") var feedback_quality := "balanced"
 @export var local_tooth_offset := Vector3(0.0, -0.55, 0.0)
 
 var terrain_world: TerrainWorld
 var terrain_collider: TerrainCollider
+var voxel_work_zone: VoxelWorkZone
 var terrain_scheduler: TerrainCommitScheduler
 var soil_state: BucketSoilState
 var authority_generation := 0
@@ -56,6 +61,7 @@ var _active_soil_presenter: ActiveSoilPatchPresenter
 var _active_soil_event_sequence := 0
 var _soil_interaction_authority: SoilInteractionAuthority
 var _arcade_stamp: ArcadeExcavationStamp
+var _voxel_authority: VoxelExcavationAuthority
 var _soil_lifecycle_tick := -1
 var _soil_authority_modes := SoilAuthorityModeController.new()
 var _bucket_ground_mode := BucketGroundInteractionMode.NORMAL
@@ -83,6 +89,7 @@ func _initialize() -> void:
 		return
 	terrain_world = get_node_or_null(terrain_world_path) as TerrainWorld
 	terrain_collider = get_node_or_null(terrain_collider_path) as TerrainCollider
+	voxel_work_zone = get_node_or_null(voxel_work_zone_path) as VoxelWorkZone
 	_presentation = get_node_or_null(motion_presentation_path) as MotionPresentation
 	if terrain_world == null or terrain_world.terrain_state == null or _presentation == null:
 		call_deferred("_initialize")
@@ -93,10 +100,6 @@ func _initialize() -> void:
 		return
 	_sync_local_tooth_offset(contract)
 	_soil_tool_classifier.configure(contract)
-	terrain_scheduler = TerrainCommitScheduler.new(terrain_world.terrain_state, terrain_world, terrain_collider)
-	soil_state = BucketSoilState.new(terrain_world.terrain_state, contract, terrain_scheduler)
-	terrain_scheduler.refresh_collider_derivative()
-	_create_parcel_pool(contract)
 	_motion_client = get_node_or_null(motion_client_path) as MotionClient
 	_tracked_chassis_controller = get_node_or_null(tracked_chassis_controller_path) as TrackedChassisController
 	_soil_effects = get_node_or_null(soil_effects_path) as SoilEffects
@@ -109,15 +112,17 @@ func _initialize() -> void:
 		_presentation.model_activated.connect(_on_model_activated)
 	if not terrain_world.world_reset.is_connected(_on_world_reset):
 		terrain_world.world_reset.connect(_on_world_reset)
-	_initialized = true
 	_soil_authority_modes.set_requested_mode(soil_material_lifecycle_mode)
 	_soil_authority_modes.set_requested_solver_mode(soil_surface_solver_mode)
+	if soil_material_lifecycle_mode != "voxel":
+		_ensure_legacy_runtime(contract)
+	_initialized = true
 	_begin_soil_authority_generation("initialize")
 	excavation_changed.emit(get_status_snapshot())
 
 
 func _physics_process(delta: float) -> void:
-	if soil_state == null or terrain_scheduler == null:
+	if not _initialized:
 		return
 	if _bucket_ground_bypassed():
 		_bucket_ground_bypass_ticks += 1
@@ -127,6 +132,23 @@ func _physics_process(delta: float) -> void:
 		_parcel_steps_bypassed += 1
 		return
 	_bucket_ground_execution_ticks += 1
+	if _selected_soil_mode() == "voxel":
+		if _voxel_authority == null:
+			return
+		if automatic_soil_enabled:
+			_automatic_samples_executed += 1
+			_step_automatic_interaction(delta)
+		_soil_steps_executed += 1
+		var voxel_result := _voxel_authority.step_fixed(delta)
+		if bool(voxel_result.get("changed", false)):
+			var transaction := voxel_result.get("transaction", {}) as Dictionary
+			_last_flow_volume_m3 = float(transaction.get("accepted_volume_m3", 0.0))
+			_last_interaction = "cut"
+			excavation_changed.emit(get_status_snapshot())
+		_queue_backend_feedback()
+		return
+	if soil_state == null or terrain_scheduler == null:
+		return
 	if automatic_soil_enabled:
 		_automatic_samples_executed += 1
 		_step_automatic_interaction(delta)
@@ -172,26 +194,28 @@ func _physics_process(delta: float) -> void:
 
 
 func queue_cut_world(sequence: int, previous_tooth: Vector3, current_tooth: Vector3) -> bool:
-	if _bucket_ground_bypassed() or soil_state == null or _selected_soil_mode() == "active_patch":
+	if _bucket_ground_bypassed() or soil_state == null or _selected_soil_mode() in ["active_patch", "voxel"]:
 		return false
 	_next_command_sequence = maxi(_next_command_sequence, sequence + 1)
 	return soil_state.queue_cut(sequence, previous_tooth, current_tooth)
 
 
 func queue_deposit_world(sequence: int, center: Vector3) -> bool:
-	if _bucket_ground_bypassed() or soil_state == null or _selected_soil_mode() == "active_patch":
+	if _bucket_ground_bypassed() or soil_state == null or _selected_soil_mode() in ["active_patch", "voxel"]:
 		return false
 	_next_command_sequence = maxi(_next_command_sequence, sequence + 1)
 	return soil_state.queue_deposit(sequence, center)
 
 
 func step_fixed_for_test() -> Dictionary:
-	if soil_state == null or terrain_scheduler == null:
-		return {"changed": false, "reason": "unavailable"}
 	if _bucket_ground_bypassed():
 		_soil_steps_bypassed += 1
 		_terrain_commits_bypassed += 1
 		return {"changed": false, "reason": "bucket_ground_interaction_bypassed"}
+	if _selected_soil_mode() == "voxel":
+		return _voxel_authority.step_fixed(1.0 / 60.0) if _voxel_authority != null else {"changed": false, "reason": "unavailable"}
+	if soil_state == null or terrain_scheduler == null:
+		return {"changed": false, "reason": "unavailable"}
 	if _selected_soil_mode() == "active_patch":
 		var active_result := _step_active_soil_patch({}, 1.0 / 60.0)
 		var active_status := get_status_snapshot()
@@ -256,6 +280,9 @@ func request_deposit() -> bool:
 
 
 func reset_for_test() -> void:
+	if _selected_soil_mode() == "voxel" and terrain_world != null:
+		terrain_world.reset_for_test()
+		return
 	if terrain_scheduler == null:
 		return
 	terrain_scheduler.reset_world()
@@ -352,8 +379,11 @@ func get_status_snapshot() -> Dictionary:
 	var legacy_status := soil_state.get_status_snapshot() if soil_state != null else {"bucket_volume_m3": 0.0, "world_generation": -1}
 	var lifecycle_status := _soil_interaction_authority.get_status_snapshot() if _soil_interaction_authority != null else {"configured": false}
 	var arcade_status := _arcade_stamp.get_status_snapshot() if _arcade_stamp != null else {"configured": false}
+	var voxel_status := _voxel_authority.get_status_snapshot() if _voxel_authority != null else {"configured": false}
 	var status := legacy_status.duplicate(true)
-	if _is_arcade_stamp_selected() and bool(arcade_status.get("configured", false)):
+	if _selected_soil_mode() == "voxel" and bool(voxel_status.get("configured", false)):
+		status = voxel_status.duplicate(true)
+	elif _is_arcade_stamp_selected() and bool(arcade_status.get("configured", false)):
 		status = arcade_status.duplicate(true)
 	elif _selected_soil_mode() == "active_patch" and bool(lifecycle_status.get("configured", false)):
 		status = lifecycle_status.duplicate(true)
@@ -376,14 +406,18 @@ func get_status_snapshot() -> Dictionary:
 		else {
 			"shadow": "conservative_shadow",
 			"active_patch": "conservative_active_patch",
+			"voxel": "voxel_bucket_authority",
 		}.get(_selected_soil_mode(), "legacy_analytic_parcel")
 	)
 	status["soil_authority_selection"] = _soil_authority_modes.get_status_snapshot()
 	status["arcade_stamp"] = arcade_status
+	status["voxel_excavation"] = voxel_status
 	status["active_soil_patch"] = _active_soil_patch.get_status_snapshot() if _active_soil_patch != null else {"configured": false}
 	status["soil_lifecycle_shadow"] = lifecycle_status.duplicate(true) if _selected_soil_mode() == "shadow" else {"configured": false, "mode": "legacy"}
 	status["soil_lifecycle_active"] = lifecycle_status.duplicate(true) if _selected_soil_mode() == "active_patch" and not _is_arcade_stamp_selected() else {"configured": false, "mode": "legacy"}
 	status["legacy_soil_status"] = legacy_status
+	status["legacy_runtime_constructed"] = soil_state != null or terrain_scheduler != null
+	status["parcel_runtime_constructed"] = _parcel_pool != null
 	status["selected_soil_payload"] = selected_payload
 	status["selected_soil_ledger_identity"] = String(selected_payload.get("ledger_identity", "legacy:unavailable"))
 	var lifecycle_shadow := status["soil_lifecycle_shadow"] as Dictionary
@@ -419,7 +453,17 @@ func get_status_snapshot() -> Dictionary:
 	return status
 
 
+func is_soil_runtime_ready() -> bool:
+	if not _initialized:
+		return false
+	if _selected_soil_mode() == "voxel":
+		return _voxel_authority != null and _voxel_authority.configured
+	return soil_state != null and terrain_scheduler != null
+
+
 func get_selected_soil_payload_snapshot() -> Dictionary:
+	if _selected_soil_mode() == "voxel" and _voxel_authority != null and _voxel_authority.configured:
+		return _voxel_authority.get_payload_snapshot()
 	if _is_arcade_stamp_selected() and _arcade_stamp != null:
 		var arcade := _arcade_stamp.get_status_snapshot()
 		if bool(arcade.get("configured", false)):
@@ -491,8 +535,6 @@ func get_dig_diagnostics() -> Dictionary:
 
 
 func step_automatic_snapshot_for_test(snapshot: Dictionary, delta: float = 1.0 / 60.0) -> Dictionary:
-	if soil_state == null or terrain_scheduler == null:
-		return {"changed": false, "reason": "unavailable"}
 	if _bucket_ground_bypassed():
 		_automatic_samples_bypassed += 1
 		_soil_steps_bypassed += 1
@@ -500,6 +542,15 @@ func step_automatic_snapshot_for_test(snapshot: Dictionary, delta: float = 1.0 /
 		return {"changed": false, "reason": "bucket_ground_interaction_bypassed"}
 	_automatic_samples_executed += 1
 	_process_bucket_snapshot(snapshot, delta)
+	if _selected_soil_mode() == "voxel":
+		var voxel_result := _voxel_authority.step_fixed(delta) if _voxel_authority != null else {"changed": false, "reason": "unavailable"}
+		var voxel_status := get_status_snapshot()
+		voxel_status["changed"] = bool(voxel_result.get("changed", false))
+		voxel_status["terrain_commit_result"] = voxel_result
+		excavation_changed.emit(voxel_status)
+		return voxel_status
+	if soil_state == null or terrain_scheduler == null:
+		return {"changed": false, "reason": "unavailable"}
 	if _selected_soil_mode() == "active_patch":
 		var active_result := _step_active_soil_patch({}, delta)
 		var active_status := get_status_snapshot()
@@ -550,8 +601,9 @@ func get_soil_visual_snapshot() -> Dictionary:
 	var status := get_selected_soil_payload_snapshot()
 	var lifecycle_shadow := _soil_interaction_authority.get_status_snapshot() if _soil_interaction_authority != null else {}
 	var arcade_status := _arcade_stamp.get_status_snapshot() if _arcade_stamp != null else {}
+	var voxel_status := _voxel_authority.get_status_snapshot() if _voxel_authority != null else {}
 	var chassis_status := _tracked_chassis_controller.get_status_snapshot() if _tracked_chassis_controller != null else {}
-	var visual_source := arcade_status if _is_arcade_stamp_selected() else lifecycle_shadow
+	var visual_source := voxel_status if _selected_soil_mode() == "voxel" else (arcade_status if _is_arcade_stamp_selected() else lifecycle_shadow)
 	var last_transaction := visual_source.get("last_transaction", {}) as Dictionary
 	return {
 		"world_generation": int(status.get("world_generation", -1)),
@@ -588,6 +640,68 @@ func _step_automatic_interaction(delta: float) -> void:
 	_process_bucket_snapshot(snapshot, delta)
 
 
+func _process_voxel_bucket_snapshot(snapshot: Dictionary) -> void:
+	if _voxel_authority == null or not _voxel_authority.configured:
+		_last_interaction = "voxel_authority_unavailable"
+		_report_active_runtime_failure(_last_interaction)
+		return
+	var identity := _voxel_fixed_identity(snapshot)
+	if identity.is_empty():
+		_last_interaction = "voxel_identity_rejected"
+		_last_interaction_batch = {"eligible": false, "operation": _last_interaction}
+		return
+	var submission := _voxel_authority.submit_pose(snapshot, identity)
+	_last_interaction = String(submission.get("reason", "voxel_rejected"))
+	_last_interaction_batch = {
+		"key": "%s|%d|%d" % [
+			String(identity.get("authority_epoch", "")),
+			int(identity.get("physics_tick", -1)),
+			int(identity.get("motion_sequence", -1)),
+		],
+		"authority_epoch": String(identity.get("authority_epoch", "")),
+		"physics_tick": int(identity.get("physics_tick", -1)),
+		"terrain_generation": int(identity.get("generation", -1)),
+		"bucket_motion_sequence": int(identity.get("motion_sequence", -1)),
+		"eligible": bool(submission.get("accepted", false)),
+		"operation": "voxel_cut" if bool(submission.get("accepted", false)) else _last_interaction,
+		"transaction_queued": bool(submission.get("accepted", false)),
+		"queue_depth": int(submission.get("queue_depth", 0)),
+	}
+
+
+func _voxel_fixed_identity(snapshot: Dictionary) -> Dictionary:
+	if _voxel_authority == null:
+		return {}
+	var chassis := _tracked_chassis_controller.get_status_snapshot() if _tracked_chassis_controller != null else {}
+	var jolt_authoritative := String(chassis.get("authority_profile", "")) == AuthorityProfile.JOLT_AUTHORITATIVE
+	if not jolt_authoritative:
+		var local_tick := Engine.get_physics_frames()
+		return {
+			"generation": _voxel_authority.generation,
+			"physics_tick": local_tick,
+			"motion_sequence": local_tick,
+			"authority_epoch": String(snapshot.get("identity", "local")),
+		}
+	var query := chassis.get("bucket_query", {}) as Dictionary
+	var physics_tick := int(query.get("physics_tick", -1))
+	var motion_sequence := int(query.get("motion_sequence", -1))
+	var epoch := String(query.get("authority_epoch", ""))
+	var identity_valid := bool(query.get("valid", false)) \
+		and epoch == String(chassis.get("authority_epoch", "")) \
+		and physics_tick == int(chassis.get("physics_tick", -1)) \
+		and motion_sequence == int(chassis.get("bucket_motion_sequence", -1)) \
+		and int(query.get("terrain_generation", -1)) == terrain_world.terrain_state.world_generation \
+		and int(query.get("terrain_revision", -1)) == terrain_world.terrain_state.terrain_revision
+	if not identity_valid:
+		return {}
+	return {
+		"generation": _voxel_authority.generation,
+		"physics_tick": physics_tick,
+		"motion_sequence": motion_sequence,
+		"authority_epoch": epoch,
+	}
+
+
 func _process_bucket_snapshot(snapshot: Dictionary, delta: float) -> void:
 	_last_pose_snapshot = snapshot.duplicate(true)
 	if not bool(snapshot.get("valid", false)):
@@ -597,6 +711,9 @@ func _process_bucket_snapshot(snapshot: Dictionary, delta: float) -> void:
 		_has_raw_support_point = false
 		if _tracked_chassis_controller != null:
 			_tracked_chassis_controller.clear_bucket_support_contact()
+		return
+	if _selected_soil_mode() == "voxel":
+		_process_voxel_bucket_snapshot(snapshot)
 		return
 	var previous: Dictionary = snapshot["previous"]
 	var current: Dictionary = snapshot["current"]
@@ -1007,7 +1124,7 @@ func _allocate_command_sequence() -> int:
 
 
 func _spawn_cut_parcels(soil_result: Dictionary) -> void:
-	if _selected_soil_mode() == "active_patch" or _parcel_pool == null:
+	if _selected_soil_mode() in ["active_patch", "voxel"] or _parcel_pool == null:
 		return
 	for event_value in soil_result.get("cut_events", []):
 		var event := event_value as Dictionary
@@ -1203,7 +1320,7 @@ func _reset_soil_interaction_authority() -> void:
 
 
 func _step_parcel_pool(delta: float) -> void:
-	if _selected_soil_mode() == "active_patch":
+	if _selected_soil_mode() in ["active_patch", "voxel"]:
 		return
 	var current: Dictionary = _last_pose_snapshot.get("current", {})
 	if not current.has("cavity"):
@@ -1284,7 +1401,7 @@ func _sample_bucket_pose() -> Dictionary:
 
 
 func _settle_bucket_cells(delta: float) -> bool:
-	if _selected_soil_mode() == "active_patch":
+	if _selected_soil_mode() in ["active_patch", "voxel"]:
 		return false
 	var current: Dictionary = _last_pose_snapshot.get("current", {})
 	if not current.has("cavity"):
@@ -1293,10 +1410,11 @@ func _settle_bucket_cells(delta: float) -> bool:
 
 
 func _queue_backend_feedback() -> void:
-	if not backend_feedback_enabled or _motion_client == null or soil_state == null:
+	if not backend_feedback_enabled or _motion_client == null:
 		return
 	var status := get_selected_soil_payload_snapshot()
-	var interaction := soil_state.soil_contract.get("interaction", {}) as Dictionary
+	var contract := _presentation.get_soil_contract() if _presentation != null else {}
+	var interaction := contract.get("interaction", {}) as Dictionary
 	var maximum_depth := float(interaction.get("maximum_cut_depth_m", 0.08))
 	var penetration := float(_last_support.get("penetration_m", 0.0))
 	_motion_client.queue_bucket_load_feedback(
@@ -1342,6 +1460,8 @@ func _on_model_activated(_model_id: String, _asset_root: Node3D) -> void:
 		soil_state.configure_contract(contract)
 	if _parcel_pool != null:
 		_parcel_pool.configure_barrier_extents(_cavity_extents_from_contract(contract))
+	if _selected_soil_mode() == "voxel" and (_voxel_authority == null or _voxel_authority.model_id != String(contract.get("model_id", ""))):
+		_report_active_runtime_failure("voxel_model_reconfigure_failed")
 
 
 func _sync_local_tooth_offset(contract: Dictionary) -> void:
@@ -1352,6 +1472,8 @@ func _sync_local_tooth_offset(contract: Dictionary) -> void:
 
 
 func _on_world_reset(generation: int) -> void:
+	if _selected_soil_mode() == "voxel" and voxel_work_zone != null:
+		voxel_work_zone.reset_zone()
 	if terrain_scheduler != null:
 		terrain_scheduler.reset_for_generation(generation)
 	if soil_state != null:
@@ -1378,6 +1500,7 @@ func _on_world_reset(generation: int) -> void:
 	_reset_soil_interaction_authority()
 	_reset_active_soil_patch(false)
 	_reset_arcade_stamp()
+	_reset_voxel_authority()
 	_begin_soil_authority_generation("world_reset")
 	excavation_changed.emit(get_status_snapshot())
 
@@ -1419,6 +1542,7 @@ func _clear_local_material(reason: String) -> bool:
 	_reset_soil_interaction_authority()
 	_reset_active_soil_patch(false)
 	_reset_arcade_stamp()
+	_reset_voxel_authority()
 	_begin_soil_authority_generation(reason)
 	excavation_changed.emit(get_status_snapshot())
 	return true
@@ -1446,6 +1570,56 @@ func _selected_soil_solver_mode() -> String:
 
 func _is_arcade_stamp_selected() -> bool:
 	return _selected_soil_mode() == "active_patch" and _selected_soil_solver_mode() == "arcade_stamp_v3"
+
+
+func _ensure_legacy_runtime(contract: Dictionary) -> bool:
+	if terrain_world == null or terrain_world.terrain_state == null:
+		return false
+	if terrain_scheduler == null:
+		terrain_scheduler = TerrainCommitScheduler.new(terrain_world.terrain_state, terrain_world, terrain_collider)
+		terrain_scheduler.refresh_collider_derivative()
+	if soil_state == null:
+		soil_state = BucketSoilState.new(terrain_world.terrain_state, contract, terrain_scheduler)
+	else:
+		soil_state.configure_contract(contract)
+	if _parcel_pool == null:
+		_create_parcel_pool(contract)
+	return true
+
+
+func _destroy_legacy_runtime() -> void:
+	if _parcel_pool != null:
+		_parcel_pool.clear_all()
+		remove_child(_parcel_pool)
+		_parcel_pool.queue_free()
+		_parcel_pool = null
+	soil_state = null
+	terrain_scheduler = null
+
+
+func _ensure_voxel_authority() -> bool:
+	if voxel_work_zone == null or voxel_work_zone.terrain == null or _presentation == null \
+		or terrain_world == null or terrain_world.terrain_state == null \
+		or _selected_soil_solver_mode() != "voxel_bucket_v1":
+		return false
+	var contract := _presentation.get_soil_contract()
+	if contract.is_empty():
+		return false
+	_reset_voxel_authority()
+	_voxel_authority = VoxelAuthority.new()
+	var capacity_override := TEST_BUCKET_CAPACITY_M3 if voxel_unlimited_bucket_for_testing else 0.0
+	return _voxel_authority.configure(
+		voxel_work_zone,
+		contract,
+		terrain_world.terrain_state.world_generation,
+		capacity_override,
+	)
+
+
+func _reset_voxel_authority() -> void:
+	if _voxel_authority != null:
+		_voxel_authority.clear()
+	_voxel_authority = null
 
 
 func _bucket_ground_bypassed() -> bool:
@@ -1495,6 +1669,22 @@ func _begin_soil_authority_generation(reason: String) -> bool:
 	if not _soil_authority_modes.begin_generation(_soil_generation_key(reason)):
 		return false
 	var selected := _selected_soil_mode()
+	if selected == "voxel":
+		_destroy_legacy_runtime()
+		_reset_soil_interaction_authority()
+		_reset_active_soil_patch(false)
+		_reset_arcade_stamp()
+		if not _ensure_voxel_authority():
+			_reset_voxel_authority()
+			_soil_authority_modes.fallback_initialization_to_legacy("voxel_initialization_failed")
+			soil_material_lifecycle_mode = "legacy"
+			soil_surface_solver_mode = "point_brush_v1"
+			selected = "legacy"
+	if selected != "voxel":
+		_reset_voxel_authority()
+		var contract := _presentation.get_soil_contract() if _presentation != null else {}
+		if not _ensure_legacy_runtime(contract):
+			return false
 	if selected in ["shadow", "active_patch"]:
 		var initialized := _ensure_arcade_stamp() if _is_arcade_stamp_selected() else (_ensure_active_soil_patch() and _ensure_soil_interaction_authority())
 		if not initialized:

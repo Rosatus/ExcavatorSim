@@ -5,11 +5,12 @@ const VoxelZone = preload("res://scripts/voxel_work_zone_config.gd")
 
 ## Deterministic, disposable Terrain3D presentation for a medium earthwork site.
 ##
-## The complete 64 m site is copied from TerrainState without modification so
+## The complete hard site is copied from TerrainState without modification so
 ## visible ground and authoritative machine support share one footprint. The
 ## central work pad remains the primary excavation/dressing exclusion zone.
 
-const SITE_EXTENT_M := 64.0
+const SITE_EXTENT_X_M := 64.0
+const SITE_EXTENT_Z_M := 80.0
 ## Terrain3D 1.0.2 requires initialized texture slots even when the project
 ## shader override does not sample them. These retained resources are bootstrap
 ## inputs only; product color/classification comes from worksite_soil_common.
@@ -26,8 +27,8 @@ func build_maps(snapshot: Dictionary) -> Dictionary:
 	var spacing := float(snapshot["spacing_m"])
 	var authority_origin: Vector2 = snapshot["origin_xz"]
 	var authority_surface: PackedFloat32Array = snapshot["surface"]
-	var site_rows := _site_samples(spacing, logical_rows)
-	var site_columns := _site_samples(spacing, logical_columns)
+	var site_rows := _site_samples(spacing, logical_rows, SITE_EXTENT_Z_M)
+	var site_columns := _site_samples(spacing, logical_columns, SITE_EXTENT_X_M)
 	var site_origin := Vector2(
 		-0.5 * float(site_columns - 1) * spacing,
 		-0.5 * float(site_rows - 1) * spacing
@@ -209,8 +210,8 @@ func _sample_bilinear(surface: PackedFloat32Array, rows: int, columns: int, spac
 	return lerpf(top, bottom, tz)
 
 
-func _site_samples(spacing: float, logical_samples: int) -> int:
-	var samples := maxi(logical_samples, roundi(SITE_EXTENT_M / spacing) + 1)
+func _site_samples(spacing: float, logical_samples: int, extent_m: float) -> int:
+	var samples := maxi(logical_samples, roundi(extent_m / spacing) + 1)
 	if samples % 2 != logical_samples % 2:
 		samples += 1
 	return samples

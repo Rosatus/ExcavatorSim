@@ -61,6 +61,10 @@ var _presentation_rows := 0
 var _presentation_columns := 0
 var _presentation_spacing := 0.0
 var _presentation_origin := Vector2.ZERO
+var _source_presentation_rows := 0
+var _source_presentation_columns := 0
+var _source_presentation_origin := Vector2.ZERO
+var _native_raster_region_aligned := false
 var _region_size_verts := 0
 var _patch_offset := Vector2i.ZERO
 var _patch_capable := false
@@ -272,7 +276,13 @@ func get_status_snapshot() -> Dictionary:
 		"patch_capable": _patch_capable,
 		"presentation_rows": _presentation_rows,
 		"presentation_columns": _presentation_columns,
-		"site_extent_m": ConstructionSiteTerrainProfile.SITE_EXTENT_M if construction_site_enabled else 0.0,
+		"presentation_origin_xz": _presentation_origin,
+		"source_presentation_rows": _source_presentation_rows,
+		"source_presentation_columns": _source_presentation_columns,
+		"source_presentation_origin_xz": _source_presentation_origin,
+		"native_raster_region_aligned": _native_raster_region_aligned,
+		"site_extent_x_m": ConstructionSiteTerrainProfile.SITE_EXTENT_X_M if construction_site_enabled else 0.0,
+		"site_extent_z_m": ConstructionSiteTerrainProfile.SITE_EXTENT_Z_M if construction_site_enabled else 0.0,
 		"material_roles": _site_profile.get_material_roles() if construction_site_enabled else PackedStringArray(),
 		"assets_source": _assets_source,
 		"material_source": material_path,
@@ -348,7 +358,7 @@ func _ensure_terrain_node() -> bool:
 
 
 func _materialize_snapshot(snapshot: Dictionary) -> bool:
-	var presentation := _site_profile.build_maps(snapshot) if construction_site_enabled else {
+	var source_presentation := _site_profile.build_maps(snapshot) if construction_site_enabled else {
 		"rows": int(snapshot["rows"]),
 		"columns": int(snapshot["columns"]),
 		"spacing_m": float(snapshot["spacing_m"]),
@@ -357,8 +367,12 @@ func _materialize_snapshot(snapshot: Dictionary) -> bool:
 		"height_bytes": snapshot["surface_bytes"],
 		"control_bytes": PackedByteArray(),
 	}
-	if presentation.is_empty():
+	if source_presentation.is_empty():
 		_set_error("Terrain3D construction-site presentation could not be built")
+		return false
+	var presentation := _align_presentation_to_native_regions(source_presentation, region_size)
+	if presentation.is_empty():
+		_set_error("Terrain3D presentation could not be aligned to native regions")
 		return false
 	var rows := int(presentation["rows"])
 	var columns := int(presentation["columns"])
@@ -412,7 +426,11 @@ func _materialize_snapshot(snapshot: Dictionary) -> bool:
 	_presentation_columns = columns
 	_presentation_spacing = spacing
 	_presentation_origin = origin
+	_source_presentation_rows = int(source_presentation["rows"])
+	_source_presentation_columns = int(source_presentation["columns"])
+	_source_presentation_origin = source_presentation["origin_xz"] as Vector2
 	_region_size_verts = int(target.get("region_size")) if _has_property(target, "region_size") else region_size
+	_native_raster_region_aligned = bool(presentation.get("native_region_aligned", false))
 	_compute_patch_capability(snapshot, presentation)
 	if _patch_capable:
 		var logical_overlay := snapshot.duplicate(true)
@@ -428,6 +446,85 @@ func _materialize_snapshot(snapshot: Dictionary) -> bool:
 	_configure_collision()
 	last_error = ""
 	return true
+
+
+## Terrain3D 1.0.x imports each image chunk at the beginning of the native
+## region containing the requested position. A non-aligned source origin would
+## therefore shift height and hole pixels in world space. Pad the semantic map
+## to complete region blocks and make the import origin region-aligned.
+func _align_presentation_to_native_regions(source: Dictionary, region_size_samples: int) -> Dictionary:
+	if not source.has_all(["rows", "columns", "spacing_m", "origin_xz", "surface", "height_bytes", "control_bytes"]):
+		return {}
+	var source_rows := int(source["rows"])
+	var source_columns := int(source["columns"])
+	var spacing := float(source["spacing_m"])
+	var source_origin := source["origin_xz"] as Vector2
+	var source_surface := source["surface"] as PackedFloat32Array
+	var source_controls := source["control_bytes"] as PackedByteArray
+	if source_rows < 2 or source_columns < 2 or spacing <= 0.0 \
+			or region_size_samples < 2 or source_surface.size() != source_rows * source_columns:
+		return {}
+	var region_world := float(region_size_samples) * spacing
+	var source_end_exclusive := source_origin + Vector2(
+		float(source_columns) * spacing,
+		float(source_rows) * spacing,
+	)
+	var region_min := Vector2i(
+		floori(source_origin.x / region_world),
+		floori(source_origin.y / region_world),
+	)
+	var region_max_exclusive := Vector2i(
+		ceili(source_end_exclusive.x / region_world),
+		ceili(source_end_exclusive.y / region_world),
+	)
+	var native_columns := (region_max_exclusive.x - region_min.x) * region_size_samples
+	var native_rows := (region_max_exclusive.y - region_min.y) * region_size_samples
+	if native_rows < region_size_samples or native_columns < region_size_samples:
+		return {}
+	var native_origin := Vector2(region_min) * region_world
+	var offset_f := (source_origin - native_origin) / spacing
+	var source_offset := Vector2i(roundi(offset_f.x), roundi(offset_f.y))
+	if absf(offset_f.x - float(source_offset.x)) > 0.01 or absf(offset_f.y - float(source_offset.y)) > 0.01:
+		return {}
+	var native_surface := PackedFloat32Array()
+	var native_height_bytes := PackedByteArray()
+	var native_control_bytes := PackedByteArray()
+	var native_count := native_rows * native_columns
+	native_surface.resize(native_count)
+	native_height_bytes.resize(native_count * 4)
+	var has_controls := source_controls.size() == source_rows * source_columns * 4
+	if has_controls:
+		native_control_bytes.resize(native_count * 4)
+	for native_row in native_rows:
+		var source_row := native_row - source_offset.y
+		for native_column in native_columns:
+			var source_column := native_column - source_offset.x
+			var native_index := native_row * native_columns + native_column
+			var inside_source := source_row >= 0 and source_row < source_rows \
+				and source_column >= 0 and source_column < source_columns
+			var height := 0.0
+			if inside_source:
+				var source_index := source_row * source_columns + source_column
+				height = source_surface[source_index]
+				if has_controls:
+					native_control_bytes.encode_u32(native_index * 4, source_controls.decode_u32(source_index * 4))
+			else:
+				var world_position := native_origin + Vector2(native_column, native_row) * spacing
+				height = _site_profile.sample_presentation_height(source, world_position)
+			native_surface[native_index] = height
+			native_height_bytes.encode_float(native_index * 4, height)
+	var aligned := source.duplicate(true)
+	aligned["rows"] = native_rows
+	aligned["columns"] = native_columns
+	aligned["origin_xz"] = native_origin
+	aligned["surface"] = native_surface
+	aligned["height_bytes"] = native_height_bytes
+	aligned["control_bytes"] = native_control_bytes
+	aligned["native_region_aligned"] = true
+	aligned["source_rows"] = source_rows
+	aligned["source_columns"] = source_columns
+	aligned["source_origin_xz"] = source_origin
+	return aligned
 
 
 ## True when the pending snapshot cannot be applied as an ordinary patch and

@@ -153,9 +153,14 @@ func _test_scene_adapter_seam() -> int:
 	if String(status["assets_source"]) != Terrain3DAdapter.TERRAIN3D_INITIALIZATION_ASSETS:
 		scene.queue_free()
 		return _fail("adapter declares the retained Terrain3D initialization assets")
-	if int(status["presentation_rows"]) != 129 or int(status["presentation_columns"]) != 129:
+	if int(status["source_presentation_rows"]) != 161 or int(status["source_presentation_columns"]) != 129:
 		scene.queue_free()
-		return _fail("adapter materializes the medium construction-site grid")
+		return _fail("adapter preserves the semantic construction-site grid")
+	if int(status["presentation_rows"]) != 256 or int(status["presentation_columns"]) != 256 \
+			or status["presentation_origin_xz"] != Vector2(-64.0, -64.0) \
+			or not bool(status["native_raster_region_aligned"]):
+		scene.queue_free()
+		return _fail("adapter pads the presentation to region-aligned native raster blocks")
 	if int(status["rock_count"]) != 0 or int(status["tree_count"]) != 0 \
 			or bool(status["grass_enabled"]) or bool(status["foliage_enabled"]):
 		scene.queue_free()
@@ -190,6 +195,18 @@ func _test_scene_adapter_seam() -> int:
 	if native_terrain.material.world_background != Terrain3DMaterial.NONE:
 		scene.queue_free()
 		return _fail("Terrain3D keeps its infinite background disabled so Sky3D owns the horizon")
+	var initial_native_data := native_terrain.data
+	if initial_native_data == null or not initial_native_data.has_method("get_control_hole") or not initial_native_data.has_method("get_height"):
+		scene.queue_free()
+		return _fail("native Terrain3D exposes world-space height and hole queries")
+	for inside in [Vector3(-16.0, 0.0, 8.0), Vector3(0.0, 0.0, 24.0), Vector3(15.5, 0.0, 39.5)]:
+		if not bool(initial_native_data.call("get_control_hole", inside)) or not is_nan(float(initial_native_data.call("get_height", inside))):
+			scene.queue_free()
+			return _fail("native Terrain3D hole matches voxel ownership at %s" % inside)
+	for outside in [Vector3(-32.0, 0.0, 0.0), Vector3(16.0, 0.0, 8.0), Vector3(-16.0, 0.0, 40.0)]:
+		if bool(initial_native_data.call("get_control_hole", outside)) or is_nan(float(initial_native_data.call("get_height", outside))):
+			scene.queue_free()
+			return _fail("native Terrain3D remains present outside voxel ownership at %s" % outside)
 	if fallback.visible or foundation.visible:
 		scene.queue_free()
 		return _fail("native Terrain3D hides both legacy ground presentation layers")
