@@ -16,7 +16,7 @@
 - [x] Run parser, pure cutter, transaction, negative-case, render-cadence,
   reset/model-switch, and one stable representative custom-editor performance
   test. Do not run unrelated full matrices.
-- [ ] Ask the user to execute the concise both-model Forward+ cut checklist;
+- [x] Ask the user to execute the concise both-model Forward+ cut checklist;
   human cleanliness/feel, full-zone presentation and practical test capacity
   remain pending until reported.
 - [x] Update the voxel authority/cutter frontend spec, commit, and archive only

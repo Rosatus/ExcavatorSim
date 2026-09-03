@@ -55,7 +55,6 @@
 
 ## Human milestone
 
-- Pending: Forward+ SY205 and SY135 slow/fast/curl cutting must be judged clean,
-  continuous, aligned, responsive, free of visible residual spikes, free of
-  Terrain3D overlap, and no longer constrained by ordinary bucket capacity.
-- Phase 3 dumping work must not begin before explicit user acceptance.
+- Accepted by the user on 2026-09-03 after rebuilding/restarting the main scene
+  with the native Terrain3D region-alignment fix. Phase 2 is approved to close
+  and Phase 3 dumping/soil-cycle work may begin.

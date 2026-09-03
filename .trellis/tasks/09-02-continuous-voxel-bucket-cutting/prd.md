@@ -50,7 +50,7 @@ Implement the sole voxel excavation authority, swept bucket cutter, coalesced SD
 - [x] Terrain3D covers the complete voxel ownership domain, deep solid soil is
   present to `Y=-5.5 m`, and test capacity reports both contract and effective
   values.
-- [ ] Human Forward+ review accepts clean, responsive, aligned cutting for SY205
+- [x] Human Forward+ review accepts clean, responsive, aligned cutting for SY205
   and SY135 before dumping work begins.
 
 ## Out of scope
