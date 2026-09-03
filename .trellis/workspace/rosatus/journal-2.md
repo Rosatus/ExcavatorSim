@@ -139,3 +139,37 @@ Added the bounded north-side Voxel Tools work zone, exclusive Terrain3D/hard-col
 ### Next Steps
 
 - None - task complete
+
+
+## Session 58: Continuous voxel bucket cutting accepted
+
+**Date**: 2026-09-03
+**Task**: Continuous voxel bucket cutting accepted
+**Branch**: `main`
+
+### Summary
+
+Implemented and validated continuous voxel cutting, fixed Terrain3D native region alignment, enabled large finite manual-test bucket capacity, and recorded human Forward+ acceptance.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5695f13` | (see git log) |
+| `32f538e` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
