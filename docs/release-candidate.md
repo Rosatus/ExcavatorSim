@@ -61,6 +61,12 @@ Windows and Linux packages once from the repository root:
 .\tools\build_release_dist.ps1
 ```
 
+When only the standalone Gateway packages need to be refreshed, use
+`tools/build_gateway_dist.ps1` instead. It builds the Web bundle once, reuses it
+for both PyInstaller targets, runs packaged smoke checks, writes clean/dirty
+source manifests, and atomically replaces only `dist/can_gateway` and
+`dist/can_gateway_linux`; it never rewrites `godot/dist`.
+
 The builder rebuilds both Gateway targets, creates an isolated copy of the
 Godot project, injects the pinned Windows/Linux custom release-template paths
 only into that copy, exports both presets into a staging directory, places the

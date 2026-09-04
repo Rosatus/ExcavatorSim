@@ -289,6 +289,10 @@ POST /api/v1/dbc/messages/{message_key}/preview
 POST /api/v1/dbc/{start,stop,reload}
 PUT  /api/v1/transport/tcp
 POST /api/v1/transport/can0/restart
+
+tools/build_gateway_dist.ps1 [-Platform all|windows|linux]
+    [-RefreshWebDependencies] [-RequireClean] [-SkipSmoke] [-PlanOnly]
+tools/build_release_dist.ps1
 ```
 
 ### 3. Contracts
@@ -311,6 +315,17 @@ POST /api/v1/transport/can0/restart
   contents are textual. Git checkout must not normalize their line endings, and release
   builders must copy their raw bytes unchanged so Windows and Linux packages retain the
   approved protocol hashes.
+- Command selection is scope-driven and mandatory: whenever the requested output is only
+  the Windows and/or Linux Gateway distribution, prefer
+  `tools/build_gateway_dist.ps1`, including when both Gateway platforms are requested.
+  Use `tools/build_release_dist.ps1` only when the request also requires Godot exports or
+  synchronized Gateway copies inside `godot/dist`; do not pay the full product-build cost
+  for a Gateway-only change.
+- `tools/build_gateway_dist.ps1` builds the Web bundle once, reuses it for both platform
+  binaries, stages and smokes each selected package, generates each manifest last, and
+  transactionally replaces only the matching `dist/can_gateway*` targets. Dependency
+  reuse is keyed by the package manifests and Node/npm versions; a changed key requires
+  `npm ci`. The Gateway-only entry must never rewrite `godot/dist`.
 - Each message has one canonical exact-DLC payload, independent `enabled`, and integer
   `frequency_hz` in `1..100` (default 50). `PUT` accepts at most one of `values` or
   `payload_hex`; either edit is converted to the canonical payload atomically. Signal edits
@@ -350,6 +365,8 @@ POST /api/v1/transport/can0/restart
 | Two DBC sources have identical bytes | collapse silently; retain both source paths |
 | UTF-8 decode fails but strict CP1252 succeeds | load file and report `dbc_encoding_fallback` |
 | Owner loop misses periodic deadlines | emit at most one current slot; skip backlog |
+| Only Gateway Windows/Linux packages are requested | run `tools/build_gateway_dist.ps1`; do not export Godot |
+| Godot exports or embedded Gateway copies are requested too | run `tools/build_release_dist.ps1` |
 
 ### 5. Good / Base / Bad Cases
 
@@ -359,9 +376,12 @@ POST /api/v1/transport/can0/restart
   then explicitly saves; the exact bytes become the send/persistence authority.
 - Base: Gateway is Godot-managed; transport/global controls remain absent while each
   simulation-capable CAN row can be switched for the current session to off/custom.
+- Good: a Gateway-only release request uses the dedicated builder and updates only the
+  selected `dist/can_gateway*` directories.
 - Bad: let the Web thread replace sinks directly, keep a second handwritten A800 codec,
   persist payload and values as competing authorities, reuse persisted data after a DBC
-  hash change, or pad a short DBC frame's wire DLC to 8.
+  hash change, pad a short DBC frame's wire DLC to 8, or run the full Godot release builder
+  for a Gateway-only package request.
 
 ### 6. Tests Required
 
@@ -379,6 +399,8 @@ POST /api/v1/transport/can0/restart
   persistence.
 - Packaging smoke starts the frozen Windows binary, loads `/`, `/api/v1/status`, Web assets,
   and adjacent DBCs; Linux packaging validates Web/DBC inclusion and helper preservation.
+- Distribution-entry tests assert Gateway-only scope selects `build_gateway_dist.ps1`,
+  platform filtering is explicit, and the dedicated builder never rewrites `godot/dist`.
 
 ### 7. Wrong vs Correct
 
@@ -397,6 +419,9 @@ Correct: preview through the codec without side effects -> explicit save -> one 
 
 Wrong: emit an operator warning for byte-identical bundled and adjacent DBC copies
 Correct: content-hash collapse silently -> expose all source paths on the one catalog entry
+
+Wrong: Gateway-only package request -> full Godot product export
+Correct: Gateway-only package request -> build_gateway_dist.ps1 -> selected Gateway dist targets only
 ```
 
 ## Scenario: Per-ID CAN authority console and transport-egress projection

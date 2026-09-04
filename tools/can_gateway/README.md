@@ -117,8 +117,40 @@ WSL2 通常没有真实 `can0`，只能用于构建和无硬件测试。构建�
 
 ## 正式发布构建
 
-从仓库根目录运行统一构建器，可重建 Windows/Linux Gateway、导出两个 Godot
-平台、把 Gateway 同步到可执行文件旁，并补齐许可证与构建来源清单：
+只重新构建 CAN Gateway 时，从仓库根目录运行 Gateway 专用构建器：
+
+```powershell
+.\tools\build_gateway_dist.ps1
+```
+
+该入口只更新 `dist/can_gateway` 和 `dist/can_gateway_linux`，不会导出或改写 Godot
+发行包。它在 Windows 上只构建一次 Web bundle，Windows/Linux PyInstaller 都复用
+该 bundle；前端依赖按 `package.json`、`package-lock.json`、Node 与 npm 版本缓存，
+未变化时跳过耗时的 `npm ci`。Linux 构建环境保存在 WSL 的
+`$HOME/.cache/excavatorsim/can-gateway-build`，避免反复跨 `/mnt/e` 安装依赖。
+
+```powershell
+# 只构建一个平台
+.\tools\build_gateway_dist.ps1 -Platform windows
+.\tools\build_gateway_dist.ps1 -Platform linux
+
+# package-lock、Node 或依赖状态变化后强制干净安装
+.\tools\build_gateway_dist.ps1 -RefreshWebDependencies
+
+# 正式发布时要求源码与生成的 Web bundle 均已提交
+.\tools\build_gateway_dist.ps1 -RequireClean
+
+# 只查看计划，不执行构建
+.\tools\build_gateway_dist.ps1 -PlanOnly
+```
+
+默认执行打包后二进制 smoke、脚本语法检查、包布局检查和 manifest 生成；Windows
+smoke 会实际启动冻结程序并验证 Web 首页、状态 API、静态资源及相邻 DBC 加载。验证
+通过后再以同盘改名方式整体替换所选正式目录；旧包里的运行输出会先保存到
+`output/release-build-residue`。`-SkipSmoke` 仅用于明确不需要验收的临时构建。
+
+需要同时导出 Godot 产品时，运行完整统一构建器；它会重建 Windows/Linux Gateway、
+导出两个 Godot 平台、把 Gateway 同步到可执行文件旁，并补齐许可证与构建来源清单：
 
 ```powershell
 .\tools\build_release_dist.ps1
