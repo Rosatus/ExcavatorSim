@@ -16,6 +16,12 @@ function ensureTimer() {
   timer = window.setInterval(tick, TICK_MS);
 }
 
+function stopTimerIfIdle() {
+  if (listeners.size > 0 || timer === undefined) return;
+  window.clearInterval(timer);
+  timer = undefined;
+}
+
 export function setServerAnchor(serverMonotonic: number) {
   anchorServer = serverMonotonic;
   anchorClient = performance.now();
@@ -31,5 +37,6 @@ export function subscribeServerClock(listener: () => void): () => void {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
+    stopTimerIfIdle();
   };
 }
