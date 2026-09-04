@@ -115,6 +115,10 @@ func acknowledge_ticket_query(ticket: Dictionary) -> bool:
 	return readiness.acknowledge_query(ticket)
 
 
+func retire_ticket(ticket: Dictionary, reason: StringName) -> bool:
+	return readiness.retire(ticket, reason)
+
+
 func get_ticket_status(ticket: Dictionary) -> Dictionary:
 	return readiness.status(ticket)
 
@@ -136,6 +140,7 @@ func get_status_snapshot() -> Dictionary:
 		"world_bounds": WorkZoneConfig.world_bounds(),
 		"voxel_bounds": WorkZoneConfig.voxel_bounds(voxel_scale_m),
 		"initial_readiness": readiness.status(initial_ticket),
+		"readiness": readiness.get_status_snapshot(),
 		"statistics": terrain.get_statistics() if terrain != null else {},
 		"reset_count": reset_count,
 		"last_error": last_error,

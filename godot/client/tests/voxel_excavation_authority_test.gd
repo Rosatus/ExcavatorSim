@@ -9,6 +9,8 @@ const WorkZoneConfig = preload("res://scripts/voxel_work_zone_config.gd")
 
 const MAX_READY_FRAMES := 1200
 const REPRESENTATIVE_COMMIT_BUDGET_USEC := 75000
+const REPRESENTATIVE_DUMP_P95_BUDGET_USEC := 6000
+const REPRESENTATIVE_DUMP_P99_BUDGET_USEC := 10000
 const EMPTY_TRACK_ADMISSION_ITERATIONS := 180
 const EMPTY_TRACK_ADMISSION_BUDGET_USEC := 100000
 
@@ -28,6 +30,7 @@ func _run() -> void:
 		_expect(await _wait_initial_ready(zone), "initial collision is ready", failures)
 		await _check_commit_contract(zone, failures)
 		_check_sy135_deep_native_cut(zone, failures)
+		_check_sy135_unengaged_native_rejections(zone, failures)
 	zone.queue_free()
 	await process_frame
 	var cadence_a := await _run_cadence(PackedFloat32Array([0.05]))
@@ -115,6 +118,12 @@ func _check_commit_contract(zone: VoxelWorkZone, failures: Array[String]) -> voi
 	_expect(int(payload.get("conservation_error_q", 1)) == 0, "fixed-point conservation is exact", failures)
 	_expect(String(payload.get("source", "")) == "voxel_bucket_v1", "payload identifies voxel authority", failures)
 	_expect(_clearance_is_air(zone, committed_proposal), "accepted constrained clearance contains no authoritative solid", failures)
+	var phase_timings := status.get("phase_timings_usec", {}) as Dictionary
+	var commit_timing := phase_timings.get("commit", {}) as Dictionary
+	_expect(int(commit_timing.get("sample_count", 0)) == 1, "accepted commit enters the bounded timing window", failures)
+	_expect(int(commit_timing.get("p95", 0)) > 0 and int(commit_timing.get("p99", 0)) > 0, "commit timing exposes p95/p99", failures)
+	_expect(String((status.get("allocation_proxies", {}) as Dictionary).get("unit", "")) == "object_count_proxy_not_bytes", "allocation telemetry is explicitly a proxy", failures)
+	_expect(int((status.get("readiness", {}) as Dictionary).get("canonical_block_count", 0)) > 0, "authority exposes canonical readiness diagnostics", failures)
 
 	var digest_after_commit := _surface_digest(zone)
 	var mass_after_commit := int(payload.get("bucket_mass_q", 0))
@@ -181,6 +190,12 @@ func _check_commit_contract(zone: VoxelWorkZone, failures: Array[String]) -> voi
 	_expect(int(authority.get_payload_snapshot().get("conservation_error_q", 1)) == 0, "deposit preserves exact fixed-point conservation", failures)
 	_expect(not String(dump_status.get("accepted_dump_event_id", "")).is_empty(), "deposit publishes one stable presentation event", failures)
 	_expect(int((dump_status.get("operation_counts", {}) as Dictionary).get("deposit", 0)) == 1, "deposit diagnostic counter advances once", failures)
+	var dump_phase_timings := dump_status.get("phase_timings_usec", {}) as Dictionary
+	var operation_commit := dump_phase_timings.get("commit_by_operation", {}) as Dictionary
+	var deposit_commit_timing := operation_commit.get("deposit", {}) as Dictionary
+	_expect(int(deposit_commit_timing.get("sample_count", 0)) == 1, "deposit keeps an independent percentile window", failures)
+	_expect(int(deposit_commit_timing.get("p95", REPRESENTATIVE_DUMP_P95_BUDGET_USEC + 1)) <= REPRESENTATIVE_DUMP_P95_BUDGET_USEC, "representative deposit p95 stays within the 6 ms focused budget", failures)
+	_expect(int(deposit_commit_timing.get("p99", REPRESENTATIVE_DUMP_P99_BUDGET_USEC + 1)) <= REPRESENTATIVE_DUMP_P99_BUDGET_USEC, "representative deposit p99 stays within the 10 ms focused budget", failures)
 	print("VOXEL_DUMP_PERF %s" % JSON.stringify({
 		"commit_usec": int(dump_transaction.get("commit_usec", -1)),
 		"support_query_usec": int(dump_transaction.get("support_query_usec", -1)),
@@ -190,6 +205,10 @@ func _check_commit_contract(zone: VoxelWorkZone, failures: Array[String]) -> voi
 		"native_edit_usec": int(dump_transaction.get("native_edit_usec", -1)),
 		"digest_usec": int(dump_transaction.get("digest_usec", -1)),
 		"readiness_issue_usec": int(dump_transaction.get("readiness_issue_usec", -1)),
+		"commit_p95_usec": int(deposit_commit_timing.get("p95", -1)),
+		"commit_p99_usec": int(deposit_commit_timing.get("p99", -1)),
+		"allocation_proxy_max": int((((dump_status.get("allocation_proxies", {}) as Dictionary).get("commit", {}) as Dictionary).get("maximum", -1))),
+		"readiness_pending_blocks": int((dump_status.get("readiness", {}) as Dictionary).get("visual_collision_pending_block_count", -1)),
 		"accepted_mass_q": int(dump_transaction.get("accepted_mass_q", -1)),
 		"conservation_error_q": int(authority.get_payload_snapshot().get("conservation_error_q", -1)),
 	}))
@@ -481,8 +500,24 @@ func _check_sy135_deep_native_cut(zone: VoxelWorkZone, failures: Array[String]) 
 	var authority := Authority.new()
 	_expect(authority.configure(zone, contract, zone.readiness.generation, 1000.0), "deep native authority configures", failures)
 	var start := Vector3(6.0, _bucket_origin_y(contract, -1.1), 32.0)
+	var pose := _pose(contract, start, Vector3(0.08, -0.12, 0.18), "deep-native")
+	var proposal_result := authority.cutter.build_proposal(
+		pose,
+		authority.generation,
+		90,
+		90,
+		"voxel-authority-test",
+		false,
+		authority._sample_sdf_world,
+	)
+	var proposal := proposal_result.get("proposal") as VoxelCutProposal
+	_expect(
+		bool(proposal_result.get("accepted", false)) and proposal != null,
+		"deep native proposal is available for post-commit occupancy checks",
+		failures,
+	)
 	var submission := authority.submit_pose(
-		_pose(contract, start, Vector3(0.08, -0.12, 0.18), "deep-native"),
+		pose,
 		_identity(authority.generation, 90, 90),
 	)
 	_expect(bool(submission.get("accepted", false)), "deep native pose is accepted", failures)
@@ -496,6 +531,75 @@ func _check_sy135_deep_native_cut(zone: VoxelWorkZone, failures: Array[String]) 
 	_expect(int(transaction.get("overburden_path_count", 0)) == 1, "deep native cut executes overburden cleanup", failures)
 	_expect(String(transaction.get("accounting_mode", "")) == "sparse_coverage_approximate", "deep native cut uses approximate accounting", failures)
 	_expect(String(transaction.get("pre_sdf_digest", "")) != String(transaction.get("post_sdf_digest", "")), "deep native cut changes sampled SDF", failures)
+	if proposal != null:
+		_expect(
+			_native_role_centerlines_are_air(zone, proposal.native_paths, ["bucket_occupancy", "bucket_floor"]),
+			"deep native cut leaves no solid samples on the accepted bucket occupancy envelope",
+			failures,
+		)
+		_expect(
+			_native_role_centerlines_are_air(zone, proposal.native_paths, ["overburden_cleanup"]),
+			"deep native cut removes the bounded unsupported-roof cleanup columns",
+			failures,
+		)
+
+
+func _check_sy135_unengaged_native_rejections(zone: VoxelWorkZone, failures: Array[String]) -> void:
+	var descriptor := SoilContractDescriptor.load_for_model("sy135")
+	if descriptor == null or not descriptor.is_valid_for("sy135"):
+		_expect(false, "SY135 negative native contract is available", failures)
+		return
+	var contract := descriptor.to_dictionary()
+	var authority := Authority.new()
+	_expect(authority.configure(zone, contract, zone.readiness.generation, 1000.0), "SY135 negative native authority configures", failures)
+	if not authority.configured:
+		return
+	var origin_y := _bucket_origin_y(contract, -0.04)
+	var origin := Vector3(-7.0, origin_y, 32.0)
+	var digest_before := _surface_digest(zone, Vector3(origin.x, 0.0, origin.z))
+	var cases := [
+		{"name": "withdrawal", "motion": Vector3(0.0, 0.08, -0.02), "rotation": 0.0},
+		{"name": "curl_without_engagement", "motion": Vector3.ZERO, "rotation": deg_to_rad(5.0)},
+	]
+	for case_index in cases.size():
+		var case := cases[case_index] as Dictionary
+		var previous := Transform3D(Basis.IDENTITY, origin)
+		var current := Transform3D(
+			Basis(Vector3.RIGHT, float(case.get("rotation", 0.0))),
+			origin + (case.get("motion", Vector3.ZERO) as Vector3),
+		)
+		var pose := _pose_from_transforms(contract, previous, current, "sy135-negative:%s" % case.get("name", ""))
+		var result := authority.submit_pose(
+			pose,
+			_identity(authority.generation, 100 + case_index, 100 + case_index),
+		)
+		_expect(
+			not bool(result.get("accepted", false)),
+			"SY135 %s is rejected before native mutation" % case.get("name", ""),
+			failures,
+		)
+		_expect(
+			_surface_digest(zone, Vector3(origin.x, 0.0, origin.z)) == digest_before,
+			"SY135 %s preserves stable SDF" % case.get("name", ""),
+			failures,
+		)
+	var back_basis := Basis(Vector3.RIGHT, PI)
+	var back_previous := Transform3D(back_basis, Vector3(origin.x, 0.2, origin.z))
+	var back_current := Transform3D(back_basis, back_previous.origin + Vector3(0.0, 0.0, 0.08))
+	var back_result := authority.submit_pose(
+		_pose_from_transforms(contract, back_previous, back_current, "sy135-negative:outer-back-brush"),
+		_identity(authority.generation, 102, 102),
+	)
+	_expect(
+		not bool(back_result.get("accepted", false)) and String(back_result.get("reason", "")) == "above_ground",
+		"SY135 outer-back brush is rejected before native mutation",
+		failures,
+	)
+	_expect(
+		_surface_digest(zone, Vector3(origin.x, 0.0, origin.z)) == digest_before,
+		"SY135 outer-back brush preserves stable SDF",
+		failures,
+	)
 
 
 func _wait_initial_ready(zone: VoxelWorkZone) -> bool:
@@ -521,6 +625,24 @@ func _pose(contract: Dictionary, start: Vector3, motion: Vector3, identity: Stri
 		return {}
 	var previous := Transform3D(Basis.IDENTITY, start)
 	var current := Transform3D(Basis.IDENTITY, start + motion)
+	return {
+		"valid": true,
+		"reason": "ok",
+		"model_id": String(contract.get("model_id", "")),
+		"soil_tool": tool.compose_snapshot(previous, current, true, identity),
+		"contract": contract,
+	}
+
+
+func _pose_from_transforms(
+	contract: Dictionary,
+	previous: Transform3D,
+	current: Transform3D,
+	identity: String
+) -> Dictionary:
+	var tool := BucketSoilTool.new()
+	if not tool.configure(contract):
+		return {}
 	return {
 		"valid": true,
 		"reason": "ok",
@@ -602,6 +724,29 @@ func _clearance_is_air(zone: VoxelWorkZone, proposal: VoxelCutProposal) -> bool:
 			if tool.get_voxel_f(coordinate) < -0.001:
 				return false
 	return true
+
+
+func _native_role_centerlines_are_air(
+	zone: VoxelWorkZone,
+	paths: Array[Dictionary],
+	roles: Array[String]
+) -> bool:
+	var tool := zone.get_voxel_tool()
+	var sample_count := 0
+	for path in paths:
+		if not roles.has(String(path.get("role", ""))):
+			continue
+		var points := path.get("points_voxels", PackedVector3Array()) as PackedVector3Array
+		for point_index in points.size():
+			var samples := PackedVector3Array([points[point_index]])
+			if point_index + 1 < points.size():
+				samples.append(points[point_index].lerp(points[point_index + 1], 0.5))
+			for sample in samples:
+				var coordinate := Vector3i(roundi(sample.x), roundi(sample.y), roundi(sample.z))
+				if tool.get_voxel_f(coordinate) < -0.001:
+					return false
+				sample_count += 1
+	return sample_count > 0
 
 
 func _expect(condition: bool, message: String, failures: Array[String]) -> void:

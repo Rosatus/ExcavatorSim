@@ -2596,9 +2596,17 @@ VoxelSoilMaterialField.stage_compaction(coordinates, compaction_delta_q) -> Dict
   Native deposits form their repose-like shape at commit and do not seed a
   continuously draining settle frontier. This intentionally permits stepped
   mound growth and approximate repose in exchange for bounded latency.
-- Overlapping native-deposit readiness work coalesces into one enlarged ticket;
-  collision remains a generation-gated derivative and may lag the visible SDF
-  by the bounded engine rebuild interval.
+- Readiness ownership is canonical per generation and native 16-cubed mesh
+  block. Point support performs one block-key lookup and never scans ticket
+  history. Compatible native-deposit work in the same probe block may coalesce
+  into one enlarged ticket; lower/raise/expected probes or different operation
+  purposes must not be collapsed into one query acknowledgement.
+- A dirty block keeps its last acknowledged Jolt collider usable while the
+  replacement mesh/collider is pending. Successful acknowledgement publishes
+  the new block revision; timeout retirement restores that fallback, or removes
+  an unconfirmed block with no fallback, rather than leaving permanent pending
+  ownership. Collision remains derivative and may lag the visible SDF by the
+  bounded engine rebuild interval.
 - `SoilEffects` polls complete soil snapshots at no more than `30 Hz`, rebuilds
   the bucket fill surface at no more than `10 Hz` and only across `5%` fill
   quanta, reuses one `ArrayMesh`, and manages hero clods through active/free
@@ -2641,6 +2649,12 @@ VoxelSoilMaterialField.stage_compaction(coordinates, compaction_delta_q) -> Dict
   `dump_batch_coalesced_count`, `native_deposit_committed`,
   `readiness_coalesced`, `support_query_usec`, and `batch_wait_usec`. Visual
   diagnostics expose snapshot pulls, fill rebuilds, cadences, and fill quantum.
+- Authority performance diagnostics use fixed 64-sample windows and expose
+  average/max/p95/p99 for proposal, commit/operation, coverage, material,
+  native edit, digest, readiness issue, and status construction. Mesh-ready,
+  collision-ready, and end-to-end lag use the same bounded shape. Allocation
+  telemetry is labeled as an object-count proxy and must not be reported as
+  allocator bytes.
 
 ### 4. Validation & Error Matrix
 

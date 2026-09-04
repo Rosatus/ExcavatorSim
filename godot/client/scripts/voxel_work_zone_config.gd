@@ -79,6 +79,35 @@ static func is_world_position_editable(world_position: Vector3, scale_m: float =
 	return editable_world_bounds(scale_m).has_point(world_position)
 
 
+static func mesh_block_coordinate(voxel_position: Vector3) -> Vector3i:
+	var block_size := float(MESH_BLOCK_SIZE_VOXELS)
+	return Vector3i(
+		floori(voxel_position.x / block_size),
+		floori(voxel_position.y / block_size),
+		floori(voxel_position.z / block_size),
+	)
+
+
+static func mesh_block_key(voxel_position: Vector3) -> String:
+	var coordinate := mesh_block_coordinate(voxel_position)
+	return "%d:%d:%d" % [coordinate.x, coordinate.y, coordinate.z]
+
+
+static func mesh_block_keys_for_area(area_voxels: AABB) -> PackedStringArray:
+	var result := PackedStringArray()
+	if area_voxels.size.x <= 0.0 or area_voxels.size.y <= 0.0 or area_voxels.size.z <= 0.0:
+		return result
+	var minimum := mesh_block_coordinate(area_voxels.position)
+	# AABBs are half-open. Pull the end inward so an edit ending exactly on a
+	# block edge does not dirty the neighboring block.
+	var maximum := mesh_block_coordinate(area_voxels.end - Vector3.ONE * 0.00001)
+	for z in range(minimum.z, maximum.z + 1):
+		for y in range(minimum.y, maximum.y + 1):
+			for x in range(minimum.x, maximum.x + 1):
+				result.append("%d:%d:%d" % [x, y, z])
+	return result
+
+
 static func _validated_scale(scale_m: float) -> float:
 	assert(is_finite(scale_m) and scale_m > 0.0, "voxel scale must be finite and positive")
 	return scale_m

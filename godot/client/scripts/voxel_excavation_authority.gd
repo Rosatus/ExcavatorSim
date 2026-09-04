@@ -7,6 +7,7 @@ const SoilOperationProposal = preload("res://scripts/voxel_soil_operation_propos
 const BucketCutter = preload("res://scripts/voxel_bucket_cutter.gd")
 const MaterialField = preload("res://scripts/voxel_soil_material_field.gd")
 const WorkZoneConfig = preload("res://scripts/voxel_work_zone_config.gd")
+const TimingWindow = preload("res://scripts/voxel_timing_window.gd")
 
 const SCHEMA_VERSION := "voxel-excavation-authority-v2"
 const COMMIT_PERIOD_S := 0.05
@@ -116,6 +117,17 @@ var _dump_release_world := Vector3.ZERO
 var _dump_released_fill_ratio := 0.0
 var _rejected_dump_event_id := ""
 var _rejected_dump_world := Vector3.ZERO
+var _proposal_timing_usec := TimingWindow.new()
+var _commit_timing_usec := TimingWindow.new()
+var _coverage_timing_usec := TimingWindow.new()
+var _material_timing_usec := TimingWindow.new()
+var _native_edit_timing_usec := TimingWindow.new()
+var _digest_timing_usec := TimingWindow.new()
+var _readiness_issue_timing_usec := TimingWindow.new()
+var _status_digest_timing_usec := TimingWindow.new()
+var _proposal_allocation_proxy := TimingWindow.new()
+var _commit_allocation_proxy := TimingWindow.new()
+var _operation_commit_timing: Dictionary = {}
 
 
 func configure(work_zone: VoxelWorkZone, contract: Dictionary, target_generation: int, capacity_override_m3: float = 0.0) -> bool:
@@ -210,6 +222,7 @@ func clear() -> void:
 	_dump_released_fill_ratio = 0.0
 	_rejected_dump_event_id = ""
 	_rejected_dump_world = Vector3.ZERO
+	_reset_timing_telemetry()
 
 
 func submit_pose(pose_snapshot: Dictionary, identity: Dictionary, delta_s: float = 1.0 / 60.0) -> Dictionary:
@@ -229,8 +242,14 @@ func submit_pose(pose_snapshot: Dictionary, identity: Dictionary, delta_s: float
 	_last_submitted_tick = tick
 	_last_submitted_motion_sequence = motion_sequence
 	_next_sequence = maxi(_next_sequence, motion_sequence + 1)
+	var proposal_started_usec := Time.get_ticks_usec()
 	var dump_result := _build_dump_proposal(pose_snapshot, identity, delta_s)
 	if bool(dump_result.get("attempted", false)):
+		var dump_candidate := dump_result.get("proposal") as VoxelSoilOperationProposal
+		_record_proposal_telemetry(
+			proposal_started_usec,
+			1 + dump_candidate.shapes.size() if dump_candidate != null else 1,
+		)
 		_engaged = false
 		if not bool(dump_result.get("accepted", false)):
 			# A previously accepted in-zone release remains valid even if the
@@ -273,6 +292,7 @@ func submit_pose(pose_snapshot: Dictionary, identity: Dictionary, delta_s: float
 			"queue_depth": _queue.size() + _soil_queue.size(),
 			"pending_dump": false,
 		}
+	proposal_started_usec = Time.get_ticks_usec()
 	var result := cutter.build_proposal(
 		pose_snapshot,
 		generation,
@@ -281,6 +301,12 @@ func submit_pose(pose_snapshot: Dictionary, identity: Dictionary, delta_s: float
 		epoch,
 		_engaged,
 		_sample_sdf_world,
+	)
+	var cut_candidate := result.get("proposal") as VoxelCutProposal
+	_record_proposal_telemetry(
+		proposal_started_usec,
+		1 + cut_candidate.capsules.size() + cut_candidate.clearance_capsules.size() \
+			+ cut_candidate.native_paths.size() if cut_candidate != null else 1,
 	)
 	_last_cutter_result = _sanitized_cutter_result(result)
 	_engaged = bool(result.get("engaged", false))
@@ -345,6 +371,7 @@ func step_fixed(delta: float) -> Dictionary:
 		else:
 			transaction = _commit_proposal(_queue.pop_front())
 	_prefer_background = not processed_background
+	_record_transaction_telemetry(transaction)
 	_last_transaction = transaction.to_dictionary()
 	_append_journal(_last_transaction)
 	if not transaction.accepted():
@@ -370,7 +397,10 @@ func get_payload_snapshot() -> Dictionary:
 
 
 func get_status_snapshot() -> Dictionary:
+	var status_started_usec := Time.get_ticks_usec()
 	var payload := get_payload_snapshot() if configured else {}
+	var readiness_status := _work_zone.readiness.get_status_snapshot() \
+		if _work_zone != null else {}
 	var oldest_age_ticks := 0
 	var oldest_tick := _last_submitted_tick
 	if not _queue.is_empty():
@@ -430,6 +460,7 @@ func get_status_snapshot() -> Dictionary:
 		"native_overburden_path_total": _native_overburden_path_total,
 		"native_deposit_committed": _native_deposit_committed_count,
 		"readiness_coalesced": _readiness_coalesced_count,
+		"readiness": readiness_status,
 		"cut_accounting_mode": "sparse_coverage_approximate" if model_id == "sy135" else "exact_sdf_volume",
 		"deposit_accounting_mode": "native_sparse_deposit_approximate",
 		"engaged": _engaged,
@@ -450,7 +481,86 @@ func get_status_snapshot() -> Dictionary:
 	# Keep diagnostics and selected-world/UI payload reads on one typed status
 	# surface without allowing payload fields to overwrite authority counters.
 	status.merge(payload, false)
+	status["phase_timings_usec"] = _phase_timing_snapshot()
+	status["allocation_proxies"] = {
+		"unit": "object_count_proxy_not_bytes",
+		"proposal": _proposal_allocation_proxy.snapshot(),
+		"commit": _commit_allocation_proxy.snapshot(),
+	}
+	_status_digest_timing_usec.record(Time.get_ticks_usec() - status_started_usec)
+	(status["phase_timings_usec"] as Dictionary)["status_digest"] = _status_digest_timing_usec.snapshot()
 	return status
+
+
+func _reset_timing_telemetry() -> void:
+	for window in [
+		_proposal_timing_usec,
+		_commit_timing_usec,
+		_coverage_timing_usec,
+		_material_timing_usec,
+		_native_edit_timing_usec,
+		_digest_timing_usec,
+		_readiness_issue_timing_usec,
+		_status_digest_timing_usec,
+		_proposal_allocation_proxy,
+		_commit_allocation_proxy,
+	]:
+		(window as VoxelTimingWindow).clear()
+	_operation_commit_timing.clear()
+	for operation in ["cut", "deposit", "settle", "compact"]:
+		_operation_commit_timing[operation] = TimingWindow.new()
+
+
+func _record_proposal_telemetry(started_usec: int, allocation_proxy: int) -> void:
+	_proposal_timing_usec.record(Time.get_ticks_usec() - started_usec)
+	_proposal_allocation_proxy.record(allocation_proxy)
+
+
+func _record_transaction_telemetry(transaction: VoxelCutTransaction) -> void:
+	if transaction == null or not transaction.accepted():
+		return
+	_commit_timing_usec.record(transaction.commit_usec)
+	_record_nonzero_timing(_coverage_timing_usec, transaction.coverage_usec)
+	_record_nonzero_timing(_material_timing_usec, transaction.material_usec)
+	_record_nonzero_timing(_native_edit_timing_usec, transaction.native_edit_usec)
+	_record_nonzero_timing(_digest_timing_usec, transaction.digest_usec)
+	_record_nonzero_timing(_readiness_issue_timing_usec, transaction.readiness_issue_usec)
+	# Godot does not expose per-transaction allocator bytes here. This explicit
+	# object-count proxy tracks the variable-size collections that dominate the
+	# proposal/commit path without pretending to be a byte measurement.
+	_commit_allocation_proxy.record(
+		transaction.coverage_candidate_count + transaction.coverage_new_count \
+			+ transaction.native_path_count + transaction.affected_cells
+	)
+	var operation_window_value: Variant = _operation_commit_timing.get(transaction.operation)
+	if operation_window_value is VoxelTimingWindow:
+		(operation_window_value as VoxelTimingWindow).record(transaction.commit_usec)
+
+
+func _record_nonzero_timing(window: VoxelTimingWindow, value_usec: int) -> void:
+	if value_usec > 0:
+		window.record(value_usec)
+
+
+func _phase_timing_snapshot() -> Dictionary:
+	var operation_commit: Dictionary = {}
+	for operation_value in _operation_commit_timing.keys():
+		var operation := String(operation_value)
+		var window_value: Variant = _operation_commit_timing.get(operation_value)
+		if window_value is VoxelTimingWindow:
+			operation_commit[operation] = (window_value as VoxelTimingWindow).snapshot()
+	return {
+		"window_size": VoxelTimingWindow.DEFAULT_CAPACITY,
+		"proposal_generation": _proposal_timing_usec.snapshot(),
+		"commit": _commit_timing_usec.snapshot(),
+		"commit_by_operation": operation_commit,
+		"coverage": _coverage_timing_usec.snapshot(),
+		"material_accounting": _material_timing_usec.snapshot(),
+		"native_edit": _native_edit_timing_usec.snapshot(),
+		"digest": _digest_timing_usec.snapshot(),
+		"readiness_issue": _readiness_issue_timing_usec.snapshot(),
+		"status_digest": _status_digest_timing_usec.snapshot(),
+	}
 
 
 func get_journal_snapshot() -> Array[Dictionary]:
@@ -871,16 +981,20 @@ func _commit_proposal(proposal: VoxelCutProposal) -> VoxelCutTransaction:
 	_affected_cells_total += transaction.affected_cells
 	_commit_usec_total += transaction.commit_usec
 	_commit_usec_max = maxi(_commit_usec_max, transaction.commit_usec)
-	var ticket := _work_zone.issue_edit_ticket(edit_area, &"voxel_bucket_cut")
-	_readiness_work.append({
-		"revision": data_revision,
-		"ticket": ticket,
-		"probe_world": proposal.probe_world,
-		"pre_hit_y": pre_hit_y,
-		"query_mode": "lower",
-		"meshed_frame": -1,
-		"issued_frame": Engine.get_physics_frames(),
-	})
+	var readiness_started := Time.get_ticks_usec()
+	_issue_readiness_work(
+		edit_area,
+		data_revision,
+		&"voxel_bucket_cut",
+		proposal.probe_world,
+		pre_hit_y,
+		"lower",
+	)
+	transaction.readiness_issue_usec = Time.get_ticks_usec() - readiness_started
+	var commit_before_readiness := transaction.commit_usec
+	transaction.commit_usec = Time.get_ticks_usec() - started
+	_commit_usec_total += transaction.commit_usec - commit_before_readiness
+	_commit_usec_max = maxi(_commit_usec_max, transaction.commit_usec)
 	return transaction
 
 
@@ -962,17 +1076,15 @@ func _commit_native_proposal(
 	_affected_samples_total += transaction.affected_samples
 	_affected_cells_total += transaction.affected_cells
 	phase_started = Time.get_ticks_usec()
-	var ticket := _work_zone.issue_edit_ticket(edit_area, &"voxel_bucket_cut_native")
+	_issue_readiness_work(
+		edit_area,
+		data_revision,
+		&"voxel_bucket_cut_native",
+		proposal.probe_world,
+		pre_hit_y,
+		"lower",
+	)
 	transaction.readiness_issue_usec = Time.get_ticks_usec() - phase_started
-	_readiness_work.append({
-		"revision": data_revision,
-		"ticket": ticket,
-		"probe_world": proposal.probe_world,
-		"pre_hit_y": pre_hit_y,
-		"query_mode": "lower",
-		"meshed_frame": -1,
-		"issued_frame": Engine.get_physics_frames(),
-	})
 	transaction.commit_usec = Time.get_ticks_usec() - started_usec
 	_commit_usec_total += transaction.commit_usec
 	_commit_usec_max = maxi(_commit_usec_max, transaction.commit_usec)
@@ -1339,18 +1451,22 @@ func _commit_soil_proposal(proposal: VoxelSoilOperationProposal) -> VoxelCutTran
 		_accepted_dump_event_id = transaction.transaction_id
 		_dump_release_world = proposal.release_world
 		_dump_released_fill_ratio = proposal.release_fill_ratio
-	var ticket := _work_zone.issue_edit_ticket(edit_area, StringName("voxel_%s" % proposal.operation))
+	var readiness_started := Time.get_ticks_usec()
 	var expected_support := _find_sdf_support_world(proposal.deposit_world)
-	_readiness_work.append({
-		"revision": data_revision,
-		"ticket": ticket,
-		"probe_world": proposal.deposit_world,
-		"pre_hit_y": pre_hit_y,
-		"query_mode": "expected",
-		"expected_hit_y": (expected_support.get("position", Vector3(0.0, INF, 0.0)) as Vector3).y if bool(expected_support.get("valid", false)) else INF,
-		"meshed_frame": -1,
-		"issued_frame": Engine.get_physics_frames(),
-	})
+	_issue_readiness_work(
+		edit_area,
+		data_revision,
+		StringName("voxel_%s" % proposal.operation),
+		proposal.deposit_world,
+		pre_hit_y,
+		"expected",
+		(expected_support.get("position", Vector3(0.0, INF, 0.0)) as Vector3).y if bool(expected_support.get("valid", false)) else INF,
+	)
+	transaction.readiness_issue_usec = Time.get_ticks_usec() - readiness_started
+	var commit_before_readiness := transaction.commit_usec
+	transaction.commit_usec = Time.get_ticks_usec() - started
+	_commit_usec_total += transaction.commit_usec - commit_before_readiness
+	_commit_usec_max = maxi(_commit_usec_max, transaction.commit_usec)
 	return transaction
 
 
@@ -1455,11 +1571,13 @@ func _commit_native_deposit_proposal(
 	_dump_release_world = proposal.release_world
 	_dump_released_fill_ratio = proposal.release_fill_ratio
 	phase_started_usec = Time.get_ticks_usec()
-	_issue_coalesced_deposit_readiness(
+	_issue_readiness_work(
 		edit_area,
 		data_revision,
+		&"voxel_deposit_native",
 		proposal.deposit_world,
 		pre_hit_y,
+		"raise",
 	)
 	transaction.readiness_issue_usec = Time.get_ticks_usec() - phase_started_usec
 	transaction.commit_usec = Time.get_ticks_usec() - started_usec
@@ -1534,35 +1652,70 @@ func _point_inside_native_deposit_paths(point: Vector3, paths: Array[Dictionary]
 	return false
 
 
-func _issue_coalesced_deposit_readiness(
+func _issue_readiness_work(
 	edit_area: AABB,
-	revision: int,
+	target_revision: int,
+	purpose: StringName,
 	probe_world: Vector3,
-	pre_hit_y: float
+	pre_hit_y: float,
+	query_mode: String,
+	expected_hit_y: float = INF
 ) -> void:
 	var merged_area := edit_area
-	for index in range(_readiness_work.size() - 1, -1, -1):
-		var existing := _readiness_work[index]
-		if String(existing.get("kind", "")) != "native_deposit":
-			continue
-		var existing_area := existing.get("edit_area", AABB()) as AABB
-		if existing_area.size == Vector3.ZERO or not existing_area.intersects(merged_area):
-			continue
-		merged_area = merged_area.merge(existing_area)
-		_readiness_work.remove_at(index)
-		_readiness_coalesced_count += 1
-	var ticket := _work_zone.issue_edit_ticket(merged_area, &"voxel_deposit_native")
+	var merged_existing := true
+	while merged_existing:
+		merged_existing = false
+		for index in range(_readiness_work.size() - 1, -1, -1):
+			var existing := _readiness_work[index]
+			var existing_area := existing.get("edit_area", AABB()) as AABB
+			if existing_area.size == Vector3.ZERO \
+					or not _readiness_work_is_compatible(existing, purpose, query_mode, probe_world) \
+					or not _areas_share_mesh_block(existing_area, merged_area):
+				continue
+			merged_area = merged_area.merge(existing_area)
+			_readiness_work.remove_at(index)
+			_readiness_coalesced_count += 1
+			merged_existing = true
+	var ticket := _work_zone.issue_edit_ticket(merged_area, purpose)
 	_readiness_work.append({
-		"kind": "native_deposit",
+		"kind": String(purpose),
 		"edit_area": merged_area,
-		"revision": revision,
+		"revision": target_revision,
 		"ticket": ticket,
 		"probe_world": probe_world,
 		"pre_hit_y": pre_hit_y,
-		"query_mode": "raise",
+		"query_mode": query_mode,
+		"expected_hit_y": expected_hit_y,
 		"meshed_frame": -1,
 		"issued_frame": Engine.get_physics_frames(),
 	})
+
+
+func _areas_share_mesh_block(first: AABB, second: AABB) -> bool:
+	var first_keys := WorkZoneConfig.mesh_block_keys_for_area(first)
+	var second_lookup: Dictionary = {}
+	for block_key in WorkZoneConfig.mesh_block_keys_for_area(second):
+		second_lookup[block_key] = true
+	for block_key in first_keys:
+		if second_lookup.has(block_key):
+			return true
+	return false
+
+
+func _readiness_work_is_compatible(
+	existing: Dictionary,
+	purpose: StringName,
+	query_mode: String,
+	probe_world: Vector3
+) -> bool:
+	if String(existing.get("kind", "")) != String(purpose) \
+			or String(existing.get("query_mode", "")) != query_mode:
+		return false
+	var existing_probe := existing.get("probe_world", Vector3(INF, INF, INF)) as Vector3
+	if not existing_probe.is_finite() or not probe_world.is_finite() or _work_zone == null:
+		return false
+	return WorkZoneConfig.mesh_block_key(WorkZoneConfig.world_to_voxel(existing_probe, _work_zone.voxel_scale_m)) \
+		== WorkZoneConfig.mesh_block_key(WorkZoneConfig.world_to_voxel(probe_world, _work_zone.voxel_scale_m))
 
 
 func _apply_soil_shapes(values: PackedFloat32Array, size: Vector3i, origin: Vector3i, shapes: Array[Dictionary]) -> int:
@@ -2174,6 +2327,7 @@ func _poll_readiness() -> void:
 			continue
 		if current_frame - int(work.get("issued_frame", current_frame)) > READINESS_WORK_TIMEOUT_FRAMES:
 			_readiness_timed_out += 1
+			_work_zone.retire_ticket(ticket, &"authority_timeout")
 			completed.append(index)
 			continue
 		if int(work.get("meshed_frame", -1)) < 0:

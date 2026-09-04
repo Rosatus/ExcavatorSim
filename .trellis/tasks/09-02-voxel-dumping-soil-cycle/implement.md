@@ -15,7 +15,7 @@
   changing; do not add a long repeated soak.
 - [x] Prevent stable-ground driving from staging empty compaction transactions;
   bound compaction coalescing and retire stale readiness polling work.
-- [ ] Add per-stage timing and allocation counters for proposal generation,
+- [x] Add per-stage timing and allocation counters for proposal generation,
   native/SDF edit, material accounting, status digest, mesh-ready, and
   collision-ready latency; capture one short continuous-cut baseline.
 - [x] Remove full SDF/material digests and broad status reconstruction from the
@@ -29,14 +29,14 @@
 - [x] Add a bounded deep-insertion overburden-column cleanup pass and include
   its estimated removal in the same coverage/mass transaction without double
   credit.
-- [ ] Debounce readiness per dirty mesh block, retain last acknowledged Jolt
+- [x] Debounce readiness per dirty mesh block, retain last acknowledged Jolt
   collider until replacement, and expose bounded visual/collider lag.
 - [x] Pause settle/compaction while cutting; drain them under an explicit idle
   budget and prevent their queue from delaying interactive cuts.
 - [x] Run focused deterministic geometry/admission tests and one short profiled
   digging pass. Human Forward+ validates cut feel and any collider lag; do not
   add a long soak or repeated automated visual run.
-- [ ] Add SY135 deep insertion tests: no solid remains in the accepted bucket
+- [x] Add SY135 deep insertion tests: no solid remains in the accepted bucket
   envelope, thin unsupported roofs are removed, and back-brush/
   withdrawal/curl-without-engagement cases preserve stable terrain.
 
@@ -90,7 +90,7 @@
   split, partial/full capacity, exact ledger pairing, approximate geometry
   bounds, rejection/reset/generation safety, one-pending-batch bounds,
   no-active-dump settle work, readiness deduplication, and re-excavation.
-- [ ] Run one short profiled dump pass after the algorithm stabilizes. Require
+- [x] Run one short profiled dump pass after the algorithm stabilizes. Require
   deposit/main-thread batch p95 <= 6 ms and p99 <= 10 ms, bounded readiness
   lag, no 20 Hz hitch pattern, and no unbounded visual allocations. Do not run
   paired soak, repeated automated visual playback, or a distribution build.

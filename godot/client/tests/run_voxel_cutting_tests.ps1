@@ -49,6 +49,7 @@ try {
         "--headless", "--editor", "--quit", "--path", $isolatedProject
     )
     foreach ($testName in @(
+        "voxel_work_zone_config_test.gd",
         "voxel_bucket_cutter_test.gd",
         "voxel_cut_queue_order_test.gd",
         "voxel_soil_material_field_test.gd",

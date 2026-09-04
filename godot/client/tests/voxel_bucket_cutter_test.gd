@@ -14,6 +14,7 @@ func _run() -> void:
 		_check_model(String(model_id), failures)
 	_check_sy135_deep_insertion(failures)
 	_check_negative_cases(failures)
+	_check_sy135_unengaged_negative_cases(failures)
 	if failures.is_empty():
 		print("Voxel bucket cutter contracts passed.")
 		quit(0)
@@ -100,6 +101,58 @@ func _check_negative_cases(failures: Array[String]) -> void:
 		_expect(not bool(result.get("accepted", false)), "%s is rejected" % case["name"], failures)
 
 
+func _check_sy135_unengaged_negative_cases(failures: Array[String]) -> void:
+	var contract := _contract("sy135")
+	var cutter := Cutter.new()
+	_expect(cutter.configure(contract, WorkZoneConfig.DEFAULT_VOXEL_SCALE_M), "sy135 negative cases configure", failures)
+	if not cutter.configured:
+		return
+	var origin_y := _bucket_origin_y(contract, -0.04)
+	var base := Transform3D(Basis.IDENTITY, Vector3(-6.0, origin_y, 30.0))
+	var withdrawal_pose := _pose(
+		contract,
+		base,
+		Transform3D(Basis.IDENTITY, base.origin + Vector3(0.0, 0.08, -0.02)),
+		"sy135:withdrawal-unengaged",
+	)
+	var withdrawal := cutter.build_proposal(withdrawal_pose, 9, 30, 30, "epoch", false, _flat_sdf)
+	_expect(
+		not bool(withdrawal.get("accepted", false)) and String(withdrawal.get("reason", "")) == "separating",
+		"sy135 unengaged withdrawal cannot authorize occupancy deletion",
+		failures,
+	)
+
+	var curl_current := Transform3D(Basis(Vector3.RIGHT, deg_to_rad(5.0)), base.origin)
+	var curl_pose := _pose(contract, base, curl_current, "sy135:curl-unengaged")
+	var curl := cutter.build_proposal(curl_pose, 9, 31, 31, "epoch", false, _flat_sdf)
+	_expect(
+		not bool(curl.get("accepted", false)),
+		"sy135 unengaged curl cannot authorize occupancy deletion (%s)" % curl.get("reason", ""),
+		failures,
+	)
+
+	# With the bucket inverted, the outer back intersects the flat soil while the
+	# leading teeth remain in air. Only the leading-front sampler is allowed to
+	# authorize a cut, so moving the back shell tangentially must stay rejected.
+	var inverted_basis := Basis(Vector3.RIGHT, PI)
+	var back_previous := Transform3D(inverted_basis, Vector3(6.0, 0.2, 30.0))
+	var back_current := Transform3D(inverted_basis, back_previous.origin + Vector3(0.0, 0.0, 0.08))
+	var back_pose := _pose(contract, back_previous, back_current, "sy135:outer-back-brush")
+	var back_region := _region(back_pose, "outer_back")
+	var teeth_region := _region(back_pose, "teeth_main_edge")
+	_expect(
+		_minimum_current_y(back_region) < 0.0 and _minimum_current_y(teeth_region) > 0.0,
+		"sy135 back-brush fixture contacts only the non-authorizing outer shell",
+		failures,
+	)
+	var back_brush := cutter.build_proposal(back_pose, 9, 32, 32, "epoch", false, _flat_sdf)
+	_expect(
+		not bool(back_brush.get("accepted", false)) and String(back_brush.get("reason", "")) == "above_ground",
+		"sy135 outer-back brush cannot authorize occupancy deletion",
+		failures,
+	)
+
+
 func _pose(contract: Dictionary, previous: Transform3D, current: Transform3D, identity: String) -> Dictionary:
 	var tool := BucketSoilTool.new()
 	tool.configure(contract)
@@ -111,6 +164,21 @@ func _pose(contract: Dictionary, previous: Transform3D, current: Transform3D, id
 		"soil_tool": tool_snapshot,
 		"contract": contract,
 	}
+
+
+func _region(pose: Dictionary, region_id: String) -> Dictionary:
+	for value in (pose.get("soil_tool", {}) as Dictionary).get("regions", []):
+		var candidate := value as Dictionary
+		if String(candidate.get("region_id", "")) == region_id:
+			return candidate
+	return {}
+
+
+func _minimum_current_y(region: Dictionary) -> float:
+	var minimum_y := INF
+	for value in region.get("current_points", []):
+		minimum_y = minf(minimum_y, (value as Vector3).y)
+	return minimum_y
 
 
 func _flat_sdf(world_position: Vector3) -> Dictionary:
