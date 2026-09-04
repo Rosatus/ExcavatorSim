@@ -307,6 +307,10 @@ POST /api/v1/transport/can0/restart
   bundled/adjacent copies collapse silently while retaining every source path. Decode each
   file strictly as UTF-8 (BOM allowed), then strict CP1252 with an encoding-fallback notice;
   malformed files remain isolated instead of dropping the healthy catalog.
+- Checked-in `.dbc` files are byte-exact, hash-bound protocol assets even though their
+  contents are textual. Git checkout must not normalize their line endings, and release
+  builders must copy their raw bytes unchanged so Windows and Linux packages retain the
+  approved protocol hashes.
 - Each message has one canonical exact-DLC payload, independent `enabled`, and integer
   `frequency_hz` in `1..100` (default 50). `PUT` accepts at most one of `values` or
   `payload_hex`; either edit is converted to the canonical payload atomically. Signal edits
@@ -609,8 +613,10 @@ temporarily unmaintained.
 
 ### 6. Tests Required
 
-- DBC/hash tests assert exact approved hashes, 30 messages, channel evidence,
-  duplicate collapse, `0x18FFF000` DLC-8 little-endian and A800 little-endian.
+- DBC/hash tests assert exact approved hashes from a clean checkout, 30 messages,
+  channel evidence, duplicate collapse, `0x18FFF000` DLC-8 little-endian and A800
+  little-endian. A Windows checkout with automatic CRLF conversion must produce the same
+  raw DBC hashes as Linux.
 - Sink tests assert CSV channel text and PC001 i32 `0/2/3` in single and mixed
   batches while CAN-frame bytes and EFF remain byte-exact.
 - CLI/process and Godot argv tests assert both platforms default TCP and spy that
