@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
 import { formatFreshness } from "./freshness";
+import { formatSignalValue } from "./signalFormat";
 import type { CanConsoleMessage, CanConsoleSnapshot, GatewayStatus } from "./types";
 
 const status: GatewayStatus = {
@@ -149,12 +150,22 @@ describe("CAN console", () => {
     expect(atAge(999.001)).toEqual({ text: ">999s", tone: "text-red-500" });
   });
 
+  it("derives signal display decimals from scale, offset and integer_only", () => {
+    expect(formatSignalValue({ ...signal, scale: 1 }, 5)).toBe("5");
+    expect(formatSignalValue({ ...signal, scale: 0.1 }, 1.2)).toBe("1.2");
+    expect(formatSignalValue(signal, 1.23)).toBe("1.23");
+    expect(formatSignalValue({ ...signal, scale: 0.0078125 }, 12.5390625)).toBe("12.5390625");
+    expect(formatSignalValue({ ...signal, scale: 0.5, offset: -40 }, 12.5)).toBe("12.5");
+    expect(formatSignalValue({ ...signal, integer_only: true }, 5)).toBe("5");
+    expect(formatSignalValue(undefined, 1.23456789)).toBe("1.23456789");
+  });
+
   it("renders egress payload, frequency, freshness and expanded physical values", async () => {
     installFetch();
     render(<App />);
     expect(await screen.findByText("0xCFDA800")).toBeInTheDocument();
     expect(screen.getByText("不适用（独立启动）")).toBeInTheDocument();
-    expect(screen.getByText("7B 00 00 00 00 00 00 00")).toBeInTheDocument();
+    expect(screen.getByLabelText("最近发送 payload 7B 00 00 00 00 00 00 00")).toBeInTheDocument();
     expect(screen.getByText("49.875 Hz")).toBeInTheDocument();
     expect(screen.getByText(/ms$/)).toHaveClass("text-emerald-500");
     const table = screen.getByRole("table");
@@ -162,7 +173,7 @@ describe("CAN console", () => {
     expect(screen.getByTestId("can-console-columns").children).toHaveLength(9);
     expect(screen.getByText(/ms$/)).toHaveClass("whitespace-nowrap", "tabular-nums");
     await userEvent.click(screen.getByRole("button", { name: "展开物理量" }));
-    expect(screen.getByText("1.230000")).toBeInTheDocument();
+    expect(screen.getByText("1.23")).toBeInTheDocument();
   });
 
   it("toggles and persists light/dark theme", async () => {
@@ -205,7 +216,7 @@ describe("CAN console", () => {
       { ...consoleSnapshot, messages: [{ ...row, authority: "simulation", simulation_available: true }] },
     );
     render(<App />);
-    expect(await screen.findByText("Godot 托管会话")).toBeInTheDocument();
+    expect(await screen.findByText("当前由 Godot 托管")).toBeInTheDocument();
     expect(screen.getByText("未连接")).toBeInTheDocument();
     expect(screen.queryByText("ICT")).not.toBeInTheDocument();
     expect(screen.queryByText("Windows PC001 Server")).not.toBeInTheDocument();

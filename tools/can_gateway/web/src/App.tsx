@@ -1,4 +1,4 @@
-import { AlertTriangle, Cable, CheckCircle2, Download, Gauge, LoaderCircle, Moon, RefreshCw, Router, Sun, Unplug } from "lucide-react";
+import { AlertTriangle, ArrowDown, Cable, CheckCircle2, Download, Gauge, LoaderCircle, Moon, RefreshCw, Router, Sun, Unplug, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { eventSocketUrl, getCanConsoleSnapshot, restartCan0, updateTcp } from "./api";
@@ -40,7 +40,7 @@ function StatusItem({ label, value, ok = true, neutral = false }: { label: strin
 
 function RuntimeSummary({ status }: { status: GatewayStatus }) {
   const socketcan = status.transport_kind === "socketcan" || status.transport_kind === "vcan";
-  return <Card><CardHeader><CardTitle>运行状态</CardTitle><CardDescription>状态、累计计数和平台传输来自 Gateway 原子快照。</CardDescription></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+  return <Card><CardHeader><CardTitle>运行状态</CardTitle><CardDescription>Gateway 的当前状态与累计计数，实时更新。</CardDescription></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
     <StatusItem label="传输" value={`${status.transport_kind} · ${status.transport_state}`} ok={status.transport_state === "ready"} />
     <StatusItem label={status.transport_kind === "tcp" ? "PC001" : "接口"} value={status.transport_kind === "tcp" ? (status.pc001_handshake ? "已握手" : "等待客户端") : status.can_interface} ok={status.transport_kind !== "tcp" || status.pc001_handshake} />
     <StatusItem label="Godot" value={status.godot_connected === null ? "不适用（独立启动）" : status.godot_connected ? "已连接" : "未连接"} ok={status.godot_connected === true} neutral={status.godot_connected === null} />
@@ -56,13 +56,45 @@ function TransportControl({ status, busy, mutate }: { status: GatewayStatus; bus
   if (status.transport_kind === "tcp") {
     const numericPort = Number(port);
     const valid = host.trim().length > 0 && Number.isInteger(numericPort) && numericPort >= 1 && numericPort <= 65535;
-    return <Card><CardHeader><CardTitle className="flex items-center gap-2"><Router className="h-4 w-4" /> PC001 TCP Server</CardTitle><CardDescription>Windows / Linux 默认一致；平台传输配置不会进入可移植 CAN console 配置。</CardDescription></CardHeader><CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end"><label className="flex-1 text-xs text-muted-foreground">监听地址<Input className="mt-1" value={host} onChange={(event) => setHost(event.target.value)} /></label><label className="w-full text-xs text-muted-foreground sm:w-36">端口<Input className="mt-1" type="number" value={port} onChange={(event) => setPort(event.target.value)} /></label><Button disabled={!valid || busy} onClick={() => mutate(() => updateTcp(status, host, numericPort))}><Cable className="h-4 w-4" /> 应用端点</Button></CardContent></Card>;
+    return <Card><CardHeader><CardTitle className="flex items-center gap-2"><Router className="h-4 w-4" /> PC001 TCP Server</CardTitle><CardDescription>PC001 上位机通过此地址和端口连接，修改后点击“应用端点”立即生效。</CardDescription></CardHeader><CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end"><label className="flex-1 text-xs text-muted-foreground">监听地址<Input className="mt-1" value={host} onChange={(event) => setHost(event.target.value)} /></label><label className="w-full text-xs text-muted-foreground sm:w-36">端口<Input className="mt-1" type="number" value={port} onChange={(event) => setPort(event.target.value)} /></label><Button disabled={!valid || busy} onClick={() => mutate(() => updateTcp(status, host, numericPort))}><Cable className="h-4 w-4" /> 应用端点</Button></CardContent></Card>;
   }
-  return <Card><CardHeader><CardTitle className="flex items-center gap-2"><Router className="h-4 w-4" /> Linux can0</CardTitle><CardDescription>固定重配 250 kbit/s、restart-ms=100、txqueuelen=10。</CardDescription></CardHeader><CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><Switch checked={confirm} onChange={setConfirm} label="确认停发并重启 can0" /><Button variant="destructive" disabled={!confirm || busy} onClick={() => mutate(async () => { await restartCan0(status); setConfirm(false); })}><RefreshCw className="h-4 w-4" /> 重启 can0</Button></CardContent></Card>;
+  return <Card><CardHeader><CardTitle className="flex items-center gap-2"><Router className="h-4 w-4" /> Linux can0</CardTitle><CardDescription>将以 250 kbit/s 重新初始化 can0（出错后 100 ms 自动恢复，发送队列长度 10），重启期间发送会短暂中断。</CardDescription></CardHeader><CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><Switch checked={confirm} onChange={setConfirm} label="确认停发并重启 can0" /><Button variant="destructive" disabled={!confirm || busy} onClick={() => mutate(async () => { await restartCan0(status); setConfirm(false); })}><RefreshCw className="h-4 w-4" /> 重启 can0</Button></CardContent></Card>;
 }
 
-function EventLog({ events, gap }: { events: GatewayEvent[]; gap: string }) {
-  return <Card><CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between"><div><CardTitle>运行事件</CardTitle><CardDescription className="mt-1">高频发送只发布合并后的实时行增量，不逐帧刷屏。</CardDescription></div><div className="flex gap-2"><Button asChild size="sm" variant="outline"><a href="./api/v1/logs/current"><Download className="h-3.5 w-3.5" /> 当前日志</a></Button><Button asChild size="sm" variant="outline"><a href="./api/v1/logs/archive"><Download className="h-3.5 w-3.5" /> 全部日志</a></Button></div></CardHeader><CardContent>{gap && <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-200">{gap}</div>}<div className="max-h-64 overflow-auto rounded-lg border bg-muted/35 font-mono text-xs">{events.length === 0 ? <div className="p-6 text-center text-muted-foreground">等待事件…</div> : events.map((event) => <div key={event.sequence} className="grid grid-cols-[62px_170px_1fr] gap-2 border-b px-3 py-2 last:border-0"><span className="text-muted-foreground">#{event.sequence}</span><span className="text-primary">{event.kind}</span><span className="break-all text-muted-foreground">{event.source} {JSON.stringify(event.detail)}</span></div>)}</div></CardContent></Card>;
+function eventTone(kind: string): string {
+  if (kind.includes("error") || kind.includes("failed")) return "text-red-500";
+  if (kind.includes("disconnected") || kind.includes("stopped")) return "text-amber-500";
+  if (kind.includes("connected") || kind.includes("started")) return "text-emerald-500";
+  return "text-primary";
+}
+
+function EventLog({ events, gap, onDismissGap }: { events: GatewayEvent[]; gap: string; onDismissGap: () => void }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const pinned = useRef(true);
+  const [detached, setDetached] = useState(false);
+
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (element && pinned.current) element.scrollTop = element.scrollHeight;
+  }, [events]);
+
+  const handleScroll = () => {
+    const element = scrollRef.current;
+    if (!element) return;
+    const atBottom = element.scrollHeight - element.scrollTop - element.clientHeight < 24;
+    pinned.current = atBottom;
+    setDetached(!atBottom);
+  };
+
+  const jumpToLatest = () => {
+    const element = scrollRef.current;
+    if (!element) return;
+    pinned.current = true;
+    element.scrollTop = element.scrollHeight;
+    setDetached(false);
+  };
+
+  return <Card><CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between"><div><CardTitle>运行事件</CardTitle><CardDescription className="mt-1">Gateway 运行过程中的关键事件，最新事件在底部。</CardDescription></div><div className="flex gap-2"><Button asChild size="sm" variant="outline"><a href="./api/v1/logs/current"><Download className="h-3.5 w-3.5" /> 当前日志</a></Button><Button asChild size="sm" variant="outline"><a href="./api/v1/logs/archive"><Download className="h-3.5 w-3.5" /> 全部日志</a></Button></div></CardHeader><CardContent>{gap && <div className="mb-3 flex items-start justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-200"><span>{gap}</span><button type="button" aria-label="关闭事件缺口提示" className="rounded p-0.5 hover:bg-amber-500/15" onClick={onDismissGap}><X className="h-3.5 w-3.5" /></button></div>}<div className="relative"><div ref={scrollRef} onScroll={handleScroll} className="max-h-64 overflow-auto rounded-lg border bg-muted/35 font-mono text-xs">{events.length === 0 ? <div className="p-6 text-center text-muted-foreground">等待事件…</div> : events.map((event) => <div key={event.sequence} className="grid grid-cols-[62px_170px_1fr] gap-2 border-b px-3 py-2 last:border-0"><span className="text-muted-foreground">#{event.sequence}</span><span className={`truncate ${eventTone(event.kind)}`} title={event.kind}>{event.kind}</span><span className="break-all text-muted-foreground">{event.source} {JSON.stringify(event.detail)}</span></div>)}</div>{detached && <button type="button" onClick={jumpToLatest} className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full border bg-card px-2.5 py-1 text-[11px] shadow-md transition-colors hover:bg-muted"><ArrowDown className="h-3 w-3" /> 回到最新</button>}</div></CardContent></Card>;
 }
 
 export default function App() {
@@ -95,7 +127,7 @@ export default function App() {
       socket.onmessage = (message) => {
         let decoded; try { decoded = decodeGatewaySocketMessage(JSON.parse(String(message.data))); } catch { decoded = null; }
         if (!decoded) { void refresh(); return; }
-        if (decoded.type === "gap") { setGap(`事件序列存在缺口；最早可用序列 ${decoded.earliest_sequence ?? "未知"}，已恢复完整快照。`); void refresh(); return; }
+        if (decoded.type === "gap") { setGap(`部分实时事件未能接收（最早可恢复序号 ${decoded.earliest_sequence ?? "未知"}），页面已自动刷新到最新完整状态。`); void refresh(); return; }
         const event = decoded.event; if (event.sequence <= lastSequence.current) return;
         lastSequence.current = event.sequence; setEvents((current) => [...current, event].slice(-MAX_VISIBLE_EVENTS));
         if (event.kind === "can_console_runtime") {
@@ -117,15 +149,15 @@ export default function App() {
     void action().then(refresh).catch(async (reason: unknown) => { if (reason instanceof GatewayApiError && reason.code === "stale_revision") await refresh(); setError(reason instanceof GatewayApiError ? `${reason.code}: ${reason.message}` : reason instanceof Error ? reason.message : "操作失败"); }).finally(() => setBusy(false));
   }, [refresh]);
 
-  if (!status || !consoleSnapshot) return <main className="grid min-h-screen place-items-center bg-background text-foreground"><div className="flex items-center gap-3 text-sm text-muted-foreground"><LoaderCircle className="h-5 w-5 animate-spin" /> 正在连接本机 Gateway…</div></main>;
+  if (!status || !consoleSnapshot) return <main className="min-h-screen bg-background text-foreground"><div className="mx-auto max-w-[1700px] space-y-5 px-4 py-6 md:px-8" aria-busy="true"><div className="flex items-center gap-3 border-b pb-5 text-sm text-muted-foreground"><LoaderCircle className="h-5 w-5 animate-spin" /> 正在连接本机 Gateway…</div><div className="h-28 animate-pulse rounded-xl bg-muted/60" /><div className="h-16 animate-pulse rounded-xl bg-muted/60" /><div className="h-80 animate-pulse rounded-xl bg-muted/60" /><div className="h-48 animate-pulse rounded-xl bg-muted/60" /></div></main>;
   return <main className="min-h-screen bg-background text-foreground"><div className="mx-auto max-w-[1700px] space-y-5 px-4 py-6 md:px-8">
-    <header className="flex flex-col gap-4 border-b pb-5 md:flex-row md:items-end md:justify-between"><div><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary"><Gauge className="h-4 w-4" /> ExcavatorSim / CAN Gateway</div><h1 className="mt-3 text-3xl font-semibold">本机 CAN 实时控制台</h1><p className="mt-2 text-sm text-muted-foreground">逐 ID 单一发送权威 · 共享编码核心 · 按当前传输能力控制 TCP / can0</p></div><div className="flex flex-wrap items-center gap-2"><Badge>{online ? "事件流在线" : "事件流重连"}</Badge><Badge>{status.mode === "standalone" ? "独立启动" : "Godot 托管"}</Badge><Badge>{status.platform}</Badge><Badge>rev {status.revision}</Badge><Button variant="outline" size="icon" onClick={toggleTheme} aria-label="切换明暗主题">{theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</Button></div></header>
+    <header className="flex flex-col gap-4 border-b pb-5 md:flex-row md:items-end md:justify-between"><div><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary"><Gauge className="h-4 w-4" /> ExcavatorSim / CAN Gateway</div><h1 className="mt-3 text-3xl font-semibold">本机 CAN 实时控制台</h1><p className="mt-2 text-sm text-muted-foreground">实时查看和控制每条 CAN 报文的发送状态，按需切换仿真、自定义或关闭</p></div><div className="flex flex-wrap items-center gap-2"><Badge variant={online ? "success" : "warning"}><span className={`h-1.5 w-1.5 rounded-full bg-current ${online ? "" : "animate-pulse"}`} />{online ? "事件流在线" : "事件流重连中"}</Badge><Badge>{status.mode === "standalone" ? "独立启动" : "Godot 托管"}</Badge><Badge>{status.platform}</Badge><Badge>rev {status.revision}</Badge><Button variant="outline" size="icon" onClick={toggleTheme} aria-label="切换明暗主题">{theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</Button></div></header>
     {error && <div role="alert" className="flex gap-3 rounded-lg border border-red-500/35 bg-red-500/10 p-4 text-sm text-red-600 dark:text-red-200"><AlertTriangle className="h-5 w-5 shrink-0" /><div><strong>操作未完成</strong><div className="mt-1 font-mono text-xs">{error}</div></div></div>}
-    {status.mode === "godot-managed" && <div className="rounded-lg border border-primary/30 bg-primary/10 p-4 text-sm"><strong>Godot 托管会话</strong><p className="mt-1 text-xs text-muted-foreground">可仿真报文默认处于“仿真”。本页允许逐 ID 临时切换关闭或自定义；传输、导入导出和全局 arm 仍由服务端禁止。</p></div>}
+    {status.mode === "godot-managed" && <div className="rounded-lg border border-primary/30 bg-primary/10 p-4 text-sm"><strong>当前由 Godot 托管</strong><p className="mt-1 text-xs text-muted-foreground">支持仿真的报文默认使用仿真数据，你可以临时将单个报文切换为关闭或自定义。传输设置、配置导入导出和全局启停由 Godot 会话管理，本页不可用。</p></div>}
     <RuntimeSummary status={status} />
     {status.mode === "standalone" && <TransportControl status={status} busy={busy} mutate={mutate} />}
     <CanConsole status={status} consoleSnapshot={consoleSnapshot} busy={busy} mutate={mutate} />
-    <EventLog events={events} gap={gap} />
-    <footer className="flex flex-wrap items-center justify-between gap-3 border-t py-5 text-xs text-muted-foreground"><span>127.0.0.1 only · {status.web_url}</span><span className="flex items-center gap-2">{online ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : <Unplug className="h-3.5 w-3.5 text-amber-500" />}{status.transport_detail || "无传输详情"}</span></footer>
+    <EventLog events={events} gap={gap} onDismissGap={() => setGap("")} />
+    <footer className="flex flex-wrap items-center justify-between gap-3 border-t py-5 text-xs text-muted-foreground"><span>仅限本机访问 · {status.web_url}</span><span className="flex items-center gap-2">{online ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : <Unplug className="h-3.5 w-3.5 text-amber-500" />}{status.transport_detail || "暂无传输详情"}</span></footer>
   </div></main>;
 }

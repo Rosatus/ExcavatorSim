@@ -16,7 +16,7 @@ export default {
         destructive: { DEFAULT: "hsl(var(--destructive))", foreground: "hsl(var(--destructive-foreground))" },
       },
       borderRadius: { lg: "var(--radius)", md: "calc(var(--radius) - 2px)" },
-      boxShadow: { panel: "0 18px 60px rgba(0, 0, 0, 0.26)" },
+      boxShadow: { panel: "0 12px 40px rgba(0, 0, 0, 0.12)" },
     },
   },
   plugins: [],
