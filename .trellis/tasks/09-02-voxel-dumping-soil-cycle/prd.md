@@ -65,6 +65,21 @@ cutting or falling-soil stalls.
 - Bound bucket-fill presentation updates to at most 10 Hz and a 5 percentage
   point quantized fill change, reuse visual resources where practical, and
   avoid rebuilding status snapshots or meshes every physics frame.
+- A bucket whose opening is visually upward or not clearly downward must retain
+  its authoritative inventory. Contract thresholds may not permit horizontal
+  or upward poses to enter the full-dump gate.
+- Cutting visuals must communicate capture rather than release: accepted cuts
+  may update the contained fill and emit bounded dust, but may not spawn
+  gravity-driven falling soil or clods from the cutting edge as if material had
+  left the bucket.
+- Falling-soil visuals must be one-shot events derived from committed deposit
+  transactions. Their origin and direction use the immutable release pose that
+  passed admission, not the bucket's later live pose when a coalesced batch is
+  committed.
+- Retained soil is represented by a bucket-local, closed shallow fill volume
+  bounded by the configured cavity proxy. It follows the bucket without rigid
+  bodies or particle collision and remains presentation-only; the scalar
+  bucket ledger is authoritative.
 
 ## Acceptance Criteria
 
@@ -112,6 +127,15 @@ cutting or falling-soil stalls.
 - [ ] Falling-soil visuals remain continuous enough to mask the 100 ms terrain
   batching, while bucket-fill mesh/status work stays bounded and pooled clods
   do not grow unbounded.
+- [ ] For both supported soil contracts, holding a non-empty bucket with its
+  opening upward or horizontal for five seconds changes neither bucket mass nor
+  accepted dump event ID and emits no falling-soil flow or clods.
+- [ ] A clearly downward pose still commits the admitted release exactly once;
+  rotating the bucket upward before the coalesced commit does not relocate the
+  release VFX to the new pose or prolong emission after the event TTL.
+- [ ] Accepted cutting increases the contained fill presentation without
+  gravity-released soil from the teeth, and the visible fill remains inside the
+  cavity proxy while curling, lifting, and slewing.
 
 ## Out of scope
 
@@ -138,3 +162,9 @@ cutting or falling-soil stalls.
 - Runtime dumping uses coalesced native add shapes with a repose-shaped profile;
   the existing exact-fit and continuous-settle algorithms remain diagnostic or
   fallback material, not the interactive default path.
+- Retained bucket soil stays a scalar authoritative inventory plus a contained
+  presentation mesh. Per-grain containment is intentionally not simulated.
+- Use `opening_down_dot >= 0.15` as the initial full-dump safety floor for all
+  model contracts, subject to one Forward+ pose calibration. This preserves the
+  existing SY205 default and prevents the current SY135 negative threshold from
+  admitting horizontal/upward release.

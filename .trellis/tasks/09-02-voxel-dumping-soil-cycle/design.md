@@ -233,6 +233,85 @@ repeated full-pool scans; their fixed pool and particles remain visual only.
 - Transaction digests and affected-cell counts become diagnostic/offline data,
   not per-cut runtime truth.
 
+## Bucket-retention remediation
+
+### Failure model
+
+The observed "soil falls through an upward bucket" can combine two independent
+failures and must not be diagnosed from particles alone:
+
+1. A real authority release is possible when a model contract's
+   `dump_opening_down_dot` is negative. SY135 currently admits a pose that is
+   only slightly upward/horizontal, even though the user reads the bucket as
+   open upward.
+2. The presentation path treats an accepted `cut` like a release. It emits
+   gravity-driven particles and rigid clods from `cutting_edge`, while the
+   ledger simultaneously credits the bucket. These objects are visual-only and
+   are not contained by the bucket.
+3. Deposit admission and native commit are separated by the bounded coalescing
+   window. The transaction retains a release position, but the continuous VFX
+   snapshot reads the later live bucket pose. A valid downward release admitted
+   at T0 can therefore appear to begin from an upward bucket at T1.
+4. The retained-fill mesh is an open top surface over a coarse cavity box. It
+   conveys a fill level but not a contained body of soil and can visually
+   intersect or disappear behind the bucket shell.
+
+### Authority invariant and diagnostics
+
+Keep the existing scalar bucket ledger and atomic native-deposit transaction.
+Do not add particle collision or make visual clods authoritative. Compute and
+publish bounded diagnostics for `opening_down_dot`, the contract threshold,
+the effective threshold, gate state, pending release mass, bucket mass, and the
+last accepted deposit event. The effective full-dump threshold is initially
+`max(contract_threshold, 0.15)`. Contract validation must reject non-finite
+normals and thresholds, while Forward+ calibration verifies that the configured
+opening frame and normal agree with the visible GLB for each model.
+
+A coalesced amount that was admitted while clearly downward remains a valid
+release even if the operator curls upward before commit; cancelling it would
+break the admission/ledger transaction. What changes is presentation: origin,
+normal, direction, transaction ID, volume, and admission timestamp are frozen
+in the pending transaction and delivered to VFX unchanged after commit. New
+release admission stops as soon as the live pose leaves the dump gate.
+
+### Event-driven soil presentation
+
+Replace sticky `last_interaction`/`last_flow_volume` release state with a typed,
+monotonic visual event from each committed deposit. `SoilEffects` consumes each
+event ID once, bridges the batch cadence for a bounded TTL, and stops when that
+TTL expires. Idle frames cannot replay an old event. The event uses the frozen
+admission/release transform instead of the current pose snapshot.
+
+An accepted `cut` is capture, not release. It updates bucket inventory and the
+contained fill mesh and may emit a small bounded dust effect at the cutting
+front, but it does not activate gravity flow or rigid clods. Gravity flow and
+clods are reserved for committed dump/deposit events.
+
+### Contained fill presentation
+
+Continue deriving fill ratio from the authoritative scalar inventory. Replace
+the single open grid with a reusable bucket-local shallow closed volume (top,
+side skirts, front/back caps) clamped to the contract cavity bounds. Parent it
+logically to the cavity frame, quantize rebuilds with the existing 10 Hz/five
+percentage-point policy, and do not add colliders or rigid bodies. The shape is
+an intentionally approximate visual mass, not a granular simulation or an
+input to conservation.
+
+### Verification boundary
+
+Fast tests cover both model contracts with contract-derived up, horizontal,
+and down poses; they must not hardcode `Vector3.DOWN` as the only positive
+case. A delayed-commit test admits a downward release, rotates the live bucket
+upward before commit, and proves that the ledger release remains exact while
+the VFX uses the immutable T0 event and expires. Presentation tests prove cuts
+do not spawn falling clods/flow, old events cannot replay, and the closed fill
+vertices remain inside cavity bounds.
+
+One human Forward+ pass then checks both models: scoop, curl upward, lift and
+slew for five seconds, and finally rotate clearly downward to dump. The review
+compares the new diagnostics against the visible opening. No distribution
+build, long soak, or particle-physics validation is part of this remediation.
+
 ## Alternatives considered
 
 1. Optimize the existing exact GDScript pipeline with dirty-cell masks,

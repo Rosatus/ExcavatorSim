@@ -173,3 +173,38 @@ Implemented and validated continuous voxel cutting, fixed Terrain3D native regio
 ### Next Steps
 
 - None - task complete
+
+
+## Session 59: Gateway Web and cached distribution wrap-up
+
+**Date**: 2026-09-04
+**Task**: Gateway Web and cached distribution wrap-up
+**Branch**: `main`
+
+### Summary
+
+Reviewed the Gateway Web changes, preserved protocol DBC bytes, added a cached Gateway-only Windows/Linux distribution builder with packaged smoke and transactional replacement, documented it as the preferred Gateway packaging path, and archived the completed lightweight task.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `854e471` | (see git log) |
+| `573edc1` | (see git log) |
+| `2c9b770` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

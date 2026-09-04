@@ -103,6 +103,67 @@
 - [x] Update the material-cycle spec.
 - [ ] Commit and archive the child after the human milestone passes.
 
+## Bucket-retention remediation phases
+
+### Phase D6 - Runtime truth and dump admission
+
+- [ ] Add concise, revision-driven diagnostics for live opening-down dot,
+  contract/effective thresholds, dump-gate state, pending release mass, bucket
+  mass, accepted deposit event ID, and frozen release pose. Use one short
+  Forward+ reproduction to distinguish real ledger debit from visual-only
+  leakage; do not add a soak.
+  - Diagnostics are implemented and covered headlessly; the one short
+    Forward+ reproduction remains part of the D9 human gate.
+- [x] Enforce an initial effective full-dump threshold floor of `0.15`, validate
+  each contract opening normal/frame against the visible model, and remove the
+  SY135 negative-threshold path that admits horizontal/upward release. Preserve
+  atomic pending-batch debit/credit and valid releases admitted before a later
+  upward curl.
+- [x] Add fast per-model contract-derived up/horizontal/down regressions. Up and
+  horizontal poses held across multiple batching deadlines must not change mass,
+  revision, pending deposit count, or accepted event ID; down remains the
+  positive control.
+
+### Phase D7 - Immutable release events
+
+- [x] Carry an immutable typed release event through pending admission and
+  commit: event/transaction ID, volume, release transform, opening normal,
+  direction, and admission timestamp. Do not reconstruct it from the live pose
+  after the coalescing delay.
+- [x] Replace sticky voxel interaction/flow state with one-shot event
+  consumption and a bounded TTL. Prove idle frames cannot replay or prolong an
+  old dump.
+- [x] Stop gravity flow and rigid-clod emission for `cut`; retain bounded dust
+  or a short inward capture cue only. Reserve falling soil for committed
+  deposit events.
+
+### Phase D8 - Contained fill visual
+
+- [x] Replace the open fill surface with a reusable closed shallow bucket-local
+  volume bounded by the cavity proxy. Keep the scalar ledger authoritative,
+  retain 10 Hz/five-percentage-point quantization, and add no colliders or
+  per-grain bodies.
+- [x] Add focused visual-contract tests for cavity-bounded vertices, stable
+  bucket-relative transform, no cut-triggered falling flow/clods, immutable
+  delayed-event pose, and event expiry.
+
+### Phase D9 - Human acceptance and closure
+
+- [x] Run the existing focused headless authority/presentation suites once after
+  implementation stabilizes. Do not build distribution packages or run a long
+  soak.
+  - 2026-09-04: voxel authority, visual mound/release, voxel world,
+    soil-interaction authority, arcade stamp, voxel material, schema, and Web
+    lifecycle checks passed. Existing `bucket_soil_tool_test.gd` still reports
+    its pre-existing floor/scrape classification failure; the broader arcade
+    world smoke also still fails its clean-generation binding precondition.
+- [ ] Human Forward+ gate for both models: scoop soil, curl opening upward,
+  lift/slew and hold for five seconds with no mass loss or falling-soil VFX,
+  then rotate clearly downward and observe one correctly placed dump event.
+- [ ] Record the calibrated threshold and accepted approximation, update the
+  material-cycle spec if the executable contract changed, then commit and
+  archive only after the human milestone passes.
+
 If native deposition cannot meet the budget, keep authoritative dump disabled
 while optimizing; never fall back silently to visual-only piles or debit
 inventory. Roll back to the prior code path only behind an explicit diagnostic
