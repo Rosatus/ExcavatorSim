@@ -12,6 +12,7 @@ func _run() -> void:
 	var failures: Array[String] = []
 	for model_id in ["sy205", "sy135"]:
 		_check_model(String(model_id), failures)
+	_check_sy135_deep_insertion(failures)
 	_check_negative_cases(failures)
 	if failures.is_empty():
 		print("Voxel bucket cutter contracts passed.")
@@ -50,6 +51,33 @@ func _check_model(model_id: String, failures: Array[String]) -> void:
 		_expect(_sources_are_canonical(proposal.capsules), "%s %s canonical region order" % [model_id, stroke["name"]], failures)
 		_expect(_edge_sweep_is_covered(pose, proposal.capsules), "%s %s connected half-voxel coverage" % [model_id, stroke["name"]], failures)
 		_expect(not proposal.clearance_capsules.is_empty(), "%s %s constrained clearance exists" % [model_id, stroke["name"]], failures)
+		if model_id == "sy135":
+			_expect(not proposal.native_paths.is_empty(), "%s %s native paths exist" % [model_id, stroke["name"]], failures)
+			_expect(_has_role(proposal.native_paths, "bucket_occupancy"), "%s %s inner occupancy participates" % [model_id, stroke["name"]], failures)
+			_expect(_has_role(proposal.native_paths, "bucket_floor"), "%s %s floor participates" % [model_id, stroke["name"]], failures)
+
+
+func _check_sy135_deep_insertion(failures: Array[String]) -> void:
+	var contract := _contract("sy135")
+	var cutter := Cutter.new()
+	_expect(cutter.configure(contract, WorkZoneConfig.DEFAULT_VOXEL_SCALE_M), "sy135 deep configures", failures)
+	var start := Vector3(0.0, _bucket_origin_y(contract, -1.1), 24.0)
+	var previous := Transform3D(Basis.IDENTITY, start)
+	var current := Transform3D(Basis.IDENTITY, start + Vector3(0.08, -0.12, 0.18))
+	var pose := _pose(contract, previous, current, "sy135:deep")
+	var result := cutter.build_proposal(pose, 8, 20, 20, "epoch", false, _flat_sdf)
+	_expect(bool(result.get("accepted", false)), "sy135 deep insertion accepted", failures)
+	if not bool(result.get("accepted", false)):
+		return
+	var proposal := result.get("proposal") as VoxelCutProposal
+	_expect(proposal != null and _has_role(proposal.native_paths, "overburden_cleanup"), "deep insertion clears unsupported overburden", failures)
+
+
+func _has_role(paths: Array[Dictionary], role: String) -> bool:
+	for path in paths:
+		if String(path.get("role", "")) == role or (path.get("components", []) as Array).has(role):
+			return true
+	return false
 
 
 func _check_negative_cases(failures: Array[String]) -> void:

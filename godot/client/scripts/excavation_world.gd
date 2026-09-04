@@ -135,6 +135,7 @@ func _physics_process(delta: float) -> void:
 	if _selected_soil_mode() == "voxel":
 		if _voxel_authority == null:
 			return
+		_submit_voxel_track_compaction()
 		if automatic_soil_enabled:
 			_automatic_samples_executed += 1
 			_step_automatic_interaction(delta)
@@ -143,7 +144,7 @@ func _physics_process(delta: float) -> void:
 		if bool(voxel_result.get("changed", false)):
 			var transaction := voxel_result.get("transaction", {}) as Dictionary
 			_last_flow_volume_m3 = float(transaction.get("accepted_volume_m3", 0.0))
-			_last_interaction = "cut"
+			_last_interaction = "dump" if String(transaction.get("operation", "cut")) == "deposit" else String(transaction.get("operation", "cut"))
 			excavation_changed.emit(get_status_snapshot())
 		_queue_backend_feedback()
 		return
@@ -627,6 +628,8 @@ func get_soil_visual_snapshot() -> Dictionary:
 		"accepted_dump_event_id": String(visual_source.get("accepted_dump_event_id", "")),
 		"dump_release_world": visual_source.get("dump_release_world", Vector3.ZERO),
 		"dump_released_fill_ratio": float(visual_source.get("dump_released_fill_ratio", 0.0)),
+		"rejected_dump_event_id": String(visual_source.get("rejected_dump_event_id", "")),
+		"rejected_dump_world": visual_source.get("rejected_dump_world", Vector3.ZERO),
 		"hero_clods_enabled": hero_clods_enabled,
 		"bucket_pose": _last_pose_snapshot.duplicate(true),
 		"soil_material_lifecycle_mode": _selected_soil_mode(),
@@ -640,7 +643,7 @@ func _step_automatic_interaction(delta: float) -> void:
 	_process_bucket_snapshot(snapshot, delta)
 
 
-func _process_voxel_bucket_snapshot(snapshot: Dictionary) -> void:
+func _process_voxel_bucket_snapshot(snapshot: Dictionary, delta: float) -> void:
 	if _voxel_authority == null or not _voxel_authority.configured:
 		_last_interaction = "voxel_authority_unavailable"
 		_report_active_runtime_failure(_last_interaction)
@@ -650,7 +653,7 @@ func _process_voxel_bucket_snapshot(snapshot: Dictionary) -> void:
 		_last_interaction = "voxel_identity_rejected"
 		_last_interaction_batch = {"eligible": false, "operation": _last_interaction}
 		return
-	var submission := _voxel_authority.submit_pose(snapshot, identity)
+	var submission := _voxel_authority.submit_pose(snapshot, identity, delta)
 	_last_interaction = String(submission.get("reason", "voxel_rejected"))
 	_last_interaction_batch = {
 		"key": "%s|%d|%d" % [
@@ -663,10 +666,16 @@ func _process_voxel_bucket_snapshot(snapshot: Dictionary) -> void:
 		"terrain_generation": int(identity.get("generation", -1)),
 		"bucket_motion_sequence": int(identity.get("motion_sequence", -1)),
 		"eligible": bool(submission.get("accepted", false)),
-		"operation": "voxel_cut" if bool(submission.get("accepted", false)) else _last_interaction,
+		"operation": String(submission.get("operation", "voxel_cut")) if bool(submission.get("accepted", false)) else _last_interaction,
 		"transaction_queued": bool(submission.get("accepted", false)),
 		"queue_depth": int(submission.get("queue_depth", 0)),
 	}
+
+
+func _submit_voxel_track_compaction() -> void:
+	if _voxel_authority == null or not _voxel_authority.configured or _tracked_chassis_controller == null:
+		return
+	_voxel_authority.submit_track_compaction(_tracked_chassis_controller.get_status_snapshot())
 
 
 func _voxel_fixed_identity(snapshot: Dictionary) -> Dictionary:
@@ -713,7 +722,7 @@ func _process_bucket_snapshot(snapshot: Dictionary, delta: float) -> void:
 			_tracked_chassis_controller.clear_bucket_support_contact()
 		return
 	if _selected_soil_mode() == "voxel":
-		_process_voxel_bucket_snapshot(snapshot)
+		_process_voxel_bucket_snapshot(snapshot, delta)
 		return
 	var previous: Dictionary = snapshot["previous"]
 	var current: Dictionary = snapshot["current"]

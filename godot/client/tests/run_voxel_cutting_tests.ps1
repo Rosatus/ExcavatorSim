@@ -53,6 +53,7 @@ try {
         "voxel_cut_queue_order_test.gd",
         "voxel_soil_material_field_test.gd",
         "voxel_excavation_authority_test.gd",
+        "soil_effects_visual_mound_test.gd",
         "soil_authority_migration_test.gd",
         "voxel_excavation_world_test.gd"
     )) {
@@ -70,7 +71,7 @@ try {
         }
     }
     $summary = [ordered]@{
-        schema_version = "voxel-cutting-focused-run-v1"
+        schema_version = "voxel-soil-cycle-focused-run-v2"
         passed = ($fatalMatches.Count -eq 0)
         godot = $toolchain.components.windows_editor
         tests = $results

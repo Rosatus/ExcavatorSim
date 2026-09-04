@@ -2518,9 +2518,16 @@ Reference: `docs/godot-integration.md`, `protocol/`, and `.trellis/tasks/08-06-e
 
 ```gdscript
 VoxelExcavationAuthority.configure(zone, soil_contract, generation) -> bool
-VoxelExcavationAuthority.submit_pose(pose_snapshot, identity) -> Dictionary
+VoxelExcavationAuthority.submit_pose(pose_snapshot, identity, delta_s = 1.0 / 60.0) -> Dictionary
+VoxelExcavationAuthority.submit_track_compaction(chassis_status) -> Dictionary
 VoxelExcavationAuthority.step_fixed(delta) -> Dictionary
 VoxelExcavationAuthority.get_payload_snapshot() -> Dictionary
+VoxelSoilMaterialField.stage_approximate_cut(coordinates, voxel_volume_m3) -> Dictionary
+VoxelSoilMaterialField.can_commit_approximate_cut(staged) -> bool
+VoxelSoilMaterialField.commit_approximate_cut(staged) -> bool
+VoxelSoilMaterialField.stage_deposit(cell_changes, requested_mass_q) -> Dictionary
+VoxelSoilMaterialField.stage_mobile_transfer(removals, additions, requested_mass_q) -> Dictionary
+VoxelSoilMaterialField.stage_compaction(coordinates, compaction_delta_q) -> Dictionary
 ```
 
 `identity` contains `generation`, `physics_tick`, `motion_sequence`, and
@@ -2529,15 +2536,34 @@ VoxelExcavationAuthority.get_payload_snapshot() -> Dictionary
 ### 3. Contracts
 
 - The cutter consumes the hash-bound SY205/SY135 `soil_tool` snapshot and
-  produces typed, immutable capsule proposals in local voxel coordinates.
+  produces typed, immutable proposals in local voxel coordinates. SY135
+  proposals carry native packed point/radius paths for the authorized leading
+  edge, inner/floor occupancy, and optional deep-insertion overburden cleanup;
+  the exact capsule representation remains the compatibility/diagnostic path.
 - Only adjacent queue-tail proposals may coalesce. Coalescing may never move a
   later fixed tick ahead of an already queued proposal.
-- Commits occur at a starting 20 Hz cadence, use one localized `VoxelBuffer`
-  paste, and publish one data revision/ticket per accepted transaction.
-- All material-stage validation finishes before SDF paste. The immediately
-  following ledger commit has no remaining conditional failure path.
-- Capacity clipping credits exactly the remaining fixed-point bucket mass;
-  represented SDF mass may differ only within one voxel-cell mass tolerance.
+- Commits occur at a starting 20 Hz cadence and publish one data revision/ticket
+  per accepted transaction. SY135 uses a bounded `VoxelTool.do_path` SDF remove;
+  the exact fallback uses one localized `VoxelBuffer` paste.
+- All material-stage validation finishes before the irreversible SDF edit. The
+  immediately following ledger commit has no remaining conditional failure
+  path. Native edits are synchronous but expose no dry-run/rollback result.
+- SY135 runtime mass is a declared sparse-coverage approximation: sample solid
+  cells along the native path, credit each coordinate at most once until a
+  deposit/transfer invalidates that coordinate, and clamp credit to remaining
+  capacity. The runtime estimator uses a fixed 1.5-voxel path step and the
+  center/+X/+Y three-point stencil; changing it is a mass-calibration change,
+  not a geometry-quality change. Exact fallback commits retain one-cell mass
+  tolerance.
+- Routine material status exposes `material_state_revision` and a deferred
+  digest marker; it must not sort/serialize/hash the complete sparse cell table
+  after every accepted cut. `state_digest()` remains an explicit diagnostic
+  and focused-test operation.
+- Inner shell, floor, and overburden paths never authorize deletion alone. They
+  are emitted only after the teeth/side leading-front SDF and into-material
+  motion gate accepts the complete proposal. Deep insertion may clear the
+  overlying column to the initial soil surface to prevent unsupported voxel
+  roofs; this intentionally prefers a clean 2.5D cut over tunnel preservation.
 - A developer-only capacity override may replace the effective voxel ledger
   capacity at a clean authority generation boundary. It must be finite and
   positive, must not mutate the hash-bound model contract, and status must
@@ -2553,6 +2579,68 @@ VoxelExcavationAuthority.get_payload_snapshot() -> Dictionary
   axes. Source-byte mask parity alone is insufficient evidence.
 - Mesh and collision revisions are derivative readiness projections; they
   cannot reject or alter an accepted SDF/mass transaction.
+- Deposit, settle, and compaction share this authority, one journal, and the
+  same readiness ticket path. Visual mounds, dust, and clods consume committed
+  transaction IDs only and never own material.
+- Runtime dump samples first enter one generation/epoch/landing-neighborhood
+  pending batch. Compatible samples coalesce for at most `100 ms`; leaving the
+  dump gate, reaching the reserved bucket remainder, or the deadline flushes
+  one immutable deposit proposal. Pending/queued mass is reserved but bucket
+  inventory is debited only after the native edit and material stage commit.
+- Product runtime deposit uses a bounded native `VoxelTool.MODE_ADD` path set
+  (currently at most two paths) and sparse air-cell coverage. The accepted
+  fixed-point mass transfer is exact, while mound shape and per-cell placement
+  are explicitly approximate. Exact buffer-copy/SDF deposit remains a named
+  diagnostic path only and must not return to the per-frame product path.
+- Active or queued dumping suppresses background settle/compaction work.
+  Native deposits form their repose-like shape at commit and do not seed a
+  continuously draining settle frontier. This intentionally permits stepped
+  mound growth and approximate repose in exchange for bounded latency.
+- Overlapping native-deposit readiness work coalesces into one enlarged ticket;
+  collision remains a generation-gated derivative and may lag the visible SDF
+  by the bounded engine rebuild interval.
+- `SoilEffects` polls complete soil snapshots at no more than `30 Hz`, rebuilds
+  the bucket fill surface at no more than `10 Hz` and only across `5%` fill
+  quanta, reuses one `ArrayMesh`, and manages hero clods through active/free
+  pools. Signals may trigger an immediate pull but reset the polling cadence so
+  the same change is not fetched twice in one interval.
+- Every mobile-soil operation has two independently checked conservation
+  dimensions: fixed-point ledger mass and SDF-represented bulk volume at the
+  operation's density/compaction. A zero ledger sum is insufficient if the SDF
+  edit exceeds the declared one-cell discretization tolerance.
+- The paired remove/add settle transaction remains available for explicit
+  diagnostics or a future bounded one-shot operation. Product runtime native
+  deposits must not enqueue it continuously. If invoked, it may move only pure
+  mobile cells, carries the donor's weighted compaction state, and must never
+  modify an SDF sample shared with stable solid material.
+- Track compaction consumes generation-bound `voxel_terrain` contact receipts,
+  preserves mobile mass, and reduces SDF bulk volume only by the density change
+  reported by the staged material state. Receipt collection is independent of
+  bucket pose sampling and remains active when automatic bucket interaction is
+  disabled.
+- Track compaction admission must reject in constant time when the material
+  field contains no compactable mobile cells. When mobile soil exists elsewhere,
+  each bounded contact footprint must still overlap a compactable cell before a
+  proposal may enter the queue. Stable-ground driving must never allocate a
+  `VoxelBuffer`, issue edit/readiness tickets, or advance data revision.
+- Compaction receipt count, coalesced footprint count, and merged sample window
+  are independently bounded. Compaction proposals may coalesce only when their
+  voxel areas overlap; vehicle motion must not merge distant track history into
+  one large staging window.
+- A newer readiness ticket supersedes polling for an overlapping older edit,
+  but a partially overlapped ticket must retain its spatial coverage so
+  unaffected points remain ready. Superseded polling work and unverifiable
+  work past the bounded timeout are retired without advancing collision
+  revision.
+- Soil work is bounded and fair: a pending/queued interactive deposit owns the
+  foreground slot; otherwise queued compaction may proceed. A full queue may
+  discard pending compaction for a deposit, but a rejected deposit is not
+  entered into the duplicate set and publishes one rejection event.
+- Status/transaction diagnostics expose `pending_dump_count`,
+  `pending_dump_mass_q`, `pending_dump_age_s`, `dump_batch_flush_count`,
+  `dump_batch_coalesced_count`, `native_deposit_committed`,
+  `readiness_coalesced`, `support_query_usec`, and `batch_wait_usec`. Visual
+  diagnostics expose snapshot pulls, fill rebuilds, cadences, and fill quantum.
 
 ### 4. Validation & Error Matrix
 
@@ -2562,8 +2650,23 @@ VoxelExcavationAuthority.get_payload_snapshot() -> Dictionary
 - stationary/above-ground/separating/teleported sweep -> named rejection, no mutation
 - protected/out-of-zone area -> `protected_or_out_of_zone`, no mutation
 - full bucket -> `bucket_full`, no SDF deletion
-- staging/capsule/sample budget exceeded -> bounded rejection, no mutation
+- staging/capsule/sample/native-path budget exceeded -> bounded rejection, no mutation
+- native coverage contains no solid/uncredited sample -> `no_sdf_change` or
+  `no_accounted_material`, no mutation
 - material/SDF mass outside tolerance -> `mass_discretization_tolerance`, no mutation
+- deposit outside editable mask/support -> `dump_out_of_zone` or
+  `dump_support_unavailable`, no bucket debit and one rejection event
+- pending deposit cannot enter the bounded soil queue -> `soil_queue_full`,
+  pending inventory remains owned by the bucket and no SDF edit occurs
+- pending/queued release already reserves all bucket mass ->
+  `dump_mass_already_reserved`, no duplicate debit or extra proposal
+- duplicate track generation/epoch/tick -> `duplicate_compaction`, no mutation
+- stale generation or sub-threshold/non-voxel track receipt -> named rejection,
+  no compaction
+- no compactable mobile material or no footprint overlap ->
+  `no_loose_track_contact` before queue/SDF staging
+- soil SDF/bulk-volume error outside tolerance ->
+  `mass_geometry_discretization`, no SDF or ledger mutation
 
 ### 5. Good/Base/Bad Cases
 
@@ -2573,6 +2676,15 @@ VoxelExcavationAuthority.get_payload_snapshot() -> Dictionary
   20 Hz commit with bounded queue depth.
 - Bad: searching the whole queue for an older overlapping proposal reorders
   transactions and is forbidden.
+- Good: cut -> 100 ms coalesced native dump -> optional track compaction ->
+  re-cut uses one SDF writer and returns deposited mobile mass to the same
+  bucket with exact ledger conservation.
+- Base: continuous release grows the mound in visible 100 ms steps and collider
+  readiness may trail the SDF, while control and camera remain responsive.
+- Base: automatic bucket sampling is off; generation-valid track receipts still
+  reach loose-only compaction while the commit scheduler drains existing work.
+- Bad: apply a fixed-radius remove sphere for settle/compaction and update only
+  material flags. This can erase geometry while the ledger remains balanced.
 
 ### 6. Tests Required
 
@@ -2591,6 +2703,26 @@ VoxelExcavationAuthority.get_payload_snapshot() -> Dictionary
   sample retains finite hard terrain.
 - Performance: run one stable representative coalesced edit after implementation
   settles; do not replace human Forward+ feel/visual acceptance with soak tests.
+- SY135 native performance: assert native transaction accounting mode/path
+  counts, bounded coverage cells, exact ledger balance, repeated-cut coverage
+  dedupe, deposit no native rejection after edit, and one real deep-insertion
+  commit with overburden cleanup. Human Forward+ owns perceived hitching and
+  final cut shape.
+- Material cycle: assert pending batches do not debit the bucket, a committed
+  native deposit preserves exact aggregate mass, idle frames do not move the
+  mound, previously accounted stable cells never lose mass, and re-cut
+  decreases mobile mass while increasing bucket mass.
+- Scheduling: assert the 100 ms deadline and dump-end flush, same-neighborhood
+  coalescing, no active settle frontier, duplicate/stale/weak track rejection,
+  and bounded deposit/compaction priority.
+- Stable-ground admission: submit many valid voxel track receipts with no mobile
+  soil and assert constant-time rejection, zero queued/accepted proposals, and
+  unchanged data revision. Readiness tests must retain ready coverage outside a
+  partially overlapping edit.
+- Presentation: assert accepted/rejected event IDs are consumed once and pooled
+  effects remain bounded, fill mesh identity is reused, 5%/10 Hz rebuild gates
+  hold, and clods recycle through the pool; human Forward+ owns
+  pile/dump/traverse/re-dig visuals and perceived hitching.
 
 ### 7. Wrong vs Correct
 
@@ -2605,4 +2737,45 @@ if pending.fixed_tick_end < proposal.fixed_tick_begin and pending.area.intersect
 	merge(pending, proposal)
 else:
 	queue.push_back(proposal)
+```
+
+```gdscript
+# Wrong: the ledger remains balanced but a fixed brush erases arbitrary volume.
+apply_remove_sphere(radius)
+material_field.commit_compaction(flags_only)
+
+# Correct: stage density change, fit SDF loss to its bulk-volume delta, then
+# atomically publish the SDF and material transaction within tolerance.
+var staged = material_field.stage_compaction(cells, delta_q)
+var fitted = fit_removed_volume(before, full_remove, staged.volume_loss_m3)
+commit_if_mass_geometry_matches(fitted, staged)
+```
+
+```gdscript
+# Wrong: each bucket wall independently erases soil and credits its own mass.
+for wall_path in bucket_paths:
+	voxel_tool.do_path(wall_path.points, wall_path.radii)
+	credit_bucket(wall_path.estimated_mass)
+
+# Correct: leading teeth authorize one immutable proposal; the authority stages
+# one deduplicated coverage estimate before applying all native geometry.
+var staged = material_field.stage_approximate_cut(coverage_cells, voxel_volume)
+if material_field.can_commit_approximate_cut(staged):
+	apply_native_paths(proposal.native_paths)
+	material_field.commit_approximate_cut(staged)
+```
+
+```gdscript
+# Wrong: every physics sample copies an SDF buffer, binary-fits a mound, then
+# schedules continuous repose settlement and rebuilds presentation resources.
+commit_exact_deposit_every_frame(released_mass_q)
+enqueue_settle_frontier(all_changed_cells)
+fill_mesh.mesh = ArrayMesh.new()
+
+# Correct: reserve/coalesce for 100 ms, stage exact ledger mass, apply one
+# bounded native add, then reuse cadence-gated presentation resources.
+stage_pending_dump(released_mass_q, landing_neighborhood)
+if batch_due_or_dump_ended:
+	commit_native_sparse_deposit()
+reuse_fill_array_mesh_at_10_hz()
 ```

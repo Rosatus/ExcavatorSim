@@ -3,7 +3,7 @@
   "name": "voxel-dumping-soil-cycle",
   "title": "Voxel dumping and soil cycle",
   "description": "Implement in-zone authoritative dumping, repose settling, track compaction, re-excavation, and conservation diagnostics.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

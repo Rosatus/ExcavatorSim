@@ -11,8 +11,14 @@ const EXIT_AIR_SDF := 0.65
 const MIN_INTO_MATERIAL_M := 0.0005
 const MIN_EDGE_RADIUS_VOXELS := 0.75
 const CLEARANCE_RADIUS_VOXELS := 0.72
+const NATIVE_SURFACE_RADIUS_VOXELS := 0.88
+const NATIVE_OVERBURDEN_RADIUS_VOXELS := 0.92
+const NATIVE_MAX_SWEEP_SAMPLES := 12
 const CUT_REGION_IDS := ["teeth_main_edge", "left_side_cutter", "right_side_cutter"]
 const CLEARANCE_REGION_IDS := ["floor_wear_plate", "inner_shell"]
+const OCCUPANCY_WIDTH_FRACTIONS := [-0.8, -0.4, 0.0, 0.4, 0.8]
+const OCCUPANCY_HEIGHT_FRACTIONS := [-0.68, 0.0, 0.68]
+const OVERBURDEN_DEPTH_FRACTIONS := [-0.72, 0.0, 0.72]
 
 var configured := false
 var model_id := ""
@@ -132,8 +138,17 @@ func build_proposal(
 		var region := _find_region(tool_snapshot, region_id)
 		if not region.is_empty():
 			clearance.append_array(_clearance_capsules(region, leading_center, leading_normal))
+	var native_paths: Array[Dictionary] = []
+	if model_id == "sy135":
+		native_paths = _build_sy135_native_paths(tool_snapshot)
+		if native_paths.is_empty():
+			rejected["reason"] = "empty_native_sweep"
+			return rejected
 	var all_capsules := capsules + clearance
 	var area := _capsule_bounds(all_capsules)
+	var native_area := _native_path_bounds(native_paths)
+	if native_area.size != Vector3.ZERO:
+		area = native_area if area.size == Vector3.ZERO else area.merge(native_area)
 	if not _area_is_editable(area):
 		rejected["reason"] = "protected_or_out_of_zone"
 		return rejected
@@ -148,8 +163,15 @@ func build_proposal(
 		"area_voxels": area,
 		"capsules": capsules,
 		"clearance_capsules": clearance,
+		"native_paths": native_paths,
 		"probe_world": leading_center,
-		"quality_flags": ["continuous_half_voxel_subdivision", "constrained_clearance"],
+		"quality_flags": [
+			"continuous_half_voxel_subdivision",
+			"constrained_clearance",
+			"native_sdf_path" if not native_paths.is_empty() else "exact_sdf_fallback",
+			"authorized_swept_occupancy" if not native_paths.is_empty() else "capsule_surface_only",
+			"overburden_cleanup" if _has_native_role(native_paths, "overburden_cleanup") else "no_overburden_cleanup",
+		],
 	})
 	if not proposal.is_valid():
 		rejected["reason"] = "proposal_validation_failed"
@@ -203,6 +225,223 @@ func _clearance_capsules(region: Dictionary, leading_center: Vector3, leading_no
 			continue
 		_append_capsule(result, previous[index], current[index], CLEARANCE_RADIUS_VOXELS, "clearance:%s" % String(region.get("region_id", "")))
 	return result
+
+
+func _build_sy135_native_paths(tool_snapshot: Dictionary) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for region_id in CUT_REGION_IDS:
+		var cut_region := _find_region(tool_snapshot, region_id)
+		if not cut_region.is_empty():
+			var leading_path := _region_swept_path(cut_region, "leading_edge")
+			if not leading_path.is_empty():
+				result.append(leading_path)
+	var inner := _find_region(tool_snapshot, "inner_shell")
+	if not inner.is_empty():
+		result.append_array(_box_surface_paths(
+			inner,
+			OCCUPANCY_WIDTH_FRACTIONS,
+			OCCUPANCY_HEIGHT_FRACTIONS,
+			"bucket_occupancy",
+			NATIVE_SURFACE_RADIUS_VOXELS,
+		))
+		result.append_array(_overburden_cleanup_paths(inner))
+	var floor := _find_region(tool_snapshot, "floor_wear_plate")
+	if not floor.is_empty():
+		result.append_array(_box_surface_paths(
+			floor,
+			OCCUPANCY_WIDTH_FRACTIONS,
+			[0.0],
+			"bucket_floor",
+			NATIVE_SURFACE_RADIUS_VOXELS,
+		))
+	return _combine_native_paths_by_role(result)
+
+
+func _region_swept_path(region: Dictionary, role: String) -> Dictionary:
+	var swept := _typed_points(region.get("swept_points", []))
+	var points_per_sample := maxi(1, int(region.get("points_per_sample", 0)))
+	if swept.size() < 2 or swept.size() % points_per_sample != 0:
+		return {}
+	var points := PackedVector3Array()
+	var sample_count := int(swept.size() / points_per_sample)
+	for sample_index in sample_count:
+		for point_offset in points_per_sample:
+			var source_index := point_offset if sample_index % 2 == 0 else points_per_sample - 1 - point_offset
+			points.append(WorkZoneConfig.world_to_voxel(
+				swept[sample_index * points_per_sample + source_index],
+				voxel_scale_m,
+			))
+	return _native_path(
+		"%s:%s" % [role, String(region.get("region_id", ""))],
+		role,
+		points,
+		maxf(_shape_radius_world(region) / voxel_scale_m, MIN_EDGE_RADIUS_VOXELS),
+	)
+
+
+func _box_surface_paths(
+	region: Dictionary,
+	width_fractions: Array,
+	height_fractions: Array,
+	role: String,
+	radius_voxels: float
+) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var dimensions := _box_half_dimensions(region)
+	if dimensions == Vector3.ZERO:
+		return result
+	var transforms := _sweep_transforms(region)
+	if transforms.size() < 2:
+		return result
+	for width_value in width_fractions:
+		var width_fraction := float(width_value)
+		for height_value in height_fractions:
+			var height_fraction := float(height_value)
+			var points := PackedVector3Array()
+			for sample_index in transforms.size():
+				var transform := transforms[sample_index]
+				var first_z := -dimensions.z * 0.92 if sample_index % 2 == 0 else dimensions.z * 0.92
+				var second_z := -first_z
+				points.append(WorkZoneConfig.world_to_voxel(
+					transform * Vector3(dimensions.x * width_fraction, dimensions.y * height_fraction, first_z),
+					voxel_scale_m,
+				))
+				points.append(WorkZoneConfig.world_to_voxel(
+					transform * Vector3(dimensions.x * width_fraction, dimensions.y * height_fraction, second_z),
+					voxel_scale_m,
+				))
+			result.append(_native_path(
+				"%s:%s:%+.2f:%+.2f" % [role, String(region.get("region_id", "")), width_fraction, height_fraction],
+				role,
+				points,
+				radius_voxels,
+			))
+	return result
+
+
+func _overburden_cleanup_paths(inner_region: Dictionary) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var dimensions := _box_half_dimensions(inner_region)
+	if dimensions == Vector3.ZERO:
+		return result
+	var transforms := _sweep_transforms(inner_region)
+	if transforms.size() < 2:
+		return result
+	var cleanup_top_y := WorkZoneConfig.INITIAL_SURFACE_Y + voxel_scale_m * 0.5
+	for width_value in OCCUPANCY_WIDTH_FRACTIONS:
+		var width_fraction := float(width_value)
+		for depth_value in OVERBURDEN_DEPTH_FRACTIONS:
+			var depth_fraction := float(depth_value)
+			var points := PackedVector3Array()
+			var penetrated := false
+			for sample_index in transforms.size():
+				var transform := transforms[sample_index]
+				var lower := transform * Vector3(
+					dimensions.x * width_fraction,
+					dimensions.y * 0.82,
+					dimensions.z * depth_fraction,
+				)
+				if lower.y >= WorkZoneConfig.INITIAL_SURFACE_Y - voxel_scale_m * 1.5:
+					continue
+				penetrated = true
+				var upper := Vector3(lower.x, cleanup_top_y, lower.z)
+				if sample_index % 2 == 0:
+					points.append(WorkZoneConfig.world_to_voxel(lower, voxel_scale_m))
+					points.append(WorkZoneConfig.world_to_voxel(upper, voxel_scale_m))
+				else:
+					points.append(WorkZoneConfig.world_to_voxel(upper, voxel_scale_m))
+					points.append(WorkZoneConfig.world_to_voxel(lower, voxel_scale_m))
+			if penetrated and points.size() >= 2:
+				result.append(_native_path(
+					"overburden:%+.2f:%+.2f" % [width_fraction, depth_fraction],
+					"overburden_cleanup",
+					points,
+					NATIVE_OVERBURDEN_RADIUS_VOXELS,
+				))
+	return result
+
+
+func _sweep_transforms(region: Dictionary) -> Array[Transform3D]:
+	var result: Array[Transform3D] = []
+	var previous := region.get("previous_transform", Transform3D()) as Transform3D
+	var current := region.get("current_transform", Transform3D()) as Transform3D
+	if not previous.is_finite() or not current.is_finite():
+		return result
+	var maximum_motion := previous.origin.distance_to(current.origin)
+	var samples := clampi(ceili(maximum_motion / (voxel_scale_m * 0.65)) + 1, 2, NATIVE_MAX_SWEEP_SAMPLES)
+	for index in samples:
+		var alpha := float(index) / float(maxi(1, samples - 1))
+		result.append(previous.interpolate_with(current, alpha))
+	return result
+
+
+func _box_half_dimensions(region: Dictionary) -> Vector3:
+	var shape := region.get("shape", {}) as Dictionary
+	var raw := shape.get("size_m", []) as Array
+	if String(shape.get("kind", "")) != "box" or raw.size() != 3:
+		return Vector3.ZERO
+	return Vector3(float(raw[0]), float(raw[1]), float(raw[2])) * 0.5
+
+
+func _native_path(path_id: String, role: String, points: PackedVector3Array, radius_voxels: float) -> Dictionary:
+	var radii := PackedFloat32Array()
+	radii.resize(points.size())
+	radii.fill(radius_voxels)
+	return {
+		"path_id": path_id,
+		"role": role,
+		"components": [role],
+		"points_voxels": points,
+		"radii_voxels": radii,
+	}
+
+
+func _combine_native_paths_by_role(paths: Array[Dictionary]) -> Array[Dictionary]:
+	var combined: Array[Dictionary] = []
+	var indexes: Dictionary = {}
+	for path in paths:
+		var role := String(path.get("role", ""))
+		if not indexes.has(role):
+			indexes[role] = combined.size()
+			combined.append({
+				"path_id": "%s:combined" % role,
+				"role": role,
+				"components": [role],
+				"points_voxels": PackedVector3Array(),
+				"radii_voxels": PackedFloat32Array(),
+			})
+		var combined_index := int(indexes[role])
+		var target := combined[combined_index]
+		var target_points := target.get("points_voxels", PackedVector3Array()) as PackedVector3Array
+		var target_radii := target.get("radii_voxels", PackedFloat32Array()) as PackedFloat32Array
+		var source_points := path.get("points_voxels", PackedVector3Array()) as PackedVector3Array
+		var source_radii := path.get("radii_voxels", PackedFloat32Array()) as PackedFloat32Array
+		for point_index in source_points.size():
+			target_points.append(source_points[point_index])
+			target_radii.append(source_radii[point_index])
+		target["points_voxels"] = target_points
+		target["radii_voxels"] = target_radii
+		combined[combined_index] = target
+	return combined
+
+
+func _native_path_bounds(paths: Array[Dictionary]) -> AABB:
+	var bounds := AABB()
+	for path in paths:
+		var points := path.get("points_voxels", PackedVector3Array()) as PackedVector3Array
+		var radii := path.get("radii_voxels", PackedFloat32Array()) as PackedFloat32Array
+		for index in points.size():
+			var radius := float(radii[index])
+			var point_bounds := AABB(points[index] - Vector3.ONE * radius, Vector3.ONE * radius * 2.0)
+			bounds = point_bounds if bounds.size == Vector3.ZERO else bounds.merge(point_bounds)
+	return bounds
+
+
+func _has_native_role(paths: Array[Dictionary], role: String) -> bool:
+	for path in paths:
+		if String(path.get("role", "")) == role or (path.get("components", []) as Array).has(role):
+			return true
+	return false
 
 
 func _append_capsule(result: Array[Dictionary], a_world: Vector3, b_world: Vector3, radius_voxels: float, source: String) -> void:

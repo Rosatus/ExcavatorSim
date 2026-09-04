@@ -115,6 +115,10 @@ func acknowledge_ticket_query(ticket: Dictionary) -> bool:
 	return readiness.acknowledge_query(ticket)
 
 
+func get_ticket_status(ticket: Dictionary) -> Dictionary:
+	return readiness.status(ticket)
+
+
 func is_support_ready_at(world_position: Vector3) -> bool:
 	return WorkZoneConfig.owns_world_xz(Vector2(world_position.x, world_position.z)) \
 		and readiness.is_point_ready(WorkZoneConfig.world_to_voxel(world_position, voxel_scale_m))

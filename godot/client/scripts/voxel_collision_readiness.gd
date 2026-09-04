@@ -33,11 +33,19 @@ func issue(area_voxels: AABB, purpose: StringName) -> Dictionary:
 		"ready_usec": 0,
 		"superseded_by_revision": 0,
 	}
-	for stored_value in _tickets.values():
-		var stored := stored_value as Dictionary
-		if int(stored.get("generation", -1)) == generation \
-				and (stored.get("area_voxels", AABB()) as AABB).intersects(area_voxels):
+	var superseded_ticket_ids: Array[int] = []
+	for ticket_id_value in _tickets.keys():
+		var stored := _tickets[ticket_id_value] as Dictionary
+		var stored_area := stored.get("area_voxels", AABB()) as AABB
+		if int(stored.get("generation", -1)) == generation and stored_area.intersects(area_voxels):
 			stored["superseded_by_revision"] = revision
+			if area_voxels.encloses(stored_area):
+				superseded_ticket_ids.append(int(ticket_id_value))
+	for ticket_id in superseded_ticket_ids:
+		# A fully covered ticket contributes no unique spatial readiness. Partial
+		# overlaps must remain so points outside the new edit retain their prior
+		# readiness (especially the initial whole-zone ticket).
+		_tickets.erase(ticket_id)
 	_next_ticket_id += 1
 	_tickets[int(ticket["ticket_id"])] = ticket
 	return ticket.duplicate(true)

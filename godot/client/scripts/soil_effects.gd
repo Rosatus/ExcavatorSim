@@ -1,6 +1,10 @@
 class_name SoilEffects
 extends Node3D
 
+const VISUAL_SNAPSHOT_PERIOD_S := 1.0 / 30.0
+const FILL_UPDATE_PERIOD_S := 0.1
+const FILL_RATIO_QUANTUM := 0.05
+
 @export var excavation_world_path := NodePath("../TerrainRoot/ExcavationWorld")
 @export var max_particles := 5000
 @export var emission_enabled := true
@@ -12,6 +16,7 @@ var _flow_material: ParticleProcessMaterial
 var _dust_particles: GPUParticles3D
 var _dust_material: ParticleProcessMaterial
 var _fill_mesh: MeshInstance3D
+var _fill_array_mesh: ArrayMesh
 var _fill_material: StandardMaterial3D
 var _last_fill_ratio := -1.0
 var _last_cavity_size := Vector3.ZERO
@@ -19,6 +24,8 @@ var _generation := -1
 var _budget := 1800
 var _excavation: ExcavationWorld
 var _clods: Array[RigidBody3D] = []
+var _active_clods: Array[RigidBody3D] = []
+var _free_clods: Array[RigidBody3D] = []
 var _clod_ages: Dictionary = {}
 var _active_clod_cap := 32
 var _clod_spawn_accumulator := 0.0
@@ -31,6 +38,12 @@ var _last_clear_reason := ""
 var _visual_mounds: Array[MeshInstance3D] = []
 var _visual_mound_cursor := 0
 var _last_visual_mound_event_id := ""
+var _last_rejected_dump_event_id := ""
+var _rejected_dump_effect_count := 0
+var _snapshot_poll_accumulator_s := 0.0
+var _fill_update_accumulator_s := FILL_UPDATE_PERIOD_S
+var _snapshot_pull_count := 0
+var _fill_rebuild_count := 0
 
 
 func _ready() -> void:
@@ -47,8 +60,12 @@ func _physics_process(delta: float) -> void:
 		_update_bypassed_count += 1
 		return
 	_update_executed_count += 1
-	if _excavation != null:
+	_snapshot_poll_accumulator_s += delta
+	_fill_update_accumulator_s += delta
+	if _excavation != null and _snapshot_poll_accumulator_s + 0.000001 >= VISUAL_SNAPSHOT_PERIOD_S:
+		_snapshot_poll_accumulator_s = fmod(_snapshot_poll_accumulator_s, VISUAL_SNAPSHOT_PERIOD_S)
 		_last_visual_snapshot = _excavation.get_soil_visual_snapshot()
+		_snapshot_pull_count += 1
 		_apply_visual_snapshot(_last_visual_snapshot)
 	_update_clods(delta, _last_visual_snapshot)
 
@@ -75,8 +92,7 @@ func set_emission_enabled(value: bool) -> void:
 		_dust_particles.restart()
 		_dust_particles.emitting = false
 	_clod_spawn_accumulator = 0.0
-	for clod in _clods:
-		_deactivate_clod(clod)
+	_reset_clod_pool()
 
 
 func set_bucket_ground_mode(value: String) -> bool:
@@ -105,9 +121,11 @@ func clear_for_generation(generation: int) -> void:
 		_fill_mesh.visible = false
 	_last_fill_ratio = -1.0
 	_last_cavity_size = Vector3.ZERO
-	for clod in _clods:
-		_deactivate_clod(clod)
+	_fill_update_accumulator_s = FILL_UPDATE_PERIOD_S
+	_snapshot_poll_accumulator_s = 0.0
+	_reset_clod_pool()
 	_clear_visual_mounds()
+	_last_rejected_dump_event_id = ""
 
 
 func get_effect_snapshot() -> Dictionary:
@@ -124,11 +142,17 @@ func get_effect_snapshot() -> Dictionary:
 		"clod_cap": _active_clod_cap,
 		"active_visual_mounds": _active_visual_mound_count(),
 		"visual_mound_cap": _visual_mounds.size(),
+		"rejected_dump_effect_count": _rejected_dump_effect_count,
 		"last_visual_mound_event_id": _last_visual_mound_event_id,
 		"bucket_ground_mode": _bucket_ground_mode,
 		"update_executed": _update_executed_count,
 		"update_bypassed": _update_bypassed_count,
 		"last_clear_reason": _last_clear_reason,
+		"snapshot_pull_count": _snapshot_pull_count,
+		"fill_rebuild_count": _fill_rebuild_count,
+		"snapshot_poll_hz": 1.0 / VISUAL_SNAPSHOT_PERIOD_S,
+		"fill_update_hz": 1.0 / FILL_UPDATE_PERIOD_S,
+		"fill_ratio_quantum": FILL_RATIO_QUANTUM,
 	}
 
 
@@ -143,6 +167,8 @@ func _build_fill_mesh() -> void:
 	_fill_material.metallic = 0.0
 	_fill_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_fill_material.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
+	_fill_array_mesh = ArrayMesh.new()
+	_fill_mesh.mesh = _fill_array_mesh
 	add_child(_fill_mesh)
 
 
@@ -238,6 +264,7 @@ func _build_clod_pool() -> void:
 		body.add_child(collision)
 		add_child(body)
 		_clods.append(body)
+		_free_clods.append(body)
 
 
 func _build_visual_mound_pool() -> void:
@@ -271,6 +298,7 @@ func _connect_excavation() -> void:
 	if not _excavation.excavation_changed.is_connected(_on_excavation_changed):
 		_excavation.excavation_changed.connect(_on_excavation_changed)
 	var status := _excavation.get_soil_visual_snapshot()
+	_snapshot_pull_count += 1
 	_generation = int(status.get("material_generation", -1))
 	_apply_visual_snapshot(status)
 
@@ -279,8 +307,12 @@ func _on_excavation_changed(status: Dictionary) -> void:
 	if BucketGroundInteractionMode.is_passthrough(_bucket_ground_mode):
 		return
 	if _excavation != null:
-		_apply_visual_snapshot(_excavation.get_soil_visual_snapshot())
+		_last_visual_snapshot = _excavation.get_soil_visual_snapshot()
+		_snapshot_pull_count += 1
+		_snapshot_poll_accumulator_s = 0.0
+		_apply_visual_snapshot(_last_visual_snapshot)
 	else:
+		_last_visual_snapshot = status.duplicate(true)
 		_apply_visual_snapshot(status)
 
 
@@ -299,6 +331,7 @@ func _apply_visual_snapshot(status: Dictionary) -> void:
 	_update_flow(status, current, pose)
 	_update_dust(status, current)
 	_update_visual_mound(status)
+	_update_rejected_dump_feedback(status)
 
 
 func apply_visual_snapshot_for_test(status: Dictionary) -> void:
@@ -309,6 +342,7 @@ func _update_fill(status: Dictionary, current: Dictionary, contract: Dictionary)
 	var fill_ratio := clampf(float(status.get("fill_ratio", 0.0)), 0.0, 1.0)
 	if fill_ratio <= 0.001 or not current.has("cavity"):
 		_fill_mesh.visible = false
+		_last_fill_ratio = 0.0
 		return
 	var cavity_contract: Dictionary = (contract.get("proxies", {}) as Dictionary).get("cavity", {})
 	var raw_size: Variant = cavity_contract.get("size_m", [])
@@ -316,17 +350,28 @@ func _update_fill(status: Dictionary, current: Dictionary, contract: Dictionary)
 		_fill_mesh.visible = false
 		return
 	var cavity_size := Vector3(float(raw_size[0]), float(raw_size[1]), float(raw_size[2]))
-	var fill_height := cavity_size.y * clampf(pow(fill_ratio, 0.72), 0.08, 1.0)
-	if absf(fill_ratio - _last_fill_ratio) > 0.01 or not cavity_size.is_equal_approx(_last_cavity_size):
+	var quantized_fill_ratio := clampf(
+		roundf(fill_ratio / FILL_RATIO_QUANTUM) * FILL_RATIO_QUANTUM,
+		0.0,
+		1.0,
+	)
+	var fill_height := cavity_size.y * clampf(pow(quantized_fill_ratio, 0.72), 0.08, 1.0)
+	var cavity_changed := not cavity_size.is_equal_approx(_last_cavity_size)
+	var first_fill := _last_fill_ratio < 0.0
+	var quantized_changed := absf(quantized_fill_ratio - _last_fill_ratio) + 0.000001 >= FILL_RATIO_QUANTUM
+	if cavity_changed or first_fill or (
+		quantized_changed and _fill_update_accumulator_s + 0.000001 >= FILL_UPDATE_PERIOD_S
+	):
 		_rebuild_fill_surface(
 			cavity_size,
 			fill_height,
-			fill_ratio,
+			quantized_fill_ratio,
 			status.get("fill_profile", PackedFloat32Array()),
 			status.get("cell_grid", [1, 1, 1])
 		)
-		_last_fill_ratio = fill_ratio
+		_last_fill_ratio = quantized_fill_ratio
 		_last_cavity_size = cavity_size
+		_fill_update_accumulator_s = 0.0
 	var cavity_transform: Transform3D = current["cavity"]
 	_fill_mesh.global_transform = cavity_transform
 	_fill_mesh.visible = true
@@ -380,13 +425,12 @@ func _update_dust(status: Dictionary, current: Dictionary) -> void:
 
 
 func _update_clods(delta: float, status: Dictionary) -> void:
-	for clod in _clods:
-		if clod.freeze:
-			continue
+	for index in range(_active_clods.size() - 1, -1, -1):
+		var clod := _active_clods[index]
 		var age := float(_clod_ages.get(clod.get_instance_id(), 0.0)) + delta
 		_clod_ages[clod.get_instance_id()] = age
 		if age > 2.5 or clod.global_position.y < -2.0 or clod.sleeping:
-			_deactivate_clod(clod)
+			_deactivate_active_clod(index)
 	if _active_clod_cap <= 0 or not bool(status.get("hero_clods_enabled", true)):
 		return
 	var interaction := String(status.get("interaction_state", "idle"))
@@ -397,7 +441,7 @@ func _update_clods(delta: float, status: Dictionary) -> void:
 		_clod_spawn_accumulator = 0.0
 		return
 	_clod_spawn_accumulator += delta * (7.0 if interaction == "cut" else (5.0 if interaction == "spill" else 11.0))
-	while _clod_spawn_accumulator >= 1.0 and _active_clod_count() < _active_clod_cap:
+	while _clod_spawn_accumulator >= 1.0 and _active_clods.size() < _active_clod_cap:
 		_clod_spawn_accumulator -= 1.0
 		if not _spawn_clod(status, interaction):
 			break
@@ -409,13 +453,10 @@ func _spawn_clod(status: Dictionary, interaction: String) -> bool:
 	var proxy_name := "cutting_edge" if interaction == "cut" else "opening"
 	if not current.has(proxy_name):
 		return false
-	var available: RigidBody3D
-	for clod in _clods:
-		if clod.freeze:
-			available = clod
-			break
-	if available == null:
+	if _free_clods.is_empty():
 		return false
+	var available := _free_clods.pop_back() as RigidBody3D
+	_active_clods.append(available)
 	var source: Transform3D = current[proxy_name]
 	var source_origin := source.origin
 	if interaction == "dump" or interaction == "spill":
@@ -438,7 +479,7 @@ func _spawn_clod(status: Dictionary, interaction: String) -> bool:
 	return true
 
 
-func _deactivate_clod(clod: RigidBody3D) -> void:
+func _deactivate_clod_state(clod: RigidBody3D) -> void:
 	clod.freeze = true
 	clod.sleeping = true
 	clod.visible = false
@@ -447,12 +488,27 @@ func _deactivate_clod(clod: RigidBody3D) -> void:
 	_clod_ages.erase(clod.get_instance_id())
 
 
-func _active_clod_count() -> int:
-	var count := 0
+func _deactivate_active_clod(index: int) -> void:
+	if index < 0 or index >= _active_clods.size():
+		return
+	var clod := _active_clods[index]
+	_deactivate_clod_state(clod)
+	_active_clods.remove_at(index)
+	_free_clods.append(clod)
+
+
+func _reset_clod_pool() -> void:
+	for clod in _active_clods:
+		_deactivate_clod_state(clod)
+	_active_clods.clear()
+	_free_clods.clear()
 	for clod in _clods:
-		if not clod.freeze:
-			count += 1
-	return count
+		_deactivate_clod_state(clod)
+		_free_clods.append(clod)
+
+
+func _active_clod_count() -> int:
+	return _active_clods.size()
 
 
 func _update_visual_mound(status: Dictionary) -> void:
@@ -479,6 +535,20 @@ func _clear_visual_mounds() -> void:
 		mound.visible = false
 	_visual_mound_cursor = 0
 	_last_visual_mound_event_id = ""
+
+
+func _update_rejected_dump_feedback(status: Dictionary) -> void:
+	var event_id := String(status.get("rejected_dump_event_id", ""))
+	if event_id.is_empty() or event_id == _last_rejected_dump_event_id:
+		return
+	var position := status.get("rejected_dump_world", Vector3.ZERO) as Vector3
+	if not position.is_finite():
+		return
+	_last_rejected_dump_event_id = event_id
+	_rejected_dump_effect_count += 1
+	if emission_enabled and _budget >= 400 and _dust_particles != null:
+		_dust_particles.global_position = position
+		_dust_particles.restart()
 
 
 func _active_visual_mound_count() -> int:
@@ -544,7 +614,11 @@ func _rebuild_fill_surface(
 		normals[index] = Vector3.UP
 	arrays[Mesh.ARRAY_NORMAL] = normals
 	arrays[Mesh.ARRAY_INDEX] = indices
-	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	mesh.surface_set_material(0, _fill_material)
-	_fill_mesh.mesh = mesh
+	if _fill_array_mesh == null:
+		_fill_array_mesh = ArrayMesh.new()
+		_fill_mesh.mesh = _fill_array_mesh
+	else:
+		_fill_array_mesh.clear_surfaces()
+	_fill_array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	_fill_array_mesh.surface_set_material(0, _fill_material)
+	_fill_rebuild_count += 1

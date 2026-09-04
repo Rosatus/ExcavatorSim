@@ -5,6 +5,21 @@ const MAIN_SCENE := preload("res://scenes/main.tscn")
 const MAX_READY_FRAMES := 1200
 
 
+class TrackReceiptProbe extends TrackedChassisController:
+	var snapshot_reads := 0
+
+
+	func get_status_snapshot() -> Dictionary:
+		snapshot_reads += 1
+		return {
+			"authority_epoch": "world-track-probe",
+			"physics_tick": snapshot_reads,
+			"terrain_identity_valid": true,
+			"terrain_generation": -1,
+			"track_contact_receipts": [],
+		}
+
+
 func _init() -> void:
 	call_deferred("_run")
 
@@ -45,6 +60,13 @@ func _run() -> void:
 		var voxel_position := VoxelWorkZoneConfig.world_to_voxel(Vector3(0.0, depth_y, 18.0), zone.voxel_scale_m)
 		var voxel_coordinate := Vector3i(roundi(voxel_position.x), roundi(voxel_position.y), roundi(voxel_position.z))
 		_expect(voxel_tool.get_voxel_f(voxel_coordinate) < -0.001, "voxel soil remains solid at %.1f m depth" % depth_y, failures)
+	var track_probe := TrackReceiptProbe.new()
+	excavation.set("_tracked_chassis_controller", track_probe)
+	excavation.automatic_soil_enabled = false
+	excavation._physics_process(0.0)
+	_expect(track_probe.snapshot_reads == 1, "track receipt forwarding remains independent of automatic bucket sampling", failures)
+	excavation.automatic_soil_enabled = true
+	track_probe.free()
 
 	var presentation := scene.get_node("MotionPresentation") as MotionPresentation
 	var contract := presentation.get_soil_contract()

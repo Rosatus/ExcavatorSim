@@ -85,6 +85,7 @@ var _previous_probe_support_loads: Dictionary = {}
 var _left_saturated := false
 var _right_saturated := false
 var _contacts: Array[Dictionary] = []
+var _track_contact_receipts: Array[Dictionary] = []
 var _quality_flags: Array[String] = []
 var _last_step_usec := 0
 var _peak_step_usec := 0
@@ -212,6 +213,7 @@ func teardown() -> void:
 	_body_descriptors.clear()
 	_joint_descriptors.clear()
 	_contacts.clear()
+	_track_contact_receipts.clear()
 	_quality_flags.clear()
 	_articulation.reset()
 	_bucket_sweeper.reset()
@@ -679,6 +681,7 @@ func _capture_post_step_snapshot() -> void:
 		"terrain_generation": _terrain_identity.x, "terrain_revision": _terrain_identity.y,
 		"terrain_identity_valid": _terrain_identity_valid,
 		"contacts": _contacts.duplicate(true), "quality_flags": _quality_flags.duplicate(),
+		"track_contact_receipts": _track_contact_receipts.duplicate(true),
 		"last_step_usec": _last_step_usec,
 		"posture_error_rad": _posture_error_rad,
 		"terrain_normal_alignment_deg": _terrain_normal_alignment_deg,
@@ -756,6 +759,7 @@ func _set_invalid_bucket_query(
 		"candidate_bucket_transform": candidate_bucket if candidate_bucket != Transform3D.IDENTITY else accepted_bucket,
 		"accepted_bucket_transform": accepted_bucket,
 		"contacts": [],
+		"track_contact_receipts": [],
 		"quality_flags": [reason],
 	}
 
@@ -1055,6 +1059,7 @@ func _apply_track_side(local_x: float, command: float, point_count: int, contact
 		contacts += 1
 		speed_sum += longitudinal_speed
 		samples.append({
+			"probe_index": probe_index,
 			"point": point,
 			"normal": normal,
 			"offset": offset,
@@ -1106,6 +1111,16 @@ func _apply_track_side(local_x: float, command: float, point_count: int, contact
 		var support_source := String(sample.get("support_source", "unknown"))
 		_track_support_source_counts[support_source] = int(_track_support_source_counts.get(support_source, 0)) + 1
 		_contacts.append({"body": "chassis", "other": String((sample["collider"] as Node).name), "point": point, "normal": normal, "impulse_n_s": 0.0, "penetration_m": 0.0, "track_side": side_name, "support_source": support_source})
+		if support_source == "voxel_terrain":
+			_track_contact_receipts.append({
+				"point": point,
+				"normal": normal,
+				"track_side": side_name,
+				"probe_index": int(sample.get("probe_index", _track_contact_receipts.size())),
+				"support_force_n": support_force,
+				"support_source": support_source,
+				"footprint_width_m": minf(float(_tracks.get("contact_width_m", 0.6)) * 0.5, 0.8),
+			})
 	return {"contact_count": contacts, "speed_m_s": speed_sum / float(contacts) if contacts > 0 else 0.0, "slip_ratio": slip_sum / float(contacts) if contacts > 0 else 0.0, "support_load_n": support_load_sum, "normal_sum": normal_sum, "saturated": saturated}
 
 
@@ -1288,6 +1303,7 @@ func _clear_tick_telemetry() -> void:
 	_left_saturated = false
 	_right_saturated = false
 	_contacts.clear()
+	_track_contact_receipts.clear()
 	_quality_flags.clear()
 	_track_support_source_counts.clear()
 
@@ -1456,6 +1472,7 @@ func _empty_snapshot() -> Dictionary:
 		"peak_pitch_angle_rad": 0.0,
 		"peak_pitch_rate_rad_s": 0.0,
 		"contacts": [],
+		"track_contact_receipts": [],
 		"track_support_source_counts": {},
 		"quality_flags": ["authoritative_runtime_unavailable"],
 	}
