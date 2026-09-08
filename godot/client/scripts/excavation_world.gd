@@ -77,6 +77,7 @@ var _terrain_commits_bypassed := 0
 var _parcel_steps_executed := 0
 var _parcel_steps_bypassed := 0
 var _last_bucket_ground_transition: Dictionary = {}
+var _last_voxel_capacity_override_error := ""
 
 
 func _ready() -> void:
@@ -135,6 +136,9 @@ func _physics_process(delta: float) -> void:
 	if _selected_soil_mode() == "voxel":
 		if _voxel_authority == null:
 			return
+		# Voxel falling-soil presentation is driven by committed one-shot release
+		# events. Never keep a cut/deposit volume sticky across idle frames.
+		_last_flow_volume_m3 = 0.0
 		_submit_voxel_track_compaction()
 		if automatic_soil_enabled:
 			_automatic_samples_executed += 1
@@ -143,7 +147,6 @@ func _physics_process(delta: float) -> void:
 		var voxel_result := _voxel_authority.step_fixed(delta)
 		if bool(voxel_result.get("changed", false)):
 			var transaction := voxel_result.get("transaction", {}) as Dictionary
-			_last_flow_volume_m3 = float(transaction.get("accepted_volume_m3", 0.0))
 			_last_interaction = "dump" if String(transaction.get("operation", "cut")) == "deposit" else String(transaction.get("operation", "cut"))
 			excavation_changed.emit(get_status_snapshot())
 		_queue_backend_feedback()
@@ -326,6 +329,27 @@ func set_bucket_ground_mode(value: String) -> bool:
 	return true
 
 
+func can_set_voxel_unlimited_bucket_for_testing() -> bool:
+	return _selected_soil_mode() == "voxel" \
+		and _voxel_authority != null and _voxel_authority.configured
+
+
+func set_voxel_unlimited_bucket_for_testing(enabled: bool) -> bool:
+	if not can_set_voxel_unlimited_bucket_for_testing():
+		_last_voxel_capacity_override_error = "voxel_authority_unavailable"
+		return false
+	var capacity_override := TEST_BUCKET_CAPACITY_M3 if enabled else 0.0
+	var result := _voxel_authority.set_bucket_capacity_override_for_testing(capacity_override)
+	if not bool(result.get("accepted", false)):
+		_last_voxel_capacity_override_error = String(result.get("reason", "capacity_override_rejected"))
+		excavation_changed.emit(get_status_snapshot())
+		return false
+	voxel_unlimited_bucket_for_testing = enabled
+	_last_voxel_capacity_override_error = ""
+	excavation_changed.emit(get_status_snapshot())
+	return true
+
+
 func set_backend_feedback_enabled(value: bool) -> void:
 	backend_feedback_enabled = value
 	if not value and _motion_client != null:
@@ -401,6 +425,9 @@ func get_status_snapshot() -> Dictionary:
 	status["requested_soil_material_lifecycle_mode"] = soil_material_lifecycle_mode
 	status["soil_surface_solver_mode"] = _selected_soil_solver_mode()
 	status["requested_soil_surface_solver_mode"] = soil_surface_solver_mode
+	status["voxel_unlimited_bucket_for_testing"] = voxel_unlimited_bucket_for_testing
+	status["voxel_unlimited_bucket_toggle_available"] = can_set_voxel_unlimited_bucket_for_testing()
+	status["voxel_capacity_override_error"] = _last_voxel_capacity_override_error
 	status["soil_authority_mode"] = (
 		"visual_first_arcade_stamp"
 		if _is_arcade_stamp_selected()
@@ -626,8 +653,14 @@ func get_soil_visual_snapshot() -> Dictionary:
 		"transaction_queued": bool(_last_interaction_batch.get("transaction_queued", false)),
 		"last_transaction": last_transaction.duplicate(true),
 		"accepted_dump_event_id": String(visual_source.get("accepted_dump_event_id", "")),
+		"accepted_dump_event": (visual_source.get("accepted_dump_event", {}) as Dictionary).duplicate(true),
 		"dump_release_world": visual_source.get("dump_release_world", Vector3.ZERO),
 		"dump_released_fill_ratio": float(visual_source.get("dump_released_fill_ratio", 0.0)),
+		"dump_pose_valid": bool(visual_source.get("dump_pose_valid", false)),
+		"opening_down_dot": float(visual_source.get("opening_down_dot", -1.0)),
+		"contract_dump_threshold": float(visual_source.get("contract_dump_threshold", SoilContractDescriptor.MIN_DUMP_OPENING_DOWN_DOT)),
+		"effective_dump_threshold": float(visual_source.get("effective_dump_threshold", SoilContractDescriptor.MIN_DUMP_OPENING_DOWN_DOT)),
+		"dump_gate_active": bool(visual_source.get("dump_gate_active", false)),
 		"rejected_dump_event_id": String(visual_source.get("rejected_dump_event_id", "")),
 		"rejected_dump_world": visual_source.get("rejected_dump_world", Vector3.ZERO),
 		"hero_clods_enabled": hero_clods_enabled,
@@ -753,7 +786,7 @@ func _process_bucket_snapshot(snapshot: Dictionary, delta: float) -> void:
 		return
 	var deposit_center: Variant = _settled_deposit_center((current["opening"] as Transform3D).origin)
 	var opening_down_dot := (snapshot["opening_normal_world"] as Vector3).dot(Vector3.DOWN)
-	var dump_threshold := float(interaction.get("dump_opening_down_dot", 0.3))
+	var dump_threshold := SoilContractDescriptor.effective_dump_opening_down_dot(interaction)
 	var operation := String(batch.get("operation", "none"))
 	if operation == "dump" and deposit_center is Vector3:
 		var dump_rate := soil_state.bucket_capacity_m3 * lerpf(0.35, 1.4, clampf((opening_down_dot - dump_threshold) / maxf(0.01, 1.0 - dump_threshold), 0.0, 1.0))
@@ -942,7 +975,7 @@ func _classify_interaction_records(
 	var bucket_loaded := selected_bucket_volume > BucketSoilState.EPSILON_M3
 	if bucket_loaded and (not query_required or query_identity_valid):
 		var opening_down_dot := (snapshot.get("opening_normal_world", Vector3.UP) as Vector3).dot(Vector3.DOWN)
-		var dump_threshold := float(interaction.get("dump_opening_down_dot", 0.3))
+		var dump_threshold := SoilContractDescriptor.effective_dump_opening_down_dot(interaction)
 		var spill_threshold := float(interaction.get("spill_opening_down_dot", dump_threshold - 0.25))
 		var fill_ratio := float(selected_payload.get("fill_ratio", 0.0))
 		var retained_classification := "carry"

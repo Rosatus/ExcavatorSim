@@ -12,7 +12,7 @@
     "cut_radius_m": 0.5,
     "deposit_radius_m": 0.75,
     "spill_opening_down_dot": -0.45,
-    "dump_opening_down_dot": -0.2
+    "dump_opening_down_dot": 0.15
   },
   "proxies": {
     "cutting_edge": {
@@ -29,7 +29,7 @@
     "opening": {
       "frame": "bucket_link",
       "center_godot": [0.0, 0.28, -0.72],
-      "normal_godot": [0.0, 0.707107, 0.707107],
+      "normal_godot": [0.0, -0.707107, -0.707107],
       "up_godot": [0.0, 0.707107, 0.707107],
       "size_m": [1.0, 0.68]
     },
@@ -142,7 +142,7 @@
         "region_id": "opening",
         "kind": "opening",
         "center_godot": [0.0, 0.28, -0.72],
-        "outward_normal_godot": [0.0, 0.707107, 0.707107],
+        "outward_normal_godot": [0.0, -0.707107, -0.707107],
         "shape": {"kind": "plane", "size_m": [1.0, 0.68], "width_axis_godot": [1.0, 0.0, 0.0], "height_axis_godot": [0.0, 0.707107, -0.707107]},
         "stable_soil_roles": [],
         "active_soil_roles": ["entry", "spill", "dump"]

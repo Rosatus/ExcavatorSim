@@ -80,7 +80,7 @@
         "cut_radius_m": {"type": "number", "exclusiveMinimum": 0},
         "deposit_radius_m": {"type": "number", "exclusiveMinimum": 0},
         "spill_opening_down_dot": {"type": "number", "minimum": -1, "maximum": 1},
-        "dump_opening_down_dot": {"type": "number", "minimum": -1, "maximum": 1}
+        "dump_opening_down_dot": {"type": "number", "minimum": 0.15, "maximum": 1}
       }
     },
     "edge_proxy": {

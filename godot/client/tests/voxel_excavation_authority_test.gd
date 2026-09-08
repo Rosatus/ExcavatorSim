@@ -22,12 +22,14 @@ func _init() -> void:
 func _run() -> void:
 	var failures: Array[String] = []
 	_check_soil_queue_fairness(failures)
+	_check_bucket_capacity_override(failures)
 	var zone := WorkZone.new()
 	zone.name = "VoxelAuthorityTestZone"
 	root.add_child(zone)
 	_expect(zone.terrain != null, "work zone runtime is available", failures)
 	if zone.terrain != null:
 		_expect(await _wait_initial_ready(zone), "initial collision is ready", failures)
+		_check_per_model_dump_gate(zone, failures)
 		await _check_commit_contract(zone, failures)
 		_check_sy135_deep_native_cut(zone, failures)
 		_check_sy135_unengaged_native_rejections(zone, failures)
@@ -66,6 +68,102 @@ func _check_soil_queue_fairness(failures: Array[String]) -> void:
 	var third := authority._dequeue_next_soil_proposal()
 	_expect(first.operation == "deposit" and second.operation == "deposit", "interactive dumps receive bounded queue priority", failures)
 	_expect(third.operation == "compact", "continuous dumps cannot starve queued compaction", failures)
+
+
+func _check_bucket_capacity_override(failures: Array[String]) -> void:
+	var descriptor := SoilContractDescriptor.load_for_model("sy135")
+	_expect(
+		descriptor != null and descriptor.is_valid_for("sy135"),
+		"SY135 capacity test contract loads (%s)" % (
+			descriptor.validation_error() if descriptor != null else "descriptor unavailable"
+		),
+		failures,
+	)
+	if descriptor == null or not descriptor.is_valid_for("sy135"):
+		return
+	var contract := descriptor.to_dictionary()
+	var field := MaterialField.new()
+	_expect(field.configure(contract, 1), "material field configures at contract capacity", failures)
+	var half_contract_mass_q := field.mass_q_for_volume(float(contract.get("heaped_capacity_m3", 0.0)) * 0.5)
+	_expect(field.credit_bucket_mass_for_test(half_contract_mass_q), "capacity test credits half a contract bucket", failures)
+	var enabled := field.set_bucket_capacity_override_for_testing(1000.0)
+	var enabled_status := field.get_status_snapshot()
+	_expect(bool(enabled.get("accepted", false)), "unlimited collection override enables without clearing mass", failures)
+	_expect(
+		is_equal_approx(float(enabled_status.get("fill_ratio", -1.0)), 0.5) \
+			and float(enabled_status.get("collection_fill_ratio", 1.0)) < 0.001,
+		"visual fill stays contract-relative while collection capacity is overridden",
+		failures,
+	)
+	var disabled := field.set_bucket_capacity_override_for_testing(0.0)
+	_expect(bool(disabled.get("accepted", false)) and not bool(field.get_status_snapshot().get("bucket_capacity_overridden", true)), "normal capacity restores when current mass fits", failures)
+	field.set_bucket_capacity_override_for_testing(1000.0)
+	field.credit_bucket_mass_for_test(field.mass_q_for_volume(0.5))
+	var rejected_disable := field.set_bucket_capacity_override_for_testing(0.0)
+	_expect(
+		not bool(rejected_disable.get("accepted", false)) \
+			and String(rejected_disable.get("reason", "")) == "bucket_mass_exceeds_requested_capacity" \
+			and bool(field.get_status_snapshot().get("bucket_capacity_overridden", false)),
+		"disabling unlimited collection rejects instead of deleting excess payload",
+		failures,
+	)
+
+
+func _check_per_model_dump_gate(zone: VoxelWorkZone, failures: Array[String]) -> void:
+	for requested_model_id in ["sy135", "sy205"]:
+		var descriptor := SoilContractDescriptor.load_for_model(requested_model_id)
+		_expect(
+			descriptor != null and descriptor.is_valid_for(requested_model_id),
+			"%s dump-gate contract loads (%s)" % [
+				requested_model_id,
+				descriptor.validation_error() if descriptor != null else "descriptor unavailable",
+			],
+			failures,
+		)
+		if descriptor == null or not descriptor.is_valid_for(requested_model_id):
+			continue
+		var contract := descriptor.to_dictionary()
+		var authority := Authority.new()
+		var generation := zone.readiness.generation
+		_expect(authority.configure(zone, contract, generation), "%s dump-gate authority configures" % requested_model_id, failures)
+		authority.material_field.bucket_mass_q = authority.material_field.mass_q_for_volume(0.01)
+		var initial_mass_q := authority.material_field.bucket_mass_q
+		var initial_revision := authority.data_revision
+		var initial_event_id := String(authority.get_status_snapshot().get("accepted_dump_event_id", ""))
+		var orientation_cases: Array[Dictionary] = [
+			{"name": "up", "normal": Vector3.UP},
+			{"name": "horizontal", "normal": Vector3.RIGHT},
+		]
+		var next_identity := 1
+		for case in orientation_cases:
+			for held_sample in 3:
+				var rejected := authority.submit_pose(
+					_dump_pose_with_normal(contract, Vector3(6.0, 1.5, 24.0), case["normal"] as Vector3, "%s:%s:%d" % [requested_model_id, case["name"], held_sample]),
+					_identity(generation, next_identity, next_identity),
+					1.0 / 60.0,
+				)
+				next_identity += 1
+				authority.step_fixed(0.11)
+				_expect(not bool(rejected.get("accepted", false)), "%s %s opening does not release" % [requested_model_id, case["name"]], failures)
+			var rejected_status := authority.get_status_snapshot()
+			_expect(authority.material_field.bucket_mass_q == initial_mass_q, "%s %s opening preserves bucket mass" % [requested_model_id, case["name"]], failures)
+			_expect(authority.data_revision == initial_revision, "%s %s opening preserves revision" % [requested_model_id, case["name"]], failures)
+			_expect(int(rejected_status.get("pending_dump_count", -1)) == 0, "%s %s opening creates no pending dump" % [requested_model_id, case["name"]], failures)
+			_expect(String(rejected_status.get("accepted_dump_event_id", "")) == initial_event_id, "%s %s opening creates no event" % [requested_model_id, case["name"]], failures)
+		var down_pose := _dump_pose_with_normal(contract, Vector3(6.0, 1.5, 24.0), Vector3.DOWN, "%s:down" % requested_model_id)
+		var accepted := authority.submit_pose(down_pose, _identity(generation, next_identity, next_identity), Authority.DUMP_GATE_CONFIRMATION_S)
+		var accepted_status := authority.get_status_snapshot()
+		_expect(bool(accepted.get("accepted", false)), "%s downward opening remains the positive control" % requested_model_id, failures)
+		_expect(float(accepted_status.get("effective_dump_threshold", 0.0)) >= SoilContractDescriptor.MIN_DUMP_OPENING_DOWN_DOT, "%s uses the shared safe dump floor" % requested_model_id, failures)
+		_expect(bool(accepted_status.get("dump_gate_active", false)), "%s reports an active downward dump gate" % requested_model_id, failures)
+		var staged_dump_count := int(accepted_status.get("pending_dump_count", 0)) + int(accepted_status.get("deposit_queue_depth", 0))
+		_expect(staged_dump_count == 1, "%s downward opening stages one bounded dump" % requested_model_id, failures)
+		var frozen_proposal: VoxelSoilOperationProposal = authority._pending_dump
+		if frozen_proposal == null and not authority._soil_queue.is_empty():
+			frozen_proposal = authority._soil_queue[0]
+		var frozen_transform := frozen_proposal.release_transform_world if frozen_proposal != null else Transform3D.IDENTITY
+		_expect(frozen_transform.origin.is_equal_approx(Vector3(6.0, 1.5, 24.0)), "%s pending dump freezes its admission transform" % requested_model_id, failures)
+		authority.clear()
 
 
 func _soil_proposal_for_queue_test(operation: String, sequence: int) -> VoxelSoilOperationProposal:
@@ -172,13 +270,15 @@ func _check_commit_contract(zone: VoxelWorkZone, failures: Array[String]) -> voi
 	_expect(int(empty_track_status.get("track_compaction_skipped_no_mobile", 0)) == EMPTY_TRACK_ADMISSION_ITERATIONS, "empty loose-soil admission is observable", failures)
 	_expect(empty_track_elapsed <= EMPTY_TRACK_ADMISSION_BUDGET_USEC, "empty track admission remains constant-time and inside focused-test budget", failures)
 	var dump_pose := _dump_pose(contract, Vector3(6.0, 1.5, 24.0), "dump")
-	var dump_submit := authority.submit_pose(dump_pose, _identity(generation, 13, 5), 1.0 / 60.0)
+	authority.submit_pose(dump_pose, _identity(generation, 13, 5), 1.0 / 60.0)
+	authority.submit_pose(dump_pose, _identity(generation, 14, 6), 1.0 / 60.0)
+	var dump_submit := authority.submit_pose(dump_pose, _identity(generation, 15, 7), 1.0 / 60.0)
 	_expect(bool(dump_submit.get("accepted", false)) and String(dump_submit.get("operation", "")) == "dump", "valid opening stages an in-zone dump batch", failures)
 	var mass_before_batch := int(authority.get_payload_snapshot().get("bucket_mass_q", 0))
 	var first_batch_step := authority.step_fixed(0.05)
 	_expect(not bool(first_batch_step.get("changed", false)) and int(authority.get_status_snapshot().get("pending_dump_count", 0)) == 1, "deposit remains pending before the 100 ms deadline", failures)
 	_expect(int(authority.get_payload_snapshot().get("bucket_mass_q", -1)) == mass_before_batch, "pending deposit does not debit bucket inventory", failures)
-	var second_dump_submit := authority.submit_pose(dump_pose, _identity(generation, 14, 6), 1.0 / 60.0)
+	var second_dump_submit := authority.submit_pose(dump_pose, _identity(generation, 16, 8), 1.0 / 60.0)
 	_expect(bool(second_dump_submit.get("accepted", false)) and int(authority.get_status_snapshot().get("dump_batch_coalesced_count", 0)) == 1, "same-neighborhood releases coalesce into one pending batch", failures)
 	var dump_result := authority.step_fixed(0.05)
 	var dump_transaction := dump_result.get("transaction", {}) as Dictionary
@@ -189,6 +289,11 @@ func _check_commit_contract(zone: VoxelWorkZone, failures: Array[String]) -> voi
 	_expect(int(authority.get_payload_snapshot().get("bucket_mass_q", mass_after_commit)) < mass_after_commit, "accepted deposit debits bucket inventory", failures)
 	_expect(int(authority.get_payload_snapshot().get("conservation_error_q", 1)) == 0, "deposit preserves exact fixed-point conservation", failures)
 	_expect(not String(dump_status.get("accepted_dump_event_id", "")).is_empty(), "deposit publishes one stable presentation event", failures)
+	var accepted_dump_event := dump_status.get("accepted_dump_event", {}) as Dictionary
+	_expect(String(accepted_dump_event.get("event_id", "")) == String(dump_status.get("accepted_dump_event_id", "")), "deposit publishes one immutable typed release event", failures)
+	_expect(int(accepted_dump_event.get("admission_tick", -1)) == 16, "coalesced release event retains the latest admitted tick", failures)
+	var accepted_release_transform := accepted_dump_event.get("release_transform_world", Transform3D.IDENTITY) as Transform3D
+	_expect(accepted_release_transform.origin.is_equal_approx(Vector3(6.0, 1.5, 24.0)), "release event retains the admitted opening transform", failures)
 	_expect(int((dump_status.get("operation_counts", {}) as Dictionary).get("deposit", 0)) == 1, "deposit diagnostic counter advances once", failures)
 	var dump_phase_timings := dump_status.get("phase_timings_usec", {}) as Dictionary
 	var operation_commit := dump_phase_timings.get("commit_by_operation", {}) as Dictionary
@@ -213,30 +318,40 @@ func _check_commit_contract(zone: VoxelWorkZone, failures: Array[String]) -> voi
 		"conservation_error_q": int(authority.get_payload_snapshot().get("conservation_error_q", -1)),
 	}))
 	var before_dump_end_mass := int(authority.get_payload_snapshot().get("bucket_mass_q", 0))
+	var before_dump_end_revision := authority.data_revision
+	var before_dump_end_event_id := String(authority.get_status_snapshot().get("accepted_dump_event_id", ""))
 	# Keep this release below the small remainder left by the first batch so the
 	# dump-end transition, rather than mass exhaustion, owns the flush.
-	var dump_end_stage := authority.submit_pose(dump_pose, _identity(generation, 15, 7), 0.001)
+	var dump_end_stage := authority.submit_pose(dump_pose, _identity(generation, 17, 9), 0.001)
 	_expect(
 		bool(dump_end_stage.get("accepted", false)) and int(authority.get_status_snapshot().get("pending_dump_count", 0)) == 1,
 		"a partial release opens a new pending batch (result=%s)" % JSON.stringify(dump_end_stage),
 		failures,
 	)
-	var dump_end_flush := authority.submit_pose(
+	var dump_end_cancel := authority.submit_pose(
 		_pose(contract, Vector3(2.0, _bucket_origin_y(contract, -0.03), 20.0), Vector3.ZERO, "dump-end"),
-		_identity(generation, 16, 8),
+		_identity(generation, 18, 10),
 	)
 	_expect(
-		bool(dump_end_flush.get("accepted", false)) and String(dump_end_flush.get("reason", "")) == "dump_end_flushed",
-		"leaving the dump gate flushes the pending batch (result=%s)" % JSON.stringify(dump_end_flush),
+		int(authority.get_status_snapshot().get("pending_dump_count", -1)) == 0 \
+			and int(authority.get_status_snapshot().get("deposit_queue_depth", -1)) == 0,
+		"leaving the dump gate cancels all uncommitted release mass (result=%s)" % JSON.stringify(dump_end_cancel),
 		failures,
 	)
-	_expect(int(authority.get_payload_snapshot().get("bucket_mass_q", -1)) == before_dump_end_mass, "dump-end queueing still does not debit before commit", failures)
+	_expect(int(authority.get_payload_snapshot().get("bucket_mass_q", -1)) == before_dump_end_mass, "cancelled dump preserves bucket inventory", failures)
 	var dump_end_commit := authority.flush_for_test()
-	_expect(bool(dump_end_commit.get("changed", false)) and int(authority.get_status_snapshot().get("pending_dump_count", -1)) == 0, "dump-end batch commits on the next authority commit", failures)
-	_expect(int(authority.get_status_snapshot().get("readiness_coalesced", 0)) > 0, "overlapping native deposits coalesce readiness work", failures)
+	var dump_end_status := authority.get_status_snapshot()
+	_expect(not bool(dump_end_commit.get("changed", false)), "cancelled dump cannot commit after the gate closes", failures)
+	_expect(authority.data_revision == before_dump_end_revision, "cancelled dump preserves the voxel revision", failures)
+	_expect(String(dump_end_status.get("accepted_dump_event_id", "")) == before_dump_end_event_id, "cancelled dump publishes no release event", failures)
+	_expect(int(dump_end_status.get("dump_cancelled_count", 0)) > 0, "cancelled dump is observable in bounded diagnostics", failures)
 	var before_outside_mass := int(authority.get_payload_snapshot().get("bucket_mass_q", 0))
 	var before_outside_revision := authority.data_revision
-	var outside_submit := authority.submit_pose(_dump_pose(contract, Vector3(30.0, 1.5, 24.0), "outside-dump"), _identity(generation, 17, 9), 1.0 / 60.0)
+	var outside_submit := authority.submit_pose(
+		_dump_pose(contract, Vector3(30.0, 1.5, 24.0), "outside-dump"),
+		_identity(generation, 19, 11),
+		Authority.DUMP_GATE_CONFIRMATION_S,
+	)
 	_expect(
 		not bool(outside_submit.get("accepted", false)) and String(outside_submit.get("reason", "")) == "dump_out_of_zone",
 		"out-of-zone dump rejects before queueing (result=%s)" % JSON.stringify(outside_submit),
@@ -662,12 +777,16 @@ func _identity(generation: int, tick: int, sequence: int) -> Dictionary:
 
 
 func _dump_pose(contract: Dictionary, opening_world: Vector3, identity: String) -> Dictionary:
+	return _dump_pose_with_normal(contract, opening_world, Vector3.DOWN, identity)
+
+
+func _dump_pose_with_normal(contract: Dictionary, opening_world: Vector3, opening_normal: Vector3, identity: String) -> Dictionary:
 	return {
 		"valid": true,
 		"reason": "ok",
 		"model_id": String(contract.get("model_id", "")),
 		"identity": identity,
-		"opening_normal_world": Vector3.DOWN,
+		"opening_normal_world": opening_normal,
 		"current": {"opening": Transform3D(Basis.IDENTITY, opening_world)},
 		"previous": {"opening": Transform3D(Basis.IDENTITY, opening_world)},
 		"contract": contract,

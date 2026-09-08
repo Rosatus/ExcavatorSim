@@ -209,8 +209,8 @@ repeated full-pool scans; their fixed pool and particles remain visual only.
 
 ### Accepted tradeoffs
 
-- Terrain growth can trail the visual release by up to 100 ms and may appear in
-  small steps; dump-end flush bounds the final delay.
+- Terrain growth can trail a continuously valid release by up to 100 ms and may
+  appear in small steps; a sub-batch remainder is retained when the gate closes.
 - Mound shape/volume is approximate and may merge slightly into prior soil.
 - Repose is represented primarily by the generated shape rather than granular
   flow, so small avalanches and individual clod landings are not simulated.
@@ -267,12 +267,19 @@ last accepted deposit event. The effective full-dump threshold is initially
 normals and thresholds, while Forward+ calibration verifies that the configured
 opening frame and normal agree with the visible GLB for each model.
 
-A coalesced amount that was admitted while clearly downward remains a valid
-release even if the operator curls upward before commit; cancelling it would
-break the admission/ledger transaction. What changes is presentation: origin,
-normal, direction, transaction ID, volume, and admission timestamp are frozen
-in the pending transaction and delivered to VFX unchanged after commit. New
-release admission stops as soon as the live pose leaves the dump gate.
+A release must remain continuously inside the dump gate until commit. The gate
+requires 50 ms of stable valid orientation before admission; curling upward or
+otherwise leaving the gate cancels pending and queued-but-uncommitted release
+proposals without debiting the bucket. Once commit begins, origin, normal,
+direction, transaction ID, volume, and admission timestamp are frozen and
+delivered to VFX unchanged.
+
+Collection capacity and presentation capacity are separate. The developer-only
+unlimited collection mode changes only the material field's effective intake
+limit. Bucket fill ratio, contained-fill geometry, and ordinary full indication
+remain relative to the hash-bound contract capacity and clamp visually at full.
+The Advanced-menu switch defaults off and cannot be disabled while retained
+mass exceeds normal capacity, avoiding hidden deletion or authority reset.
 
 ### Event-driven soil presentation
 

@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/client-boundary.md","reason":"Defines Godot terrain/physics authority boundaries that the standalone workbench must not silently bypass when later promoted."}
+{"file":".trellis/spec/frontend/godot-mcp.md","reason":"Defines safe multi-session editor authoring and immutable embedded-GLB import policy."}
+{"file":".trellis/spec/frontend/validation-budget.md","reason":"Keeps objective Agent checks focused while assigning final composition and visual feel to one human review."}
+{"file":".trellis/tasks/09-04-earthworks-construction-site-worldbuilding/research/local-evidence.md","reason":"Captures the active-editor isolation constraint, pinned toolchain, and curated high-poly asset inventory."}
+{"file":".trellis/tasks/09-04-earthworks-construction-site-worldbuilding/research/terrain-tooling.md","reason":"Captures official Terrain3D/Voxel Tools constraints behind the full-region ownership design."}

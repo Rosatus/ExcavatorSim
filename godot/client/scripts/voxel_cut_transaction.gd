@@ -40,6 +40,10 @@ var readiness_issue_usec := 0
 var release_world := Vector3.ZERO
 var deposit_world := Vector3.ZERO
 var release_fill_ratio := 0.0
+var release_transform_world := Transform3D.IDENTITY
+var release_normal_world := Vector3.DOWN
+var release_direction_world := Vector3.DOWN
+var admission_tick := -1
 var rejection_reason := ""
 var commit_usec := 0
 
@@ -88,6 +92,10 @@ func to_dictionary() -> Dictionary:
 		"release_world": release_world,
 		"deposit_world": deposit_world,
 		"release_fill_ratio": release_fill_ratio,
+		"release_transform_world": release_transform_world,
+		"release_normal_world": release_normal_world,
+		"release_direction_world": release_direction_world,
+		"admission_tick": admission_tick,
 		"rejection_reason": rejection_reason,
 		"commit_usec": commit_usec,
 	}

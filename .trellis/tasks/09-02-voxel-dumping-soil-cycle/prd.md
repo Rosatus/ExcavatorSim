@@ -44,7 +44,8 @@ cutting or falling-soil stalls.
   capacity fitting for every release tick.
 - Coalesce validated releases for the same active landing neighborhood into one
   bounded pending deposit, with a default maximum accumulation window of
-  100 ms and an immediate flush when dumping stops.
+  100 ms. Leaving the dump gate before commit cancels the uncommitted release
+  and retains it in the bucket.
 - Keep bucket debit and credited mobile-soil mass exactly paired at the
   committed-batch ledger boundary. The visible/native mound volume may use a
   bounded approximation based on sparse free-space probes and loose-soil bulk
@@ -112,8 +113,8 @@ cutting or falling-soil stalls.
   short captured telemetry reports native deposit/main-thread batch p95 <= 6 ms
   and p99 <= 10 ms on the development machine.
 - [ ] A continuing valid dump becomes visible in terrain no later than the
-  100 ms coalescing bound, and ending a dump flushes its final accepted mass on
-  the next authority commit without leaving a stranded pending batch.
+  100 ms coalescing bound, while leaving the gate cancels any final uncommitted
+  remainder without leaving a stranded pending batch.
 - [ ] Every committed deposit pairs bucket debit and credited mobile-soil mass
   exactly in the ledger, while native mound geometry remains within the
   declared approximate-volume tolerance. Rejected, stale, duplicate,
@@ -130,9 +131,11 @@ cutting or falling-soil stalls.
 - [ ] For both supported soil contracts, holding a non-empty bucket with its
   opening upward or horizontal for five seconds changes neither bucket mass nor
   accepted dump event ID and emits no falling-soil flow or clods.
-- [ ] A clearly downward pose still commits the admitted release exactly once;
-  rotating the bucket upward before the coalesced commit does not relocate the
-  release VFX to the new pose or prolong emission after the event TTL.
+- [ ] A clearly downward pose held through commit releases exactly once;
+  rotating upward before commit preserves bucket mass and emits no release VFX.
+- [ ] Unlimited collection is a default-off Advanced test mode. It does not
+  suppress normal contract-relative bucket fill, and turning it off never
+  deletes excess retained soil.
 - [ ] Accepted cutting increases the contained fill presentation without
   gravity-released soil from the teeth, and the visible fill remains inside the
   cavity proxy while curling, lifting, and slewing.

@@ -307,7 +307,6 @@ script = ExtResource("22_voxel_boundary")
 script = ExtResource("8_excavation_world")
 soil_material_lifecycle_mode = "voxel"
 soil_surface_solver_mode = "voxel_bucket_v1"
-voxel_unlimited_bucket_for_testing = true
 
 [node name="ChassisMotionRoot" type="Node3D" parent="." unique_id=1336743182]
 script = ExtResource("15_track_controller")
@@ -560,6 +559,10 @@ placeholder_text = "Gateway TCP 监听地址，默认 0.0.0.0"
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
 placeholder_text = "Gateway TCP 端口，默认 5678"
+
+[node name="UnlimitedBucketCapacity" type="CheckButton" parent="OperatorUI/StatusPanel/Margin/VBox/AdvancedPanel"]
+layout_mode = 2
+text = "无限收集斗容（测试）"
 
 [node name="BucketVolume" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox/AdvancedPanel" unique_id=2114908316]
 layout_mode = 2

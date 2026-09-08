@@ -20,6 +20,10 @@ var compaction_delta_q := 0
 var release_world := Vector3.ZERO
 var deposit_world := Vector3.ZERO
 var release_fill_ratio := 0.0
+var release_transform_world := Transform3D.IDENTITY
+var release_normal_world := Vector3.DOWN
+var release_direction_world := Vector3.DOWN
+var admission_tick := -1
 var support_query_usec := 0
 var batch_wait_usec := 0
 var quality_flags: Array[String] = []
@@ -41,6 +45,13 @@ static func create(fields: Dictionary) -> VoxelSoilOperationProposal:
 	proposal.release_world = fields.get("release_world", Vector3.ZERO) as Vector3
 	proposal.deposit_world = fields.get("deposit_world", proposal.release_world) as Vector3
 	proposal.release_fill_ratio = float(fields.get("release_fill_ratio", 0.0))
+	proposal.release_transform_world = fields.get(
+		"release_transform_world",
+		Transform3D(Basis.IDENTITY, proposal.release_world),
+	) as Transform3D
+	proposal.release_normal_world = fields.get("release_normal_world", Vector3.DOWN) as Vector3
+	proposal.release_direction_world = fields.get("release_direction_world", Vector3.DOWN) as Vector3
+	proposal.admission_tick = int(fields.get("admission_tick", proposal.fixed_tick_begin))
 	proposal.support_query_usec = maxi(0, int(fields.get("support_query_usec", 0)))
 	proposal.batch_wait_usec = maxi(0, int(fields.get("batch_wait_usec", 0)))
 	for value in fields.get("shapes", []):
@@ -60,6 +71,15 @@ func is_valid() -> bool:
 		return false
 	if not release_world.is_finite() or not deposit_world.is_finite() \
 			or area_voxels.size.x <= 0.0 or area_voxels.size.y <= 0.0 or area_voxels.size.z <= 0.0:
+		return false
+	if not _transform_is_finite(release_transform_world) \
+			or not release_normal_world.is_finite() or not release_direction_world.is_finite():
+		return false
+	if operation == "deposit" and (
+		admission_tick < 0
+		or absf(release_normal_world.length() - 1.0) > 0.001
+		or absf(release_direction_world.length() - 1.0) > 0.001
+	):
 		return false
 	if shapes.is_empty() or requested_mass_q <= 0:
 		return false
@@ -94,6 +114,10 @@ func to_dictionary() -> Dictionary:
 		"release_world": release_world,
 		"deposit_world": deposit_world,
 		"release_fill_ratio": release_fill_ratio,
+		"release_transform_world": release_transform_world,
+		"release_normal_world": release_normal_world,
+		"release_direction_world": release_direction_world,
+		"admission_tick": admission_tick,
 		"support_query_usec": support_query_usec,
 		"batch_wait_usec": batch_wait_usec,
 		"quality_flags": quality_flags.duplicate(),
@@ -110,19 +134,34 @@ func _compute_hash() -> String:
 			a.x, a.y, a.z, b.x, b.y, b.z,
 			float(shape.get("radius_voxels", 0.0)),
 		])
-	var canonical := "%d|%d|%d|%d|%s|%s|%s|%s|%d|%d|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f|%.6f|%d|%d|%s|%s" % [
+	var release_basis := release_transform_world.basis
+	var canonical := "%d|%d|%d|%d|%s|%s|%s|%s|%d|%d|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f|%.6f|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f|%d|%d|%d|%s|%s" % [
 		generation, fixed_tick_begin, fixed_tick_end, sequence,
 		model_id, authority_epoch, tool_hash, operation,
 		requested_mass_q, compaction_delta_q,
 		release_world.x, release_world.y, release_world.z,
 		deposit_world.x, deposit_world.y, deposit_world.z,
 		release_fill_ratio,
+		release_transform_world.origin.x, release_transform_world.origin.y, release_transform_world.origin.z,
+		release_basis.x.x, release_basis.x.y, release_basis.x.z,
+		release_basis.y.x, release_basis.y.y, release_basis.y.z,
+		release_basis.z.x, release_basis.z.y, release_basis.z.z,
+		release_normal_world.x, release_normal_world.y, release_normal_world.z,
+		release_direction_world.x, release_direction_world.y, release_direction_world.z,
+		admission_tick,
 		support_query_usec,
 		batch_wait_usec,
 		";".join(quality_flags),
 		";".join(rows),
 	]
 	return canonical.sha256_text()
+
+
+static func _transform_is_finite(value: Transform3D) -> bool:
+	return value.origin.is_finite() \
+		and value.basis.x.is_finite() \
+		and value.basis.y.is_finite() \
+		and value.basis.z.is_finite()
 
 
 static func _shape_valid(shape: Dictionary) -> bool:

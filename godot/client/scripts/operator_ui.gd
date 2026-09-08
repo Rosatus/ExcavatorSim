@@ -61,6 +61,7 @@ var _ignore_quality_toggle := false
 @onready var _timed_can_button: Button = $StatusPanel/Margin/VBox/Tools/TimedCANTrigger
 @onready var _gateway_host_edit: LineEdit = $StatusPanel/Margin/VBox/AdvancedPanel/GatewayHost
 @onready var _gateway_port_edit: LineEdit = $StatusPanel/Margin/VBox/AdvancedPanel/GatewayPort
+@onready var _unlimited_bucket_button: CheckButton = $StatusPanel/Margin/VBox/AdvancedPanel/UnlimitedBucketCapacity
 
 const GATEWAY_CONFIG_PATH := "user://ict_config.cfg"
 @onready var _bucket_volume_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/BucketVolume
@@ -103,6 +104,7 @@ func _ready() -> void:
 	_mute_audio_button.toggled.connect(_on_audio_muted)
 	_test_graphics_button.toggled.connect(_on_test_graphics_toggled)
 	_bucket_passthrough_button.toggled.connect(_on_bucket_passthrough_toggled)
+	_unlimited_bucket_button.toggled.connect(_on_unlimited_bucket_toggled)
 	_can_output_button.pressed.connect(_on_can_output_pressed)
 	_gateway_button.pressed.connect(_on_gateway_restart_pressed)
 	_timed_can_button.pressed.connect(_on_timed_can_pressed)
@@ -149,6 +151,7 @@ func _apply_static_copy() -> void:
 	_test_graphics_button.text = UIStrings.BUTTON_TEST_GRAPHICS
 	_test_graphics_button.tooltip_text = "Use an untextured black/white terrain grid and hide site dressing."
 	_bucket_passthrough_button.tooltip_text = "Let the bucket pass through terrain. Entering or leaving clears bucket soil and pending soil work."
+	_unlimited_bucket_button.tooltip_text = "Testing only: raise collection capacity while keeping the visible full-bucket level at the model contract capacity."
 	_guide_title_label.text = UIStrings.GUIDE_TITLE
 	_guide_intro_label.text = UIStrings.GUIDE_INTRO
 	_guide_recovery_label.text = UIStrings.GUIDE_RECOVERY
@@ -194,6 +197,20 @@ func _on_bucket_passthrough_toggled(enabled: bool) -> void:
 	)
 	if not _product_session.request_bucket_ground_mode(requested):
 		_sync_bucket_passthrough_toggle()
+
+
+func _on_unlimited_bucket_toggled(enabled: bool) -> void:
+	if _excavation_world == null \
+			or not _excavation_world.set_voxel_unlimited_bucket_for_testing(enabled):
+		_sync_unlimited_bucket_toggle()
+		if _excavation_world != null:
+			var status := _excavation_world.get_status_snapshot()
+			var reason := String(status.get("voxel_capacity_override_error", "unavailable"))
+			_completion_label.text = (
+				"Cannot restore normal bucket capacity while the bucket exceeds its contract capacity; dump soil first."
+				if reason == "bucket_mass_exceeds_requested_capacity"
+				else "Unlimited bucket test mode is unavailable: %s" % reason
+			)
 
 
 func _sync_test_graphics_toggle() -> void:
@@ -623,6 +640,7 @@ func _on_gateway_model_changed(_model_id: String) -> void:
 func _on_excavation_changed(_status: Dictionary) -> void:
 	_refresh_soil()
 	_refresh_camera_selector()
+	_sync_unlimited_bucket_toggle()
 
 
 func _refresh() -> void:
@@ -655,6 +673,7 @@ func _refresh() -> void:
 	_maybe_complete_action(status)
 	_refresh_model_selector()
 	_sync_bucket_passthrough_toggle()
+	_sync_unlimited_bucket_toggle()
 
 
 func _terrain_diagnostics_text() -> String:
@@ -712,6 +731,18 @@ func _sync_bucket_passthrough_toggle() -> void:
 	)
 
 
+func _sync_unlimited_bucket_toggle() -> void:
+	if _unlimited_bucket_button == null:
+		return
+	var status := _excavation_world.get_status_snapshot() if _excavation_world != null else {}
+	_unlimited_bucket_button.disabled = not bool(
+		status.get("voxel_unlimited_bucket_toggle_available", false)
+	)
+	_unlimited_bucket_button.set_pressed_no_signal(
+		bool(status.get("voxel_unlimited_bucket_for_testing", false))
+	)
+
+
 func _refresh_soil() -> void:
 	if _excavation_world == null:
 		_operation_label.text = "SOIL STATUS UNAVAILABLE"
@@ -728,14 +759,19 @@ func _refresh_soil() -> void:
 	var fill_ratio := clampf(float(selected.get("fill_ratio", 0.0)), 0.0, 1.0)
 	_current_fill_ratio = fill_ratio
 	var volume := maxf(0.0, float(selected.get("bucket_volume_m3", 0.0)))
-	var capacity := maxf(volume, float(status.get("bucket_capacity_m3", 0.35)))
+	var visual_capacity := float(selected.get(
+		"visual_bucket_capacity_m3",
+		selected.get("contract_bucket_capacity_m3", status.get("bucket_capacity_m3", 0.35)),
+	))
+	var capacity := maxf(0.0, visual_capacity)
 	var operation := _derive_operation(status, fill_ratio)
 	_operation_label.text = UIStrings.operation_text(operation)
 	_operation_label.add_theme_color_override("font_color", _operation_color(operation))
 	_bucket_status_label.text = "Bucket %s   %d%%" % [UIStrings.fill_text(fill_ratio), roundi(fill_ratio * 100.0)]
 	_bucket_fill.value = fill_ratio * 100.0
 	var dig := _excavation_world.get_dig_diagnostics()
-	_bucket_volume_label.text = "Bucket soil: %.3f / %.2f m³   Dig: %s pen=%.3f eng=%d%% boomV=%.2f boomPos=%.2f en=%d foc=%d" % [volume, capacity, String(dig.get("interaction", "?")), float(dig.get("penetration_m", 0.0)), roundi(float(dig.get("engagement", 0.0)) * 100.0), float(dig.get("boom_velocity", 0.0)), float(dig.get("boom_position", 0.0)), int(bool(dig.get("enabled", false))), int(bool(dig.get("focused", false)))]
+	var capacity_suffix := " (unlimited collection test)" if bool(status.get("voxel_unlimited_bucket_for_testing", false)) else ""
+	_bucket_volume_label.text = "Bucket soil: %.3f / %.2f m³%s   Dig: %s pen=%.3f eng=%d%% boomV=%.2f boomPos=%.2f en=%d foc=%d" % [volume, capacity, capacity_suffix, String(dig.get("interaction", "?")), float(dig.get("penetration_m", 0.0)), roundi(float(dig.get("engagement", 0.0)) * 100.0), float(dig.get("boom_velocity", 0.0)), float(dig.get("boom_position", 0.0)), int(bool(dig.get("enabled", false))), int(bool(dig.get("focused", false)))]
 
 
 func _derive_operation(status: Dictionary, fill_ratio: float) -> String:

@@ -307,7 +307,7 @@ func _try_dump(pose_snapshot: Dictionary, tick: int) -> Dictionary:
 	if not bool(pose_snapshot.get("valid", false)) or not current.has("opening"):
 		return {"changed": false, "reason": "dump_pose_unavailable"}
 	var interaction := (pose_snapshot.get("contract", contract) as Dictionary).get("interaction", {}) as Dictionary
-	var threshold := float(interaction.get("dump_opening_down_dot", 0.3))
+	var threshold := SoilContractDescriptor.effective_dump_opening_down_dot(interaction)
 	var opening_normal := pose_snapshot.get("opening_normal_world", Vector3.UP) as Vector3
 	if not opening_normal.is_finite() or opening_normal.dot(Vector3.DOWN) <= threshold:
 		return {"changed": false, "reason": "dump_not_oriented"}

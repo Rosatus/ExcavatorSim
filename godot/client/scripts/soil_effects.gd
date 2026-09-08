@@ -4,6 +4,8 @@ extends Node3D
 const VISUAL_SNAPSHOT_PERIOD_S := 1.0 / 30.0
 const FILL_UPDATE_PERIOD_S := 0.1
 const FILL_RATIO_QUANTUM := 0.05
+const RELEASE_EVENT_MIN_TTL_S := 0.28
+const RELEASE_EVENT_MAX_TTL_S := 0.85
 
 @export var excavation_world_path := NodePath("../TerrainRoot/ExcavationWorld")
 @export var max_particles := 5000
@@ -44,6 +46,10 @@ var _snapshot_poll_accumulator_s := 0.0
 var _fill_update_accumulator_s := FILL_UPDATE_PERIOD_S
 var _snapshot_pull_count := 0
 var _fill_rebuild_count := 0
+var _active_release_event: Dictionary = {}
+var _last_release_event_id := ""
+var _release_event_elapsed_s := 0.0
+var _release_event_ttl_s := 0.0
 
 
 func _ready() -> void:
@@ -67,6 +73,7 @@ func _physics_process(delta: float) -> void:
 		_last_visual_snapshot = _excavation.get_soil_visual_snapshot()
 		_snapshot_pull_count += 1
 		_apply_visual_snapshot(_last_visual_snapshot)
+	_advance_release_event(delta)
 	_update_clods(delta, _last_visual_snapshot)
 
 
@@ -126,6 +133,10 @@ func clear_for_generation(generation: int) -> void:
 	_reset_clod_pool()
 	_clear_visual_mounds()
 	_last_rejected_dump_event_id = ""
+	_active_release_event.clear()
+	_last_release_event_id = ""
+	_release_event_elapsed_s = 0.0
+	_release_event_ttl_s = 0.0
 
 
 func get_effect_snapshot() -> Dictionary:
@@ -153,6 +164,10 @@ func get_effect_snapshot() -> Dictionary:
 		"snapshot_poll_hz": 1.0 / VISUAL_SNAPSHOT_PERIOD_S,
 		"fill_update_hz": 1.0 / FILL_UPDATE_PERIOD_S,
 		"fill_ratio_quantum": FILL_RATIO_QUANTUM,
+		"active_release_event_id": String(_active_release_event.get("event_id", "")),
+		"last_release_event_id": _last_release_event_id,
+		"release_event_age_s": _release_event_elapsed_s,
+		"release_event_ttl_s": _release_event_ttl_s,
 	}
 
 
@@ -327,6 +342,7 @@ func _apply_visual_snapshot(status: Dictionary) -> void:
 	var pose: Dictionary = status.get("bucket_pose", {})
 	var current: Dictionary = pose.get("current", {})
 	var contract: Dictionary = pose.get("contract", {})
+	_consume_release_event(status, pose)
 	_update_fill(status, current, contract)
 	_update_flow(status, current, pose)
 	_update_dust(status, current)
@@ -335,7 +351,80 @@ func _apply_visual_snapshot(status: Dictionary) -> void:
 
 
 func apply_visual_snapshot_for_test(status: Dictionary) -> void:
+	_last_visual_snapshot = status.duplicate(true)
 	_apply_visual_snapshot(status)
+
+
+func advance_release_visual_for_test(delta: float) -> void:
+	_advance_release_event(delta)
+	_update_flow(_last_visual_snapshot, {}, {})
+
+
+func _consume_release_event(status: Dictionary, pose: Dictionary) -> void:
+	var event := status.get("accepted_dump_event", {}) as Dictionary
+	var event_id := String(event.get("event_id", status.get("accepted_dump_event_id", "")))
+	if event_id.is_empty() or event_id == _last_release_event_id:
+		return
+	if event.is_empty():
+		event = _release_event_from_live_pose(status, pose)
+	if event.is_empty():
+		return
+	event["event_id"] = event_id
+	var release_transform := event.get("release_transform_world", Transform3D.IDENTITY) as Transform3D
+	var direction := event.get("direction_world", Vector3.DOWN) as Vector3
+	if not release_transform.origin.is_finite() or not direction.is_finite() or direction.is_zero_approx():
+		return
+	_active_release_event = event.duplicate(true)
+	_last_release_event_id = event_id
+	_release_event_elapsed_s = 0.0
+	var released_volume := maxf(0.0, float(event.get("accepted_volume_m3", 0.0)))
+	_release_event_ttl_s = clampf(
+		RELEASE_EVENT_MIN_TTL_S + sqrt(released_volume) * 0.9,
+		RELEASE_EVENT_MIN_TTL_S,
+		RELEASE_EVENT_MAX_TTL_S,
+	)
+	_clod_spawn_accumulator = 0.0
+	if _flow_particles != null:
+		_flow_particles.restart()
+
+
+func _advance_release_event(delta: float) -> void:
+	if _active_release_event.is_empty():
+		return
+	_release_event_elapsed_s += maxf(0.0, delta)
+	if _release_event_elapsed_s + 0.000001 < _release_event_ttl_s:
+		return
+	_active_release_event.clear()
+	_clod_spawn_accumulator = 0.0
+	if _flow_particles != null:
+		_flow_particles.emitting = false
+
+
+func _release_event_from_live_pose(status: Dictionary, pose: Dictionary) -> Dictionary:
+	var interaction := String(status.get("interaction_state", "idle"))
+	var event_id := String(status.get("accepted_dump_event_id", ""))
+	if interaction not in ["spill", "dump"] and event_id.is_empty():
+		return {}
+	var current := pose.get("current", {}) as Dictionary
+	if not current.has("opening"):
+		return {}
+	var opening := current["opening"] as Transform3D
+	var release_world := status.get("dump_release_world", opening.origin) as Vector3
+	opening.origin = release_world
+	var opening_normal := pose.get("opening_normal_world", Vector3.DOWN) as Vector3
+	if not opening_normal.is_finite() or opening_normal.is_zero_approx():
+		opening_normal = Vector3.DOWN
+	else:
+		opening_normal = opening_normal.normalized()
+	return {
+		"event_id": event_id,
+		"accepted_volume_m3": maxf(0.0, float(status.get("flow_volume_m3", 0.0))),
+		"release_transform_world": opening,
+		"release_world": release_world,
+		"opening_normal_world": opening_normal,
+		"direction_world": (opening_normal * 0.65 + Vector3.DOWN * 0.85).normalized(),
+		"fill_ratio": float(status.get("dump_released_fill_ratio", status.get("fill_ratio", 0.0))),
+	}
 
 
 func _update_fill(status: Dictionary, current: Dictionary, contract: Dictionary) -> void:
@@ -381,28 +470,36 @@ func _update_flow(status: Dictionary, current: Dictionary, pose: Dictionary) -> 
 	if not emission_enabled or _budget <= 0:
 		_flow_particles.emitting = false
 		return
+	if not _active_release_event.is_empty():
+		_apply_flow_release_event(_active_release_event)
+		return
 	var interaction := String(status.get("interaction_state", "idle"))
-	var active := interaction == "cut" or interaction == "spill" or interaction == "dump"
+	var active := interaction == "spill" or interaction == "dump"
 	if not active or float(status.get("flow_volume_m3", 0.0)) <= BucketSoilState.EPSILON_M3:
 		_flow_particles.emitting = false
 		return
-	var proxy_name := "cutting_edge" if interaction == "cut" else "opening"
-	if not current.has(proxy_name):
+	if not current.has("opening"):
 		_flow_particles.emitting = false
 		return
-	var source: Transform3D = current[proxy_name]
-	var direction := pose.get("cutting_direction_world", Vector3.DOWN) as Vector3
-	if interaction == "dump" or interaction == "spill":
-		var opening_normal := pose.get("opening_normal_world", Vector3.DOWN) as Vector3
-		if not opening_normal.is_zero_approx():
-			source.origin += opening_normal.normalized() * 0.24
-			direction = (opening_normal.normalized() * 0.65 + Vector3.DOWN * 0.85).normalized()
-		else:
-			direction = Vector3.DOWN
+	var fallback_event := _release_event_from_live_pose(status, pose)
+	if fallback_event.is_empty():
+		_flow_particles.emitting = false
+		return
+	_apply_flow_release_event(fallback_event)
+
+
+func _apply_flow_release_event(event: Dictionary) -> void:
+	var source := event.get("release_transform_world", Transform3D.IDENTITY) as Transform3D
+	var opening_normal := event.get("opening_normal_world", Vector3.DOWN) as Vector3
+	var direction := event.get("direction_world", Vector3.DOWN) as Vector3
+	if opening_normal.is_finite() and not opening_normal.is_zero_approx():
+		source.origin += opening_normal.normalized() * 0.24
+	if not direction.is_finite() or direction.is_zero_approx():
+		direction = Vector3.DOWN
 	_flow_particles.global_transform = Transform3D(Basis.IDENTITY, source.origin)
 	_flow_material.direction = direction.normalized()
-	_flow_material.initial_velocity_min = 0.45 if interaction == "cut" else (0.55 if interaction == "spill" else 0.7)
-	_flow_material.initial_velocity_max = 1.35 if interaction == "cut" else (1.45 if interaction == "spill" else 2.1)
+	_flow_material.initial_velocity_min = 0.7
+	_flow_material.initial_velocity_max = 2.1
 	_flow_particles.emitting = true
 
 
@@ -433,36 +530,40 @@ func _update_clods(delta: float, status: Dictionary) -> void:
 			_deactivate_active_clod(index)
 	if _active_clod_cap <= 0 or not bool(status.get("hero_clods_enabled", true)):
 		return
-	var interaction := String(status.get("interaction_state", "idle"))
-	if (
-		(interaction != "cut" and interaction != "spill" and interaction != "dump")
-		or float(status.get("flow_volume_m3", 0.0)) <= BucketSoilState.EPSILON_M3
-	):
+	var release_event := _active_release_event
+	if release_event.is_empty():
+		var interaction := String(status.get("interaction_state", "idle"))
+		if interaction in ["spill", "dump"] \
+				and float(status.get("flow_volume_m3", 0.0)) > BucketSoilState.EPSILON_M3:
+			release_event = _release_event_from_live_pose(status, status.get("bucket_pose", {}) as Dictionary)
+	if release_event.is_empty():
 		_clod_spawn_accumulator = 0.0
 		return
-	_clod_spawn_accumulator += delta * (7.0 if interaction == "cut" else (5.0 if interaction == "spill" else 11.0))
+	_clod_spawn_accumulator += delta * 11.0
 	while _clod_spawn_accumulator >= 1.0 and _active_clods.size() < _active_clod_cap:
 		_clod_spawn_accumulator -= 1.0
-		if not _spawn_clod(status, interaction):
+		if not _spawn_clod_from_event(release_event):
 			break
 
 
 func _spawn_clod(status: Dictionary, interaction: String) -> bool:
-	var pose: Dictionary = status.get("bucket_pose", {})
-	var current: Dictionary = pose.get("current", {})
-	var proxy_name := "cutting_edge" if interaction == "cut" else "opening"
-	if not current.has(proxy_name):
+	if interaction == "cut":
+		return false
+	return _spawn_clod_from_event(_release_event_from_live_pose(status, status.get("bucket_pose", {}) as Dictionary))
+
+
+func _spawn_clod_from_event(event: Dictionary) -> bool:
+	if event.is_empty():
 		return false
 	if _free_clods.is_empty():
 		return false
 	var available := _free_clods.pop_back() as RigidBody3D
 	_active_clods.append(available)
-	var source: Transform3D = current[proxy_name]
+	var source := event.get("release_transform_world", Transform3D.IDENTITY) as Transform3D
 	var source_origin := source.origin
-	if interaction == "dump" or interaction == "spill":
-		var opening_normal := pose.get("opening_normal_world", Vector3.DOWN) as Vector3
-		if not opening_normal.is_zero_approx():
-			source_origin += opening_normal.normalized() * 0.2
+	var opening_normal := event.get("opening_normal_world", Vector3.DOWN) as Vector3
+	if opening_normal.is_finite() and not opening_normal.is_zero_approx():
+		source_origin += opening_normal.normalized() * 0.2
 	_spawn_sequence += 1
 	var noise_x := _spawn_noise(_spawn_sequence, 17)
 	var noise_y := _spawn_noise(_spawn_sequence, 29)
@@ -473,7 +574,10 @@ func _spawn_clod(status: Dictionary, interaction: String) -> bool:
 	available.sleeping = false
 	available.visible = true
 	var lateral := Vector3(noise_x * 0.35, lerpf(0.1, 0.45, (noise_y + 1.0) * 0.5), noise_z * 0.35)
-	available.linear_velocity = lateral if interaction == "cut" else lateral + Vector3.DOWN * 0.8
+	var direction := event.get("direction_world", Vector3.DOWN) as Vector3
+	if not direction.is_finite() or direction.is_zero_approx():
+		direction = Vector3.DOWN
+	available.linear_velocity = lateral + direction.normalized() * 0.8
 	available.angular_velocity = Vector3(noise_z, noise_x, noise_y) * 4.0
 	_clod_ages[available.get_instance_id()] = 0.0
 	return true
@@ -579,7 +683,8 @@ func _rebuild_fill_surface(
 		columns = maxi(2, int(grid_value[0]))
 		rows = maxi(2, int(grid_value[2]))
 	var profile := profile_value as PackedFloat32Array if profile_value is PackedFloat32Array else PackedFloat32Array()
-	var vertices := PackedVector3Array()
+	var bottom_y := -0.48 * cavity_size.y
+	var top_points: Array[Vector3] = []
 	for row in rows:
 		var z_unit := float(row) / float(rows - 1)
 		var z := lerpf(-0.43 * cavity_size.z, 0.43 * cavity_size.z, z_unit)
@@ -595,25 +700,69 @@ func _rebuild_fill_surface(
 			if profile_index < profile.size():
 				local_fill = clampf(profile[profile_index], 0.0, 1.0)
 			var local_height := cavity_size.y * clampf(pow(local_fill, 0.72), 0.02, 1.0)
-			var y := -0.5 * cavity_size.y + maxf(local_height, 0.15 * fill_height) * (0.82 + heaping * mound)
-			vertices.append(Vector3(x, y, z))
-	var indices := PackedInt32Array()
+			var y := clampf(
+				-0.5 * cavity_size.y + maxf(local_height, 0.15 * fill_height) * (0.82 + heaping * mound),
+				bottom_y + 0.02 * cavity_size.y,
+				0.48 * cavity_size.y,
+			)
+			top_points.append(Vector3(x, y, z))
+	var vertices: Array[Vector3] = []
+	var normals: Array[Vector3] = []
+	var indices: Array[int] = []
 	for row in rows - 1:
 		for column in columns - 1:
 			var top_left := row * columns + column
 			var top_right := top_left + 1
 			var bottom_left := (row + 1) * columns + column
 			var bottom_right := bottom_left + 1
-			indices.append_array([top_left, bottom_left, top_right, top_right, bottom_left, bottom_right])
+			_append_fill_triangle(vertices, normals, indices, top_points[top_left], top_points[bottom_left], top_points[top_right])
+			_append_fill_triangle(vertices, normals, indices, top_points[top_right], top_points[bottom_left], top_points[bottom_right])
+	var x_min := -0.45 * cavity_size.x
+	var x_max := 0.45 * cavity_size.x
+	var z_min := -0.43 * cavity_size.z
+	var z_max := 0.43 * cavity_size.z
+	var bottom_front_left := Vector3(x_min, bottom_y, z_min)
+	var bottom_front_right := Vector3(x_max, bottom_y, z_min)
+	var bottom_back_left := Vector3(x_min, bottom_y, z_max)
+	var bottom_back_right := Vector3(x_max, bottom_y, z_max)
+	_append_fill_triangle(vertices, normals, indices, bottom_front_left, bottom_front_right, bottom_back_left)
+	_append_fill_triangle(vertices, normals, indices, bottom_front_right, bottom_back_right, bottom_back_left)
+	for column in columns - 1:
+		_append_fill_quad(
+			vertices, normals, indices,
+			top_points[column], top_points[column + 1],
+			Vector3(top_points[column].x, bottom_y, z_min),
+			Vector3(top_points[column + 1].x, bottom_y, z_min),
+		)
+		var back_left := (rows - 1) * columns + column
+		_append_fill_quad(
+			vertices, normals, indices,
+			top_points[back_left + 1], top_points[back_left],
+			Vector3(top_points[back_left + 1].x, bottom_y, z_max),
+			Vector3(top_points[back_left].x, bottom_y, z_max),
+		)
+	for row in rows - 1:
+		var left_top := row * columns
+		var left_bottom := (row + 1) * columns
+		_append_fill_quad(
+			vertices, normals, indices,
+			top_points[left_bottom], top_points[left_top],
+			Vector3(x_min, bottom_y, top_points[left_bottom].z),
+			Vector3(x_min, bottom_y, top_points[left_top].z),
+		)
+		var right_top := row * columns + columns - 1
+		var right_bottom := (row + 1) * columns + columns - 1
+		_append_fill_quad(
+			vertices, normals, indices,
+			top_points[right_top], top_points[right_bottom],
+			Vector3(x_max, bottom_y, top_points[right_top].z),
+			Vector3(x_max, bottom_y, top_points[right_bottom].z),
+		)
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = vertices
-	var normals := PackedVector3Array()
-	normals.resize(vertices.size())
-	for index in normals.size():
-		normals[index] = Vector3.UP
-	arrays[Mesh.ARRAY_NORMAL] = normals
-	arrays[Mesh.ARRAY_INDEX] = indices
+	arrays[Mesh.ARRAY_VERTEX] = PackedVector3Array(vertices)
+	arrays[Mesh.ARRAY_NORMAL] = PackedVector3Array(normals)
+	arrays[Mesh.ARRAY_INDEX] = PackedInt32Array(indices)
 	if _fill_array_mesh == null:
 		_fill_array_mesh = ArrayMesh.new()
 		_fill_mesh.mesh = _fill_array_mesh
@@ -622,3 +771,33 @@ func _rebuild_fill_surface(
 	_fill_array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	_fill_array_mesh.surface_set_material(0, _fill_material)
 	_fill_rebuild_count += 1
+
+
+func _append_fill_quad(
+	vertices: Array[Vector3],
+	normals: Array[Vector3],
+	indices: Array[int],
+	top_a: Vector3,
+	top_b: Vector3,
+	bottom_a: Vector3,
+	bottom_b: Vector3
+) -> void:
+	_append_fill_triangle(vertices, normals, indices, top_a, bottom_a, top_b)
+	_append_fill_triangle(vertices, normals, indices, top_b, bottom_a, bottom_b)
+
+
+func _append_fill_triangle(
+	vertices: Array[Vector3],
+	normals: Array[Vector3],
+	indices: Array[int],
+	a: Vector3,
+	b: Vector3,
+	c: Vector3
+) -> void:
+	var normal := (b - a).cross(c - a).normalized()
+	if not normal.is_finite() or normal.is_zero_approx():
+		normal = Vector3.UP
+	var base := vertices.size()
+	vertices.append_array([a, b, c])
+	normals.append_array([normal, normal, normal])
+	indices.append_array([base, base + 1, base + 2])

@@ -56,8 +56,8 @@
 
 - [x] Introduce one typed pending-deposit batch per active landing neighborhood.
   Coalesce validated releases for at most 100 ms, flush on neighborhood change
-  and dump-end, and discard safely on rejection/reset/generation change without
-  debiting bucket inventory.
+  while the dump gate remains valid, and discard safely on dump-gate exit,
+  rejection, reset, or generation change without debiting bucket inventory.
 - [x] Pre-stage the complete accepted deposit transaction before mutation:
   cached support, bounds/generation, bounded free-space probes, sparse material
   mutations, affected blocks, ledger amounts, transaction identity, and journal
@@ -86,7 +86,7 @@
 
 ### Phase D5 - Focused verification and human gate
 
-- [x] Add fast deposit regressions for 100 ms/dump-end flush, landing-neighborhood
+- [x] Add fast deposit regressions for 100 ms/dump-end cancellation, landing-neighborhood
   split, partial/full capacity, exact ledger pairing, approximate geometry
   bounds, rejection/reset/generation safety, one-pending-batch bounds,
   no-active-dump settle work, readiness deduplication, and re-excavation.
@@ -115,10 +115,10 @@
   - Diagnostics are implemented and covered headlessly; the one short
     Forward+ reproduction remains part of the D9 human gate.
 - [x] Enforce an initial effective full-dump threshold floor of `0.15`, validate
-  each contract opening normal/frame against the visible model, and remove the
-  SY135 negative-threshold path that admits horizontal/upward release. Preserve
-  atomic pending-batch debit/credit and valid releases admitted before a later
-  upward curl.
+  each contract opening normal points out of its cavity, and remove the SY135
+  negative-threshold path that admits horizontal/upward release. Preserve
+  atomic pending-batch debit/credit; an upward curl cancels any release that has
+  not crossed the commit boundary.
 - [x] Add fast per-model contract-derived up/horizontal/down regressions. Up and
   horizontal poses held across multiple batching deadlines must not change mass,
   revision, pending deposit count, or accepted event ID; down remains the
@@ -163,6 +163,27 @@
 - [ ] Record the calibrated threshold and accepted approximation, update the
   material-cycle spec if the executable contract changed, then commit and
   archive only after the human milestone passes.
+
+### Phase D10 - Retention correction and test capacity control
+
+- [x] Move the unlimited collection-capacity override into an Advanced-menu
+  test switch and default it off. Switching is non-destructive; restoring the
+  contract capacity rejects while retained mass exceeds that capacity.
+- [x] Decouple effective collection capacity from the contract-relative visual
+  fill ratio so unlimited testing still produces a readable contained fill.
+- [x] Require a continuously valid dump gate for 50 ms and cancel pending or
+  queued-but-uncommitted releases when the opening leaves the gate. Preserve
+  bucket mass, voxel revision, and accepted event identity on cancellation.
+- [x] Correct the hash-bound opening-normal sign for supported contracts using
+  the cavity-side invariant, and add focused capacity/cancellation regressions.
+  - 2026-09-04: voxel authority (`deposit 1.693 ms` in the focused sample),
+    material-field, release-presentation, and voxel-world integration tests
+    passed. A Godot AI MCP main-scene run confirmed the Advanced switch defaults
+    off, toggles live capacity `0.66 -> 1000 -> 0.66 m³`, and keeps visual
+    capacity at `0.66 m³`.
+- [ ] Human Forward+ check: confirm Advanced defaults off, toggle unlimited
+  collection on, scoop/curl/lift without leakage, then point the opening clearly
+  down long enough to produce a committed dump.
 
 If native deposition cannot meet the budget, keep authoritative dump disabled
 while optimizing; never fall back silently to visual-only piles or debit

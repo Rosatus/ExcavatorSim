@@ -64,9 +64,15 @@ func _check_default_hierarchy(ui: MotionOperatorUI) -> void:
 	if operation.text.is_empty() or "Bucket" not in bucket.text or warning.text.is_empty():
 		_fail("default HUD did not expose operation, bucket, and recovery state")
 	var advanced_toggle := ui.get_node("StatusPanel/Margin/VBox/Tools/Advanced") as CheckButton
+	var unlimited_bucket := ui.get_node_or_null(
+		"StatusPanel/Margin/VBox/AdvancedPanel/UnlimitedBucketCapacity"
+	) as CheckButton
+	if unlimited_bucket == null or unlimited_bucket.button_pressed:
+		_fail("unlimited bucket test control was missing or enabled by default")
 	advanced_toggle.button_pressed = true
 	var advanced_copy := _visible_label_copy(ui)
-	if not advanced.visible or "Gen:" not in advanced_copy:
+	if not advanced.visible or "Gen:" not in advanced_copy \
+			or unlimited_bucket == null or not unlimited_bucket.visible:
 		_fail("advanced diagnostics did not expose generation details on request")
 	if "Terrain: terrain3d -> terrain3d" not in advanced_copy \
 			or "Material: project_procedural_worksite_soil" not in advanced_copy:

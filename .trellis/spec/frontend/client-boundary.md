@@ -2565,9 +2565,11 @@ VoxelSoilMaterialField.stage_compaction(coordinates, compaction_delta_q) -> Dict
   overlying column to the initial soil surface to prevent unsupported voxel
   roofs; this intentionally prefers a clean 2.5D cut over tunnel preservation.
 - A developer-only capacity override may replace the effective voxel ledger
-  capacity at a clean authority generation boundary. It must be finite and
-  positive, must not mutate the hash-bound model contract, and status must
-  expose contract capacity, override provenance, and effective capacity.
+  capacity at initialization or through the Advanced test control. It must be
+  finite and positive and must not mutate the hash-bound model contract.
+  Collection headroom uses the effective capacity, while bucket fill
+  presentation remains relative to contract capacity. Restoring normal
+  capacity rejects if current mass would exceed it and never deletes soil.
 - Terrain3D remains hard-ground presentation outside the voxel zone. Its
   presentation domain must contain the complete half-open voxel X/Z ownership
   domain before applying the shared hole mask; no owned voxel cell may be
@@ -2583,10 +2585,20 @@ VoxelSoilMaterialField.stage_compaction(coordinates, compaction_delta_q) -> Dict
   same readiness ticket path. Visual mounds, dust, and clods consume committed
   transaction IDs only and never own material.
 - Runtime dump samples first enter one generation/epoch/landing-neighborhood
-  pending batch. Compatible samples coalesce for at most `100 ms`; leaving the
-  dump gate, reaching the reserved bucket remainder, or the deadline flushes
-  one immutable deposit proposal. Pending/queued mass is reserved but bucket
-  inventory is debited only after the native edit and material stage commit.
+  pending batch. Compatible samples coalesce for at most `100 ms`; reaching the
+  reserved bucket remainder or the deadline flushes one immutable deposit
+  proposal only while the gate remains active. Leaving the dump gate cancels
+  pending and queued-but-uncommitted deposits. Bucket inventory is debited only
+  after the native edit and material stage commit.
+- Full dump admission uses the hash-bound model opening normal and an effective
+  `opening_normal_world.dot(Vector3.DOWN)` threshold no lower than `0.15`.
+  Upward and horizontal openings may not release material. Admission requires
+  50 ms continuously inside the gate; leaving it before commit preserves
+  bucket mass and produces no accepted release event.
+- A pending release freezes its opening transform, normalized opening normal,
+  derived fall direction, admission tick, and fill ratio. The accepted deposit
+  publishes one immutable `voxel-soil-release-event-v1`; presentation must not
+  reconstruct the event from the later live bucket pose.
 - Product runtime deposit uses a bounded native `VoxelTool.MODE_ADD` path set
   (currently at most two paths) and sparse air-cell coverage. The accepted
   fixed-point mass transfer is exact, while mound shape and per-cell placement
@@ -2608,10 +2620,13 @@ VoxelSoilMaterialField.stage_compaction(coordinates, compaction_delta_q) -> Dict
   ownership. Collision remains derivative and may lag the visible SDF by the
   bounded engine rebuild interval.
 - `SoilEffects` polls complete soil snapshots at no more than `30 Hz`, rebuilds
-  the bucket fill surface at no more than `10 Hz` and only across `5%` fill
-  quanta, reuses one `ArrayMesh`, and manages hero clods through active/free
-  pools. Signals may trigger an immediate pull but reset the polling cadence so
-  the same change is not fetched twice in one interval.
+  a closed, cavity-bounded bucket fill volume at no more than `10 Hz` and only
+  across `5%` fill quanta, reuses one `ArrayMesh`, and manages hero clods through
+  active/free pools. Falling flow and clods consume committed release events
+  once and expire after a bounded visual TTL; `cut` may emit contact dust but
+  never falling soil or rigid clods. Signals may trigger an immediate pull but
+  reset the polling cadence so the same change is not fetched twice in one
+  interval.
 - Every mobile-soil operation has two independently checked conservation
   dimensions: fixed-point ledger mass and SDF-represented bulk volume at the
   operation's density/compaction. A zero ledger sum is insufficient if the SDF
@@ -2648,7 +2663,10 @@ VoxelSoilMaterialField.stage_compaction(coordinates, compaction_delta_q) -> Dict
   `pending_dump_mass_q`, `pending_dump_age_s`, `dump_batch_flush_count`,
   `dump_batch_coalesced_count`, `native_deposit_committed`,
   `readiness_coalesced`, `support_query_usec`, and `batch_wait_usec`. Visual
-  diagnostics expose snapshot pulls, fill rebuilds, cadences, and fill quantum.
+  diagnostics expose snapshot pulls, fill rebuilds, cadences, fill quantum,
+  active/last release event ID, and release age/TTL. Dump diagnostics also
+  expose live opening-down dot, contract/effective threshold, gate state,
+  accepted event, and the pending release's frozen transform/admission tick.
 - Authority performance diagnostics use fixed 64-sample windows and expose
   average/max/p95/p99 for proposal, commit/operation, coverage, material,
   native edit, digest, readiness issue, and status construction. Mesh-ready,
@@ -2670,6 +2688,8 @@ VoxelSoilMaterialField.stage_compaction(coordinates, compaction_delta_q) -> Dict
 - material/SDF mass outside tolerance -> `mass_discretization_tolerance`, no mutation
 - deposit outside editable mask/support -> `dump_out_of_zone` or
   `dump_support_unavailable`, no bucket debit and one rejection event
+- upward/horizontal or invalid opening normal -> no dump proposal, no pending
+  batch, revision, accepted event, or bucket-mass change
 - pending deposit cannot enter the bounded soil queue -> `soil_queue_full`,
   pending inventory remains owned by the bucket and no SDF edit occurs
 - pending/queued release already reserves all bucket mass ->
@@ -2726,15 +2746,17 @@ VoxelSoilMaterialField.stage_compaction(coordinates, compaction_delta_q) -> Dict
   native deposit preserves exact aggregate mass, idle frames do not move the
   mound, previously accounted stable cells never lose mass, and re-cut
   decreases mobile mass while increasing bucket mass.
-- Scheduling: assert the 100 ms deadline and dump-end flush, same-neighborhood
-  coalescing, no active settle frontier, duplicate/stale/weak track rejection,
-  and bounded deposit/compaction priority.
+- Scheduling: assert the 100 ms deadline, dump-end cancellation,
+  same-neighborhood coalescing, no active settle frontier,
+  duplicate/stale/weak track rejection, and bounded deposit/compaction priority.
 - Stable-ground admission: submit many valid voxel track receipts with no mobile
   soil and assert constant-time rejection, zero queued/accepted proposals, and
   unchanged data revision. Readiness tests must retain ready coverage outside a
   partially overlapping edit.
 - Presentation: assert accepted/rejected event IDs are consumed once and pooled
-  effects remain bounded, fill mesh identity is reused, 5%/10 Hz rebuild gates
+  effects remain bounded, delayed events retain their frozen release pose and
+  expire without replay, cuts emit no falling flow/clods, the closed fill stays
+  inside cavity bounds, fill mesh identity is reused, 5%/10 Hz rebuild gates
   hold, and clods recycle through the pool; human Forward+ owns
   pile/dump/traverse/re-dig visuals and perceived hitching.
 

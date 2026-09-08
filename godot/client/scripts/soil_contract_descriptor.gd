@@ -8,6 +8,7 @@ extends RefCounted
 const CATALOG_PATH := "res://resources/models/model_catalog.json"
 const SCHEMA_VERSION := "excavator-soil-contract-v1"
 const TOOL_SCHEMA_VERSION := "bucket-soil-tool-v1"
+const MIN_DUMP_OPENING_DOWN_DOT := 0.15
 const TOP_LEVEL_FIELDS := [
 	"schema_version", "model_id", "material_density_kg_m3",
 	"nominal_capacity_m3", "heaped_capacity_m3", "cell_grid",
@@ -65,6 +66,13 @@ static func from_dictionary_for_test(data: Dictionary) -> SoilContractDescriptor
 	var descriptor := SoilContractDescriptor.new()
 	descriptor._data = data.duplicate(true)
 	return descriptor
+
+
+static func effective_dump_opening_down_dot(interaction: Dictionary) -> float:
+	return maxf(
+		MIN_DUMP_OPENING_DOWN_DOT,
+		float(interaction.get("dump_opening_down_dot", MIN_DUMP_OPENING_DOWN_DOT)),
+	)
 
 
 func is_valid_for(model_id: String) -> bool:
@@ -125,8 +133,15 @@ func _validate_interaction(value: Variant) -> bool:
 	var dump: Variant = interaction.get("dump_opening_down_dot")
 	if not _finite_number(spill) or not _finite_number(dump):
 		return _reject("interaction.spill_opening_down_dot", "thresholds must be finite")
-	if float(spill) < -1.0 or float(dump) > 1.0 or float(spill) >= float(dump):
-		return _reject("interaction.spill_opening_down_dot", "must be below the bounded dump threshold")
+	if float(spill) < -1.0 or float(spill) > 1.0:
+		return _reject("interaction.spill_opening_down_dot", "must be within [-1, 1]")
+	if float(dump) < MIN_DUMP_OPENING_DOWN_DOT or float(dump) > 1.0:
+		return _reject(
+			"interaction.dump_opening_down_dot",
+			"must be within [%.2f, 1]" % MIN_DUMP_OPENING_DOWN_DOT,
+		)
+	if float(spill) >= float(dump):
+		return _reject("interaction.spill_opening_down_dot", "must be below the dump threshold")
 	return true
 
 
@@ -337,6 +352,13 @@ func _validate_geometry_consistency(regions: Dictionary) -> bool:
 	var proxy_normal := _vector3((proxies["opening"] as Dictionary)["normal_godot"])
 	if opening_normal.dot(proxy_normal) < 0.999:
 		return _reject("bucket_tool.regions.opening.outward_normal_godot", "must match the opening proxy orientation")
+	var opening_center := _vector3((proxies["opening"] as Dictionary)["center_godot"])
+	var cavity_center := _vector3((proxies["cavity"] as Dictionary)["center_godot"])
+	if (cavity_center - opening_center).dot(proxy_normal) >= -0.001:
+		return _reject(
+			"proxies.opening.normal_godot",
+			"must point out of the cavity rather than toward its center",
+		)
 	return true
 
 

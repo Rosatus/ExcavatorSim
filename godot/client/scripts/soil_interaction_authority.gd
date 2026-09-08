@@ -22,7 +22,7 @@ var bucket_capacity_m3 := 0.0
 var nominal_capacity_m3 := 0.0
 var material_density_kg_m3 := 1600.0
 var spill_opening_down_dot := 0.05
-var dump_opening_down_dot := 0.3
+var dump_opening_down_dot := SoilContractDescriptor.MIN_DUMP_OPENING_DOWN_DOT
 
 var _grid_dimensions := Vector3i.ONE
 var _cell_capacity_m3 := 0.0
@@ -73,13 +73,13 @@ func configure(
 	material_density_kg_m3 = float(contract.get("material_density_kg_m3", 0.0))
 	var interaction := contract.get("interaction", {}) as Dictionary
 	spill_opening_down_dot = float(interaction.get("spill_opening_down_dot", 0.05))
-	dump_opening_down_dot = float(interaction.get("dump_opening_down_dot", 0.3))
+	dump_opening_down_dot = SoilContractDescriptor.effective_dump_opening_down_dot(interaction)
 	if bucket_capacity_m3 <= EPSILON_M3 or nominal_capacity_m3 <= EPSILON_M3 or material_density_kg_m3 <= 0.0:
 		return false
 	if (
 		spill_opening_down_dot < -1.0
 		or spill_opening_down_dot > 1.0
-		or dump_opening_down_dot < -1.0
+		or dump_opening_down_dot < SoilContractDescriptor.MIN_DUMP_OPENING_DOWN_DOT
 		or dump_opening_down_dot > 1.0
 		or spill_opening_down_dot >= dump_opening_down_dot
 	):
@@ -105,7 +105,7 @@ func clear() -> void:
 	nominal_capacity_m3 = 0.0
 	material_density_kg_m3 = 1600.0
 	spill_opening_down_dot = 0.05
-	dump_opening_down_dot = 0.3
+	dump_opening_down_dot = SoilContractDescriptor.MIN_DUMP_OPENING_DOWN_DOT
 	_grid_dimensions = Vector3i.ONE
 	_cell_capacity_m3 = 0.0
 	_cell_fill = PackedFloat32Array()

@@ -38,6 +38,7 @@ const DEPOSIT_MIN_RADIUS_VOXELS := 1.0
 const DEPOSIT_MAX_RADIUS_VOXELS := 4.0
 const DEPOSIT_MAX_HEIGHT_VOXELS := 8.0
 const DUMP_BATCH_PERIOD_S := 0.1
+const DUMP_GATE_CONFIRMATION_S := 0.05
 const DUMP_LANDING_NEIGHBORHOOD_VOXELS := 4.0
 const MAX_CONSECUTIVE_DEPOSIT_COMMITS := 2
 const MAX_COMPACTION_SHAPES_PER_PROPOSAL := 32
@@ -113,8 +114,19 @@ var _readiness_timed_out := 0
 var _rejection_reasons: Dictionary = {}
 var _operation_counts: Dictionary = {"cut": 0, "deposit": 0, "settle": 0, "compact": 0}
 var _accepted_dump_event_id := ""
+var _accepted_dump_event: Dictionary = {}
 var _dump_release_world := Vector3.ZERO
 var _dump_released_fill_ratio := 0.0
+var _dump_pose_valid := false
+var _opening_down_dot := -1.0
+var _contract_dump_threshold := SoilContractDescriptor.MIN_DUMP_OPENING_DOWN_DOT
+var _effective_dump_threshold := SoilContractDescriptor.MIN_DUMP_OPENING_DOWN_DOT
+var _dump_gate_raw_active := false
+var _dump_gate_active := false
+var _dump_gate_hold_s := 0.0
+var _dump_cancelled_count := 0
+var _dump_cancelled_mass_q := 0
+var _last_dump_cancel_reason := ""
 var _rejected_dump_event_id := ""
 var _rejected_dump_world := Vector3.ZERO
 var _proposal_timing_usec := TimingWindow.new()
@@ -156,6 +168,12 @@ func configure(work_zone: VoxelWorkZone, contract: Dictionary, target_generation
 	generation = target_generation
 	configured = true
 	return true
+
+
+func set_bucket_capacity_override_for_testing(capacity_override_m3: float) -> Dictionary:
+	if not configured:
+		return {"accepted": false, "reason": "authority_unavailable"}
+	return material_field.set_bucket_capacity_override_for_testing(capacity_override_m3)
 
 
 func clear() -> void:
@@ -218,8 +236,19 @@ func clear() -> void:
 	_rejection_reasons.clear()
 	_operation_counts = {"cut": 0, "deposit": 0, "settle": 0, "compact": 0}
 	_accepted_dump_event_id = ""
+	_accepted_dump_event.clear()
 	_dump_release_world = Vector3.ZERO
 	_dump_released_fill_ratio = 0.0
+	_dump_pose_valid = false
+	_opening_down_dot = -1.0
+	_contract_dump_threshold = SoilContractDescriptor.MIN_DUMP_OPENING_DOWN_DOT
+	_effective_dump_threshold = SoilContractDescriptor.MIN_DUMP_OPENING_DOWN_DOT
+	_dump_gate_raw_active = false
+	_dump_gate_active = false
+	_dump_gate_hold_s = 0.0
+	_dump_cancelled_count = 0
+	_dump_cancelled_mass_q = 0
+	_last_dump_cancel_reason = ""
 	_rejected_dump_event_id = ""
 	_rejected_dump_world = Vector3.ZERO
 	_reset_timing_telemetry()
@@ -242,6 +271,9 @@ func submit_pose(pose_snapshot: Dictionary, identity: Dictionary, delta_s: float
 	_last_submitted_tick = tick
 	_last_submitted_motion_sequence = motion_sequence
 	_next_sequence = maxi(_next_sequence, motion_sequence + 1)
+	_update_dump_gate_diagnostics(pose_snapshot, delta_s)
+	if not _dump_gate_raw_active:
+		_cancel_uncommitted_dumps("dump_gate_closed_before_commit")
 	var proposal_started_usec := Time.get_ticks_usec()
 	var dump_result := _build_dump_proposal(pose_snapshot, identity, delta_s)
 	if bool(dump_result.get("attempted", false)):
@@ -252,10 +284,7 @@ func submit_pose(pose_snapshot: Dictionary, identity: Dictionary, delta_s: float
 		)
 		_engaged = false
 		if not bool(dump_result.get("accepted", false)):
-			# A previously accepted in-zone release remains valid even if the
-			# opening subsequently leaves the dump gate. Queue it before reporting
-			# the current rejected sample; neither path debits inventory here.
-			_flush_pending_dump_to_queue()
+			_cancel_uncommitted_dumps("dump_admission_invalid_before_commit")
 			var dump_reason := String(dump_result.get("reason", "dump_rejected"))
 			_record_rejected_dump(dump_reason, dump_result.get("release_world", Vector3.ZERO) as Vector3, identity)
 			return _reject_submission(dump_reason)
@@ -280,17 +309,6 @@ func submit_pose(pose_snapshot: Dictionary, identity: Dictionary, delta_s: float
 			"input_hash": dump_proposal.input_hash,
 			"queue_depth": _queue.size() + _soil_queue.size(),
 			"pending_dump": _pending_dump != null,
-		}
-	if _pending_dump != null:
-		_engaged = false
-		if not _flush_pending_dump_to_queue():
-			return _reject_submission("soil_queue_full")
-		return {
-			"accepted": true,
-			"reason": "dump_end_flushed",
-			"operation": "dump",
-			"queue_depth": _queue.size() + _soil_queue.size(),
-			"pending_dump": false,
 		}
 	proposal_started_usec = Time.get_ticks_usec()
 	var result := cutter.build_proposal(
@@ -429,9 +447,15 @@ func get_status_snapshot() -> Dictionary:
 		"pending_dump_count": 1 if _pending_dump != null else 0,
 		"pending_dump_mass_q": _pending_dump.requested_mass_q if _pending_dump != null else 0,
 		"pending_dump_age_s": _pending_dump_elapsed_s if _pending_dump != null else 0.0,
+		"pending_dump_release_transform_world": _pending_dump.release_transform_world if _pending_dump != null else Transform3D.IDENTITY,
+		"pending_dump_admission_tick": _pending_dump.admission_tick if _pending_dump != null else -1,
 		"dump_batch_period_s": DUMP_BATCH_PERIOD_S,
+		"dump_gate_confirmation_s": DUMP_GATE_CONFIRMATION_S,
 		"dump_batch_flush_count": _dump_batch_flush_count,
 		"dump_batch_coalesced_count": _dump_batch_coalesced_count,
+		"dump_cancelled_count": _dump_cancelled_count,
+		"dump_cancelled_mass_q": _dump_cancelled_mass_q,
+		"last_dump_cancel_reason": _last_dump_cancel_reason,
 		"compaction_queue_depth": _soil_operation_queue_depth("compact"),
 		"dump_admission_policy": "evict_pending_compaction_when_full",
 		"peak_queue_depth": _peak_queue_depth,
@@ -470,8 +494,16 @@ func get_status_snapshot() -> Dictionary:
 		"rejection_reasons": _rejection_reasons.duplicate(true),
 		"operation_counts": _operation_counts.duplicate(true),
 		"accepted_dump_event_id": _accepted_dump_event_id,
+		"accepted_dump_event": _accepted_dump_event.duplicate(true),
 		"dump_release_world": _dump_release_world,
 		"dump_released_fill_ratio": _dump_released_fill_ratio,
+		"dump_pose_valid": _dump_pose_valid,
+		"opening_down_dot": _opening_down_dot,
+		"contract_dump_threshold": _contract_dump_threshold,
+		"effective_dump_threshold": _effective_dump_threshold,
+		"dump_gate_raw_active": _dump_gate_raw_active,
+		"dump_gate_active": _dump_gate_active,
+		"dump_gate_hold_s": _dump_gate_hold_s,
 		"rejected_dump_event_id": _rejected_dump_event_id,
 		"rejected_dump_world": _rejected_dump_world,
 		"journal_size": _journal.size(),
@@ -703,6 +735,29 @@ func _flush_pending_dump_to_queue() -> bool:
 	return true
 
 
+func _cancel_uncommitted_dumps(reason: String) -> int:
+	var cancelled_count := 0
+	var cancelled_mass_q := 0
+	if _pending_dump != null:
+		cancelled_count += 1
+		cancelled_mass_q += _pending_dump.requested_mass_q
+		_pending_dump = null
+		_pending_dump_elapsed_s = 0.0
+		_pending_dump_key = ""
+	for index in range(_soil_queue.size() - 1, -1, -1):
+		if _soil_queue[index].operation != "deposit":
+			continue
+		cancelled_count += 1
+		cancelled_mass_q += _soil_queue[index].requested_mass_q
+		_soil_queue.remove_at(index)
+	if cancelled_count > 0:
+		_dump_cancelled_count += cancelled_count
+		_dump_cancelled_mass_q += cancelled_mass_q
+		_last_dump_cancel_reason = reason
+		_consecutive_deposit_commits = 0
+	return cancelled_count
+
+
 func _queued_deposit_mass_q() -> int:
 	var total := 0
 	for proposal in _soil_queue:
@@ -752,6 +807,10 @@ func _resized_dump_proposal(
 		"release_world": base.release_world,
 		"deposit_world": shape_data.get("deposit_world", support_world) as Vector3,
 		"release_fill_ratio": base.release_fill_ratio,
+		"release_transform_world": base.release_transform_world,
+		"release_normal_world": base.release_normal_world,
+		"release_direction_world": base.release_direction_world,
+		"admission_tick": base.admission_tick,
 		"support_query_usec": base.support_query_usec,
 		"batch_wait_usec": batch_wait_usec,
 		"quality_flags": flags,
@@ -824,6 +883,10 @@ func _coalesce_or_enqueue_soil(proposal: VoxelSoilOperationProposal) -> bool:
 				"release_world": proposal.release_world,
 				"deposit_world": proposal.deposit_world,
 				"release_fill_ratio": proposal.release_fill_ratio,
+				"release_transform_world": proposal.release_transform_world,
+				"release_normal_world": proposal.release_normal_world,
+				"release_direction_world": proposal.release_direction_world,
+				"admission_tick": proposal.admission_tick,
 				"quality_flags": pending.quality_flags + proposal.quality_flags + ["coalesced"],
 			})
 			_coalesced_count += 1
@@ -1165,18 +1228,51 @@ func submit_track_compaction(chassis_status: Dictionary) -> Dictionary:
 	return {"accepted": true, "reason": "compaction_queued", "queue_depth": _queue.size() + _soil_queue.size()}
 
 
+func _update_dump_gate_diagnostics(pose_snapshot: Dictionary, delta_s: float) -> void:
+	_dump_pose_valid = bool(pose_snapshot.get("valid", false))
+	var contract := pose_snapshot.get("contract", {}) as Dictionary
+	var interaction := contract.get("interaction", {}) as Dictionary
+	_contract_dump_threshold = float(interaction.get(
+		"dump_opening_down_dot",
+		SoilContractDescriptor.MIN_DUMP_OPENING_DOWN_DOT,
+	))
+	_effective_dump_threshold = SoilContractDescriptor.effective_dump_opening_down_dot(interaction)
+	var opening_normal := pose_snapshot.get("opening_normal_world", Vector3.UP) as Vector3
+	if not _dump_pose_valid or not opening_normal.is_finite() or opening_normal.length_squared() < 0.99:
+		_opening_down_dot = -1.0
+		_dump_gate_raw_active = false
+		_dump_gate_active = false
+		_dump_gate_hold_s = 0.0
+		return
+	_opening_down_dot = opening_normal.normalized().dot(Vector3.DOWN)
+	_dump_gate_raw_active = _opening_down_dot >= _effective_dump_threshold
+	if _dump_gate_raw_active:
+		_dump_gate_hold_s = minf(
+			DUMP_GATE_CONFIRMATION_S,
+			_dump_gate_hold_s + clampf(delta_s, 0.0, DUMP_BATCH_PERIOD_S),
+		)
+	else:
+		_dump_gate_hold_s = 0.0
+	_dump_gate_active = _dump_gate_raw_active \
+		and _dump_gate_hold_s + 0.000001 >= DUMP_GATE_CONFIRMATION_S
+
+
 func _build_dump_proposal(pose_snapshot: Dictionary, identity: Dictionary, delta_s: float) -> Dictionary:
 	if material_field.bucket_mass_q <= 0 or not bool(pose_snapshot.get("valid", false)):
 		return {"attempted": false}
 	var contract := pose_snapshot.get("contract", {}) as Dictionary
-	var interaction := contract.get("interaction", {}) as Dictionary
-	var opening_down_dot := (pose_snapshot.get("opening_normal_world", Vector3.UP) as Vector3).dot(Vector3.DOWN)
-	var dump_threshold := float(interaction.get("dump_opening_down_dot", 1.0))
-	if opening_down_dot < dump_threshold:
+	var opening_normal := pose_snapshot.get("opening_normal_world", Vector3.UP) as Vector3
+	if not opening_normal.is_finite() or opening_normal.length_squared() < 0.99:
+		return {"attempted": false}
+	opening_normal = opening_normal.normalized()
+	var opening_down_dot := opening_normal.dot(Vector3.DOWN)
+	var dump_threshold := _effective_dump_threshold
+	if not _dump_gate_active:
 		return {"attempted": false}
 	var current := pose_snapshot.get("current", {}) as Dictionary
 	var opening := current.get("opening", Transform3D.IDENTITY) as Transform3D
 	var release_world := opening.origin
+	var release_direction := (opening_normal * 0.65 + Vector3.DOWN * 0.85).normalized()
 	if not WorkZoneConfig.is_world_position_editable(release_world, _work_zone.voxel_scale_m):
 		return {"attempted": true, "accepted": false, "reason": "dump_out_of_zone", "release_world": release_world}
 	var support_started_usec := Time.get_ticks_usec()
@@ -1216,11 +1312,36 @@ func _build_dump_proposal(pose_snapshot: Dictionary, identity: Dictionary, delta
 		"requested_mass_q": requested_mass_q,
 		"release_world": release_world,
 		"deposit_world": deposit_world,
-		"release_fill_ratio": float(material_field.bucket_mass_q) / float(material_field.bucket_capacity_mass_q),
+		"release_fill_ratio": clampf(material_field.visual_fill_ratio(), 0.0, 1.0),
+		"release_transform_world": opening,
+		"release_normal_world": opening_normal,
+		"release_direction_world": release_direction,
+		"admission_tick": int(identity.get("physics_tick", -1)),
 		"support_query_usec": support_query_usec,
 		"quality_flags": ["opening_validated", "sdf_support", "loose_density", "native_repose_profile"],
 	})
 	return {"attempted": true, "accepted": proposal.is_valid(), "reason": "accepted", "proposal": proposal, "release_world": release_world}
+
+
+func _publish_accepted_dump_event(transaction: VoxelCutTransaction) -> void:
+	_accepted_dump_event_id = transaction.transaction_id
+	_dump_release_world = transaction.release_world
+	_dump_released_fill_ratio = transaction.release_fill_ratio
+	_accepted_dump_event = {
+		"schema_version": "voxel-soil-release-event-v1",
+		"event_id": transaction.transaction_id,
+		"transaction_id": transaction.transaction_id,
+		"generation": transaction.generation,
+		"revision": transaction.revision,
+		"admission_tick": transaction.admission_tick,
+		"accepted_volume_m3": transaction.accepted_volume_m3,
+		"accepted_mass_q": transaction.accepted_mass_q,
+		"release_transform_world": transaction.release_transform_world,
+		"release_world": transaction.release_world,
+		"opening_normal_world": transaction.release_normal_world,
+		"direction_world": transaction.release_direction_world,
+		"fill_ratio": transaction.release_fill_ratio,
+	}
 
 
 func _find_sdf_support_world(world_position: Vector3) -> Dictionary:
@@ -1254,10 +1375,16 @@ func _commit_soil_proposal(proposal: VoxelSoilOperationProposal) -> VoxelCutTran
 	transaction.release_world = proposal.release_world
 	transaction.deposit_world = proposal.deposit_world
 	transaction.release_fill_ratio = proposal.release_fill_ratio
+	transaction.release_transform_world = proposal.release_transform_world
+	transaction.release_normal_world = proposal.release_normal_world
+	transaction.release_direction_world = proposal.release_direction_world
+	transaction.admission_tick = proposal.admission_tick
 	transaction.support_query_usec = proposal.support_query_usec
 	transaction.batch_wait_usec = proposal.batch_wait_usec
 	if proposal.generation != generation or proposal.model_id != model_id or proposal.tool_hash != tool_hash:
 		return _reject_transaction(transaction, "stale_or_wrong_tool", started)
+	if proposal.operation == "deposit" and not _dump_gate_active:
+		return _reject_transaction(transaction, "dump_gate_closed_before_commit", started)
 	if proposal.operation == "deposit" and material_field.bucket_mass_q <= 0:
 		return _reject_transaction(transaction, "bucket_empty", started)
 	if proposal.operation == "deposit" and not proposal.quality_flags.has("exact_sdf_diagnostic"):
@@ -1448,9 +1575,7 @@ func _commit_soil_proposal(proposal: VoxelSoilOperationProposal) -> VoxelCutTran
 	if proposal.operation in ["deposit", "settle"]:
 		_enqueue_settle_cells(affected_cells)
 	if proposal.operation == "deposit":
-		_accepted_dump_event_id = transaction.transaction_id
-		_dump_release_world = proposal.release_world
-		_dump_released_fill_ratio = proposal.release_fill_ratio
+		_publish_accepted_dump_event(transaction)
 	var readiness_started := Time.get_ticks_usec()
 	var expected_support := _find_sdf_support_world(proposal.deposit_world)
 	_issue_readiness_work(
@@ -1567,9 +1692,7 @@ func _commit_native_deposit_proposal(
 	_operation_counts["deposit"] = int(_operation_counts.get("deposit", 0)) + 1
 	_affected_samples_total += transaction.affected_samples
 	_affected_cells_total += transaction.affected_cells
-	_accepted_dump_event_id = transaction.transaction_id
-	_dump_release_world = proposal.release_world
-	_dump_released_fill_ratio = proposal.release_fill_ratio
+	_publish_accepted_dump_event(transaction)
 	phase_started_usec = Time.get_ticks_usec()
 	_issue_readiness_work(
 		edit_area,

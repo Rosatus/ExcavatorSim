@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/godot-mcp.md","reason":"Check that workbench MCP operations target a separate session and GLB source/import integrity is preserved."}
+{"file":".trellis/spec/frontend/validation-budget.md","reason":"Check only focused parser/import/terrain-boundary evidence is automated and subjective visual acceptance remains human-owned."}
+{"file":".trellis/tasks/09-04-earthworks-construction-site-worldbuilding/research/local-evidence.md","reason":"Check changed-path isolation and selected asset hashes against the recorded local facts."}
+{"file":".trellis/tasks/09-04-earthworks-construction-site-worldbuilding/research/terrain-tooling.md","reason":"Check finite VoxelTerrain, block alignment, complete Terrain3D region exclusion, and the 4.7 compatibility canary."}

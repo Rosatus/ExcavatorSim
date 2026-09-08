@@ -195,7 +195,7 @@ func _classify_region(
 		role_scope = "active"
 	elif active_roles.has("dump") and fill_ratio > 0.000001:
 		var opening_down_dot := outward.dot(Vector3.DOWN)
-		var dump_threshold := float(interaction.get("dump_opening_down_dot", 0.3))
+		var dump_threshold := SoilContractDescriptor.effective_dump_opening_down_dot(interaction)
 		var spill_threshold := float(interaction.get("spill_opening_down_dot", dump_threshold - 0.25))
 		if opening_down_dot > dump_threshold:
 			classification = "dump"

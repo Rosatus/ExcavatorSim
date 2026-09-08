@@ -60,6 +60,42 @@ func remaining_capacity_mass_q() -> int:
 	return maxi(0, bucket_capacity_mass_q - bucket_mass_q)
 
 
+func visual_fill_ratio() -> float:
+	var visual_capacity_mass_q := _mass_q(contract_bucket_capacity_m3)
+	return (
+		float(bucket_mass_q) / float(visual_capacity_mass_q)
+		if visual_capacity_mass_q > 0
+		else 0.0
+	)
+
+
+func set_bucket_capacity_override_for_testing(capacity_override_m3: float) -> Dictionary:
+	if generation < 0 or not is_finite(capacity_override_m3) or capacity_override_m3 < 0.0:
+		return {"accepted": false, "reason": "invalid_capacity_override"}
+	var override_valid := capacity_override_m3 > 0.0
+	var next_capacity_m3 := capacity_override_m3 if override_valid else contract_bucket_capacity_m3
+	var next_capacity_mass_q := _mass_q(next_capacity_m3)
+	if next_capacity_mass_q <= 0:
+		return {"accepted": false, "reason": "invalid_capacity_override"}
+	if bucket_mass_q > next_capacity_mass_q:
+		return {
+			"accepted": false,
+			"reason": "bucket_mass_exceeds_requested_capacity",
+			"bucket_mass_q": bucket_mass_q,
+			"requested_capacity_mass_q": next_capacity_mass_q,
+		}
+	bucket_capacity_override_m3 = capacity_override_m3 if override_valid else 0.0
+	bucket_capacity_m3 = next_capacity_m3
+	bucket_capacity_mass_q = next_capacity_mass_q
+	return {
+		"accepted": true,
+		"reason": "capacity_override_updated",
+		"bucket_capacity_overridden": override_valid,
+		"bucket_capacity_m3": bucket_capacity_m3,
+		"bucket_capacity_mass_q": bucket_capacity_mass_q,
+	}
+
+
 func mass_q_for_volume(volume_m3: float) -> int:
 	return _mass_q(volume_m3)
 
@@ -515,7 +551,12 @@ func cell_snapshot(coordinate: Vector3i) -> Dictionary:
 
 
 func get_status_snapshot(cell_grid: Array = [1, 1, 1], center_of_mass_local: Vector3 = Vector3.ZERO) -> Dictionary:
-	var fill_ratio := float(bucket_mass_q) / float(bucket_capacity_mass_q) if bucket_capacity_mass_q > 0 else 0.0
+	var collection_fill_ratio := (
+		float(bucket_mass_q) / float(bucket_capacity_mass_q)
+		if bucket_capacity_mass_q > 0
+		else 0.0
+	)
+	var fill_ratio := visual_fill_ratio()
 	var profile_size := 1
 	for value in cell_grid:
 		profile_size *= maxi(1, int(value))
@@ -531,6 +572,8 @@ func get_status_snapshot(cell_grid: Array = [1, 1, 1], center_of_mass_local: Vec
 		"bucket_capacity_overridden": bucket_capacity_override_m3 > 0.0,
 		"bucket_capacity_m3": bucket_capacity_m3,
 		"bucket_capacity_mass_q": bucket_capacity_mass_q,
+		"visual_bucket_capacity_m3": contract_bucket_capacity_m3,
+		"collection_fill_ratio": collection_fill_ratio,
 		"bucket_mass_q": bucket_mass_q,
 		"bucket_volume_m3": volume_for_mass_q(bucket_mass_q),
 		"payload_mass_kg": float(bucket_mass_q) / float(MASS_Q_PER_KG),
