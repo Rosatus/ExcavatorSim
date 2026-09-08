@@ -54,6 +54,7 @@ try {
         "voxel_cut_queue_order_test.gd",
         "voxel_soil_material_field_test.gd",
         "voxel_excavation_authority_test.gd",
+        "voxel_cutting_performance_test.gd",
         "soil_effects_visual_mound_test.gd",
         "soil_authority_migration_test.gd",
         "voxel_excavation_world_test.gd"

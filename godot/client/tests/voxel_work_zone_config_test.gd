@@ -51,6 +51,7 @@ func _check_config(failures: Array[String]) -> void:
 
 func _check_readiness(failures: Array[String]) -> void:
 	var readiness := VoxelCollisionReadiness.new()
+	readiness.set_diagnostics_enabled(true)
 	var first := readiness.issue(AABB(Vector3.ZERO, Vector3.ONE * 16.0), &"initial")
 	_expect(not readiness.is_ready(first), "new ticket starts pending", failures)
 	_expect(not readiness.acknowledge_query(first), "query cannot precede mesh", failures)

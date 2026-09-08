@@ -62,6 +62,7 @@ var _ignore_quality_toggle := false
 @onready var _gateway_host_edit: LineEdit = $StatusPanel/Margin/VBox/AdvancedPanel/GatewayHost
 @onready var _gateway_port_edit: LineEdit = $StatusPanel/Margin/VBox/AdvancedPanel/GatewayPort
 @onready var _unlimited_bucket_button: CheckButton = $StatusPanel/Margin/VBox/AdvancedPanel/UnlimitedBucketCapacity
+@onready var _cutting_diagnostics_button: CheckButton = $StatusPanel/Margin/VBox/AdvancedPanel/CuttingDiagnostics
 
 const GATEWAY_CONFIG_PATH := "user://ict_config.cfg"
 @onready var _bucket_volume_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/BucketVolume
@@ -105,6 +106,7 @@ func _ready() -> void:
 	_test_graphics_button.toggled.connect(_on_test_graphics_toggled)
 	_bucket_passthrough_button.toggled.connect(_on_bucket_passthrough_toggled)
 	_unlimited_bucket_button.toggled.connect(_on_unlimited_bucket_toggled)
+	_cutting_diagnostics_button.toggled.connect(_on_cutting_diagnostics_toggled)
 	_can_output_button.pressed.connect(_on_can_output_pressed)
 	_gateway_button.pressed.connect(_on_gateway_restart_pressed)
 	_timed_can_button.pressed.connect(_on_timed_can_pressed)
@@ -152,6 +154,7 @@ func _apply_static_copy() -> void:
 	_test_graphics_button.tooltip_text = "Use an untextured black/white terrain grid and hide site dressing."
 	_bucket_passthrough_button.tooltip_text = "Let the bucket pass through terrain. Entering or leaving clears bucket soil and pending soil work."
 	_unlimited_bucket_button.tooltip_text = "Testing only: raise collection capacity while keeping the visible full-bucket level at the model contract capacity."
+	_cutting_diagnostics_button.tooltip_text = "按需采集切削耗时与地形统计；关闭可减少开销。重新开启将清空旧计时样本，不影响地形和斗内土量。"
 	_guide_title_label.text = UIStrings.GUIDE_TITLE
 	_guide_intro_label.text = UIStrings.GUIDE_INTRO
 	_guide_recovery_label.text = UIStrings.GUIDE_RECOVERY
@@ -211,6 +214,19 @@ func _on_unlimited_bucket_toggled(enabled: bool) -> void:
 				if reason == "bucket_mass_exceeds_requested_capacity"
 				else "Unlimited bucket test mode is unavailable: %s" % reason
 			)
+
+
+func _on_cutting_diagnostics_toggled(enabled: bool) -> void:
+	if _excavation_world != null:
+		_excavation_world.set_voxel_diagnostics_enabled(enabled)
+	_sync_cutting_diagnostics_toggle()
+
+
+func _sync_cutting_diagnostics_toggle() -> void:
+	_cutting_diagnostics_button.disabled = _excavation_world == null
+	_cutting_diagnostics_button.set_pressed_no_signal(
+		_excavation_world != null and _excavation_world.voxel_diagnostics_enabled
+	)
 
 
 func _sync_test_graphics_toggle() -> void:
@@ -641,6 +657,7 @@ func _on_excavation_changed(_status: Dictionary) -> void:
 	_refresh_soil()
 	_refresh_camera_selector()
 	_sync_unlimited_bucket_toggle()
+	_sync_cutting_diagnostics_toggle()
 
 
 func _refresh() -> void:
@@ -674,6 +691,7 @@ func _refresh() -> void:
 	_refresh_model_selector()
 	_sync_bucket_passthrough_toggle()
 	_sync_unlimited_bucket_toggle()
+	_sync_cutting_diagnostics_toggle()
 
 
 func _terrain_diagnostics_text() -> String:

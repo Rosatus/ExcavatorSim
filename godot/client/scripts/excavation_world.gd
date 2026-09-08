@@ -21,6 +21,7 @@ const TEST_BUCKET_CAPACITY_M3 := 1000.0
 @export var soil_tool_shadow_enabled := false
 @export var active_soil_patch_prototype_enabled := false
 @export var voxel_unlimited_bucket_for_testing := false
+@export var voxel_diagnostics_enabled := false
 @export_enum("loose", "compact", "sand", "damp") var active_soil_material_preset := "loose"
 @export_enum("legacy", "shadow", "active_patch", "voxel") var soil_material_lifecycle_mode := "active_patch"
 ## Keep the existing product writer selected until the v2 release candidate has
@@ -356,6 +357,15 @@ func set_backend_feedback_enabled(value: bool) -> void:
 		_motion_client.clear_bucket_load_feedback()
 
 
+func set_voxel_diagnostics_enabled(enabled: bool) -> void:
+	voxel_diagnostics_enabled = enabled
+	if _voxel_authority != null:
+		_voxel_authority.set_diagnostics_enabled(enabled)
+	elif voxel_work_zone != null:
+		voxel_work_zone.readiness.set_diagnostics_enabled(enabled)
+	excavation_changed.emit(get_status_snapshot())
+
+
 func set_soil_tool_shadow_enabled(value: bool) -> void:
 	soil_tool_shadow_enabled = value
 	if not value:
@@ -426,6 +436,7 @@ func get_status_snapshot() -> Dictionary:
 	status["soil_surface_solver_mode"] = _selected_soil_solver_mode()
 	status["requested_soil_surface_solver_mode"] = soil_surface_solver_mode
 	status["voxel_unlimited_bucket_for_testing"] = voxel_unlimited_bucket_for_testing
+	status["voxel_diagnostics_enabled"] = voxel_diagnostics_enabled
 	status["voxel_unlimited_bucket_toggle_available"] = can_set_voxel_unlimited_bucket_for_testing()
 	status["voxel_capacity_override_error"] = _last_voxel_capacity_override_error
 	status["soil_authority_mode"] = (
@@ -629,7 +640,7 @@ func get_soil_visual_snapshot() -> Dictionary:
 	var status := get_selected_soil_payload_snapshot()
 	var lifecycle_shadow := _soil_interaction_authority.get_status_snapshot() if _soil_interaction_authority != null else {}
 	var arcade_status := _arcade_stamp.get_status_snapshot() if _arcade_stamp != null else {}
-	var voxel_status := _voxel_authority.get_status_snapshot() if _voxel_authority != null else {}
+	var voxel_status := _voxel_authority.get_visual_snapshot() if _voxel_authority != null else {}
 	var chassis_status := _tracked_chassis_controller.get_status_snapshot() if _tracked_chassis_controller != null else {}
 	var visual_source := voxel_status if _selected_soil_mode() == "voxel" else (arcade_status if _is_arcade_stamp_selected() else lifecycle_shadow)
 	var last_transaction := visual_source.get("last_transaction", {}) as Dictionary
@@ -651,9 +662,10 @@ func get_soil_visual_snapshot() -> Dictionary:
 		"interaction_operation": String(_last_interaction_batch.get("operation", _last_interaction)),
 		"interaction_penetration_m": float(_last_interaction_batch.get("analytic_penetration_m", 0.0)),
 		"transaction_queued": bool(_last_interaction_batch.get("transaction_queued", false)),
-		"last_transaction": last_transaction.duplicate(true),
+		"last_transaction": last_transaction if _selected_soil_mode() == "voxel" else last_transaction.duplicate(true),
 		"accepted_dump_event_id": String(visual_source.get("accepted_dump_event_id", "")),
-		"accepted_dump_event": (visual_source.get("accepted_dump_event", {}) as Dictionary).duplicate(true),
+		"accepted_dump_event": visual_source.get("accepted_dump_event", {}) if _selected_soil_mode() == "voxel" \
+			else (visual_source.get("accepted_dump_event", {}) as Dictionary).duplicate(true),
 		"dump_release_world": visual_source.get("dump_release_world", Vector3.ZERO),
 		"dump_released_fill_ratio": float(visual_source.get("dump_released_fill_ratio", 0.0)),
 		"dump_pose_valid": bool(visual_source.get("dump_pose_valid", false)),
@@ -1649,6 +1661,7 @@ func _ensure_voxel_authority() -> bool:
 		return false
 	_reset_voxel_authority()
 	_voxel_authority = VoxelAuthority.new()
+	_voxel_authority.set_diagnostics_enabled(voxel_diagnostics_enabled)
 	var capacity_override := TEST_BUCKET_CAPACITY_M3 if voxel_unlimited_bucket_for_testing else 0.0
 	return _voxel_authority.configure(
 		voxel_work_zone,

@@ -564,6 +564,10 @@ placeholder_text = "Gateway TCP 端口，默认 5678"
 layout_mode = 2
 text = "无限收集斗容（测试）"
 
+[node name="CuttingDiagnostics" type="CheckButton" parent="OperatorUI/StatusPanel/Margin/VBox/AdvancedPanel" unique_id=2088439654]
+layout_mode = 2
+text = "切削性能诊断"
+
 [node name="BucketVolume" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox/AdvancedPanel" unique_id=2114908316]
 layout_mode = 2
 theme_override_font_sizes/font_size = 12

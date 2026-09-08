@@ -11,6 +11,8 @@ const MAX_COMPLETED_TICKET_RECEIPTS := 256
 
 var generation := 0
 var revision := 0
+var diagnostics_enabled := false
+var _diagnostic_epoch := 0
 var _next_ticket_id := 1
 var _tickets: Dictionary = {}
 var _ticket_order: Array[int] = []
@@ -20,6 +22,16 @@ var _collision_latency_usec := TimingWindow.new()
 var _end_to_end_latency_usec := TimingWindow.new()
 var _last_acknowledged_revision := 0
 var _last_acknowledged_usec := 0
+
+
+func set_diagnostics_enabled(enabled: bool) -> void:
+	if diagnostics_enabled == enabled:
+		return
+	diagnostics_enabled = enabled
+	_diagnostic_epoch += 1
+	_mesh_latency_usec.clear()
+	_collision_latency_usec.clear()
+	_end_to_end_latency_usec.clear()
 
 
 func reset() -> void:
@@ -42,6 +54,7 @@ func issue(area_voxels: AABB, purpose: StringName) -> Dictionary:
 	var issued_usec := Time.get_ticks_usec()
 	var block_keys := WorkZoneConfig.mesh_block_keys_for_area(area_voxels)
 	var ticket := {
+		"diagnostic_epoch": _diagnostic_epoch if diagnostics_enabled else -1,
 		"ticket_id": ticket_id,
 		"generation": generation,
 		"revision": revision,
@@ -103,7 +116,8 @@ func mark_meshed(ticket: Dictionary) -> bool:
 	current["meshed"] = true
 	if int(current["meshed_usec"]) == 0:
 		current["meshed_usec"] = now_usec
-		_mesh_latency_usec.record(now_usec - int(current.get("issued_usec", now_usec)))
+		if diagnostics_enabled and int(current.get("diagnostic_epoch", -1)) == _diagnostic_epoch:
+			_mesh_latency_usec.record(now_usec - int(current.get("issued_usec", now_usec)))
 	for block_key in current.get("block_keys", PackedStringArray()) as PackedStringArray:
 		var block_value: Variant = _blocks.get(block_key)
 		if block_value is Dictionary:
@@ -121,8 +135,9 @@ func acknowledge_query(ticket: Dictionary) -> bool:
 	var now_usec := Time.get_ticks_usec()
 	current["query_acknowledged"] = true
 	current["ready_usec"] = now_usec
-	_collision_latency_usec.record(now_usec - int(current.get("meshed_usec", now_usec)))
-	_end_to_end_latency_usec.record(now_usec - int(current.get("issued_usec", now_usec)))
+	if diagnostics_enabled and int(current.get("diagnostic_epoch", -1)) == _diagnostic_epoch:
+		_collision_latency_usec.record(now_usec - int(current.get("meshed_usec", now_usec)))
+		_end_to_end_latency_usec.record(now_usec - int(current.get("issued_usec", now_usec)))
 	_last_acknowledged_revision = int(current.get("revision", 0))
 	_last_acknowledged_usec = now_usec
 	for block_key in current.get("block_keys", PackedStringArray()) as PackedStringArray:
@@ -228,6 +243,7 @@ func get_status_snapshot() -> Dictionary:
 	return {
 		"generation": generation,
 		"revision": revision,
+		"diagnostics_enabled": diagnostics_enabled,
 		"canonical_block_count": _blocks.size(),
 		"pending_block_count": pending_blocks,
 		"meshed_block_count": meshed_blocks,
@@ -237,9 +253,9 @@ func get_status_snapshot() -> Dictionary:
 		"ticket_receipt_count": _tickets.size(),
 		"last_acknowledged_revision": _last_acknowledged_revision,
 		"last_acknowledged_usec": _last_acknowledged_usec,
-		"mesh_latency_usec": _mesh_latency_usec.snapshot(),
-		"collision_latency_usec": _collision_latency_usec.snapshot(),
-		"end_to_end_latency_usec": _end_to_end_latency_usec.snapshot(),
+		"mesh_latency_usec": _mesh_latency_usec.snapshot() if diagnostics_enabled else {},
+		"collision_latency_usec": _collision_latency_usec.snapshot() if diagnostics_enabled else {},
+		"end_to_end_latency_usec": _end_to_end_latency_usec.snapshot() if diagnostics_enabled else {},
 	}
 
 

@@ -192,6 +192,7 @@ func _check_commit_contract(zone: VoxelWorkZone, failures: Array[String]) -> voi
 		return
 	var contract := descriptor.to_dictionary()
 	var authority := Authority.new()
+	authority.set_diagnostics_enabled(true)
 	var generation := zone.readiness.generation
 	_expect(authority.configure(zone, contract, generation), "authority configures", failures)
 	if not authority.configured:
@@ -204,7 +205,7 @@ func _check_commit_contract(zone: VoxelWorkZone, failures: Array[String]) -> voi
 	_expect(bool(submission.get("accepted", false)), "valid fixed-tick sweep is queued", failures)
 	var result := authority.flush_for_test()
 	_expect(bool(result.get("changed", false)), "queued sweep commits", failures)
-	var status := authority.get_status_snapshot()
+	var status := authority.get_status_snapshot(true)
 	var transaction := status.get("last_transaction", {}) as Dictionary
 	var payload := authority.get_payload_snapshot()
 	_expect(int(status.get("data_revision", 0)) == 1, "data revision advances once", failures)
@@ -282,7 +283,7 @@ func _check_commit_contract(zone: VoxelWorkZone, failures: Array[String]) -> voi
 	_expect(bool(second_dump_submit.get("accepted", false)) and int(authority.get_status_snapshot().get("dump_batch_coalesced_count", 0)) == 1, "same-neighborhood releases coalesce into one pending batch", failures)
 	var dump_result := authority.step_fixed(0.05)
 	var dump_transaction := dump_result.get("transaction", {}) as Dictionary
-	var dump_status := authority.get_status_snapshot()
+	var dump_status := authority.get_status_snapshot(true)
 	_expect(bool(dump_result.get("changed", false)) and String(dump_transaction.get("operation", "")) == "deposit", "deposit commits through the soil authority", failures)
 	_expect(String(dump_transaction.get("accounting_mode", "")) == "native_sparse_deposit_approximate" and int(dump_transaction.get("native_path_count", 0)) > 0, "runtime deposit uses the bounded native approximate path", failures)
 	_expect(int(dump_transaction.get("batch_wait_usec", 0)) >= 100000, "native deposit records the bounded batch wait", failures)
@@ -545,7 +546,7 @@ func _check_commit_contract(zone: VoxelWorkZone, failures: Array[String]) -> voi
 	_expect(limited.model_id == "sy135" and int(limited.get_payload_snapshot().get("bucket_mass_q", -1)) == 0, "model switch clears prior bucket inventory", failures)
 
 
-func _run_cadence(deltas: PackedFloat32Array) -> Dictionary:
+func _run_cadence(deltas: PackedFloat32Array, diagnostics: bool = true, authority: VoxelExcavationAuthority = null) -> Dictionary:
 	var zone := WorkZone.new()
 	zone.name = "CadenceZone"
 	root.add_child(zone)
@@ -559,7 +560,9 @@ func _run_cadence(deltas: PackedFloat32Array) -> Dictionary:
 		await process_frame
 		return {}
 	var contract := descriptor.to_dictionary()
-	var authority := Authority.new()
+	if authority == null:
+		authority = Authority.new()
+	authority.set_diagnostics_enabled(diagnostics)
 	if not authority.configure(zone, contract, zone.readiness.generation):
 		zone.queue_free()
 		await process_frame
@@ -580,7 +583,17 @@ func _run_cadence(deltas: PackedFloat32Array) -> Dictionary:
 	var status := authority.get_status_snapshot()
 	var transaction := status.get("last_transaction", {}) as Dictionary
 	var payload := authority.get_payload_snapshot()
+	# Independent SDF evidence keeps the off/on comparison meaningful even
+	# when optional native transaction digest sampling is disabled.
+	var verify_window := authority._integer_window(transaction.get("area_voxels", AABB()) as AABB)
+	var verify_size := verify_window["size"] as Vector3i
+	var verify_buffer := VoxelBuffer.new()
+	verify_buffer.set_channel_depth(VoxelBuffer.CHANNEL_SDF, VoxelBuffer.DEPTH_16_BIT)
+	verify_buffer.create(verify_size.x, verify_size.y, verify_size.z)
+	zone.get_voxel_tool().copy(verify_window["origin"], verify_buffer, Authority.SDF_CHANNEL_MASK, false)
 	var result := {
+		"verified_sdf_digest": authority._buffer_values(verify_buffer, verify_size).to_byte_array().hex_encode().sha256_text(),
+		"pre_sdf_digest": String(transaction.get("pre_sdf_digest", "")),
 		"post_sdf_digest": String(transaction.get("post_sdf_digest", "")),
 		"accepted_mass_q": int(transaction.get("accepted_mass_q", 0)),
 		"bucket_mass_q": int(payload.get("bucket_mass_q", 0)),
@@ -613,6 +626,7 @@ func _check_sy135_deep_native_cut(zone: VoxelWorkZone, failures: Array[String]) 
 		return
 	var contract := descriptor.to_dictionary()
 	var authority := Authority.new()
+	authority.set_diagnostics_enabled(true)
 	_expect(authority.configure(zone, contract, zone.readiness.generation, 1000.0), "deep native authority configures", failures)
 	var start := Vector3(6.0, _bucket_origin_y(contract, -1.1), 32.0)
 	var pose := _pose(contract, start, Vector3(0.08, -0.12, 0.18), "deep-native")

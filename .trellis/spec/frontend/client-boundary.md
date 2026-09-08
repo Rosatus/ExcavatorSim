@@ -2522,6 +2522,10 @@ VoxelExcavationAuthority.submit_pose(pose_snapshot, identity, delta_s = 1.0 / 60
 VoxelExcavationAuthority.submit_track_compaction(chassis_status) -> Dictionary
 VoxelExcavationAuthority.step_fixed(delta) -> Dictionary
 VoxelExcavationAuthority.get_payload_snapshot() -> Dictionary
+ExcavationWorld.set_voxel_diagnostics_enabled(enabled: bool) -> void
+VoxelExcavationAuthority.set_diagnostics_enabled(enabled: bool) -> void
+VoxelExcavationAuthority.get_visual_snapshot() -> Dictionary
+VoxelExcavationAuthority.get_status_snapshot(refresh_diagnostics: bool = false) -> Dictionary
 VoxelSoilMaterialField.stage_approximate_cut(coordinates, voxel_volume_m3) -> Dictionary
 VoxelSoilMaterialField.can_commit_approximate_cut(staged) -> bool
 VoxelSoilMaterialField.commit_approximate_cut(staged) -> bool
@@ -2702,6 +2706,31 @@ VoxelSoilMaterialField.stage_compaction(coordinates, compaction_delta_q) -> Dict
   collision-ready, and end-to-end lag use the same bounded shape. Allocation
   telemetry is labeled as an object-count proxy and must not be reported as
   allocator bytes.
+- Cutting performance diagnostics are process-local and default-off, owned by
+  `ExcavationWorld.voxel_diagnostics_enabled` and toggled through Advanced.
+  Resets/model reconfiguration reapply the preference without a separate
+  material transition. Switching clears timing windows/cache only; it never
+  clears queues, inventory, release events or readiness tickets/blocks.
+- Disabled diagnostics skip optional clock/window/allocation sampling and
+  native SDF diagnostic digest reads. Native transaction `pre_sdf_digest` and
+  `post_sdf_digest` are then empty; exact executor digests remain active because
+  they enforce no-op rejection. Identity, mass, revisions and errors stay live.
+  Optional `phase_timings_usec`, `allocation_proxies`, `voxel_statistics` and
+  aggregate `readiness` status fields are empty dictionaries while disabled.
+- Enabled aggregate diagnostics refresh at most every 250 ms on ordinary
+  status reads; explicit `get_status_snapshot(true)` forces fresh aggregates
+  without enabling a disabled diagnostic session. Cached responses are detached.
+  Only tickets issued in the current diagnostic session contribute latency
+  samples; older tickets still finish their collision acknowledgement normally.
+- Effects/audio must use the detached voxel `get_visual_snapshot()` projection,
+  never full authority status. Full diagnostic caching must not delay gameplay
+  payload, transaction/event or live opening fields.
+- Native coverage admission preserves the original `x,y,z` decimal-string
+  lexical order before the solid-cell cap. Per-axis precomputed lexical ranks
+  packed into integer keys avoid per-probe string allocation; changing to
+  numerical coordinate order would alter the capped mass sample subset.
+  The reusable coverage buffer copies the tight candidate bounding box fresh
+  on every call and is discarded at authority teardown; it is not an SDF cache.
 
 ### 4. Validation & Error Matrix
 
@@ -2773,6 +2802,12 @@ VoxelSoilMaterialField.stage_compaction(coordinates, compaction_delta_q) -> Dict
   dedupe, deposit no native rejection after edit, and one real deep-insertion
   commit with overburden cleanup. Human Forward+ owns perceived hitching and
   final cut shape.
+- Diagnostic/coverage regression: compare the frozen legacy estimator against
+  optimized coordinates and order at both supported scales, including duplicate,
+  air, clipped, negative-boundary and capped cases. Assert fresh buffer contents
+  after edits, zero native digest sampler calls while off, detached visual/cache
+  reads, diagnostic-session latency isolation, Advanced wiring/reset preference,
+  and on/off equality of independently hashed edit-window SDF plus mass/revisions.
 - Material cycle: assert pending batches do not debit the bucket, a committed
   native deposit preserves exact aggregate mass, idle frames do not move the
   mound, previously accounted stable cells never lose mass, and re-cut

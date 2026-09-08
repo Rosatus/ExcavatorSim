@@ -46,6 +46,18 @@ func _run() -> void:
 	_expect(not bool(selected.get("parcel_runtime_constructed", true)), "legacy parcel runtime stays unconstructed", failures)
 	_expect(String((selected.get("selected_soil_payload", {}) as Dictionary).get("source", "")) == "voxel_bucket_v1", "selected payload comes from voxel ledger", failures)
 	var voxel_status := selected.get("voxel_excavation", {}) as Dictionary
+	_expect(not bool(selected.get("voxel_diagnostics_enabled", true)), "world diagnostics default off", failures)
+	_expect((voxel_status.get("phase_timings_usec", {}) as Dictionary).is_empty(), "default world status skips optional diagnostics", failures)
+	var diagnostics_button := scene.get_node("OperatorUI/StatusPanel/Margin/VBox/AdvancedPanel/CuttingDiagnostics") as CheckButton
+	_expect(not diagnostics_button.button_pressed, "Advanced diagnostic control defaults off", failures)
+	var material_before_toggle := excavation._voxel_authority.get_payload_snapshot()
+	var revision_before_toggle := excavation._voxel_authority.data_revision
+	diagnostics_button.button_pressed = true
+	_expect(excavation.voxel_diagnostics_enabled and excavation._voxel_authority.diagnostics_enabled, "Advanced toggle enables the existing authority", failures)
+	_expect(excavation._voxel_authority.get_payload_snapshot() == material_before_toggle \
+		and excavation._voxel_authority.data_revision == revision_before_toggle, "diagnostic toggle preserves material and data revision", failures)
+	excavation.set_voxel_diagnostics_enabled(false)
+	_expect(not diagnostics_button.button_pressed and not excavation._voxel_authority.diagnostics_enabled, "owner change synchronizes the Advanced toggle", failures)
 	_expect(bool(voxel_status.get("bucket_capacity_overridden", false)), "world enables the dedicated test bucket mode", failures)
 	_expect(is_equal_approx(float(voxel_status.get("bucket_capacity_m3", 0.0)), ExcavationWorld.TEST_BUCKET_CAPACITY_M3), "world applies the large finite test capacity", failures)
 	_expect(float(voxel_status.get("contract_bucket_capacity_m3", 0.0)) < float(voxel_status.get("bucket_capacity_m3", 0.0)), "test capacity preserves the smaller model contract capacity", failures)
@@ -88,12 +100,15 @@ func _run() -> void:
 	_expect(int(ground_status.get("terrain_commits_executed", -1)) == 0, "legacy heightfield commits never step", failures)
 	_expect(int(ground_status.get("parcel_steps_executed", -1)) == 0, "legacy parcel simulation never steps", failures)
 	var generation_before_reset := int(post_status.get("world_generation", -1))
+	excavation.set_voxel_diagnostics_enabled(true)
 	excavation.reset_for_test()
 	await physics_frame
 	var reset_status := excavation.get_status_snapshot()
 	_expect(int(reset_status.get("world_generation", -1)) > generation_before_reset, "world reset advances voxel authority generation", failures)
 	_expect(is_zero_approx(float((reset_status.get("selected_soil_payload", {}) as Dictionary).get("payload_mass_kg", -1.0))), "world reset clears voxel bucket inventory", failures)
 	_expect(not bool(reset_status.get("legacy_runtime_constructed", true)), "voxel reset does not revive legacy runtime", failures)
+	_expect(excavation._voxel_authority.diagnostics_enabled and diagnostics_button.button_pressed, "world reset retains diagnostic preference on the new authority", failures)
+	excavation.set_voxel_diagnostics_enabled(false)
 
 	scene.queue_free()
 	await process_frame

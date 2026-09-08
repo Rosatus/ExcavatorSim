@@ -25,6 +25,7 @@ const MAX_NATIVE_DEPOSIT_PROBES := 4096
 const MAX_NATIVE_DEPOSIT_PATHS := 2
 const NATIVE_COVERAGE_STEP_VOXELS := 1.5
 const NATIVE_DIGEST_SAMPLE_LIMIT := 128
+const DIAGNOSTIC_SNAPSHOT_PERIOD_USEC := 250000
 const SDF_HALO_VOXELS := 2
 const CAPACITY_SEARCH_STEPS := 14
 const SDF_CHANNEL_MASK := 1 << VoxelBuffer.CHANNEL_SDF
@@ -63,6 +64,7 @@ var collision_revision := 0
 var model_id := ""
 var tool_hash := ""
 var last_error := ""
+var diagnostics_enabled := false
 var cutter := BucketCutter.new()
 var material_field := MaterialField.new()
 
@@ -143,6 +145,14 @@ var _status_digest_timing_usec := TimingWindow.new()
 var _proposal_allocation_proxy := TimingWindow.new()
 var _commit_allocation_proxy := TimingWindow.new()
 var _operation_commit_timing: Dictionary = {}
+var _timed_commit_count := 0
+var _diagnostic_snapshot_cache: Dictionary = {}
+var _diagnostic_snapshot_usec := 0
+var _coverage_min := Vector3i.ZERO
+var _coverage_size := Vector3i.ZERO
+var _coverage_axis_ranks: Array[PackedInt32Array] = []
+var _coverage_buffer: VoxelBuffer
+var _coverage_buffer_size := Vector3i.ZERO
 
 
 func configure(work_zone: VoxelWorkZone, contract: Dictionary, target_generation: int, capacity_override_m3: float = 0.0) -> bool:
@@ -165,6 +175,8 @@ func configure(work_zone: VoxelWorkZone, contract: Dictionary, target_generation
 		return _fail("material_field_configuration_failed")
 	_work_zone = work_zone
 	_tool = voxel_tool
+	_configure_coverage_index()
+	_work_zone.readiness.set_diagnostics_enabled(diagnostics_enabled)
 	_contract = contract.duplicate(true)
 	model_id = candidate_model
 	tool_hash = cutter.tool_hash
@@ -190,6 +202,9 @@ func clear() -> void:
 	last_error = ""
 	_work_zone = null
 	_tool = null
+	_coverage_axis_ranks.clear()
+	_coverage_buffer = null
+	_coverage_buffer_size = Vector3i.ZERO
 	_contract.clear()
 	_queue.clear()
 	_soil_queue.clear()
@@ -277,7 +292,7 @@ func submit_pose(pose_snapshot: Dictionary, identity: Dictionary, delta_s: float
 	_update_dump_gate_diagnostics(pose_snapshot, delta_s)
 	if not _dump_gate_raw_active:
 		_cancel_uncommitted_dumps("dump_gate_closed_before_commit")
-	var proposal_started_usec := Time.get_ticks_usec()
+	var proposal_started_usec := _diagnostic_clock_usec()
 	var dump_result := _build_dump_proposal(pose_snapshot, identity, delta_s)
 	if bool(dump_result.get("attempted", false)):
 		var dump_candidate := dump_result.get("proposal") as VoxelSoilOperationProposal
@@ -313,7 +328,7 @@ func submit_pose(pose_snapshot: Dictionary, identity: Dictionary, delta_s: float
 			"queue_depth": _queue.size() + _soil_queue.size(),
 			"pending_dump": _pending_dump != null,
 		}
-	proposal_started_usec = Time.get_ticks_usec()
+	proposal_started_usec = _diagnostic_clock_usec()
 	var result := cutter.build_proposal(
 		pose_snapshot,
 		generation,
@@ -417,11 +432,37 @@ func get_payload_snapshot() -> Dictionary:
 	return status
 
 
-func get_status_snapshot() -> Dictionary:
-	var status_started_usec := Time.get_ticks_usec()
+func set_diagnostics_enabled(enabled: bool) -> void:
+	if diagnostics_enabled == enabled:
+		return
+	diagnostics_enabled = enabled
+	_reset_timing_telemetry()
+	if _work_zone != null:
+		_work_zone.readiness.set_diagnostics_enabled(enabled)
+
+
+func get_visual_snapshot() -> Dictionary:
+	# Detached gameplay projection: no payload, terrain statistics, readiness
+	# scans or timing-window sorting. Effects and audio pull this frequently.
+	return {
+		"last_transaction": _last_transaction.duplicate(true),
+		"accepted_dump_event_id": _accepted_dump_event_id,
+		"accepted_dump_event": _accepted_dump_event.duplicate(true),
+		"dump_release_world": _dump_release_world,
+		"dump_released_fill_ratio": _dump_released_fill_ratio,
+		"dump_pose_valid": _dump_pose_valid,
+		"opening_down_dot": _opening_down_dot,
+		"contract_dump_threshold": _contract_dump_threshold,
+		"effective_dump_threshold": _effective_dump_threshold,
+		"dump_gate_active": _dump_gate_active,
+		"rejected_dump_event_id": _rejected_dump_event_id,
+		"rejected_dump_world": _rejected_dump_world,
+	}
+
+
+func get_status_snapshot(refresh_diagnostics: bool = false) -> Dictionary:
+	var status_started_usec := _diagnostic_clock_usec()
 	var payload := get_payload_snapshot() if configured else {}
-	var readiness_status := _work_zone.readiness.get_status_snapshot() \
-		if _work_zone != null else {}
 	var oldest_age_ticks := 0
 	var oldest_tick := _last_submitted_tick
 	if not _queue.is_empty():
@@ -433,6 +474,7 @@ func get_status_snapshot() -> Dictionary:
 	oldest_age_ticks = maxi(0, _last_submitted_tick - oldest_tick)
 	var status := {
 		"schema_version": SCHEMA_VERSION,
+		"diagnostics_enabled": diagnostics_enabled,
 		"configured": configured,
 		"generation": generation,
 		"data_revision": data_revision,
@@ -481,53 +523,60 @@ func get_status_snapshot() -> Dictionary:
 		"affected_cells": _affected_cells_total,
 		"commit_usec_total": _commit_usec_total,
 		"commit_usec_max": _commit_usec_max,
-		"commit_usec_average": float(_commit_usec_total) / float(_committed_count) if _committed_count > 0 else 0.0,
+		"commit_usec_average": float(_commit_usec_total) / float(_timed_commit_count) if _timed_commit_count > 0 else 0.0,
 		"native_committed": _native_committed_count,
 		"native_path_total": _native_path_total,
 		"native_overburden_path_total": _native_overburden_path_total,
 		"native_deposit_committed": _native_deposit_committed_count,
 		"readiness_coalesced": _readiness_coalesced_count,
-		"readiness": readiness_status,
 		"cut_accounting_mode": "sparse_coverage_approximate" if model_id == "sy135" else "exact_sdf_volume",
 		"deposit_accounting_mode": "native_sparse_deposit_approximate",
 		"engaged": _engaged,
 		"last_error": last_error,
 		"last_cutter_result": _last_cutter_result.duplicate(true),
-		"last_transaction": _last_transaction.duplicate(true),
 		"rejection_reasons": _rejection_reasons.duplicate(true),
 		"operation_counts": _operation_counts.duplicate(true),
-		"accepted_dump_event_id": _accepted_dump_event_id,
-		"accepted_dump_event": _accepted_dump_event.duplicate(true),
-		"dump_release_world": _dump_release_world,
-		"dump_released_fill_ratio": _dump_released_fill_ratio,
-		"dump_pose_valid": _dump_pose_valid,
-		"opening_down_dot": _opening_down_dot,
-		"contract_dump_threshold": _contract_dump_threshold,
-		"effective_dump_threshold": _effective_dump_threshold,
 		"dump_gate_raw_active": _dump_gate_raw_active,
-		"dump_gate_active": _dump_gate_active,
 		"dump_gate_hold_s": _dump_gate_hold_s,
-		"rejected_dump_event_id": _rejected_dump_event_id,
-		"rejected_dump_world": _rejected_dump_world,
 		"journal_size": _journal.size(),
 		"payload": payload,
-		"voxel_statistics": _work_zone.terrain.get_statistics() if _work_zone != null and _work_zone.terrain != null else {},
 	}
 	# Keep diagnostics and selected-world/UI payload reads on one typed status
 	# surface without allowing payload fields to overwrite authority counters.
 	status.merge(payload, false)
-	status["phase_timings_usec"] = _phase_timing_snapshot()
-	status["allocation_proxies"] = {
-		"unit": "object_count_proxy_not_bytes",
-		"proposal": _proposal_allocation_proxy.snapshot(),
-		"commit": _commit_allocation_proxy.snapshot(),
-	}
-	_status_digest_timing_usec.record(Time.get_ticks_usec() - status_started_usec)
-	(status["phase_timings_usec"] as Dictionary)["status_digest"] = _status_digest_timing_usec.snapshot()
+	status.merge(get_visual_snapshot())
+	if not diagnostics_enabled:
+		status.merge({"readiness": {}, "voxel_statistics": {}, "phase_timings_usec": {}, "allocation_proxies": {}})
+		return status
+	if refresh_diagnostics or _diagnostic_snapshot_cache.is_empty() \
+			or status_started_usec - _diagnostic_snapshot_usec >= DIAGNOSTIC_SNAPSHOT_PERIOD_USEC:
+		_diagnostic_snapshot_cache = {
+			"readiness": _work_zone.readiness.get_status_snapshot() if _work_zone != null else {},
+			"voxel_statistics": _work_zone.terrain.get_statistics() if _work_zone != null and _work_zone.terrain != null else {},
+			"phase_timings_usec": _phase_timing_snapshot(),
+			"allocation_proxies": {
+				"unit": "object_count_proxy_not_bytes",
+				"proposal": _proposal_allocation_proxy.snapshot(),
+				"commit": _commit_allocation_proxy.snapshot(),
+			},
+		}
+		_diagnostic_snapshot_usec = status_started_usec
+		_status_digest_timing_usec.record(_diagnostic_clock_usec() - status_started_usec)
+		(_diagnostic_snapshot_cache["phase_timings_usec"] as Dictionary)["status_digest"] = _status_digest_timing_usec.snapshot()
+	status.merge(_diagnostic_snapshot_cache.duplicate(true))
 	return status
 
 
+func _diagnostic_clock_usec() -> int:
+	return Time.get_ticks_usec() if diagnostics_enabled else 0
+
+
 func _reset_timing_telemetry() -> void:
+	_commit_usec_total = 0
+	_commit_usec_max = 0
+	_timed_commit_count = 0
+	_diagnostic_snapshot_cache.clear()
+	_diagnostic_snapshot_usec = 0
 	for window in [
 		_proposal_timing_usec,
 		_commit_timing_usec,
@@ -547,13 +596,16 @@ func _reset_timing_telemetry() -> void:
 
 
 func _record_proposal_telemetry(started_usec: int, allocation_proxy: int) -> void:
-	_proposal_timing_usec.record(Time.get_ticks_usec() - started_usec)
+	if not diagnostics_enabled:
+		return
+	_proposal_timing_usec.record(_diagnostic_clock_usec() - started_usec)
 	_proposal_allocation_proxy.record(allocation_proxy)
 
 
 func _record_transaction_telemetry(transaction: VoxelCutTransaction) -> void:
-	if transaction == null or not transaction.accepted():
+	if not diagnostics_enabled or transaction == null or not transaction.accepted():
 		return
+	_timed_commit_count += 1
 	_commit_timing_usec.record(transaction.commit_usec)
 	_record_nonzero_timing(_coverage_timing_usec, transaction.coverage_usec)
 	_record_nonzero_timing(_material_timing_usec, transaction.material_usec)
@@ -942,7 +994,7 @@ func _soil_operation_queue_depth(operation: String) -> int:
 
 
 func _commit_proposal(proposal: VoxelCutProposal) -> VoxelCutTransaction:
-	var started := Time.get_ticks_usec()
+	var started := _diagnostic_clock_usec()
 	var transaction := CutTransaction.new()
 	transaction.generation = proposal.generation
 	transaction.sequence = proposal.sequence
@@ -1023,14 +1075,14 @@ func _commit_proposal(proposal: VoxelCutProposal) -> VoxelCutTransaction:
 	material_field.commit_cut(material_stage)
 	data_revision += 1
 	transaction.revision = data_revision
-	transaction.commit_usec = Time.get_ticks_usec() - started
+	transaction.commit_usec = _diagnostic_clock_usec() - started
 	_committed_count += 1
 	_operation_counts["cut"] = int(_operation_counts.get("cut", 0)) + 1
 	_affected_samples_total += transaction.affected_samples
 	_affected_cells_total += transaction.affected_cells
 	_commit_usec_total += transaction.commit_usec
 	_commit_usec_max = maxi(_commit_usec_max, transaction.commit_usec)
-	var readiness_started := Time.get_ticks_usec()
+	var readiness_started := _diagnostic_clock_usec()
 	_issue_readiness_work(
 		edit_area,
 		data_revision,
@@ -1039,9 +1091,9 @@ func _commit_proposal(proposal: VoxelCutProposal) -> VoxelCutTransaction:
 		pre_hit_y,
 		"lower",
 	)
-	transaction.readiness_issue_usec = Time.get_ticks_usec() - readiness_started
+	transaction.readiness_issue_usec = _diagnostic_clock_usec() - readiness_started
 	var commit_before_readiness := transaction.commit_usec
-	transaction.commit_usec = Time.get_ticks_usec() - started
+	transaction.commit_usec = _diagnostic_clock_usec() - started
 	_commit_usec_total += transaction.commit_usec - commit_before_readiness
 	_commit_usec_max = maxi(_commit_usec_max, transaction.commit_usec)
 	return transaction
@@ -1062,23 +1114,23 @@ func _commit_native_proposal(
 	var edit_area := AABB(Vector3(origin), Vector3(size))
 	if not _tool.is_area_editable(edit_area):
 		return _reject_transaction(transaction, "voxel_area_not_editable", started_usec)
-	var phase_started := Time.get_ticks_usec()
+	var phase_started := _diagnostic_clock_usec()
 	var coverage_coordinates := _native_coverage_coordinates(proposal.native_paths, origin, size)
-	transaction.coverage_usec = Time.get_ticks_usec() - phase_started
+	transaction.coverage_usec = _diagnostic_clock_usec() - phase_started
 	transaction.coverage_candidate_count = coverage_coordinates.size()
 	if coverage_coordinates.is_empty():
 		return _reject_transaction(transaction, "no_sdf_change", started_usec)
-	phase_started = Time.get_ticks_usec()
-	transaction.pre_sdf_digest = _native_sample_digest(coverage_coordinates)
-	transaction.digest_usec += Time.get_ticks_usec() - phase_started
+	phase_started = _diagnostic_clock_usec()
+	transaction.pre_sdf_digest = _native_sample_digest(coverage_coordinates) if diagnostics_enabled else ""
+	transaction.digest_usec += _diagnostic_clock_usec() - phase_started
 	var voxel_volume_m3 := pow(_work_zone.voxel_scale_m, 3.0)
-	phase_started = Time.get_ticks_usec()
+	phase_started = _diagnostic_clock_usec()
 	var material_stage := material_field.stage_approximate_cut(coverage_coordinates, voxel_volume_m3, true)
 	if not bool(material_stage.get("valid", false)):
 		return _reject_transaction(transaction, String(material_stage.get("reason", "material_stage_failed")), started_usec)
 	if not material_field.can_commit_approximate_cut(material_stage):
 		return _reject_transaction(transaction, "material_commit_invariant", started_usec)
-	transaction.material_usec += Time.get_ticks_usec() - phase_started
+	transaction.material_usec += _diagnostic_clock_usec() - phase_started
 	transaction.accounting_mode = "sparse_coverage_approximate"
 	transaction.requested_mass_q = int(material_stage.get("requested_mass_q", 0))
 	transaction.accepted_mass_q = int(material_stage.get("accepted_mass_q", 0))
@@ -1100,21 +1152,21 @@ func _commit_native_proposal(
 	var pre_hit_y := _ray_surface_y(proposal.probe_world)
 	_tool.channel = VoxelBuffer.CHANNEL_SDF
 	_tool.mode = VoxelTool.MODE_REMOVE
-	phase_started = Time.get_ticks_usec()
+	phase_started = _diagnostic_clock_usec()
 	for path in proposal.native_paths:
 		var points := path.get("points_voxels", PackedVector3Array()) as PackedVector3Array
 		var radii := path.get("radii_voxels", PackedFloat32Array()) as PackedFloat32Array
 		_tool.do_path(points, radii)
-	transaction.native_edit_usec = Time.get_ticks_usec() - phase_started
-	phase_started = Time.get_ticks_usec()
-	transaction.post_sdf_digest = _native_sample_digest(coverage_coordinates)
-	transaction.digest_usec += Time.get_ticks_usec() - phase_started
+	transaction.native_edit_usec = _diagnostic_clock_usec() - phase_started
+	phase_started = _diagnostic_clock_usec()
+	transaction.post_sdf_digest = _native_sample_digest(coverage_coordinates) if diagnostics_enabled else ""
+	transaction.digest_usec += _diagnostic_clock_usec() - phase_started
 	# The material stage is validated before the irreversible native edit. The
 	# native API is synchronous and has no reject result, so this commit cannot
 	# race another material mutation inside the single authority transaction.
-	phase_started = Time.get_ticks_usec()
+	phase_started = _diagnostic_clock_usec()
 	material_field.commit_approximate_cut(material_stage)
-	transaction.material_usec += Time.get_ticks_usec() - phase_started
+	transaction.material_usec += _diagnostic_clock_usec() - phase_started
 	data_revision += 1
 	transaction.revision = data_revision
 	if transaction.capacity_clipped:
@@ -1126,7 +1178,7 @@ func _commit_native_proposal(
 	_operation_counts["cut"] = int(_operation_counts.get("cut", 0)) + 1
 	_affected_samples_total += transaction.affected_samples
 	_affected_cells_total += transaction.affected_cells
-	phase_started = Time.get_ticks_usec()
+	phase_started = _diagnostic_clock_usec()
 	_issue_readiness_work(
 		edit_area,
 		data_revision,
@@ -1135,8 +1187,8 @@ func _commit_native_proposal(
 		pre_hit_y,
 		"lower",
 	)
-	transaction.readiness_issue_usec = Time.get_ticks_usec() - phase_started
-	transaction.commit_usec = Time.get_ticks_usec() - started_usec
+	transaction.readiness_issue_usec = _diagnostic_clock_usec() - phase_started
+	transaction.commit_usec = _diagnostic_clock_usec() - started_usec
 	_commit_usec_total += transaction.commit_usec
 	_commit_usec_max = maxi(_commit_usec_max, transaction.commit_usec)
 	return transaction
@@ -1286,9 +1338,9 @@ func _build_dump_proposal(pose_snapshot: Dictionary, identity: Dictionary, delta
 			or release_world.z < editable.position.z or release_world.z >= editable.end.z \
 			or release_world.y < editable.position.y:
 		return {"attempted": true, "accepted": false, "reason": "dump_out_of_zone", "release_world": release_world}
-	var support_started_usec := Time.get_ticks_usec()
+	var support_started_usec := _diagnostic_clock_usec()
 	var support := _find_sdf_support_world(release_world)
-	var support_query_usec := Time.get_ticks_usec() - support_started_usec
+	var support_query_usec := _diagnostic_clock_usec() - support_started_usec
 	if not bool(support.get("valid", false)):
 		return {"attempted": true, "accepted": false, "reason": "dump_support_unavailable", "release_world": release_world}
 	var support_world := support.get("position", Vector3.ZERO) as Vector3
@@ -1379,7 +1431,7 @@ func _find_sdf_support_world(world_position: Vector3) -> Dictionary:
 
 
 func _commit_soil_proposal(proposal: VoxelSoilOperationProposal) -> VoxelCutTransaction:
-	var started := Time.get_ticks_usec()
+	var started := _diagnostic_clock_usec()
 	var transaction := CutTransaction.new()
 	transaction.generation = proposal.generation
 	transaction.sequence = proposal.sequence
@@ -1583,7 +1635,7 @@ func _commit_soil_proposal(proposal: VoxelSoilOperationProposal) -> VoxelCutTran
 		material_field.commit_mobile_transfer(material_stage)
 	data_revision += 1
 	transaction.revision = data_revision
-	transaction.commit_usec = Time.get_ticks_usec() - started
+	transaction.commit_usec = _diagnostic_clock_usec() - started
 	_committed_count += 1
 	_operation_counts[proposal.operation] = int(_operation_counts.get(proposal.operation, 0)) + 1
 	_affected_samples_total += transaction.affected_samples
@@ -1594,7 +1646,7 @@ func _commit_soil_proposal(proposal: VoxelSoilOperationProposal) -> VoxelCutTran
 		_enqueue_settle_cells(affected_cells)
 	if proposal.operation == "deposit":
 		_publish_accepted_dump_event(transaction)
-	var readiness_started := Time.get_ticks_usec()
+	var readiness_started := _diagnostic_clock_usec()
 	var expected_support := _find_sdf_support_world(proposal.deposit_world)
 	_issue_readiness_work(
 		edit_area,
@@ -1605,9 +1657,9 @@ func _commit_soil_proposal(proposal: VoxelSoilOperationProposal) -> VoxelCutTran
 		"expected",
 		(expected_support.get("position", Vector3(0.0, INF, 0.0)) as Vector3).y if bool(expected_support.get("valid", false)) else INF,
 	)
-	transaction.readiness_issue_usec = Time.get_ticks_usec() - readiness_started
+	transaction.readiness_issue_usec = _diagnostic_clock_usec() - readiness_started
 	var commit_before_readiness := transaction.commit_usec
-	transaction.commit_usec = Time.get_ticks_usec() - started
+	transaction.commit_usec = _diagnostic_clock_usec() - started
 	_commit_usec_total += transaction.commit_usec - commit_before_readiness
 	_commit_usec_max = maxi(_commit_usec_max, transaction.commit_usec)
 	return transaction
@@ -1721,7 +1773,7 @@ func _commit_surface_deposit_proposal(
 	var staged := material_field.stage_deposit(changes, accepted_mass)
 	if not material_field.can_commit_deposit(staged):
 		return _reject_transaction(transaction, "material_commit_invariant", started_usec)
-	transaction.coverage_usec = Time.get_ticks_usec() - started_usec
+	transaction.coverage_usec = _diagnostic_clock_usec() - started_usec
 	transaction.area_voxels = area
 	transaction.deposit_world = probe_world - Vector3.UP * scale_m * 2.0
 	transaction.accounting_mode = "surface_patch_deposit_approximate"
@@ -1734,9 +1786,9 @@ func _commit_surface_deposit_proposal(
 	transaction.affected_samples = changed_samples
 	transaction.affected_cells = changes.size()
 	var pre_hit_y := _ray_surface_y(probe_world)
-	var edit_started := Time.get_ticks_usec()
+	var edit_started := _diagnostic_clock_usec()
 	_tool.paste(origin, buffer, SDF_CHANNEL_MASK)
-	transaction.native_edit_usec = Time.get_ticks_usec() - edit_started
+	transaction.native_edit_usec = _diagnostic_clock_usec() - edit_started
 	material_field.commit_deposit(staged)
 	data_revision += 1
 	transaction.revision = data_revision
@@ -1750,11 +1802,11 @@ func _commit_surface_deposit_proposal(
 	var visible_landing := _find_sdf_support_world(proposal.release_world)
 	if bool(visible_landing.get("valid", false)):
 		_accepted_dump_event["landing_world"] = visible_landing["position"]
-	var readiness_started := Time.get_ticks_usec()
+	var readiness_started := _diagnostic_clock_usec()
 	_issue_readiness_work(area, data_revision, &"voxel_deposit_surface", probe_world,
 		pre_hit_y, "expected", transaction.deposit_world.y)
-	transaction.readiness_issue_usec = Time.get_ticks_usec() - readiness_started
-	transaction.commit_usec = Time.get_ticks_usec() - started_usec
+	transaction.readiness_issue_usec = _diagnostic_clock_usec() - readiness_started
+	transaction.commit_usec = _diagnostic_clock_usec() - started_usec
 	_commit_usec_total += transaction.commit_usec
 	_commit_usec_max = maxi(_commit_usec_max, transaction.commit_usec)
 	return transaction
@@ -1776,9 +1828,9 @@ func _commit_native_deposit_proposal(
 	var edit_area := AABB(Vector3(origin), Vector3(size))
 	if not _tool.is_area_editable(edit_area):
 		return _reject_transaction(transaction, "voxel_area_not_editable", started_usec)
-	var phase_started_usec := Time.get_ticks_usec()
+	var phase_started_usec := _diagnostic_clock_usec()
 	var deposit_coordinates := _native_deposit_coordinates(paths, origin, size)
-	transaction.coverage_usec = Time.get_ticks_usec() - phase_started_usec
+	transaction.coverage_usec = _diagnostic_clock_usec() - phase_started_usec
 	transaction.coverage_candidate_count = deposit_coordinates.size()
 	if deposit_coordinates.is_empty():
 		return _reject_transaction(transaction, "no_deposit_capacity", started_usec)
@@ -1805,13 +1857,13 @@ func _commit_native_deposit_proposal(
 			"added_mass_q": cell_mass_q,
 		})
 		remaining_q -= cell_mass_q
-	phase_started_usec = Time.get_ticks_usec()
+	phase_started_usec = _diagnostic_clock_usec()
 	var material_stage := material_field.stage_deposit(deposit_changes, accepted_target_q)
 	if not bool(material_stage.get("valid", false)):
 		return _reject_transaction(transaction, String(material_stage.get("reason", "material_stage_failed")), started_usec)
 	if not material_field.can_commit_deposit(material_stage):
 		return _reject_transaction(transaction, "material_commit_invariant", started_usec)
-	transaction.material_usec += Time.get_ticks_usec() - phase_started_usec
+	transaction.material_usec += _diagnostic_clock_usec() - phase_started_usec
 	transaction.accounting_mode = "native_sparse_deposit_approximate"
 	transaction.requested_mass_q = proposal.requested_mass_q
 	transaction.accepted_mass_q = int(material_stage.get("accepted_mass_q", 0))
@@ -1825,27 +1877,27 @@ func _commit_native_deposit_proposal(
 	transaction.affected_cells = transaction.coverage_new_count
 	transaction.affected_samples = deposit_coordinates.size()
 	transaction.native_path_count = paths.size()
-	phase_started_usec = Time.get_ticks_usec()
-	transaction.pre_sdf_digest = _native_sample_digest(deposit_coordinates)
-	transaction.digest_usec += Time.get_ticks_usec() - phase_started_usec
+	phase_started_usec = _diagnostic_clock_usec()
+	transaction.pre_sdf_digest = _native_sample_digest(deposit_coordinates) if diagnostics_enabled else ""
+	transaction.digest_usec += _diagnostic_clock_usec() - phase_started_usec
 	var pre_hit_y := _ray_surface_y(proposal.deposit_world)
 	_tool.channel = VoxelBuffer.CHANNEL_SDF
 	_tool.mode = VoxelTool.MODE_ADD
-	phase_started_usec = Time.get_ticks_usec()
+	phase_started_usec = _diagnostic_clock_usec()
 	for path in paths:
 		var points := path.get("points_voxels", PackedVector3Array()) as PackedVector3Array
 		var radii := path.get("radii_voxels", PackedFloat32Array()) as PackedFloat32Array
 		_tool.do_path(points, radii)
-	transaction.native_edit_usec = Time.get_ticks_usec() - phase_started_usec
-	phase_started_usec = Time.get_ticks_usec()
-	transaction.post_sdf_digest = _native_sample_digest(deposit_coordinates)
-	transaction.digest_usec += Time.get_ticks_usec() - phase_started_usec
+	transaction.native_edit_usec = _diagnostic_clock_usec() - phase_started_usec
+	phase_started_usec = _diagnostic_clock_usec()
+	transaction.post_sdf_digest = _native_sample_digest(deposit_coordinates) if diagnostics_enabled else ""
+	transaction.digest_usec += _diagnostic_clock_usec() - phase_started_usec
 	# Admission and the complete material mutation are frozen before native edit.
 	# VoxelTool has no reject/rollback result, so publication has no conditional
 	# branch after this point.
-	phase_started_usec = Time.get_ticks_usec()
+	phase_started_usec = _diagnostic_clock_usec()
 	material_field.commit_deposit(material_stage)
-	transaction.material_usec += Time.get_ticks_usec() - phase_started_usec
+	transaction.material_usec += _diagnostic_clock_usec() - phase_started_usec
 	data_revision += 1
 	transaction.revision = data_revision
 	if transaction.capacity_clipped:
@@ -1858,7 +1910,7 @@ func _commit_native_deposit_proposal(
 	_affected_samples_total += transaction.affected_samples
 	_affected_cells_total += transaction.affected_cells
 	_publish_accepted_dump_event(transaction)
-	phase_started_usec = Time.get_ticks_usec()
+	phase_started_usec = _diagnostic_clock_usec()
 	_issue_readiness_work(
 		edit_area,
 		data_revision,
@@ -1867,8 +1919,8 @@ func _commit_native_deposit_proposal(
 		pre_hit_y,
 		"raise",
 	)
-	transaction.readiness_issue_usec = Time.get_ticks_usec() - phase_started_usec
-	transaction.commit_usec = Time.get_ticks_usec() - started_usec
+	transaction.readiness_issue_usec = _diagnostic_clock_usec() - phase_started_usec
+	transaction.commit_usec = _diagnostic_clock_usec() - started_usec
 	_commit_usec_total += transaction.commit_usec
 	_commit_usec_max = maxi(_commit_usec_max, transaction.commit_usec)
 	return transaction
@@ -2371,15 +2423,35 @@ func _integer_window_without_halo(area: AABB) -> Dictionary:
 	return {"origin": minimum, "size": maximum - minimum}
 
 
+func _configure_coverage_index() -> void:
+	var bounds := WorkZoneConfig.voxel_bounds(_work_zone.voxel_scale_m)
+	_coverage_min = Vector3i(ceil(bounds.position.x), ceil(bounds.position.y), ceil(bounds.position.z))
+	var maximum := Vector3i(floor(bounds.end.x), floor(bounds.end.y), floor(bounds.end.z))
+	_coverage_size = maximum - _coverage_min
+	_coverage_axis_ranks.clear()
+	for axis in 3:
+		var labels := PackedStringArray()
+		for offset in _coverage_size[axis]:
+			labels.append("%d," % (_coverage_min[axis] + offset))
+		labels.sort()
+		var ranks := PackedInt32Array()
+		ranks.resize(labels.size())
+		for rank in labels.size():
+			ranks[labels[rank].trim_suffix(",").to_int() - _coverage_min[axis]] = rank
+		_coverage_axis_ranks.append(ranks)
+
+
 func _native_coverage_coordinates(
 	paths: Array[Dictionary],
 	origin: Vector3i,
 	size: Vector3i
 ) -> Array[Vector3i]:
 	var unique: Dictionary = {}
-	var bounds := WorkZoneConfig.voxel_bounds(_work_zone.voxel_scale_m)
-	var bounds_min := Vector3i(ceil(bounds.position.x), ceil(bounds.position.y), ceil(bounds.position.z))
-	var bounds_max := Vector3i(floor(bounds.end.x), floor(bounds.end.y), floor(bounds.end.z)) - Vector3i.ONE
+	var bounds_min := _coverage_min
+	var bounds_max := _coverage_min + _coverage_size - Vector3i.ONE
+	var x_ranks := _coverage_axis_ranks[0]
+	var y_ranks := _coverage_axis_ranks[1]
+	var z_ranks := _coverage_axis_ranks[2]
 	for path in paths:
 		var points := path.get("points_voxels", PackedVector3Array()) as PackedVector3Array
 		var radii := path.get("radii_voxels", PackedFloat32Array()) as PackedFloat32Array
@@ -2400,7 +2472,11 @@ func _native_coverage_coordinates(
 						continue
 					if Vector3(coordinate).distance_to(sample) > radius + 0.55:
 						continue
-					var key := "%d,%d,%d" % [coordinate.x, coordinate.y, coordinate.z]
+					# Integer keys retain the old decimal-string lexical order so
+					# the capped sample subset and transaction digests stay identical.
+					var key := (x_ranks[coordinate.x - bounds_min.x] * _coverage_size.y \
+						+ y_ranks[coordinate.y - bounds_min.y]) * _coverage_size.z \
+						+ z_ranks[coordinate.z - bounds_min.z]
 					if unique.has(key):
 						continue
 					unique[key] = coordinate
@@ -2410,20 +2486,40 @@ func _native_coverage_coordinates(
 
 
 func _solid_coordinates_from_buffer(unique: Dictionary, origin: Vector3i, size: Vector3i) -> Array[Vector3i]:
-	var buffer := VoxelBuffer.new()
-	buffer.set_channel_depth(VoxelBuffer.CHANNEL_SDF, VoxelBuffer.DEPTH_16_BIT)
-	buffer.create(size.x, size.y, size.z)
-	_tool.copy(origin, buffer, SDF_CHANNEL_MASK, false)
+	var result: Array[Vector3i] = []
+	if unique.is_empty():
+		return result
+	var read_min := origin + size
+	var read_max := origin - Vector3i.ONE
+	for coordinate_value in unique.values():
+		var coordinate := coordinate_value as Vector3i
+		var local := coordinate - origin
+		if local.x < 0 or local.y < 0 or local.z < 0 \
+				or local.x >= size.x or local.y >= size.y or local.z >= size.z:
+			continue
+		read_min = read_min.min(coordinate)
+		read_max = read_max.max(coordinate)
+	if read_max.x < read_min.x or read_max.y < read_min.y or read_max.z < read_min.z:
+		return result
+	var read_size := read_max - read_min + Vector3i.ONE
+	if _coverage_buffer == null:
+		_coverage_buffer = VoxelBuffer.new()
+		_coverage_buffer.set_channel_depth(VoxelBuffer.CHANNEL_SDF, VoxelBuffer.DEPTH_16_BIT)
+	if _coverage_buffer_size != read_size:
+		_coverage_buffer.create(read_size.x, read_size.y, read_size.z)
+		_coverage_buffer_size = read_size
+	# Every read overwrites the entire tight region. Reuse storage, never SDF.
+	_tool.copy(read_min, _coverage_buffer, SDF_CHANNEL_MASK, false)
 	var keys := unique.keys()
 	keys.sort()
-	var result: Array[Vector3i] = []
 	for key_value in keys:
 		var coordinate := unique[key_value] as Vector3i
 		var local := coordinate - origin
 		if local.x < 0 or local.y < 0 or local.z < 0 \
 				or local.x >= size.x or local.y >= size.y or local.z >= size.z:
 			continue
-		if buffer.get_voxel_f(local.x, local.y, local.z, VoxelBuffer.CHANNEL_SDF) > 0.0:
+		var read_local := coordinate - read_min
+		if _coverage_buffer.get_voxel_f(read_local.x, read_local.y, read_local.z, VoxelBuffer.CHANNEL_SDF) > 0.0:
 			continue
 		result.append(coordinate)
 		if result.size() >= MAX_NATIVE_COVERAGE_CELLS:
@@ -2724,7 +2820,7 @@ func _record_rejection(reason: String) -> void:
 
 func _reject_transaction(transaction: VoxelCutTransaction, reason: String, started_usec: int) -> VoxelCutTransaction:
 	transaction.rejection_reason = reason
-	transaction.commit_usec = Time.get_ticks_usec() - started_usec
+	transaction.commit_usec = _diagnostic_clock_usec() - started_usec
 	return transaction
 
 
