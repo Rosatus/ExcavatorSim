@@ -242,3 +242,36 @@ User accepted soil surface deposition, release visuals, wider SY135 boom/arm lim
 ### Next Steps
 
 - None - task complete
+
+
+## Session 61: Cutting performance and optional diagnostics
+
+**Date**: 2026-09-08
+**Task**: Cutting performance and optional diagnostics
+**Branch**: `main`
+
+### Summary
+
+Optimized native coverage ordering and SDF buffer reuse; added default-off cutting diagnostics with throttled aggregation and readiness epochs. Targeted cutting, world, work-zone and queue checks pass. Existing broad authority and soil-effects failures reproduced on baseline and documented in archived result. User accepted delivery and authorized commit, push and archive.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `30b2f22` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
