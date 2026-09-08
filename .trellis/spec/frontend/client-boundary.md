@@ -2591,21 +2591,31 @@ VoxelSoilMaterialField.stage_compaction(coordinates, compaction_delta_q) -> Dict
   pending and queued-but-uncommitted deposits. Bucket inventory is debited only
   after the native edit and material stage commit.
 - Full dump admission uses the hash-bound model opening normal and an effective
-  `opening_normal_world.dot(Vector3.DOWN)` threshold no lower than `0.15`.
+  `opening_normal_world.dot(Vector3.DOWN)` threshold no lower than `0.5` in voxel mode.
   Upward and horizontal openings may not release material. Admission requires
-  50 ms continuously inside the gate; leaving it before commit preserves
-  bucket mass and produces no accepted release event.
+  120 ms continuously inside the gate, a free outlet, and no active/pending
+  cutting; leaving it before commit preserves bucket mass and produces no
+  accepted release event. The hash-bound descriptor threshold remains intact;
+  diagnostics expose the stricter effective runtime threshold separately.
 - A pending release freezes its opening transform, normalized opening normal,
   derived fall direction, admission tick, and fill ratio. The accepted deposit
-  publishes one immutable `voxel-soil-release-event-v1`; presentation must not
-  reconstruct the event from the later live bucket pose.
-- Product runtime deposit uses a bounded native `VoxelTool.MODE_ADD` path set
-  (currently at most two paths) and sparse air-cell coverage. The accepted
-  fixed-point mass transfer is exact, while mound shape and per-cell placement
-  are explicitly approximate. Exact buffer-copy/SDF deposit remains a named
-  diagnostic path only and must not return to the per-frame product path.
+  publishes one immutable `voxel-soil-release-event-v1` with separate landing
+  position and release duration. Presentation copies this event before updating
+  its active emitter from the live outlet while the release gate remains valid;
+  already born particles retain world positions. Closing the gate stops births.
+- Product runtime deposit uses a disposable 17 x 17 surface-height plan at
+  three-voxel spacing, a rounded repose envelope, and one bounded SDF buffer
+  paste. Each commit samples current SDF; it cannot reuse a persistent pile
+  volume cache after cutting. The outer patch ring stays unchanged, and a
+  32,768-sample publication budget rejects before debit. Positive increments
+  form supported slabs above existing surfaces, preserving cavities below.
+  Exact bucket/mobile mass transfer remains separate from approximate column
+  geometry. Legacy native add brushes and exact 3D integration/fitting are not
+  product paths. A single rounded brush is not sufficient evidence that
+  repeated deposits produce a repose-shaped pile: fixed-location growth must
+  expand the existing footprint rather than stack primitives on its summit.
 - Active or queued dumping suppresses background settle/compaction work.
-  Native deposits form their repose-like shape at commit and do not seed a
+  Surface deposits form their repose-like shape at commit and do not seed a
   continuously draining settle frontier. This intentionally permits stepped
   mound growth and approximate repose in exchange for bounded latency.
 - Readiness ownership is canonical per generation and native 16-cubed mesh
@@ -2622,15 +2632,20 @@ VoxelSoilMaterialField.stage_compaction(coordinates, compaction_delta_q) -> Dict
 - `SoilEffects` polls complete soil snapshots at no more than `30 Hz`, rebuilds
   a closed, cavity-bounded bucket fill volume at no more than `10 Hz` and only
   across `5%` fill quanta, reuses one `ArrayMesh`, and manages hero clods through
-  active/free pools. Falling flow and clods consume committed release events
-  once and expire after a bounded visual TTL; `cut` may emit contact dust but
+  active/free pools. Voxel mode never spawns arcade decorative mound meshes:
+  its ground surface is already rendered by the authoritative SDF. Falling
+  flow and clods consume committed release events once, with short bounded
+  emission segments and volume-budgeted clod births; consecutive events must
+  not restart airborne particles. Clods retire at the reported landing height
+  or lifetime bound. `cut` may emit contact dust but
   never falling soil or rigid clods. Signals may trigger an immediate pull but
   reset the polling cadence so the same change is not fetched twice in one
   interval.
-- Every mobile-soil operation has two independently checked conservation
-  dimensions: fixed-point ledger mass and SDF-represented bulk volume at the
-  operation's density/compaction. A zero ledger sum is insufficient if the SDF
-  edit exceeds the declared one-cell discretization tolerance.
+- Mobile-soil operations have two distinct conservation dimensions: fixed-point
+  ledger mass and represented bulk volume. Product surface deposits estimate
+  the latter from positive column increments and do not claim exact integrated
+  SDF volume. Exact diagnostic operations retain their one-cell discretization
+  tolerance; a zero ledger sum alone never proves geometric or visual quality.
 - The paired remove/add settle transaction remains available for explicit
   diagnostics or a future bounded one-shot operation. Product runtime native
   deposits must not enqueue it continuously. If invoked, it may move only pure

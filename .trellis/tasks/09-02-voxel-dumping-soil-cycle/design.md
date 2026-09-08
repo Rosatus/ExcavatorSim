@@ -1,5 +1,51 @@
 # Design - authoritative dump and soil cycle
 
+## Current implementation: visual-first surface deposits (2026-09-08)
+
+The user approved implementation of the reassessment and explicitly owns all
+runtime/visual acceptance. Agent validation is limited to script parsing and
+static change review for this pass. The sections below record previous
+iterations; where they conflict, this section supersedes their native mound,
+release emitter, and admission details.
+
+- Keep voxel cutting and the existing single material authority. Replace the
+  product's stacked native mound brushes with `SoilDepositSurface`: sample a
+  disposable 17 x 17 support grid, spaced three voxels apart, solve a rounded
+  repose envelope against existing heights, then interpolate positive height
+  increments. Re-read actual support in changed columns, stage their material
+  additions, and publish one bounded `VoxelBuffer` paste. No persistent pile
+  cache, second renderer, full 3D integration, or iterative SDF fitting is used.
+- The patch spans 48 voxels (6 m at the product resolution); its outside ring
+  remains unchanged. The peak is capped before growth reaches this boundary.
+  Unrepresented mass stays in the bucket. Staged buffers are capped at 32,768
+  samples; steep/large edits or protected-boundary overlaps reject before debit.
+  Height-column volume and per-cell material placement are approximate; exact
+  bucket debit equals mobile-soil credit. This is still a surface approximation
+  on complex overhangs, not a granular dynamics solver.
+- Every batch re-reads the current SDF, including previous piles and new cuts.
+  A growing pile expands its footprint instead of starting another mound on
+  its summit. Support interpolation uses the actual positive/negative SDF
+  crossing, correcting the old below-surface offset.
+- Voxel mode never emits the arcade fallback's permanent decorative mound.
+  Ground appearance and collision remain derived from the same voxel data.
+- Release requires an effective down-dot of at least 0.5 held for 120 ms,
+  no active/pending cut, and a free outlet. Model descriptors remain unchanged;
+  the stricter voxel policy is visible through effective-threshold diagnostics.
+- The immutable event records release and landing separately. Presentation
+  consumes a bounded 100 ms segment with a 20 ms cadence allowance, follows the
+  live outlet only while the gate remains valid, and never restarts all existing
+  particles at a new batch. Closing the gate stops births; airborne particles
+  remain in world space. Hero-clod births are volume-budgeted, with landing-height
+  retirement, and the stream spans the model's opening width. The existing
+  batch-time geometry publication remains approximate relative to flight time.
+- Old exact and native-brush helpers remain diagnostic/legacy code, not product
+  fallbacks. The established tests for two native paths, frozen persistent
+  emitter positions, and 50 ms gate admission describe the previous design and
+  are not acceptance evidence for this replacement.
+
+Implementation rationale and alternatives:
+`research/2026-09-08-visual-first-reassessment.md`.
+
 The parent design plus accepted foundation/cutting contracts are authoritative.
 
 Bucket mass releases at a bounded per-tick rate only when opening orientation,

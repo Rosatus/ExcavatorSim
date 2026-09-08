@@ -1,5 +1,25 @@
 # Implement - authoritative dump and soil cycle
 
+## Current pass — 2026-09-08
+
+User authorized direct implementation and requested that final testing and
+visual/runtime acceptance be performed manually by the user. Earlier automated
+gate checklists below are historical; they are not rerun requirements for this
+pass and their checked boxes do not certify the new algorithm.
+
+- [x] Save incoming work as checkpoint commit `3a6f1d6`.
+- [x] Audit repeated same-location deposition and persistent outlet mounds.
+- [x] Replace product deposit brushes with a bounded disposable surface plan
+  and one staged SDF publication, preserving the existing ledger/readiness owner.
+- [x] Suppress voxel decorative mounds; use short continuous release segments,
+  world-space particles, volume-budgeted clods and ground-height retirement.
+- [x] Require clear downward orientation, a free outlet, and no active cutting
+  before releasing; preserve uncommitted inventory on gate exit.
+- [x] Godot `--check-only` for the changed authority and presentation scripts.
+- [ ] User manual acceptance: scoop/curl/carry; continuous dumping at one fixed
+  spot; moving dump; re-excavate the resulting mound; judge responsiveness.
+- [ ] Archive after user acceptance.
+
 - [x] Add typed deposit/settle/compact operations to the existing authority and
   journal; do not create a second soil state.
 - [x] Implement opening/in-zone/support validation, bounded release rate,

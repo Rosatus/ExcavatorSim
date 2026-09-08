@@ -8,6 +8,8 @@ const BucketCutter = preload("res://scripts/voxel_bucket_cutter.gd")
 const MaterialField = preload("res://scripts/voxel_soil_material_field.gd")
 const WorkZoneConfig = preload("res://scripts/voxel_work_zone_config.gd")
 const TimingWindow = preload("res://scripts/voxel_timing_window.gd")
+const DepositSurface = preload("res://scripts/soil_deposit_surface.gd")
+const MAX_DEPOSIT_SURFACE_SAMPLES := 32768
 
 const SCHEMA_VERSION := "voxel-excavation-authority-v2"
 const COMMIT_PERIOD_S := 0.05
@@ -38,7 +40,8 @@ const DEPOSIT_MIN_RADIUS_VOXELS := 1.0
 const DEPOSIT_MAX_RADIUS_VOXELS := 4.0
 const DEPOSIT_MAX_HEIGHT_VOXELS := 8.0
 const DUMP_BATCH_PERIOD_S := 0.1
-const DUMP_GATE_CONFIRMATION_S := 0.05
+const DUMP_GATE_CONFIRMATION_S := 0.12
+const DUMP_RELEASE_DOWN_DOT := 0.5
 const DUMP_LANDING_NEIGHBORHOOD_VOXELS := 4.0
 const MAX_CONSECUTIVE_DEPOSIT_COMMITS := 2
 const MAX_COMPACTION_SHAPES_PER_PROPOSAL := 32
@@ -1236,7 +1239,8 @@ func _update_dump_gate_diagnostics(pose_snapshot: Dictionary, delta_s: float) ->
 		"dump_opening_down_dot",
 		SoilContractDescriptor.MIN_DUMP_OPENING_DOWN_DOT,
 	))
-	_effective_dump_threshold = SoilContractDescriptor.effective_dump_opening_down_dot(interaction)
+	_effective_dump_threshold = maxf(DUMP_RELEASE_DOWN_DOT,
+		SoilContractDescriptor.effective_dump_opening_down_dot(interaction))
 	var opening_normal := pose_snapshot.get("opening_normal_world", Vector3.UP) as Vector3
 	if not _dump_pose_valid or not opening_normal.is_finite() or opening_normal.length_squared() < 0.99:
 		_opening_down_dot = -1.0
@@ -1246,6 +1250,16 @@ func _update_dump_gate_diagnostics(pose_snapshot: Dictionary, delta_s: float) ->
 		return
 	_opening_down_dot = opening_normal.normalized().dot(Vector3.DOWN)
 	_dump_gate_raw_active = _opening_down_dot >= _effective_dump_threshold
+	var current := pose_snapshot.get("current", {}) as Dictionary
+	# Retain material while cutting or while the outlet is buried. A transient
+	# down-facing pose during a scoop is not a free-air unload operation.
+	if _engaged or not _queue.is_empty() or not current.has("opening"):
+		_dump_gate_raw_active = false
+	elif _dump_gate_raw_active:
+		var opening := current["opening"] as Transform3D
+		var outlet := WorkZoneConfig.world_to_voxel(opening.origin + opening_normal * 0.12, _work_zone.voxel_scale_m)
+		if _tool.get_voxel_f(Vector3i(roundi(outlet.x), roundi(outlet.y), roundi(outlet.z))) <= 0.0:
+			_dump_gate_raw_active = false
 	if _dump_gate_raw_active:
 		_dump_gate_hold_s = minf(
 			DUMP_GATE_CONFIRMATION_S,
@@ -1338,6 +1352,8 @@ func _publish_accepted_dump_event(transaction: VoxelCutTransaction) -> void:
 		"accepted_mass_q": transaction.accepted_mass_q,
 		"release_transform_world": transaction.release_transform_world,
 		"release_world": transaction.release_world,
+		"landing_world": transaction.deposit_world,
+		"release_duration_s": DUMP_BATCH_PERIOD_S,
 		"opening_normal_world": transaction.release_normal_world,
 		"direction_world": transaction.release_direction_world,
 		"fill_ratio": transaction.release_fill_ratio,
@@ -1354,8 +1370,13 @@ func _find_sdf_support_world(world_position: Vector3) -> Dictionary:
 	var prior_sdf := 1.0
 	for y in range(top, bottom - 1, -1):
 		var sdf := _tool.get_voxel_f(Vector3i(x, y, z))
+		if y == top and sdf <= 0.0:
+			return {"valid": false}
 		if sdf <= 0.0 and prior_sdf > 0.0:
-			return {"valid": true, "position": WorkZoneConfig.voxel_to_world(Vector3(x, float(y) + clampf(sdf, -0.5, 0.5), z), _work_zone.voxel_scale_m)}
+			var gradient := maxf(0.0001, prior_sdf - sdf)
+			var surface_y := float(y) - sdf / gradient
+			return {"valid": true, "gradient": gradient,
+				"position": WorkZoneConfig.voxel_to_world(Vector3(x, surface_y, z), _work_zone.voxel_scale_m)}
 		prior_sdf = sdf
 	return {"valid": false}
 
@@ -1388,7 +1409,7 @@ func _commit_soil_proposal(proposal: VoxelSoilOperationProposal) -> VoxelCutTran
 	if proposal.operation == "deposit" and material_field.bucket_mass_q <= 0:
 		return _reject_transaction(transaction, "bucket_empty", started)
 	if proposal.operation == "deposit" and not proposal.quality_flags.has("exact_sdf_diagnostic"):
-		return _commit_native_deposit_proposal(proposal, transaction, started)
+		return _commit_surface_deposit_proposal(proposal, transaction, started)
 	var window := _integer_window(proposal.area_voxels)
 	var origin := window.get("origin", Vector3i.ZERO) as Vector3i
 	var size := window.get("size", Vector3i.ZERO) as Vector3i
@@ -1591,6 +1612,153 @@ func _commit_soil_proposal(proposal: VoxelSoilOperationProposal) -> VoxelCutTran
 	var commit_before_readiness := transaction.commit_usec
 	transaction.commit_usec = Time.get_ticks_usec() - started
 	_commit_usec_total += transaction.commit_usec - commit_before_readiness
+	_commit_usec_max = maxi(_commit_usec_max, transaction.commit_usec)
+	return transaction
+
+
+func _commit_surface_deposit_proposal(
+	proposal: VoxelSoilOperationProposal,
+	transaction: VoxelCutTransaction,
+	started_usec: int
+) -> VoxelCutTransaction:
+	var scale_m := _work_zone.voxel_scale_m
+	var voxel_volume := pow(scale_m, 3.0)
+	var target_mass := mini(proposal.requested_mass_q, material_field.bucket_mass_q)
+	var radius := DepositSurface.GRID_RADIUS * DepositSurface.GRID_STEP
+	var landing := WorkZoneConfig.world_to_voxel(proposal.release_world, scale_m)
+	var scan_top := WorkZoneConfig.world_to_voxel(WorkZoneConfig.MAX_WORLD, scale_m).y \
+		- WorkZoneConfig.PROTECTED_SHELL_VOXELS - 1.0
+	var patch_origin := Vector3i(roundi(landing.x) - radius, 0, roundi(landing.z) - radius)
+	var heights := PackedFloat32Array()
+	# One coarse 2D support scan per committed batch, not per input tick.
+	for z in DepositSurface.GRID_SIZE:
+		for x in DepositSurface.GRID_SIZE:
+			var sample_world := WorkZoneConfig.voxel_to_world(Vector3(
+				patch_origin.x + x * DepositSurface.GRID_STEP, scan_top,
+				patch_origin.z + z * DepositSurface.GRID_STEP), scale_m)
+			if not WorkZoneConfig.is_world_position_editable(sample_world, scale_m):
+				heights.append(WorkZoneConfig.world_to_voxel(WorkZoneConfig.MAX_WORLD, scale_m).y)
+				continue
+			var support := _find_sdf_support_world(sample_world)
+			if not bool(support.get("valid", false)):
+				return _reject_transaction(transaction, "dump_surface_support_unavailable", started_usec)
+			heights.append(WorkZoneConfig.world_to_voxel(support["position"], scale_m).y)
+	var planned := DepositSurface.plan(heights,
+		material_field.loose_volume_for_mass_q(target_mass) / voxel_volume,
+		tan(deg_to_rad(REPOSE_ANGLE_DEG)))
+	if planned.is_empty():
+		return _reject_transaction(transaction, "dump_surface_patch_full", started_usec)
+	var additions := planned["additions"] as PackedFloat32Array
+	var columns: Array[Dictionary] = []
+	var area := AABB()
+	var represented_volume := 0.0
+	var highest_addition := 0.0
+	var probe_world := proposal.release_world
+	for z in range(1, radius * 2):
+		for x in range(1, radius * 2):
+			var added := DepositSurface.interpolate(additions, x, z)
+			if added <= 0.0001:
+				continue
+			var coordinate := Vector3i(patch_origin.x + x, 0, patch_origin.z + z)
+			var sample_world := WorkZoneConfig.voxel_to_world(Vector3(coordinate.x, scan_top, coordinate.z), scale_m)
+			var support := _find_sdf_support_world(sample_world)
+			if not bool(support.get("valid", false)):
+				return _reject_transaction(transaction, "dump_surface_support_unavailable", started_usec)
+			var base := WorkZoneConfig.world_to_voxel(support["position"], scale_m).y
+			var top := base + added
+			var column_area := AABB(Vector3(coordinate.x - 1, floorf(base) - 2, coordinate.z - 1),
+				Vector3(3, ceilf(top) - floorf(base) + 5, 3))
+			area = column_area if columns.is_empty() else area.merge(column_area)
+			columns.append({"coordinate": coordinate, "base": base, "top": top,
+				"gradient": float(support.get("gradient", 1.0))})
+			represented_volume += added * voxel_volume
+			if added > highest_addition:
+				highest_addition = added
+				probe_world = WorkZoneConfig.voxel_to_world(Vector3(coordinate.x, top + 2.0, coordinate.z), scale_m)
+	if columns.is_empty():
+		return _reject_transaction(transaction, "dump_surface_patch_full", started_usec)
+	var window := _integer_window_without_halo(area)
+	var origin := window["origin"] as Vector3i
+	var size := window["size"] as Vector3i
+	var world_area := AABB(WorkZoneConfig.voxel_to_world(Vector3(origin), scale_m), Vector3(size) * scale_m)
+	if size.x * size.y * size.z > MAX_DEPOSIT_SURFACE_SAMPLES:
+		return _reject_transaction(transaction, "dump_surface_sample_budget", started_usec)
+	if not WorkZoneConfig.editable_world_bounds(scale_m).encloses(world_area) or not _tool.is_area_editable(area):
+		return _reject_transaction(transaction, "dump_surface_out_of_zone", started_usec)
+	var accepted_mass := mini(target_mass, material_field.mass_q_for_loose_volume(represented_volume))
+	if accepted_mass <= 0:
+		return _reject_transaction(transaction, "sub_quantum_change", started_usec)
+	var volume_scale := minf(1.0, material_field.loose_volume_for_mass_q(accepted_mass) / represented_volume)
+	var buffer := VoxelBuffer.new()
+	buffer.set_channel_depth(VoxelBuffer.CHANNEL_SDF, VoxelBuffer.DEPTH_16_BIT)
+	buffer.create(size.x, size.y, size.z)
+	_tool.copy(origin, buffer, SDF_CHANNEL_MASK, false)
+	var changes: Array[Dictionary] = []
+	var changed_samples := 0
+	for column in columns:
+		var coordinate := column["coordinate"] as Vector3i
+		var base := float(column["base"])
+		var top := base + (float(column["top"]) - base) * volume_scale
+		var gradient := float(column["gradient"])
+		for y in range(floori(base) - 1, ceili(top) + 2):
+			var local := Vector3i(coordinate.x, y, coordinate.z) - origin
+			var before := buffer.get_voxel_f(local.x, local.y, local.z, VoxelBuffer.CHANNEL_SDF)
+			# A supported slab, not an infinite column: old cavities below the
+			# sampled surface are never filled as a side effect of a deposit.
+			var slab := maxf((float(y) - top) * gradient, (base - 1.0 - y) * gradient)
+			var after := minf(before, clampf(slab, -1.0, 1.0))
+			if after < before - 0.000001:
+				buffer.set_voxel_f(after, local.x, local.y, local.z, VoxelBuffer.CHANNEL_SDF)
+				changed_samples += 1
+		for y in range(floori(base), ceili(top)):
+			var added_volume := maxf(0.0, minf(top, y + 1.0) - maxf(base, y)) * voxel_volume
+			if added_volume <= 0.0:
+				continue
+			changes.append({"coordinate": Vector3i(coordinate.x, y, coordinate.z),
+				"pre_fraction": clampf(base - y, 0.0, 1.0),
+				"post_fraction": clampf(top - y, 0.0, 1.0),
+				"cell_volume_m3": voxel_volume, "added_volume_m3": added_volume})
+	if changed_samples == 0 or changes.is_empty():
+		return _reject_transaction(transaction, "no_sdf_change", started_usec)
+	_assign_added_cell_mass(changes, accepted_mass)
+	var staged := material_field.stage_deposit(changes, accepted_mass)
+	if not material_field.can_commit_deposit(staged):
+		return _reject_transaction(transaction, "material_commit_invariant", started_usec)
+	transaction.coverage_usec = Time.get_ticks_usec() - started_usec
+	transaction.area_voxels = area
+	transaction.deposit_world = probe_world - Vector3.UP * scale_m * 2.0
+	transaction.accounting_mode = "surface_patch_deposit_approximate"
+	transaction.requested_mass_q = proposal.requested_mass_q
+	transaction.accepted_mass_q = accepted_mass
+	transaction.represented_mass_q = accepted_mass
+	transaction.requested_volume_m3 = material_field.loose_volume_for_mass_q(proposal.requested_mass_q)
+	transaction.accepted_volume_m3 = material_field.loose_volume_for_mass_q(accepted_mass)
+	transaction.capacity_clipped = accepted_mass < proposal.requested_mass_q
+	transaction.affected_samples = changed_samples
+	transaction.affected_cells = changes.size()
+	var pre_hit_y := _ray_surface_y(probe_world)
+	var edit_started := Time.get_ticks_usec()
+	_tool.paste(origin, buffer, SDF_CHANNEL_MASK)
+	transaction.native_edit_usec = Time.get_ticks_usec() - edit_started
+	material_field.commit_deposit(staged)
+	data_revision += 1
+	transaction.revision = data_revision
+	_committed_count += 1
+	_operation_counts["deposit"] = int(_operation_counts.get("deposit", 0)) + 1
+	_affected_samples_total += changed_samples
+	_affected_cells_total += changes.size()
+	if transaction.capacity_clipped:
+		_capacity_clipped_count += 1
+	_publish_accepted_dump_event(transaction)
+	var visible_landing := _find_sdf_support_world(proposal.release_world)
+	if bool(visible_landing.get("valid", false)):
+		_accepted_dump_event["landing_world"] = visible_landing["position"]
+	var readiness_started := Time.get_ticks_usec()
+	_issue_readiness_work(area, data_revision, &"voxel_deposit_surface", probe_world,
+		pre_hit_y, "expected", transaction.deposit_world.y)
+	transaction.readiness_issue_usec = Time.get_ticks_usec() - readiness_started
+	transaction.commit_usec = Time.get_ticks_usec() - started_usec
+	_commit_usec_total += transaction.commit_usec
 	_commit_usec_max = maxi(_commit_usec_max, transaction.commit_usec)
 	return transaction
 

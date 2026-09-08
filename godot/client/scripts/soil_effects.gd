@@ -4,8 +4,8 @@ extends Node3D
 const VISUAL_SNAPSHOT_PERIOD_S := 1.0 / 30.0
 const FILL_UPDATE_PERIOD_S := 0.1
 const FILL_RATIO_QUANTUM := 0.05
-const RELEASE_EVENT_MIN_TTL_S := 0.28
-const RELEASE_EVENT_MAX_TTL_S := 0.85
+const RELEASE_EVENT_MIN_TTL_S := 0.1
+const RELEASE_EVENT_MAX_TTL_S := 0.14
 
 @export var excavation_world_path := NodePath("../TerrainRoot/ExcavationWorld")
 @export var max_particles := 5000
@@ -29,6 +29,8 @@ var _clods: Array[RigidBody3D] = []
 var _active_clods: Array[RigidBody3D] = []
 var _free_clods: Array[RigidBody3D] = []
 var _clod_ages: Dictionary = {}
+var _clod_landing_heights: Dictionary = {}
+var _release_clod_budget := 0.0
 var _active_clod_cap := 32
 var _clod_spawn_accumulator := 0.0
 var _last_visual_snapshot: Dictionary = {}
@@ -74,6 +76,7 @@ func _physics_process(delta: float) -> void:
 		_snapshot_pull_count += 1
 		_apply_visual_snapshot(_last_visual_snapshot)
 	_advance_release_event(delta)
+	_update_release_source(_last_visual_snapshot)
 	_update_clods(delta, _last_visual_snapshot)
 
 
@@ -137,6 +140,7 @@ func clear_for_generation(generation: int) -> void:
 	_last_release_event_id = ""
 	_release_event_elapsed_s = 0.0
 	_release_event_ttl_s = 0.0
+	_release_clod_budget = 0.0
 
 
 func get_effect_snapshot() -> Dictionary:
@@ -197,10 +201,11 @@ func _build_particles() -> void:
 	_flow_particles.randomness = 0.45
 	_flow_particles.fixed_fps = 30
 	_flow_particles.interpolate = true
+	_flow_particles.local_coords = false
 	_flow_particles.emitting = false
 	_flow_material = ParticleProcessMaterial.new()
 	_flow_material.direction = Vector3.DOWN
-	_flow_material.spread = 24.0
+	_flow_material.spread = 12.0
 	_flow_material.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
 	_flow_material.emission_box_extents = Vector3(0.12, 0.035, 0.09)
 	_flow_material.initial_velocity_min = 0.5
@@ -343,6 +348,7 @@ func _apply_visual_snapshot(status: Dictionary) -> void:
 	var current: Dictionary = pose.get("current", {})
 	var contract: Dictionary = pose.get("contract", {})
 	_consume_release_event(status, pose)
+	_update_release_source(status)
 	_update_fill(status, current, contract)
 	_update_flow(status, current, pose)
 	_update_dust(status, current)
@@ -379,13 +385,14 @@ func _consume_release_event(status: Dictionary, pose: Dictionary) -> void:
 	_release_event_elapsed_s = 0.0
 	var released_volume := maxf(0.0, float(event.get("accepted_volume_m3", 0.0)))
 	_release_event_ttl_s = clampf(
-		RELEASE_EVENT_MIN_TTL_S + sqrt(released_volume) * 0.9,
+		float(event.get("release_duration_s", RELEASE_EVENT_MIN_TTL_S)) + 0.02,
 		RELEASE_EVENT_MIN_TTL_S,
 		RELEASE_EVENT_MAX_TTL_S,
 	)
-	_clod_spawn_accumulator = 0.0
+	_release_clod_budget = minf(float(max_clods), _release_clod_budget + released_volume * 55.0)
+	# Continuous batches must not restart particles already falling in world space.
 	if _flow_particles != null:
-		_flow_particles.restart()
+		_flow_particles.amount_ratio = clampf(released_volume / _release_event_ttl_s / 0.65, 0.05, 1.0)
 
 
 func _advance_release_event(delta: float) -> void:
@@ -396,8 +403,34 @@ func _advance_release_event(delta: float) -> void:
 		return
 	_active_release_event.clear()
 	_clod_spawn_accumulator = 0.0
+	_release_clod_budget = 0.0
 	if _flow_particles != null:
 		_flow_particles.emitting = false
+
+
+func _update_release_source(status: Dictionary) -> void:
+	if String(status.get("soil_material_lifecycle_mode", "")) != "voxel" or _active_release_event.is_empty():
+		return
+	if not bool(status.get("dump_gate_active", false)):
+		_active_release_event.clear()
+		_release_clod_budget = 0.0
+		_clod_spawn_accumulator = 0.0
+		_flow_particles.emitting = false
+		return
+	var pose := status.get("bucket_pose", {}) as Dictionary
+	var current := pose.get("current", {}) as Dictionary
+	if current.has("opening"):
+		# Only the emitter follows the current outlet. Already born particles
+		# remain in world space; the immutable transaction is never modified.
+		_active_release_event["release_transform_world"] = current["opening"]
+		_active_release_event["opening_normal_world"] = pose.get("opening_normal_world", Vector3.DOWN)
+		_active_release_event["direction_world"] = Vector3.DOWN
+		var contract := pose.get("contract", {}) as Dictionary
+		var opening_proxy := (contract.get("proxies", {}) as Dictionary).get("opening", {}) as Dictionary
+		var opening_size := opening_proxy.get("size_m", [1.0, 0.5]) as Array
+		var source := current["opening"] as Transform3D
+		var across := source.basis.x.normalized().abs() * float(opening_size[0]) * 0.32
+		_flow_material.emission_box_extents = Vector3(maxf(0.04, across.x), 0.025, maxf(0.04, across.z))
 
 
 func _release_event_from_live_pose(status: Dictionary, pose: Dictionary) -> Dictionary:
@@ -493,13 +526,17 @@ func _apply_flow_release_event(event: Dictionary) -> void:
 	var opening_normal := event.get("opening_normal_world", Vector3.DOWN) as Vector3
 	var direction := event.get("direction_world", Vector3.DOWN) as Vector3
 	if opening_normal.is_finite() and not opening_normal.is_zero_approx():
-		source.origin += opening_normal.normalized() * 0.24
+		source.origin += opening_normal.normalized() * 0.05
 	if not direction.is_finite() or direction.is_zero_approx():
 		direction = Vector3.DOWN
 	_flow_particles.global_transform = Transform3D(Basis.IDENTITY, source.origin)
-	_flow_material.direction = direction.normalized()
-	_flow_material.initial_velocity_min = 0.7
-	_flow_material.initial_velocity_max = 2.1
+	_flow_material.direction = Vector3.DOWN
+	_flow_material.initial_velocity_min = 0.55
+	_flow_material.initial_velocity_max = 0.9
+	if event.has("landing_world"):
+		var landing := event["landing_world"] as Vector3
+		var fall_height := maxf(0.05, source.origin.y - landing.y)
+		_flow_particles.lifetime = clampf((sqrt(0.7 * 0.7 + 11.0 * fall_height) - 0.7) / 5.5, 0.12, 1.8)
 	_flow_particles.emitting = true
 
 
@@ -526,7 +563,9 @@ func _update_clods(delta: float, status: Dictionary) -> void:
 		var clod := _active_clods[index]
 		var age := float(_clod_ages.get(clod.get_instance_id(), 0.0)) + delta
 		_clod_ages[clod.get_instance_id()] = age
-		if age > 2.5 or clod.global_position.y < -2.0 or clod.sleeping:
+		var landing_y := float(_clod_landing_heights.get(clod.get_instance_id(), -INF))
+		if age > 2.5 or clod.global_position.y < -6.0 or clod.sleeping \
+				or (age > 0.08 and clod.global_position.y <= landing_y + 0.04):
 			_deactivate_active_clod(index)
 	if _active_clod_cap <= 0 or not bool(status.get("hero_clods_enabled", true)):
 		return
@@ -542,8 +581,11 @@ func _update_clods(delta: float, status: Dictionary) -> void:
 	_clod_spawn_accumulator += delta * 11.0
 	while _clod_spawn_accumulator >= 1.0 and _active_clods.size() < _active_clod_cap:
 		_clod_spawn_accumulator -= 1.0
+		if _release_clod_budget < 1.0:
+			break
 		if not _spawn_clod_from_event(release_event):
 			break
+		_release_clod_budget -= 1.0
 
 
 func _spawn_clod(status: Dictionary, interaction: String) -> bool:
@@ -563,7 +605,7 @@ func _spawn_clod_from_event(event: Dictionary) -> bool:
 	var source_origin := source.origin
 	var opening_normal := event.get("opening_normal_world", Vector3.DOWN) as Vector3
 	if opening_normal.is_finite() and not opening_normal.is_zero_approx():
-		source_origin += opening_normal.normalized() * 0.2
+		source_origin += opening_normal.normalized() * 0.05
 	_spawn_sequence += 1
 	var noise_x := _spawn_noise(_spawn_sequence, 17)
 	var noise_y := _spawn_noise(_spawn_sequence, 29)
@@ -580,6 +622,8 @@ func _spawn_clod_from_event(event: Dictionary) -> bool:
 	available.linear_velocity = lateral + direction.normalized() * 0.8
 	available.angular_velocity = Vector3(noise_z, noise_x, noise_y) * 4.0
 	_clod_ages[available.get_instance_id()] = 0.0
+	if event.has("landing_world"):
+		_clod_landing_heights[available.get_instance_id()] = (event["landing_world"] as Vector3).y
 	return true
 
 
@@ -590,6 +634,7 @@ func _deactivate_clod_state(clod: RigidBody3D) -> void:
 	clod.linear_velocity = Vector3.ZERO
 	clod.angular_velocity = Vector3.ZERO
 	_clod_ages.erase(clod.get_instance_id())
+	_clod_landing_heights.erase(clod.get_instance_id())
 
 
 func _deactivate_active_clod(index: int) -> void:
@@ -616,6 +661,12 @@ func _active_clod_count() -> int:
 
 
 func _update_visual_mound(status: Dictionary) -> void:
+	# Voxel soil already owns its visible ground surface. The arcade fallback's
+	# decorative spheres belong neither at the voxel outlet nor over its mound.
+	if String(status.get("soil_material_lifecycle_mode", "")) == "voxel":
+		if not _last_visual_mound_event_id.is_empty():
+			_clear_visual_mounds()
+		return
 	var event_id := String(status.get("accepted_dump_event_id", ""))
 	if event_id.is_empty() or event_id == _last_visual_mound_event_id or _visual_mounds.is_empty():
 		return

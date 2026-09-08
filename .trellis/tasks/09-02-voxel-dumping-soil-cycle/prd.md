@@ -1,5 +1,27 @@
 # Voxel dumping and soil cycle
 
+## Current acceptance priority — 2026-09-08
+
+The user confirms cutting is the main simulation concern and dumping mainly
+serves a believable visual result. The approved replacement must prevent
+persistent soil pieces along the bucket path and grow a broad connected pile
+under repeated fixed-position dumping. Keep re-excavation and shared terrain
+collision. Do not use successful ledger checks as proof of visual quality.
+
+The user explicitly delegates final tests and runtime/visual acceptance to
+manual review. Agent checks for this pass are parsing and static review only.
+The surface-deposit design supersedes earlier requirements prescribing native
+add-path mound geometry and fixed historical release thresholds; approximate
+volume, exact ledger transfer, bounded work, and capture/retention still apply.
+
+- [ ] Scooping, curling upward and carrying leave no persistent floating soil.
+- [ ] Repeated dumping at one location broadens a single pile instead of
+  stacking separate mound primitives into a tower.
+- [ ] A moving bucket emits a continuous stream from its outlet without
+  repeatedly restarting all airborne particles or emitting from abandoned poses.
+- [ ] The pile remains re-excavatable and does not grow back from a stale cache.
+- [ ] Human review accepts shape, responsiveness and remaining approximation.
+
 ## Goal
 
 Implement responsive in-zone authoritative dumping, repose-shaped loose soil,
