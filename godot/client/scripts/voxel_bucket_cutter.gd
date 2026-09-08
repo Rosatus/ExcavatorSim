@@ -18,7 +18,6 @@ const CUT_REGION_IDS := ["teeth_main_edge", "left_side_cutter", "right_side_cutt
 const CLEARANCE_REGION_IDS := ["floor_wear_plate", "inner_shell"]
 const OCCUPANCY_WIDTH_FRACTIONS := [-0.8, -0.4, 0.0, 0.4, 0.8]
 const OCCUPANCY_HEIGHT_FRACTIONS := [-0.68, 0.0, 0.68]
-const OVERBURDEN_DEPTH_FRACTIONS := [-0.72, 0.0, 0.72]
 
 var configured := false
 var model_id := ""
@@ -107,6 +106,10 @@ func build_proposal(
 	rejected["into_material_m"] = maximum_into if is_finite(maximum_into) else 0.0
 	if maximum_motion < MIN_MOTION_M:
 		rejected["reason"] = "stationary"
+		# A committed brush clears its own contact probes. Keep the established
+		# episode through a pause in that cavity, without submitting an air cut.
+		rejected["engaged"] = was_engaged and model_id == "sy135" \
+			and valid_samples == current_points.size() and _within_lift_exit_envelope(tool_snapshot)
 		return rejected
 	if maximum_motion > MAX_TELEPORT_M:
 		rejected["reason"] = "teleported"
@@ -115,12 +118,24 @@ func build_proposal(
 		rejected["reason"] = "sdf_unavailable"
 		return rejected
 	var air_limit := EXIT_AIR_SDF if was_engaged else ENTER_AIR_SDF
-	if minimum_sdf > air_limit:
-		rejected["reason"] = "above_ground"
-		return rejected
 	var into_threshold := -MIN_INTO_MATERIAL_M if was_engaged else MIN_INTO_MATERIAL_M
-	if maximum_into < into_threshold:
+	# A previously authorized cut must finish the trailing roof sweep while the
+	# teeth lift out. Teeth-only entry tests cannot decide that the whole bucket
+	# has left the soil. Never use this continuation to start an unengaged cut.
+	var finishing_lift := false
+	if was_engaged and model_id == "sy135":
+		finishing_lift = _has_lift_exit_contact(tool_snapshot, sdf_sampler)
+	# Contact decides whether this frame cuts; the geometric exit decides
+	# when the episode ends. Clearing one frame must not disable later contact.
+	var retain_lift := was_engaged and model_id == "sy135" \
+		and _has_upward_motion(tool_snapshot) and _within_lift_exit_envelope(tool_snapshot)
+	if minimum_sdf > air_limit and not finishing_lift:
+		rejected["reason"] = "above_ground"
+		rejected["engaged"] = retain_lift
+		return rejected
+	if maximum_into < into_threshold and not finishing_lift:
 		rejected["reason"] = "separating"
+		rejected["engaged"] = retain_lift
 		return rejected
 
 	var capsules: Array[Dictionary] = []
@@ -140,7 +155,7 @@ func build_proposal(
 			clearance.append_array(_clearance_capsules(region, leading_center, leading_normal))
 	var native_paths: Array[Dictionary] = []
 	if model_id == "sy135":
-		native_paths = _build_sy135_native_paths(tool_snapshot)
+		native_paths = _build_sy135_native_paths(tool_snapshot, finishing_lift)
 		if native_paths.is_empty():
 			rejected["reason"] = "empty_native_sweep"
 			return rejected
@@ -166,6 +181,7 @@ func build_proposal(
 		"native_paths": native_paths,
 		"probe_world": leading_center,
 		"quality_flags": [
+			"engaged_lift_exit" if finishing_lift else "leading_front_admission",
 			"continuous_half_voxel_subdivision",
 			"constrained_clearance",
 			"native_sdf_path" if not native_paths.is_empty() else "exact_sdf_fallback",
@@ -184,6 +200,61 @@ func build_proposal(
 		"minimum_sdf": minimum_sdf,
 		"into_material_m": maximum_into,
 	}
+
+
+func _within_lift_exit_envelope(tool_snapshot: Dictionary) -> bool:
+	var inner := _find_region(tool_snapshot, "inner_shell")
+	var half := _box_half_dimensions(inner)
+	var current := inner.get("current_transform", Transform3D.IDENTITY) as Transform3D
+	if half == Vector3.ZERO or not current.is_finite():
+		return false
+	var bounds := current * AABB(-half, half * 2.0)
+	if bounds.position.y < WorkZoneConfig.INITIAL_SURFACE_Y:
+		return true
+	for point in _lip_bridge_points(tool_snapshot, 1.0):
+		if point.y < WorkZoneConfig.INITIAL_SURFACE_Y:
+			return true
+	return false
+
+
+func _has_upward_motion(tool_snapshot: Dictionary) -> bool:
+	var inner := _find_region(tool_snapshot, "inner_shell")
+	var previous := inner.get("previous_transform", Transform3D.IDENTITY) as Transform3D
+	var current := inner.get("current_transform", Transform3D.IDENTITY) as Transform3D
+	var edge := _find_region(tool_snapshot, "teeth_main_edge")
+	var previous_edge := edge.get("previous_center_world", previous.origin) as Vector3
+	var current_edge := edge.get("current_center_world", current.origin) as Vector3
+	return maxf(current.origin.y - previous.origin.y, current_edge.y - previous_edge.y) > MIN_INTO_MATERIAL_M
+
+
+func _has_lift_exit_contact(tool_snapshot: Dictionary, sdf_sampler: Callable, require_lift: bool = true) -> bool:
+	var inner := _find_region(tool_snapshot, "inner_shell")
+	var dimensions := _box_half_dimensions(inner)
+	if dimensions == Vector3.ZERO:
+		return false
+	var previous := inner.get("previous_transform", Transform3D.IDENTITY) as Transform3D
+	var current := inner.get("current_transform", Transform3D.IDENTITY) as Transform3D
+	if require_lift and not _has_upward_motion(tool_snapshot):
+		return false
+	# Use the world-vertical lower envelope, not the box's local +Y face.
+	# The latter may be airborne while the rotated bottom is still in soil.
+	for alpha in [0.0, 0.5, 1.0]:
+		var transform := previous.interpolate_with(current, float(alpha))
+		var lower_points := _roof_lower_points(transform, dimensions)
+		lower_points.append_array(_lip_bridge_points(tool_snapshot, float(alpha)))
+		for lower in lower_points:
+			if lower.y > WorkZoneConfig.INITIAL_SURFACE_Y:
+				continue
+			# Check the same vertical column emitted by cleanup. Surface-only
+			# contact misses thin remnants after the original roof was removed.
+			var top_y := WorkZoneConfig.INITIAL_SURFACE_Y - voxel_scale_m * 0.25
+			var steps := clampi(ceili(absf(top_y - lower.y) / voxel_scale_m), 1, 32)
+			for step in range(steps + 1):
+				var point := Vector3(lower.x, lerpf(lower.y, top_y, float(step) / steps), lower.z)
+				var value: Variant = sdf_sampler.call(point)
+				if value is Dictionary and bool(value.get("valid", false)) and float(value.get("sdf", INF)) <= 0.0:
+					return true
+	return false
 
 
 func _segment_sweep_capsules(region: Dictionary, clearance: bool) -> Array[Dictionary]:
@@ -227,7 +298,7 @@ func _clearance_capsules(region: Dictionary, leading_center: Vector3, leading_no
 	return result
 
 
-func _build_sy135_native_paths(tool_snapshot: Dictionary) -> Array[Dictionary]:
+func _build_sy135_native_paths(tool_snapshot: Dictionary, finishing_lift: bool = false) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for region_id in CUT_REGION_IDS:
 		var cut_region := _find_region(tool_snapshot, region_id)
@@ -244,7 +315,7 @@ func _build_sy135_native_paths(tool_snapshot: Dictionary) -> Array[Dictionary]:
 			"bucket_occupancy",
 			NATIVE_SURFACE_RADIUS_VOXELS,
 		))
-		result.append_array(_overburden_cleanup_paths(inner))
+		result.append_array(_overburden_cleanup_paths(inner, finishing_lift))
 	var floor := _find_region(tool_snapshot, "floor_wear_plate")
 	if not floor.is_empty():
 		result.append_array(_box_surface_paths(
@@ -254,7 +325,81 @@ func _build_sy135_native_paths(tool_snapshot: Dictionary) -> Array[Dictionary]:
 			"bucket_floor",
 			NATIVE_SURFACE_RADIUS_VOXELS,
 		))
-	return _combine_native_paths_by_role(result)
+	var combined := _combine_native_paths_by_role(result)
+	# Preserve lip path boundaries: joining the old wear-plate lane's end to
+	# the lip's opposite corner would cut an unintended diagonal connector.
+	combined.append_array(_lip_bridge_paths(tool_snapshot, finishing_lift))
+	return combined
+
+
+func _lip_bridge_points(tool_snapshot: Dictionary, alpha: float) -> Array[Vector3]:
+	# The contract's cavity and short wear plate stop behind the tooth line.
+	# Cover the working lip between those two edges, not an enlarged cavity.
+	var result: Array[Vector3] = []
+	var edge := _find_region(tool_snapshot, "teeth_main_edge")
+	var floor := _find_region(tool_snapshot, "floor_wear_plate")
+	var half := _box_half_dimensions(floor)
+	var previous := _typed_points(edge.get("previous_points", []))
+	var current := _typed_points(edge.get("current_points", []))
+	if half == Vector3.ZERO or previous.size() != 3 or current.size() != 3:
+		return result
+	var floor_previous := floor.get("previous_transform", Transform3D.IDENTITY) as Transform3D
+	var floor_current := floor.get("current_transform", Transform3D.IDENTITY) as Transform3D
+	var transform := floor_previous.interpolate_with(floor_current, alpha)
+	var tooth_left := previous[0].lerp(current[0], alpha)
+	var tooth_right := previous[2].lerp(current[2], alpha)
+	var tooth_center := (tooth_left + tooth_right) * 0.5
+	var front_z := half.z
+	if (transform * Vector3(0, 0, -half.z)).distance_squared_to(tooth_center) < (transform * Vector3(0, 0, half.z)).distance_squared_to(tooth_center):
+		front_z = -half.z
+	var floor_left := transform * Vector3(-half.x, 0, front_z)
+	var floor_right := transform * Vector3(half.x, 0, front_z)
+	if floor_left.distance_squared_to(tooth_left) > floor_right.distance_squared_to(tooth_left):
+		var swap := floor_left
+		floor_left = floor_right
+		floor_right = swap
+	var spacing := NATIVE_SURFACE_RADIUS_VOXELS * voxel_scale_m * 1.2
+	var width_steps := maxi(1, ceili(tooth_left.distance_to(tooth_right) / spacing))
+	var depth_steps := maxi(1, ceili(maxf(tooth_left.distance_to(floor_left), tooth_right.distance_to(floor_right)) / spacing))
+	for width in range(width_steps + 1):
+		var fraction := float(width) / width_steps
+		var tooth := tooth_left.lerp(tooth_right, fraction)
+		var plate := floor_left.lerp(floor_right, fraction)
+		for depth in range(depth_steps + 1):
+			var along := float(depth if width % 2 == 0 else depth_steps - depth) / depth_steps
+			result.append(tooth.lerp(plate, along))
+	return result
+
+
+func _lip_bridge_paths(tool_snapshot: Dictionary, finishing_lift: bool) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var transforms := _sweep_transforms(_find_region(tool_snapshot, "floor_wear_plate"))
+	var surface := PackedVector3Array()
+	var roof := PackedVector3Array()
+	var cutoff := WorkZoneConfig.INITIAL_SURFACE_Y - (0.0 if finishing_lift else voxel_scale_m * 1.5)
+	for index in transforms.size():
+		var points := _lip_bridge_points(tool_snapshot, float(index) / maxi(1, transforms.size() - 1))
+		if index % 2 == 1:
+			points.reverse()
+		for point in points:
+			_append_distinct_path_point(surface, point)
+			if point.y >= cutoff:
+				continue
+			var upper := Vector3(point.x, WorkZoneConfig.INITIAL_SURFACE_Y + voxel_scale_m * 0.5, point.z)
+			var reverse := (roof.size() / 2) % 2 == 1
+			_append_distinct_path_point(roof, upper if reverse else point)
+			_append_distinct_path_point(roof, point if reverse else upper)
+	if surface.size() >= 2:
+		result.append(_native_path("floor:tooth_lip", "bucket_floor", surface, NATIVE_SURFACE_RADIUS_VOXELS))
+	if roof.size() >= 2:
+		result.append(_native_path("overburden:tooth_lip", "overburden_cleanup", roof, NATIVE_OVERBURDEN_RADIUS_VOXELS))
+	return result
+
+
+func _append_distinct_path_point(points: PackedVector3Array, world: Vector3) -> void:
+	var point := WorkZoneConfig.world_to_voxel(world, voxel_scale_m)
+	if points.is_empty() or points[points.size() - 1].distance_squared_to(point) > 0.00000001:
+		points.append(point)
 
 
 func _region_swept_path(region: Dictionary, role: String) -> Dictionary:
@@ -293,6 +438,11 @@ func _box_surface_paths(
 	var transforms := _sweep_transforms(region)
 	if transforms.size() < 2:
 		return result
+	# Round lanes must cover the diagonal between neighbours, not merely
+	# overlap along each axis. Reserve radius for temporal subdivision too.
+	if role == "bucket_occupancy":
+		width_fractions = _coverage_fractions(dimensions.x, radius_voxels)
+		height_fractions = _coverage_fractions(dimensions.y, radius_voxels)
 	for width_value in width_fractions:
 		var width_fraction := float(width_value)
 		for height_value in height_fractions:
@@ -319,45 +469,65 @@ func _box_surface_paths(
 	return result
 
 
-func _overburden_cleanup_paths(inner_region: Dictionary) -> Array[Dictionary]:
+func _coverage_fractions(half_extent: float, radius_voxels: float) -> Array:
+	var count := maxi(1, ceili(2.0 * half_extent / (radius_voxels * voxel_scale_m * 1.2)))
+	var fractions: Array = []
+	for index in count:
+		fractions.append(-1.0 + (2.0 * index + 1.0) / count)
+	return fractions
+
+
+func _roof_lower_points(transform: Transform3D, half: Vector3) -> Array[Vector3]:
+	var result: Array[Vector3] = []
+	var bounds := transform * AABB(-half, half * 2.0)
+	var inverse := transform.affine_inverse()
+	var direction := inverse.basis * Vector3.UP
+	var spacing := NATIVE_OVERBURDEN_RADIUS_VOXELS * voxel_scale_m * 1.2
+	var count_x := maxi(1, ceili(bounds.size.x / spacing))
+	var count_z := maxi(1, ceili(bounds.size.z / spacing))
+	for ix in count_x:
+		for iz in count_z:
+			var world := Vector3(bounds.position.x + bounds.size.x * (ix + 0.5) / count_x,
+				transform.origin.y, bounds.position.z + bounds.size.z * (iz + 0.5) / count_z)
+			var local := inverse * world
+			var lower := -INF
+			var upper := INF
+			var intersects := true
+			for axis in 3:
+				if absf(direction[axis]) < 0.000001:
+					if absf(local[axis]) > half[axis]:
+						intersects = false
+						break
+					continue
+				var a := (-half[axis] - local[axis]) / direction[axis]
+				var b := (half[axis] - local[axis]) / direction[axis]
+				lower = maxf(lower, minf(a, b))
+				upper = minf(upper, maxf(a, b))
+			if intersects and lower <= upper:
+				result.append(world + Vector3.UP * lower)
+	return result
+
+
+func _overburden_cleanup_paths(inner_region: Dictionary, finishing_lift: bool = false) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	var dimensions := _box_half_dimensions(inner_region)
 	if dimensions == Vector3.ZERO:
 		return result
-	var transforms := _sweep_transforms(inner_region)
-	if transforms.size() < 2:
-		return result
 	var cleanup_top_y := WorkZoneConfig.INITIAL_SURFACE_Y + voxel_scale_m * 0.5
-	for width_value in OCCUPANCY_WIDTH_FRACTIONS:
-		var width_fraction := float(width_value)
-		for depth_value in OVERBURDEN_DEPTH_FRACTIONS:
-			var depth_fraction := float(depth_value)
-			var points := PackedVector3Array()
-			var penetrated := false
-			for sample_index in transforms.size():
-				var transform := transforms[sample_index]
-				var lower := transform * Vector3(
-					dimensions.x * width_fraction,
-					dimensions.y * 0.82,
-					dimensions.z * depth_fraction,
-				)
-				if lower.y >= WorkZoneConfig.INITIAL_SURFACE_Y - voxel_scale_m * 1.5:
-					continue
-				penetrated = true
-				var upper := Vector3(lower.x, cleanup_top_y, lower.z)
-				if sample_index % 2 == 0:
-					points.append(WorkZoneConfig.world_to_voxel(lower, voxel_scale_m))
-					points.append(WorkZoneConfig.world_to_voxel(upper, voxel_scale_m))
-				else:
-					points.append(WorkZoneConfig.world_to_voxel(upper, voxel_scale_m))
-					points.append(WorkZoneConfig.world_to_voxel(lower, voxel_scale_m))
-			if penetrated and points.size() >= 2:
-				result.append(_native_path(
-					"overburden:%+.2f:%+.2f" % [width_fraction, depth_fraction],
-					"overburden_cleanup",
-					points,
-					NATIVE_OVERBURDEN_RADIUS_VOXELS,
-				))
+	var cutoff_y := WorkZoneConfig.INITIAL_SURFACE_Y if finishing_lift else WorkZoneConfig.INITIAL_SURFACE_Y - voxel_scale_m * 1.5
+	var points := PackedVector3Array()
+	for transform in _sweep_transforms(inner_region):
+		for lower in _roof_lower_points(transform, dimensions):
+			if lower.y >= cutoff_y:
+				continue
+			var upper := Vector3(lower.x, cleanup_top_y, lower.z)
+			# Alternate vertical direction so connections remain inside the
+			# sampled lower-envelope/roof region. Do not emit degenerate pairs.
+			var reverse := (points.size() / 2) % 2 == 1
+			points.append(WorkZoneConfig.world_to_voxel(upper if reverse else lower, voxel_scale_m))
+			points.append(WorkZoneConfig.world_to_voxel(lower if reverse else upper, voxel_scale_m))
+	if points.size() >= 2:
+		result.append(_native_path("overburden:lower_envelope", "overburden_cleanup", points, NATIVE_OVERBURDEN_RADIUS_VOXELS))
 	return result
 
 
@@ -368,6 +538,8 @@ func _sweep_transforms(region: Dictionary) -> Array[Transform3D]:
 	if not previous.is_finite() or not current.is_finite():
 		return result
 	var maximum_motion := previous.origin.distance_to(current.origin)
+	var rotation := previous.basis.get_rotation_quaternion().angle_to(current.basis.get_rotation_quaternion())
+	maximum_motion += _box_half_dimensions(region).length() * absf(rotation)
 	var samples := clampi(ceili(maximum_motion / (voxel_scale_m * 0.65)) + 1, 2, NATIVE_MAX_SWEEP_SAMPLES)
 	for index in samples:
 		var alpha := float(index) / float(maxi(1, samples - 1))

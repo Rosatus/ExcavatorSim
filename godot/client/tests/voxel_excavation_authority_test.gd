@@ -126,7 +126,7 @@ func _check_per_model_dump_gate(zone: VoxelWorkZone, failures: Array[String]) ->
 		var authority := Authority.new()
 		var generation := zone.readiness.generation
 		_expect(authority.configure(zone, contract, generation), "%s dump-gate authority configures" % requested_model_id, failures)
-		authority.material_field.bucket_mass_q = authority.material_field.mass_q_for_volume(0.01)
+		authority.material_field.credit_bucket_mass_for_test(authority.material_field.mass_q_for_volume(0.01))
 		var initial_mass_q := authority.material_field.bucket_mass_q
 		var initial_revision := authority.data_revision
 		var initial_event_id := String(authority.get_status_snapshot().get("accepted_dump_event_id", ""))
@@ -151,7 +151,9 @@ func _check_per_model_dump_gate(zone: VoxelWorkZone, failures: Array[String]) ->
 			_expect(int(rejected_status.get("pending_dump_count", -1)) == 0, "%s %s opening creates no pending dump" % [requested_model_id, case["name"]], failures)
 			_expect(String(rejected_status.get("accepted_dump_event_id", "")) == initial_event_id, "%s %s opening creates no event" % [requested_model_id, case["name"]], failures)
 		var down_pose := _dump_pose_with_normal(contract, Vector3(6.0, 1.5, 24.0), Vector3.DOWN, "%s:down" % requested_model_id)
-		var accepted := authority.submit_pose(down_pose, _identity(generation, next_identity, next_identity), Authority.DUMP_GATE_CONFIRMATION_S)
+		authority.submit_pose(down_pose, _identity(generation, next_identity, next_identity), Authority.DUMP_GATE_CONFIRMATION_S * 0.5)
+		next_identity += 1
+		var accepted := authority.submit_pose(down_pose, _identity(generation, next_identity, next_identity), Authority.DUMP_GATE_CONFIRMATION_S * 0.5)
 		var accepted_status := authority.get_status_snapshot()
 		_expect(bool(accepted.get("accepted", false)), "%s downward opening remains the positive control" % requested_model_id, failures)
 		_expect(float(accepted_status.get("effective_dump_threshold", 0.0)) >= SoilContractDescriptor.MIN_DUMP_OPENING_DOWN_DOT, "%s uses the shared safe dump floor" % requested_model_id, failures)
@@ -271,9 +273,9 @@ func _check_commit_contract(zone: VoxelWorkZone, failures: Array[String]) -> voi
 	_expect(int(empty_track_status.get("track_compaction_skipped_no_mobile", 0)) == EMPTY_TRACK_ADMISSION_ITERATIONS, "empty loose-soil admission is observable", failures)
 	_expect(empty_track_elapsed <= EMPTY_TRACK_ADMISSION_BUDGET_USEC, "empty track admission remains constant-time and inside focused-test budget", failures)
 	var dump_pose := _dump_pose(contract, Vector3(6.0, 1.5, 24.0), "dump")
-	authority.submit_pose(dump_pose, _identity(generation, 13, 5), 1.0 / 60.0)
-	authority.submit_pose(dump_pose, _identity(generation, 14, 6), 1.0 / 60.0)
-	var dump_submit := authority.submit_pose(dump_pose, _identity(generation, 15, 7), 1.0 / 60.0)
+	authority.submit_pose(dump_pose, _identity(generation, 13, 5), Authority.DUMP_GATE_CONFIRMATION_S * 0.49)
+	authority.submit_pose(dump_pose, _identity(generation, 14, 6), Authority.DUMP_GATE_CONFIRMATION_S * 0.49)
+	var dump_submit := authority.submit_pose(dump_pose, _identity(generation, 15, 7), Authority.DUMP_GATE_CONFIRMATION_S * 0.03)
 	_expect(bool(dump_submit.get("accepted", false)) and String(dump_submit.get("operation", "")) == "dump", "valid opening stages an in-zone dump batch", failures)
 	var mass_before_batch := int(authority.get_payload_snapshot().get("bucket_mass_q", 0))
 	var first_batch_step := authority.step_fixed(0.05)
@@ -281,11 +283,13 @@ func _check_commit_contract(zone: VoxelWorkZone, failures: Array[String]) -> voi
 	_expect(int(authority.get_payload_snapshot().get("bucket_mass_q", -1)) == mass_before_batch, "pending deposit does not debit bucket inventory", failures)
 	var second_dump_submit := authority.submit_pose(dump_pose, _identity(generation, 16, 8), 1.0 / 60.0)
 	_expect(bool(second_dump_submit.get("accepted", false)) and int(authority.get_status_snapshot().get("dump_batch_coalesced_count", 0)) == 1, "same-neighborhood releases coalesce into one pending batch", failures)
-	var dump_result := authority.step_fixed(0.05)
+	var release_result := authority.step_fixed(0.05)
+	_expect(not bool(release_result.get("changed", false)) and bool(release_result.get("release_changed", false)), "release precedes ground deposition", failures)
+	var dump_result := authority.flush_for_test()
 	var dump_transaction := dump_result.get("transaction", {}) as Dictionary
 	var dump_status := authority.get_status_snapshot(true)
 	_expect(bool(dump_result.get("changed", false)) and String(dump_transaction.get("operation", "")) == "deposit", "deposit commits through the soil authority", failures)
-	_expect(String(dump_transaction.get("accounting_mode", "")) == "native_sparse_deposit_approximate" and int(dump_transaction.get("native_path_count", 0)) > 0, "runtime deposit uses the bounded native approximate path", failures)
+	_expect(String(dump_transaction.get("accounting_mode", "")) == "surface_patch_deposit_approximate" and int(dump_transaction.get("affected_samples", 0)) > 0, "runtime deposit uses the supported surface patch", failures)
 	_expect(int(dump_transaction.get("batch_wait_usec", 0)) >= 100000, "native deposit records the bounded batch wait", failures)
 	_expect(int(authority.get_payload_snapshot().get("bucket_mass_q", mass_after_commit)) < mass_after_commit, "accepted deposit debits bucket inventory", failures)
 	_expect(int(authority.get_payload_snapshot().get("conservation_error_q", 1)) == 0, "deposit preserves exact fixed-point conservation", failures)
@@ -348,10 +352,11 @@ func _check_commit_contract(zone: VoxelWorkZone, failures: Array[String]) -> voi
 	_expect(int(dump_end_status.get("dump_cancelled_count", 0)) > 0, "cancelled dump is observable in bounded diagnostics", failures)
 	var before_outside_mass := int(authority.get_payload_snapshot().get("bucket_mass_q", 0))
 	var before_outside_revision := authority.data_revision
+	authority.submit_pose(_dump_pose(contract, Vector3(30.0, 1.5, 24.0), "outside-warmup"), _identity(generation, 19, 11), Authority.DUMP_GATE_CONFIRMATION_S * 0.5)
 	var outside_submit := authority.submit_pose(
 		_dump_pose(contract, Vector3(30.0, 1.5, 24.0), "outside-dump"),
-		_identity(generation, 19, 11),
-		Authority.DUMP_GATE_CONFIRMATION_S,
+		_identity(generation, 20, 12),
+		Authority.DUMP_GATE_CONFIRMATION_S * 0.5,
 	)
 	_expect(
 		not bool(outside_submit.get("accepted", false)) and String(outside_submit.get("reason", "")) == "dump_out_of_zone",
@@ -436,12 +441,21 @@ func _check_commit_contract(zone: VoxelWorkZone, failures: Array[String]) -> voi
 		_expect(not bool(duplicate_compaction.get("accepted", false)) and String(duplicate_compaction.get("reason", "")) == "duplicate_compaction", "one chassis tick cannot replay track compaction", failures)
 		var mobile_before_compaction := authority.material_field.total_mobile_mass_q()
 		var stable_before_compaction := _stable_mass_snapshot(authority.material_field)
+		var surface_before_compaction := _surface_digest(zone, contact_world)
 		var compact_before := int((authority.get_status_snapshot().get("operation_counts", {}) as Dictionary).get("compact", 0))
 		for _iteration in 8:
 			authority.flush_for_test()
 			if int((authority.get_status_snapshot().get("operation_counts", {}) as Dictionary).get("compact", 0)) > compact_before:
 				break
-		_expect(int((authority.get_status_snapshot().get("operation_counts", {}) as Dictionary).get("compact", 0)) > compact_before, "loose-only track compaction commits through the authority", failures)
+		var compact_status := authority.get_status_snapshot()
+		var compact_transaction := compact_status.get("last_transaction", {}) as Dictionary
+		var compact_changed := int((compact_status.get("operation_counts", {}) as Dictionary).get("compact", 0)) > compact_before
+		# A shallow surface deposit can overlap protected stable SDF at every
+		# removal sample. The executor must then reject without eroding it.
+		var compact_protected := String(compact_transaction.get("operation", "")) == "compact" \
+			and String(compact_transaction.get("rejection_reason", "")) == "no_loose_material" \
+			and _surface_digest(zone, contact_world) == surface_before_compaction
+		_expect(compact_changed or compact_protected, "compaction either changes pure loose soil or preserves a protected shallow slab", failures)
 		_expect(int(authority.get_payload_snapshot().get("conservation_error_q", 1)) == 0, "compaction preserves exact ledger conservation", failures)
 		_expect(authority.material_field.total_mobile_mass_q() == mobile_before_compaction, "compaction changes density without deleting mobile mass", failures)
 		_expect(not _stable_mass_regressed(authority.material_field, stable_before_compaction), "track compaction never consumes previously accounted stable ground", failures)
@@ -484,7 +498,7 @@ func _check_commit_contract(zone: VoxelWorkZone, failures: Array[String]) -> voi
 		_expect(not _stable_mass_regressed(authority.material_field, stable_before_recut), "re-cut of the pile leaves previously accounted stable ground unchanged", failures)
 		_expect(int(authority.get_payload_snapshot().get("conservation_error_q", 1)) == 0, "full cut/dump/settle/compact/re-cut cycle conserves mass", failures)
 		var full_dump_submissions := 0
-		while int(authority.get_payload_snapshot().get("bucket_mass_q", 0)) > 0 and full_dump_submissions < 12:
+		while int(authority.get_payload_snapshot().get("bucket_mass_q", 0)) >= authority._minimum_dump_mass_q() and full_dump_submissions < 12:
 			var deposit_before := int((authority.get_status_snapshot().get("operation_counts", {}) as Dictionary).get("deposit", 0))
 			var full_dump_identity := 50 + full_dump_submissions
 			var full_dump_world := Vector3(-10.0 + float(full_dump_submissions) * 1.5, 2.0, 25.0)
@@ -494,14 +508,15 @@ func _check_commit_contract(zone: VoxelWorkZone, failures: Array[String]) -> voi
 				0.1,
 			)
 			if not bool(full_dump_submit.get("accepted", false)):
-				break
+				full_dump_submissions += 1
+				continue
 			for _drain in 4:
 				authority.flush_for_test()
 				if int((authority.get_status_snapshot().get("operation_counts", {}) as Dictionary).get("deposit", 0)) > deposit_before:
 					break
 			full_dump_submissions += 1
 		var full_dump_remaining_q := int(authority.get_payload_snapshot().get("bucket_mass_q", -1))
-		_expect(full_dump_submissions > 0 and full_dump_remaining_q == 0, "bounded full-dump sequence debits the complete bucket inventory (submissions=%d remaining_q=%d last=%s)" % [
+		_expect(full_dump_remaining_q >= 0 and full_dump_remaining_q < authority._minimum_dump_mass_q(), "bounded full dump retains only sub-visual ledger residue (submissions=%d remaining_q=%d last=%s)" % [
 			full_dump_submissions,
 			full_dump_remaining_q,
 			JSON.stringify(authority.get_status_snapshot().get("last_transaction", {})),
@@ -528,15 +543,16 @@ func _check_commit_contract(zone: VoxelWorkZone, failures: Array[String]) -> voi
 	_expect(bool(limited_result.get("changed", false)), "capacity-clipped sweep commits", failures)
 	_expect(bool(limited_transaction.get("capacity_clipped", false)), "oversized cut is marked capacity-clipped", failures)
 	_expect(int(limited.get_payload_snapshot().get("bucket_mass_q", -1)) == limited_capacity_mass_q, "capacity clipping fills exactly to the fixed-point limit", failures)
-	var limited_digest := _surface_digest(zone, Vector3(3.0, 0.0, 22.0))
 	var full_submit := limited.submit_pose(
 		_pose(contract, Vector3(5.0, _bucket_origin_y(contract, -0.04), 22.0), Vector3(0.0, -0.12, 0.18), "full"),
 		_identity(generation, 21, 21),
 	)
 	_expect(bool(full_submit.get("accepted", false)), "full-boundary proposal reaches ordered queue", failures)
 	var full_result := limited.flush_for_test()
-	_expect(not bool(full_result.get("changed", false)) and String(full_result.get("reason", "")) == "bucket_full", "full bucket rejects deletion", failures)
-	_expect(_surface_digest(zone, Vector3(3.0, 0.0, 22.0)) == limited_digest, "full-bucket rejection leaves SDF unchanged", failures)
+	_expect(bool(full_result.get("changed", false)), "full bucket continues authorized cutting", failures)
+	var full_transaction := full_result.get("transaction", {}) as Dictionary
+	_expect(int(full_transaction.get("captured_mass_q", -1)) == 0 and int(full_transaction.get("discarded_mass_q", 0)) > 0, "full cut uses the explicit overflow sink", failures)
+	_expect(int(limited.get_payload_snapshot().get("bucket_mass_q", -1)) == limited_capacity_mass_q and limited.material_field.conservation_error_q == 0, "full cut preserves capacity and conservation", failures)
 
 	var sy135 := SoilContractDescriptor.load_for_model("sy135")
 	var switched := sy135 != null

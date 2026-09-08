@@ -183,10 +183,7 @@ func _teardown_runtime() -> void:
 
 
 func _make_soil_material() -> StandardMaterial3D:
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color("765537")
-	material.roughness = 0.96
-	return material
+	return preload("res://scripts/soil_visual_resources.gd").surface_material(true)
 
 
 func _module_contract_available() -> bool:

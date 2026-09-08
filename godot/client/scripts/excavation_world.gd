@@ -149,6 +149,7 @@ func _physics_process(delta: float) -> void:
 		if bool(voxel_result.get("changed", false)):
 			var transaction := voxel_result.get("transaction", {}) as Dictionary
 			_last_interaction = "dump" if String(transaction.get("operation", "cut")) == "deposit" else String(transaction.get("operation", "cut"))
+		if bool(voxel_result.get("changed", false)) or bool(voxel_result.get("release_changed", false)):
 			excavation_changed.emit(get_status_snapshot())
 		_queue_backend_feedback()
 		return
@@ -664,6 +665,8 @@ func get_soil_visual_snapshot() -> Dictionary:
 		"transaction_queued": bool(_last_interaction_batch.get("transaction_queued", false)),
 		"last_transaction": last_transaction if _selected_soil_mode() == "voxel" else last_transaction.duplicate(true),
 		"accepted_dump_event_id": String(visual_source.get("accepted_dump_event_id", "")),
+		"flight_queue_depth": int(visual_source.get("flight_queue_depth", 0)),
+		"in_flight_mass_q": int(visual_source.get("in_flight_mass_q", 0)),
 		"accepted_dump_event": visual_source.get("accepted_dump_event", {}) if _selected_soil_mode() == "voxel" \
 			else (visual_source.get("accepted_dump_event", {}) as Dictionary).duplicate(true),
 		"dump_release_world": visual_source.get("dump_release_world", Vector3.ZERO),

@@ -6,8 +6,11 @@ extends "res://scripts/voxel_excavation_authority.gd"
 func _native_coverage_coordinates(
 	paths: Array[Dictionary],
 	origin: Vector3i,
-	size: Vector3i
+	size: Vector3i,
+	geometry_candidates: Dictionary = {}
 ) -> Array[Vector3i]:
+	# This frozen oracle compares credit coordinates, not residual admission.
+	geometry_candidates.clear()
 	var unique: Dictionary = {}
 	var bounds := WorkZoneConfig.voxel_bounds(_work_zone.voxel_scale_m)
 	var bounds_min := Vector3i(ceil(bounds.position.x), ceil(bounds.position.y), ceil(bounds.position.z))

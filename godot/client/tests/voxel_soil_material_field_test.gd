@@ -94,6 +94,8 @@ func _init() -> void:
 	var diagnostic_status := approximate.get_status_snapshot()
 	_expect(not diagnostic_digest.is_empty() and not bool(diagnostic_status.get("material_state_digest_deferred", true)), "explicit diagnostics publish the current material digest", failures)
 	var repeated_stage := approximate.stage_approximate_cut(approximate_coordinates, cell_volume)
+	_expect(approximate.has_credited_cut_coordinates(approximate_coordinates), "credit receipt can authorize geometry-only cleanup", failures)
+	_expect(not approximate.has_credited_cut_coordinates([]) and not approximate.has_credited_cut_coordinates([Vector3i(99, 99, 99)]), "empty or uncredited cells cannot authorize geometry-only cleanup", failures)
 	_expect(not bool(repeated_stage.get("valid", false)), "coverage prevents repeated credit for the same cut cells", failures)
 	var approximate_deposit_changes: Array[Dictionary] = [{
 		"coordinate": Vector3i(8, -2, 12),
@@ -104,6 +106,7 @@ func _init() -> void:
 	}]
 	var approximate_deposit := approximate.stage_deposit(approximate_deposit_changes, approximate_mass_q)
 	_expect(approximate.commit_deposit(approximate_deposit), "deposit invalidates approximate coverage", failures)
+	_expect(not approximate.has_credited_cut_coordinates(approximate_coordinates), "deposit also invalidates geometry-only credit receipt", failures)
 	var recut_stage := approximate.stage_approximate_cut([Vector3i(8, -2, 12)], cell_volume)
 	_expect(bool(recut_stage.get("valid", false)), "deposited cell can be credited by a later cut", failures)
 	if failures.is_empty():

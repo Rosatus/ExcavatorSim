@@ -13,6 +13,10 @@ func _run() -> void:
 	for model_id in ["sy205", "sy135"]:
 		_check_model(String(model_id), failures)
 	_check_sy135_deep_insertion(failures)
+	_check_sy135_lift_exit(failures)
+	_check_occupancy_volume(failures)
+	_check_tooth_lip_bridge(failures)
+	_check_rotated_shallow_roof(failures)
 	_check_negative_cases(failures)
 	_check_sy135_unengaged_negative_cases(failures)
 	if failures.is_empty():
@@ -79,6 +83,193 @@ func _has_role(paths: Array[Dictionary], role: String) -> bool:
 		if String(path.get("role", "")) == role or (path.get("components", []) as Array).has(role):
 			return true
 	return false
+
+
+func _check_sy135_lift_exit(failures: Array[String]) -> void:
+	var contract := _contract("sy135")
+	var cutter := Cutter.new()
+	cutter.configure(contract, WorkZoneConfig.DEFAULT_VOXEL_SCALE_M)
+	var start := Vector3(0.0, _bucket_origin_y(contract, -0.45), 24.0)
+	var previous := Transform3D(Basis.IDENTITY, start)
+	var current := Transform3D(Basis(Vector3.RIGHT, deg_to_rad(25.0)), start + Vector3(0.04, 0.08, 0.07))
+	var pose := _pose(contract, previous, current, "sy135:lift-exit")
+	var result := cutter.build_proposal(pose, 8, 21, 21, "epoch", true, _flat_sdf)
+	var held_pose := _pose(contract, previous, previous, "engaged-hold")
+	var held := cutter.build_proposal(held_pose, 8, 19, 19, "epoch", true, _flat_sdf)
+	_expect(not bool(held["accepted"]) and bool(held["engaged"]), "engaged stationary hold retains contact without a cut", failures)
+	var held_air := cutter.build_proposal(held_pose, 8, 19, 19, "epoch", true,
+		func(_point: Vector3) -> Dictionary: return {"valid": true, "sdf": 1.0, "gradient_world": Vector3.UP})
+	_expect(not bool(held_air["accepted"]) and bool(held_air["engaged"]), "pause in cleared cavity retains episode without a cut", failures)
+	var fresh_air := cutter.build_proposal(held_pose, 8, 19, 19, "epoch", false,
+		func(_point: Vector3) -> Dictionary: return {"valid": true, "sdf": 1.0, "gradient_world": Vector3.UP})
+	_expect(not bool(fresh_air["engaged"]), "cleared cavity cannot initiate an episode", failures)
+	var invalid_hold := cutter.build_proposal(held_pose, 8, 19, 19, "epoch", true,
+		func(_point: Vector3) -> Dictionary: return {"valid": false})
+	_expect(not bool(invalid_hold["engaged"]), "invalid SDF retires held episode", failures)
+	var high := Transform3D(Basis.IDENTITY, start + Vector3.UP * 3)
+	var exited_hold := cutter.build_proposal(_pose(contract, high, high, "exited"), 8, 19, 19, "epoch", true,
+		func(_point: Vector3) -> Dictionary: return {"valid": true, "sdf": 1.0, "gradient_world": Vector3.UP})
+	_expect(not bool(exited_hold["engaged"]), "fully exited stationary bucket retires episode", failures)
+	var sideways := Transform3D(previous.basis, previous.origin + Vector3.RIGHT * 0.04)
+	var departed := cutter.build_proposal(_pose(contract, previous, sideways, "sideways-clear"), 8, 19, 19, "epoch", true,
+		func(_point: Vector3) -> Dictionary: return {"valid": true, "sdf": 2.0, "gradient_world": Vector3.UP})
+	_expect(not bool(departed["accepted"]) and not bool(departed["engaged"]), "non-lifting traversal through air retires episode", failures)
+	var buried := cutter.build_proposal(pose, 8, 20, 20, "epoch", true,
+		func(point: Vector3) -> Dictionary: return {"valid": true, "sdf": -0.2 if point.y < -0.1 else 1.0, "gradient_world": Vector3.UP})
+	_expect(bool(buried["accepted"]), "lift detects residual below a cleared original surface", failures)
+	_expect(bool(result.get("accepted", false)), "engaged lifting finishes trailing surface sweep (%s)" % result.get("reason", ""), failures)
+	if bool(result.get("accepted", false)):
+		var proposal := result["proposal"] as VoxelCutProposal
+		_expect(proposal.quality_flags.has("engaged_lift_exit"), "lift uses bounded continuation rather than new leading admission", failures)
+		_expect(_has_role(proposal.native_paths, "overburden_cleanup"), "lift exit includes shallow roof cleanup", failures)
+	var unengaged := cutter.build_proposal(pose, 8, 22, 22, "epoch", false, _flat_sdf)
+	_expect(not bool(unengaged.get("accepted", false)), "same lift cannot initiate an unengaged cut", failures)
+	var slope_contact := cutter.build_proposal(pose, 8, 24, 24, "epoch", true,
+		func(point: Vector3) -> Dictionary: return {"valid": true, "sdf": minf(0.0, point.y / 0.125), "gradient_world": Vector3.FORWARD})
+	_expect(bool(slope_contact.get("accepted", false)), "lift can remain in contact with an advancing front", failures)
+	if bool(slope_contact.get("accepted", false)):
+		_expect((slope_contact["proposal"] as VoxelCutProposal).quality_flags.has("engaged_lift_exit"),
+			"lifting while leading gate still passes also receives shallow cleanup", failures)
+	var air := cutter.build_proposal(pose, 8, 23, 23, "epoch", true,
+		func(_point: Vector3) -> Dictionary: return {"valid": true, "sdf": 1.0, "gradient_world": Vector3.UP})
+	_expect(not bool(air.get("accepted", false)), "continuation ends once residual surface is cleared", failures)
+	# A shallow shell roof used to disappear from cleanup at 1.5 voxel depth.
+	var shallow := {"shape": {"kind": "box", "size_m": [0.6, 0.1, 0.6]},
+		"previous_transform": Transform3D(Basis.IDENTITY, Vector3(0, -0.12, 24)),
+		"current_transform": Transform3D(Basis.IDENTITY, Vector3(0, -0.08, 24.04))}
+	_expect(cutter._overburden_cleanup_paths(shallow).is_empty(), "ordinary shallow cut retains existing roof policy", failures)
+	_expect(not cutter._overburden_cleanup_paths(shallow, true).is_empty(), "authorized shallow exit closes roof gap", failures)
+	# Check between old depth strips, not just path centerlines.
+	var exit_paths := cutter._overburden_cleanup_paths(shallow, true)
+	for depth in [-0.72, -0.36, 0.0, 0.36, 0.72]:
+		var point := WorkZoneConfig.world_to_voxel(Vector3(0.0, 0.0, 24.0 + 0.3 * float(depth)))
+		var covered := false
+		for path in exit_paths:
+			var points := path["points_voxels"] as PackedVector3Array
+			var radii := path["radii_voxels"] as PackedFloat32Array
+			for index in range(points.size() - 1):
+				if _distance_to_segment(point, points[index], points[index + 1]) <= radii[index]:
+					covered = true
+		_expect(covered, "lift cleanup covers surface between depth strips at %.2f" % depth, failures)
+	var rotation := {"shape": {"kind": "box", "size_m": [1.0, 1.0, 1.0]},
+		"previous_transform": Transform3D.IDENTITY,
+		"current_transform": Transform3D(Basis(Vector3.RIGHT, deg_to_rad(25)), Vector3.ZERO)}
+	_expect(cutter._sweep_transforms(rotation).size() > 2, "rotation-only sweep samples corner arc instead of origin distance", failures)
+
+
+func _check_tooth_lip_bridge(failures: Array[String]) -> void:
+	var contract := _contract("sy135")
+	var cutter := Cutter.new()
+	cutter.configure(contract, WorkZoneConfig.DEFAULT_VOXEL_SCALE_M)
+	for yaw in [0.0, 0.8, 2.7]:
+		var basis := Basis(Vector3.UP, yaw) * Basis(Vector3.FORWARD, 0.15)
+		var current := Transform3D(basis, Vector3(0, -1.5, 24))
+		var previous := Transform3D(basis, current.origin - Vector3.UP * 0.01)
+		var pose := _pose(contract, previous, current, "lip")
+		var paths := cutter._build_sy135_native_paths(pose.soil_tool, true)
+		var lip: Dictionary = {}
+		for path in paths:
+			if path.path_id == "floor:tooth_lip":
+				lip = path
+			var points: PackedVector3Array = path.points_voxels
+			for i in range(points.size() - 1):
+				_expect(points[i].distance_squared_to(points[i + 1]) > 0.00000001, "final lip proposal has no degenerate segments", failures)
+		_expect(not lip.is_empty(), "lip retains separate native path boundary", failures)
+		if lip.is_empty():
+			continue
+		var target := WorkZoneConfig.world_to_voxel(current * Vector3(0, 0.184, -1.104))
+		var outside := WorkZoneConfig.world_to_voxel(current * Vector3(0.8, 0.184, -1.104))
+		var covered := false
+		var exterior_covered := false
+		var points: PackedVector3Array = lip.points_voxels
+		for i in range(points.size() - 1):
+			covered = covered or _distance_to_segment(target, points[i], points[i + 1]) < lip.radii_voxels[i]
+			exterior_covered = exterior_covered or _distance_to_segment(outside, points[i], points[i + 1]) < lip.radii_voxels[i]
+		_expect(covered and not exterior_covered, "rotated lip covers working span and preserves exterior", failures)
+
+
+func _check_occupancy_volume(failures: Array[String]) -> void:
+	var cutter := Cutter.new()
+	cutter.configure(_contract("sy135"), WorkZoneConfig.DEFAULT_VOXEL_SCALE_M)
+	var region := {"region_id": "inner_shell", "shape": {"kind": "box", "size_m": [0.94, 0.64, 0.78]},
+		"previous_transform": Transform3D(Basis.IDENTITY, Vector3(0, -1, 24)),
+		"current_transform": Transform3D(Basis.IDENTITY, Vector3(0, -0.996, 24))}
+	var paths := cutter._box_surface_paths(region, Cutter.OCCUPANCY_WIDTH_FRACTIONS,
+		Cutter.OCCUPANCY_HEIGHT_FRACTIONS, "bucket_occupancy", Cutter.NATIVE_SURFACE_RADIUS_VOXELS)
+	var missed := 0
+	# Independent dense cross-section, including lane midpoints and box edges.
+	for x in range(25):
+		for y in range(19):
+			for z in [-0.38, 0.0, 0.38]:
+				var point := WorkZoneConfig.world_to_voxel(Vector3(lerpf(-0.46, 0.46, x / 24.0),
+					-1.0 + lerpf(-0.31, 0.31, y / 18.0), 24.0 + float(z)))
+				var covered := false
+				for path in paths:
+					var points := path["points_voxels"] as PackedVector3Array
+					var radii := path["radii_voxels"] as PackedFloat32Array
+					for index in range(points.size() - 1):
+						if _distance_to_segment(point, points[index], points[index + 1]) < radii[index]:
+							covered = true
+				if not covered:
+					missed += 1
+	print("OCCUPANCY_VOLUME missed=%d/1425" % missed)
+	_expect(missed == 0, "whole inner volume has no gaps between round brush lanes (%d missed)" % missed, failures)
+	region["previous_transform"] = Transform3D(Basis.IDENTITY, Vector3(0, -0.3, 24))
+	region["current_transform"] = Transform3D(Basis.IDENTITY, Vector3(0.02, -0.13, 24.08))
+	var roof_paths := cutter._overburden_cleanup_paths(region, true)
+	var degenerate := 0
+	var last_crossing_covered := false
+	# Independent intersection of the trailing lane with the world surface.
+	# Inspect every segment too: a zero-length native capsule can corrupt SDF.
+	var crossing := WorkZoneConfig.world_to_voxel(Vector3(0.01, 0.0, 24.39))
+	for path in roof_paths:
+		var points := path["points_voxels"] as PackedVector3Array
+		var radii := path["radii_voxels"] as PackedFloat32Array
+		for index in range(points.size() - 1):
+			if points[index].distance_squared_to(points[index + 1]) < 0.00000001:
+				degenerate += 1
+			if _distance_to_segment(crossing, points[index], points[index + 1]) < radii[index]:
+				last_crossing_covered = true
+	_expect(degenerate == 0, "roof cutoff crossing emits no zero-length native segment", failures)
+	_expect(last_crossing_covered, "trailing surface intersection is covered during exit", failures)
+
+
+func _check_rotated_shallow_roof(failures: Array[String]) -> void:
+	var cutter := Cutter.new()
+	var contract := _contract("sy135")
+	cutter.configure(contract, WorkZoneConfig.DEFAULT_VOXEL_SCALE_M)
+	var previous := Transform3D(Basis(Vector3.RIGHT, deg_to_rad(25)), Vector3(0, -0.12, 24))
+	var current := Transform3D(previous.basis, previous.origin + Vector3(0, 0.025, 0.025))
+	var pose := _pose(contract, previous, current, "shallow-rotated-roof")
+	var result := cutter.build_proposal(pose, 1, 1, 1, "epoch", true, _flat_sdf)
+	_expect(bool(result.get("accepted", false)), "shallow rotated inner bottom still authorizes engaged exit", failures)
+	var inner := cutter._find_region(pose["soil_tool"], "inner_shell")
+	var half := cutter._box_half_dimensions(inner)
+	var transform := inner["current_transform"] as Transform3D
+	var paths := cutter._overburden_cleanup_paths(inner, true)
+	var missed := 0
+	var checked := 0
+	# Independently project the whole submerged volume, not the selected +Y face.
+	for ix in range(9):
+		for iy in range(9):
+			for iz in range(9):
+				var world := transform * (half * Vector3(lerpf(-0.95, 0.95, ix / 8.0), lerpf(-0.95, 0.95, iy / 8.0), lerpf(-0.95, 0.95, iz / 8.0)))
+				if world.y > -0.01:
+					continue
+				checked += 1
+				world.y = 0
+				var point := WorkZoneConfig.world_to_voxel(world)
+				var covered := false
+				for path in paths:
+					var points := path["points_voxels"] as PackedVector3Array
+					var radii := path["radii_voxels"] as PackedFloat32Array
+					for index in range(points.size() - 1):
+						if _distance_to_segment(point, points[index], points[index + 1]) < radii[index]:
+							covered = true
+				if not covered:
+					missed += 1
+	print("ROTATED_ROOF checked=%d missed=%d" % [checked, missed])
+	_expect(checked > 0 and missed == 0, "whole submerged volume projects to cleared roof (%d/%d missed)" % [missed, checked], failures)
 
 
 func _check_negative_cases(failures: Array[String]) -> void:

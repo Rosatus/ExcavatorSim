@@ -56,6 +56,12 @@ try {
         "voxel_excavation_authority_test.gd",
         "voxel_cutting_performance_test.gd",
         "soil_effects_visual_mound_test.gd",
+        "soil_release_visual_quality_test.gd",
+        "soil_dump_completion_test.gd",
+        "voxel_lift_exit_test.gd",
+        "voxel_continuous_lift_test.gd",
+        "voxel_live_residual_test.gd",
+        "voxel_residual_recut_test.gd",
         "soil_authority_migration_test.gd",
         "voxel_excavation_world_test.gd"
     )) {

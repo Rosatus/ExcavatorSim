@@ -1,6 +1,9 @@
 class_name SoilEffects
 extends Node3D
 
+const VisualResources = preload("res://scripts/soil_visual_resources.gd")
+const SoilFlight = preload("res://scripts/soil_flight.gd")
+
 const VISUAL_SNAPSHOT_PERIOD_S := 1.0 / 30.0
 const FILL_UPDATE_PERIOD_S := 0.1
 const FILL_RATIO_QUANTUM := 0.05
@@ -52,6 +55,8 @@ var _active_release_event: Dictionary = {}
 var _last_release_event_id := ""
 var _release_event_elapsed_s := 0.0
 var _release_event_ttl_s := 0.0
+var _voxel_flight_visible := false
+var _completed_flight_clear_count := 0
 
 
 func _ready() -> void:
@@ -93,6 +98,8 @@ func set_emission_enabled(value: bool) -> void:
 	emission_enabled = value
 	if emission_enabled:
 		return
+	_active_release_event.clear()
+	_release_clod_budget = 0.0
 	if _flow_particles != null:
 		_flow_particles.emitting = false
 		_flow_particles.restart()
@@ -141,6 +148,7 @@ func clear_for_generation(generation: int) -> void:
 	_release_event_elapsed_s = 0.0
 	_release_event_ttl_s = 0.0
 	_release_clod_budget = 0.0
+	_voxel_flight_visible = false
 
 
 func get_effect_snapshot() -> Dictionary:
@@ -172,6 +180,7 @@ func get_effect_snapshot() -> Dictionary:
 		"last_release_event_id": _last_release_event_id,
 		"release_event_age_s": _release_event_elapsed_s,
 		"release_event_ttl_s": _release_event_ttl_s,
+		"completed_flight_clears": _completed_flight_clear_count,
 	}
 
 
@@ -180,9 +189,7 @@ func _build_fill_mesh() -> void:
 	_fill_mesh.name = "BucketSoilFill"
 	_fill_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	_fill_mesh.visible = false
-	_fill_material = StandardMaterial3D.new()
-	_fill_material.albedo_color = Color("#62442e")
-	_fill_material.roughness = 0.94
+	_fill_material = VisualResources.surface_material()
 	_fill_material.metallic = 0.0
 	_fill_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_fill_material.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
@@ -210,18 +217,17 @@ func _build_particles() -> void:
 	_flow_material.emission_box_extents = Vector3(0.12, 0.035, 0.09)
 	_flow_material.initial_velocity_min = 0.5
 	_flow_material.initial_velocity_max = 1.8
-	_flow_material.gravity = Vector3(0.0, -5.5, 0.0)
-	_flow_material.scale_min = 0.45
-	_flow_material.scale_max = 1.25
+	_flow_material.gravity = Vector3.DOWN * SoilFlight.GRAVITY
+	_flow_material.scale_min = 0.35
+	_flow_material.scale_max = 1.35
+	_flow_material.angle_min = -180.0
+	_flow_material.angle_max = 180.0
+	_flow_material.angular_velocity_min = -120.0
+	_flow_material.angular_velocity_max = 120.0
 	_flow_particles.process_material = _flow_material
-	var grain := BoxMesh.new()
-	grain.size = Vector3(0.046, 0.028, 0.061)
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color("#875a34")
-	material.roughness = 1.0
-	grain.material = material
+	var grain := VisualResources.clod_mesh(Vector3(0.042, 0.036, 0.05))
 	_flow_particles.draw_pass_1 = grain
-	_flow_particles.visibility_aabb = AABB(Vector3(-4.0, -4.0, -4.0), Vector3(8.0, 8.0, 8.0))
+	_flow_particles.visibility_aabb = AABB(Vector3(-6.0, -48.0, -6.0), Vector3(12.0, 52.0, 12.0))
 	add_child(_flow_particles)
 
 
@@ -249,6 +255,7 @@ func _build_dust_particles() -> void:
 	var dust_color := StandardMaterial3D.new()
 	dust_color.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	dust_color.albedo_color = Color(0.55, 0.39, 0.24, 0.26)
+	dust_color.albedo_texture = VisualResources.dust_texture()
 	dust_color.roughness = 1.0
 	dust_color.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	dust_color.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -263,18 +270,16 @@ func _build_clod_pool() -> void:
 		var body := RigidBody3D.new()
 		body.name = "SoilClod%02d" % index
 		body.mass = 0.12
+		body.gravity_scale = SoilFlight.GRAVITY / maxf(0.001, float(ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)))
+		body.linear_damp_mode = RigidBody3D.DAMP_MODE_REPLACE
+		body.linear_damp = 0.0
 		body.collision_layer = 1 << 5
 		body.collision_mask = 1
 		body.freeze = true
 		body.visible = false
 		body.can_sleep = true
 		var mesh_instance := MeshInstance3D.new()
-		var mesh := BoxMesh.new()
-		mesh.size = Vector3(0.09, 0.065, 0.11)
-		var material := StandardMaterial3D.new()
-		material.albedo_color = Color("#59402e")
-		material.roughness = 1.0
-		mesh.material = material
+		var mesh := VisualResources.clod_mesh(Vector3(0.09, 0.075, 0.105), index % 4)
 		mesh_instance.mesh = mesh
 		body.add_child(mesh_instance)
 		var collision := CollisionShape3D.new()
@@ -348,6 +353,7 @@ func _apply_visual_snapshot(status: Dictionary) -> void:
 	var current: Dictionary = pose.get("current", {})
 	var contract: Dictionary = pose.get("contract", {})
 	_consume_release_event(status, pose)
+	_sync_voxel_flight_completion(status)
 	_update_release_source(status)
 	_update_fill(status, current, contract)
 	_update_flow(status, current, pose)
@@ -380,7 +386,20 @@ func _consume_release_event(status: Dictionary, pose: Dictionary) -> void:
 	var direction := event.get("direction_world", Vector3.DOWN) as Vector3
 	if not release_transform.origin.is_finite() or not direction.is_finite() or direction.is_zero_approx():
 		return
+	_last_release_event_id = event_id
+	if String(status.get("soil_material_lifecycle_mode", "")) == "voxel" \
+			and status.has("flight_queue_depth") and int(status["flight_queue_depth"]) == 0:
+		# A late subscriber must not replay an already landed release.
+		return
+	if not emission_enabled or _budget <= 0:
+		return
 	_active_release_event = event.duplicate(true)
+	if bool(event.get("release_committed", false)):
+		var contract := pose.get("contract", {}) as Dictionary
+		var proxy := (contract.get("proxies", {}) as Dictionary).get("opening", {}) as Dictionary
+		var size := proxy.get("size_m", [0.6, 0.3]) as Array
+		var across := release_transform.basis.x.normalized().abs() * float(size[0]) * 0.32
+		_flow_material.emission_box_extents = Vector3(maxf(0.04, across.x), 0.025, maxf(0.04, across.z))
 	_last_release_event_id = event_id
 	_release_event_elapsed_s = 0.0
 	var released_volume := maxf(0.0, float(event.get("accepted_volume_m3", 0.0)))
@@ -392,7 +411,26 @@ func _consume_release_event(status: Dictionary, pose: Dictionary) -> void:
 	_release_clod_budget = minf(float(max_clods), _release_clod_budget + released_volume * 55.0)
 	# Continuous batches must not restart particles already falling in world space.
 	if _flow_particles != null:
-		_flow_particles.amount_ratio = clampf(released_volume / _release_event_ttl_s / 0.65, 0.05, 1.0)
+		_flow_particles.amount_ratio = clampf(released_volume / _release_event_ttl_s / 0.65, 0.0, 1.0)
+
+
+func _sync_voxel_flight_completion(status: Dictionary) -> void:
+	if String(status.get("soil_material_lifecycle_mode", "")) != "voxel" or not status.has("flight_queue_depth"):
+		return
+	if int(status["flight_queue_depth"]) > 0:
+		_voxel_flight_visible = true
+		return
+	if not _voxel_flight_visible:
+		return
+	_voxel_flight_visible = false
+	_completed_flight_clear_count += 1
+	_active_release_event.clear()
+	_release_clod_budget = 0.0
+	_clod_spawn_accumulator = 0.0
+	_flow_particles.emitting = false
+	_flow_particles.restart()
+	_flow_particles.emitting = false
+	_reset_clod_pool()
 
 
 func _advance_release_event(delta: float) -> void:
@@ -410,6 +448,10 @@ func _advance_release_event(delta: float) -> void:
 
 func _update_release_source(status: Dictionary) -> void:
 	if String(status.get("soil_material_lifecycle_mode", "")) != "voxel" or _active_release_event.is_empty():
+		return
+	if bool(_active_release_event.get("release_committed", false)):
+		# A committed release is already outside the bucket. Its short emission
+		# segment uses the frozen source and survives a later gate closure.
 		return
 	if not bool(status.get("dump_gate_active", false)):
 		_active_release_event.clear()
@@ -506,6 +548,9 @@ func _update_flow(status: Dictionary, current: Dictionary, pose: Dictionary) -> 
 	if not _active_release_event.is_empty():
 		_apply_flow_release_event(_active_release_event)
 		return
+	if String(status.get("soil_material_lifecycle_mode", "")) == "voxel":
+		_flow_particles.emitting = false
+		return
 	var interaction := String(status.get("interaction_state", "idle"))
 	var active := interaction == "spill" or interaction == "dump"
 	if not active or float(status.get("flow_volume_m3", 0.0)) <= BucketSoilState.EPSILON_M3:
@@ -531,12 +576,11 @@ func _apply_flow_release_event(event: Dictionary) -> void:
 		direction = Vector3.DOWN
 	_flow_particles.global_transform = Transform3D(Basis.IDENTITY, source.origin)
 	_flow_material.direction = Vector3.DOWN
-	_flow_material.initial_velocity_min = 0.55
-	_flow_material.initial_velocity_max = 0.9
+	_flow_material.initial_velocity_min = SoilFlight.INITIAL_SPEED
+	_flow_material.initial_velocity_max = SoilFlight.INITIAL_SPEED
 	if event.has("landing_world"):
 		var landing := event["landing_world"] as Vector3
-		var fall_height := maxf(0.05, source.origin.y - landing.y)
-		_flow_particles.lifetime = clampf((sqrt(0.7 * 0.7 + 11.0 * fall_height) - 0.7) / 5.5, 0.12, 1.8)
+		_flow_particles.lifetime = clampf(SoilFlight.duration(source.origin, landing), 0.12, SoilFlight.MAX_FLIGHT_S)
 	_flow_particles.emitting = true
 
 
@@ -564,13 +608,13 @@ func _update_clods(delta: float, status: Dictionary) -> void:
 		var age := float(_clod_ages.get(clod.get_instance_id(), 0.0)) + delta
 		_clod_ages[clod.get_instance_id()] = age
 		var landing_y := float(_clod_landing_heights.get(clod.get_instance_id(), -INF))
-		if age > 2.5 or clod.global_position.y < -6.0 or clod.sleeping \
+		if age > SoilFlight.MAX_FLIGHT_S + 0.2 or clod.global_position.y < -6.0 or clod.sleeping \
 				or (age > 0.08 and clod.global_position.y <= landing_y + 0.04):
 			_deactivate_active_clod(index)
-	if _active_clod_cap <= 0 or not bool(status.get("hero_clods_enabled", true)):
+	if not emission_enabled or _budget <= 0 or _active_clod_cap <= 0 or not bool(status.get("hero_clods_enabled", true)):
 		return
 	var release_event := _active_release_event
-	if release_event.is_empty():
+	if release_event.is_empty() and String(status.get("soil_material_lifecycle_mode", "")) != "voxel":
 		var interaction := String(status.get("interaction_state", "idle"))
 		if interaction in ["spill", "dump"] \
 				and float(status.get("flow_volume_m3", 0.0)) > BucketSoilState.EPSILON_M3:
@@ -615,11 +659,11 @@ func _spawn_clod_from_event(event: Dictionary) -> bool:
 	available.freeze = false
 	available.sleeping = false
 	available.visible = true
-	var lateral := Vector3(noise_x * 0.35, lerpf(0.1, 0.45, (noise_y + 1.0) * 0.5), noise_z * 0.35)
+	var lateral := Vector3(noise_x * 0.35, 0.0, noise_z * 0.35)
 	var direction := event.get("direction_world", Vector3.DOWN) as Vector3
 	if not direction.is_finite() or direction.is_zero_approx():
 		direction = Vector3.DOWN
-	available.linear_velocity = lateral + direction.normalized() * 0.8
+	available.linear_velocity = lateral + direction.normalized() * SoilFlight.INITIAL_SPEED
 	available.angular_velocity = Vector3(noise_z, noise_x, noise_y) * 4.0
 	_clod_ages[available.get_instance_id()] = 0.0
 	if event.has("landing_world"):

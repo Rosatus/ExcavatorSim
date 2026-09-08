@@ -2559,11 +2559,28 @@ VoxelSoilMaterialField.stage_compaction(coordinates, compaction_delta_q) -> Dict
   center/+X/+Y three-point stencil; changing it is a mass-calibration change,
   not a geometry-quality change. Exact fallback commits retain one-cell mass
   tolerance.
+- Sparse credit receipts deduplicate mass, not geometry. A prior native brush
+  may credit a stencil cell while leaving part of its SDF solid. If every
+  current coverage cell is already credited, the ledger balances, and a
+  current solid sample lies strictly inside the new brush, execute a native
+  geometry-only cut without a second ledger mutation. Mark the transaction
+  `native_geometry_only=true`, keep accepted/captured/discarded mass zero,
+  and publish its new terrain revision/readiness normally. The accepted
+  transaction predicate permits this only for a native approximate cut;
+  zero-mass deposit/exact-cut transactions remain rejected.
+  Collect strict-inclusion candidates during the bounded sparse coverage
+  walk, then intersect with current solid coordinates. Never add a second
+  segments-by-all-cells search. Keep credit invalidation on deposits.
+  `voxel_residual_recut_test.gd` must reproduce partial-cell cuts through the
+  actual queue and native executor, verify real SDF changes per cleanup,
+  unchanged bucket/material digest, empty and full capacity, and stopped
+  updates after residual removal. Single-stroke geometry tests cannot prove
+  this cross-layer contract.
 - Product cutting continues at full capacity. A cut transaction's
   `accepted_mass_q` is the removed amount; `captured_mass_q` is capped to bucket
   headroom and `discarded_mass_q` records excess. Both native and exact product
   executors opt into overflow staging. The generation balance includes the
-  discard sink: `terrain_mass_delta_q + bucket_mass_q + discarded_cut_mass_q`.
+  discard sink and released stock: `terrain_mass_delta_q + bucket_mass_q + in_flight_mass_q + discarded_cut_mass_q`.
   Deposit, transfer and compaction must all use that balance after overflow;
   otherwise the first full-bucket cut would break later soil operations.
 - SY135 runtime equipment limits are boom `[-25°, 45°]`, arm `[-60°, 45°]`.
@@ -2575,7 +2592,59 @@ VoxelSoilMaterialField.stage_compaction(coordinates, compaction_delta_q) -> Dict
   and focused-test operation.
 - Inner shell, floor, and overburden paths never authorize deletion alone. They
   are emitted only after the teeth/side leading-front SDF and into-material
-  motion gate accepts the complete proposal. Deep insertion may clear the
+  motion gate starts cutting. A previously engaged SY135 cut may finish an
+  upward exit while the trailing inner-shell footprint still contains valid
+  nonpositive original-surface SDF. This bounded continuation also applies while
+  the leading gate remains accepted, includes shallow roof columns, and stops
+  when clear. It cannot initiate an unengaged cut. Roof depth strips for lift
+  exit overlap at product resolution; sweep subdivision includes corner
+  rotation arc as well as translation, with the same 12-sample cap.
+  Circular brush lanes must overlap in the two-dimensional cross-section,
+  including diagonal gaps: choose centered lanes with spacing at most 1.2
+  brush radii in each axis. Roof cleanup and lift contact use the same
+  world-vertical lower envelope of the transformed inner box: intersect
+  vertical rays with its oriented-box slabs over a radius-spaced X/Z grid.
+  Never substitute its local +Y face for this lower envelope: contract box
+  axes follow the outward normal, so that face can be airborne while the
+  bottom still cuts soil. Emit columns from the actual lower intersection to
+  the initial surface plus half a voxel; shallow lift columns require a
+  lower intersection below the surface. Never emit degenerate native pairs.
+  Regression must scan both the inner volume and the surface above submerged
+  portions of a rotated cavity through continuous lift/exit, plus an untouched
+  exterior control. A clean interior alone does not imply a clean roof.
+  A stationary frame never starts or submits a cut. Keep an established SY135
+  episode across stationary/upward frames in the cleared cavity while the
+  current inner-box lower bound remains below the original surface and SDF
+  samples remain valid. Absence of solid contact suppresses this frame's cut,
+  not the episode: the previous brush may have cleared its own probes.
+  Fully exiting the surface, invalid history/data, discontinuities and
+  non-lifting movement rejected in air retire it. No unengaged cut is started
+  by this retention. Actual lift proposals still require solid contact.
+  Lift contact samples the
+  full lower-envelope-to-surface column (voxel spacing, at most 32 intervals),
+  not just the original surface plane: a lower residual sheet can remain after
+  the original surface is air. Cover engaged pause followed by lift, stationary
+  air, and below-surface residuals in regression tests. Also commit the entry
+  before pausing, run small steps at the real 60 Hz / 20 Hz commit cadence,
+  assert later lift commits occur, and inspect the whole historical interior
+  and roof footprint. A hold before commit still samples uncut soil and cannot
+  test continuation across a cleared cavity.
+  The cavity box is not the whole cutting footprint. SY135's short floor
+  plate ends behind the tooth line. Fill that working lip with a ruled
+  surface between the sampled tooth edge and the nearest floor end edge,
+  pairing matching width ends. Use radius-spaced lanes at the existing
+  surface radius; include its below-surface columns in roof cleanup, actual
+  lift contact and geometric episode exit. Keep this surface and its roof
+  as separate native paths after combining the older roles, avoiding an
+  unintended connector from the wear plate's last lane to the lip. Alternate
+  temporal traversal and remove consecutive degenerate points.
+  The recorded `sy135_live_residual_trajectory.json` fixture must reproduce
+  the actual tooth-to-floor residual before the fix and clear the observed
+  underside and surface targets afterwards. Rotate the lip in unit checks,
+  verify nonzero final path segments and untouched lateral ground. Do not
+  replace this with an inner-cavity-only oracle. Geometry expansion may
+  increase credited coverage; the sparse calibration itself stays unchanged.
+  Deep insertion may clear the
   overlying column to the initial soil surface to prevent unsupported voxel
   roofs; this intentionally prefers a clean 2.5D cut over tunnel preservation.
 - A developer-only capacity override may replace the effective voxel ledger
@@ -2597,18 +2666,25 @@ VoxelSoilMaterialField.stage_compaction(coordinates, compaction_delta_q) -> Dict
   cannot reject or alter an accepted SDF/mass transaction.
 - Deposit, settle, and compaction share this authority, one journal, and the
   same readiness ticket path. Visual mounds, dust, and clods consume committed
-  transaction IDs only and never own material.
+  release IDs only and never own material; a release may precede its ground deposit.
 - Runtime dump samples first enter one generation/epoch/landing-neighborhood
   pending batch. Compatible samples coalesce for at most `100 ms`; reaching the
   reserved bucket remainder or the deadline flushes one immutable deposit
   proposal only while the gate remains active. Leaving the dump gate cancels
-  pending and queued-but-uncommitted deposits. Bucket inventory is debited only
-  after the native edit and material stage commit.
+  pending and queued-but-unreleased deposits. A released batch transfers bucket
+  stock into the same material field's `in_flight_mass_q` and waits in the
+  bounded flight queue before ground commit. See [Soil Release Visuals](./soil-release-visuals.md).
+- Retain bucket stock below `0.01 * voxel_scale_m^3` loose volume instead of
+  relaunching unrepresentable SDF residue. This remains accounted material,
+  not discarded inventory. Visual emission intensity has no fixed 5% floor.
+  Voxel presentation consumes flight depth through the world snapshot: final
+  flight retirement clears flow and clods once, and a completed event cannot
+  be replayed by a late subscriber or legacy continuous-flow fallback.
 - Full dump admission uses the hash-bound model opening normal and an effective
   `opening_normal_world.dot(Vector3.DOWN)` threshold no lower than `0.5` in voxel mode.
   Upward and horizontal openings may not release material. Admission requires
   120 ms continuously inside the gate, a free outlet, and no active/pending
-  cutting; leaving it before commit preserves bucket mass and produces no
+  cutting; leaving it before release preserves bucket mass and produces no
   accepted release event. The hash-bound descriptor threshold remains intact;
   diagnostics expose the stricter effective runtime threshold separately.
 - A release point may be above the voxel volume. Validate its horizontal
@@ -2616,11 +2692,11 @@ VoxelSoilMaterialField.stage_compaction(coordinates, compaction_delta_q) -> Dict
   against the bucket. Air above the volume must not be sampled as an unloaded
   solid voxel by the outlet gate. Keep the lower bound and buried-outlet checks.
 - A pending release freezes its opening transform, normalized opening normal,
-  derived fall direction, admission tick, and fill ratio. The accepted deposit
-  publishes one immutable `voxel-soil-release-event-v1` with separate landing
-  position and release duration. Presentation copies this event before updating
-  its active emitter from the live outlet while the release gate remains valid;
-  already born particles retain world positions. Closing the gate stops births.
+  derived fall direction, admission tick, and fill ratio. Committed release
+  publishes one immutable `voxel-soil-release-event-v1` with separate predicted
+  landing, release duration, `flight_duration_s`, and `release_committed=true`.
+  Its short emission segment uses the frozen source; gate closure cannot cancel
+  already released soil. Landing must not replay the release event.
 - Product runtime deposit uses a disposable 17 x 17 surface-height plan at
   three-voxel spacing, a rounded repose envelope, and one bounded SDF buffer
   paste. Each commit samples current SDF; it cannot reuse a persistent pile

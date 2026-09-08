@@ -9,6 +9,7 @@ const MaterialField = preload("res://scripts/voxel_soil_material_field.gd")
 const WorkZoneConfig = preload("res://scripts/voxel_work_zone_config.gd")
 const TimingWindow = preload("res://scripts/voxel_timing_window.gd")
 const DepositSurface = preload("res://scripts/soil_deposit_surface.gd")
+const SoilFlight = preload("res://scripts/soil_flight.gd")
 const MAX_DEPOSIT_SURFACE_SAMPLES := 32768
 
 const SCHEMA_VERSION := "voxel-excavation-authority-v2"
@@ -41,6 +42,7 @@ const DEPOSIT_MIN_RADIUS_VOXELS := 1.0
 const DEPOSIT_MAX_RADIUS_VOXELS := 4.0
 const DEPOSIT_MAX_HEIGHT_VOXELS := 8.0
 const DUMP_BATCH_PERIOD_S := 0.1
+const MIN_DUMP_VOLUME_VOXELS := 0.01
 const DUMP_GATE_CONFIRMATION_S := 0.12
 const DUMP_RELEASE_DOWN_DOT := 0.5
 const DUMP_LANDING_NEIGHBORHOOD_VOXELS := 4.0
@@ -76,6 +78,9 @@ var _soil_queue: Array[VoxelSoilOperationProposal] = []
 var _pending_dump: VoxelSoilOperationProposal
 var _pending_dump_elapsed_s := 0.0
 var _pending_dump_key := ""
+var _flights: Array[Dictionary] = []
+var _landing_in_progress := false
+var _release_published_since_step := false
 var _journal: Array[Dictionary] = []
 var _seen_inputs: Dictionary = {}
 var _seen_order: Array[String] = []
@@ -192,6 +197,11 @@ func set_bucket_capacity_override_for_testing(capacity_override_m3: float) -> Di
 
 
 func clear() -> void:
+	if material_field.in_flight_mass_q > 0:
+		material_field.return_from_flight(material_field.in_flight_mass_q)
+	_flights.clear()
+	_landing_in_progress = false
+	_release_published_since_step = false
 	configured = false
 	generation = -1
 	data_revision = 0
@@ -368,19 +378,28 @@ func submit_pose(pose_snapshot: Dictionary, identity: Dictionary, delta_s: float
 
 
 func step_fixed(delta: float) -> Dictionary:
+	var result := _step_fixed_impl(delta)
+	result["release_changed"] = _release_published_since_step
+	_release_published_since_step = false
+	return result
+
+
+func _step_fixed_impl(delta: float) -> Dictionary:
 	_poll_readiness()
 	if not configured or not is_finite(delta) or delta < 0.0:
 		return {"changed": false, "reason": "authority_unavailable"}
 	_commit_accumulator_s += delta
+	for flight in _flights:
+		flight["remaining_s"] = maxf(0.0, float(flight["remaining_s"]) - delta)
 	if _pending_dump != null:
 		_pending_dump_elapsed_s += delta
 		if _pending_dump_elapsed_s + 0.000001 >= DUMP_BATCH_PERIOD_S:
 			_flush_pending_dump_to_queue()
-	if _queue.is_empty() and _soil_queue.is_empty() and _settle_frontier.is_empty() and _pending_dump == null:
+	if _queue.is_empty() and _soil_queue.is_empty() and _settle_frontier.is_empty() and _pending_dump == null and _flights.is_empty():
 		return {"changed": false, "reason": "idle"}
 	# Active dumping owns the foreground slot. Do not spend the batching window
 	# committing stale compaction work while a deposit is waiting to flush.
-	if _queue.is_empty() and _pending_dump != null and _soil_operation_queue_depth("deposit") == 0:
+	if _queue.is_empty() and _pending_dump != null and _soil_operation_queue_depth("deposit") == 0 and _ready_flight_index() < 0:
 		return {
 			"changed": false,
 			"reason": "dump_batch_coalescing",
@@ -391,8 +410,10 @@ func step_fixed(delta: float) -> Dictionary:
 	_commit_accumulator_s = fmod(_commit_accumulator_s, COMMIT_PERIOD_S)
 	var transaction: VoxelCutTransaction
 	var processed_background := false
-	var dump_work_pending := _pending_dump != null or _soil_operation_queue_depth("deposit") > 0
-	if not dump_work_pending and _queue.is_empty() and not _settle_frontier.is_empty() and (
+	if _queue.is_empty() and _ready_flight_index() >= 0:
+		transaction = _land_flight(_ready_flight_index())
+	var dump_work_pending := _pending_dump != null or not _flights.is_empty() or _soil_operation_queue_depth("deposit") > 0
+	if transaction == null and not dump_work_pending and _queue.is_empty() and not _settle_frontier.is_empty() and (
 			_prefer_background or (_queue.is_empty() and _soil_queue.is_empty())
 	):
 		var settle_proposal := _build_next_settle_proposal()
@@ -419,7 +440,11 @@ func step_fixed(delta: float) -> Dictionary:
 func flush_for_test() -> Dictionary:
 	if _pending_dump != null and not _flush_pending_dump_to_queue():
 		return {"changed": false, "reason": "soil_queue_full"}
-	return step_fixed(COMMIT_PERIOD_S)
+	# Explicit drain helper; normal step_fixed never skips flight time.
+	var advance := COMMIT_PERIOD_S
+	for flight in _flights:
+		advance = maxf(advance, float(flight["remaining_s"]) + COMMIT_PERIOD_S)
+	return step_fixed(advance)
 
 
 func get_payload_snapshot() -> Dictionary:
@@ -445,6 +470,8 @@ func get_visual_snapshot() -> Dictionary:
 	# Detached gameplay projection: no payload, terrain statistics, readiness
 	# scans or timing-window sorting. Effects and audio pull this frequently.
 	return {
+		"flight_queue_depth": _flights.size(),
+		"in_flight_mass_q": material_field.in_flight_mass_q,
 		"last_transaction": _last_transaction.duplicate(true),
 		"accepted_dump_event_id": _accepted_dump_event_id,
 		"accepted_dump_event": _accepted_dump_event.duplicate(true),
@@ -485,6 +512,8 @@ func get_status_snapshot(refresh_diagnostics: bool = false) -> Dictionary:
 		"queue_depth": _queue.size() + _soil_queue.size(),
 		"cut_queue_depth": _queue.size(),
 		"soil_queue_depth": _soil_queue.size(),
+		"flight_queue_depth": _flights.size(),
+		"in_flight_mass_q": material_field.in_flight_mass_q,
 		"queue_capacity": MAX_QUEUE_DEPTH + MAX_SOIL_QUEUE_DEPTH,
 		"cut_queue_capacity": MAX_QUEUE_DEPTH,
 		"soil_queue_capacity": MAX_SOIL_QUEUE_DEPTH,
@@ -763,15 +792,17 @@ func _stage_pending_dump(proposal: VoxelSoilOperationProposal) -> Dictionary:
 		_pending_dump = merged
 		_dump_batch_coalesced_count += 1
 	if _pending_dump.requested_mass_q >= available_mass_q:
-		if not _flush_pending_dump_to_queue():
-			return {"accepted": true, "reason": "dump_pending_backpressure", "staged": true}
-		return {"accepted": true, "reason": "dump_batch_queued", "staged": true}
+		# Release during step_fixed so a newborn flight cannot age by a delta
+		# which elapsed before it was published.
+		_pending_dump_elapsed_s = DUMP_BATCH_PERIOD_S
 	return {"accepted": true, "reason": "dump_pending", "staged": true}
 
 
 func _flush_pending_dump_to_queue() -> bool:
 	if _pending_dump == null:
 		return true
+	if _flights.size() >= SoilFlight.MAX_RELEASES or _release_published_since_step:
+		return false
 	var fields := _pending_dump.to_dictionary()
 	fields["batch_wait_usec"] = maxi(
 		int(fields.get("batch_wait_usec", 0)),
@@ -781,13 +812,58 @@ func _flush_pending_dump_to_queue() -> bool:
 	flags.append("bounded_100ms_batch")
 	fields["quality_flags"] = flags
 	var queued := SoilOperationProposal.create(fields)
-	if not queued.is_valid() or not _coalesce_or_enqueue_soil(queued):
+	if not queued.is_valid():
 		return false
+	var support := _find_sdf_support_world(queued.release_world)
+	if not bool(support.get("valid", false)):
+		return false
+	var landing := support["position"] as Vector3
+	var flight_s := SoilFlight.duration(queued.release_world, landing)
+	if flight_s > SoilFlight.MAX_FLIGHT_S or not material_field.release_to_flight(queued.requested_mass_q):
+		return false
+	_flights.append({"proposal": queued, "remaining_s": flight_s + DUMP_BATCH_PERIOD_S * 0.5})
+	var release := CutTransaction.new()
+	release.transaction_id = "release:%d:%s" % [generation, queued.input_hash]
+	release.generation = generation
+	release.revision = data_revision
+	release.admission_tick = queued.admission_tick
+	release.accepted_mass_q = queued.requested_mass_q
+	release.accepted_volume_m3 = material_field.loose_volume_for_mass_q(queued.requested_mass_q)
+	release.release_world = queued.release_world
+	release.release_transform_world = queued.release_transform_world
+	release.release_normal_world = queued.release_normal_world
+	release.release_direction_world = Vector3.DOWN
+	release.release_fill_ratio = queued.release_fill_ratio
+	release.deposit_world = landing
+	_publish_accepted_dump_event(release)
+	_accepted_dump_event["flight_duration_s"] = flight_s
+	_accepted_dump_event["release_committed"] = true
+	_release_published_since_step = true
 	_pending_dump = null
 	_pending_dump_elapsed_s = 0.0
 	_pending_dump_key = ""
 	_dump_batch_flush_count += 1
 	return true
+
+
+func _ready_flight_index() -> int:
+	for index in _flights.size():
+		if float(_flights[index]["remaining_s"]) <= 0.000001:
+			return index
+	return -1
+
+
+func _land_flight(index: int) -> VoxelCutTransaction:
+	var flight := _flights[index]
+	_flights.remove_at(index)
+	var proposal := flight["proposal"] as VoxelSoilOperationProposal
+	# Synchronous escrow resolution: only this arrival becomes available to the
+	# existing atomic SDF/material executor. Failed/partial deposits return stock.
+	material_field.return_from_flight(proposal.requested_mass_q)
+	_landing_in_progress = true
+	var transaction := _commit_soil_proposal(proposal)
+	_landing_in_progress = false
+	return transaction
 
 
 func _cancel_uncommitted_dumps(reason: String) -> int:
@@ -1115,7 +1191,8 @@ func _commit_native_proposal(
 	if not _tool.is_area_editable(edit_area):
 		return _reject_transaction(transaction, "voxel_area_not_editable", started_usec)
 	var phase_started := _diagnostic_clock_usec()
-	var coverage_coordinates := _native_coverage_coordinates(proposal.native_paths, origin, size)
+	var geometry_candidates: Dictionary = {}
+	var coverage_coordinates := _native_coverage_coordinates(proposal.native_paths, origin, size, geometry_candidates)
 	transaction.coverage_usec = _diagnostic_clock_usec() - phase_started
 	transaction.coverage_candidate_count = coverage_coordinates.size()
 	if coverage_coordinates.is_empty():
@@ -1126,10 +1203,18 @@ func _commit_native_proposal(
 	var voxel_volume_m3 := pow(_work_zone.voxel_scale_m, 3.0)
 	phase_started = _diagnostic_clock_usec()
 	var material_stage := material_field.stage_approximate_cut(coverage_coordinates, voxel_volume_m3, true)
-	if not bool(material_stage.get("valid", false)):
+	# Sparse credit may include the edge of a cell that an earlier brush did
+	# not remove. Credit deduplication is not evidence that geometry is empty.
+	var geometry_only := not bool(material_stage.get("valid", false)) \
+		and material_field.has_credited_cut_coordinates(coverage_coordinates)
+	if geometry_only and not _has_geometry_candidate(geometry_candidates, coverage_coordinates):
+		return _reject_transaction(transaction, "no_sdf_change", started_usec)
+	if not bool(material_stage.get("valid", false)) and not geometry_only:
 		return _reject_transaction(transaction, String(material_stage.get("reason", "material_stage_failed")), started_usec)
-	if not material_field.can_commit_approximate_cut(material_stage):
+	if not geometry_only and not material_field.can_commit_approximate_cut(material_stage):
 		return _reject_transaction(transaction, "material_commit_invariant", started_usec)
+	if geometry_only:
+		material_stage = {}
 	transaction.material_usec += _diagnostic_clock_usec() - phase_started
 	transaction.accounting_mode = "sparse_coverage_approximate"
 	transaction.requested_mass_q = int(material_stage.get("requested_mass_q", 0))
@@ -1157,6 +1242,7 @@ func _commit_native_proposal(
 		var points := path.get("points_voxels", PackedVector3Array()) as PackedVector3Array
 		var radii := path.get("radii_voxels", PackedFloat32Array()) as PackedFloat32Array
 		_tool.do_path(points, radii)
+	transaction.native_geometry_only = geometry_only
 	transaction.native_edit_usec = _diagnostic_clock_usec() - phase_started
 	phase_started = _diagnostic_clock_usec()
 	transaction.post_sdf_digest = _native_sample_digest(coverage_coordinates) if diagnostics_enabled else ""
@@ -1165,7 +1251,8 @@ func _commit_native_proposal(
 	# native API is synchronous and has no reject result, so this commit cannot
 	# race another material mutation inside the single authority transaction.
 	phase_started = _diagnostic_clock_usec()
-	material_field.commit_approximate_cut(material_stage)
+	if not geometry_only:
+		material_field.commit_approximate_cut(material_stage)
 	transaction.material_usec += _diagnostic_clock_usec() - phase_started
 	data_revision += 1
 	transaction.revision = data_revision
@@ -1315,8 +1402,15 @@ func _update_dump_gate_diagnostics(pose_snapshot: Dictionary, delta_s: float) ->
 		and _dump_gate_hold_s + 0.000001 >= DUMP_GATE_CONFIRMATION_S
 
 
+func _minimum_dump_mass_q() -> int:
+	# Surface plans, interpolation and 16-bit SDF cannot represent arbitrarily
+	# small deposits. Retain this sub-visual stock; never cycle it through flight
+	# repeatedly or discard it from the conservation ledger.
+	return maxi(1, material_field.mass_q_for_loose_volume(pow(_work_zone.voxel_scale_m, 3.0) * MIN_DUMP_VOLUME_VOXELS))
+
+
 func _build_dump_proposal(pose_snapshot: Dictionary, identity: Dictionary, delta_s: float) -> Dictionary:
-	if material_field.bucket_mass_q <= 0 or not bool(pose_snapshot.get("valid", false)):
+	if material_field.bucket_mass_q < _minimum_dump_mass_q() or not bool(pose_snapshot.get("valid", false)):
 		return {"attempted": false}
 	var contract := pose_snapshot.get("contract", {}) as Dictionary
 	var opening_normal := pose_snapshot.get("opening_normal_world", Vector3.UP) as Vector3
@@ -1387,6 +1481,8 @@ func _build_dump_proposal(pose_snapshot: Dictionary, identity: Dictionary, delta
 
 
 func _publish_accepted_dump_event(transaction: VoxelCutTransaction) -> void:
+	if _landing_in_progress:
+		return
 	_accepted_dump_event_id = transaction.transaction_id
 	_dump_release_world = transaction.release_world
 	_dump_released_fill_ratio = transaction.release_fill_ratio
@@ -1453,7 +1549,7 @@ func _commit_soil_proposal(proposal: VoxelSoilOperationProposal) -> VoxelCutTran
 	transaction.batch_wait_usec = proposal.batch_wait_usec
 	if proposal.generation != generation or proposal.model_id != model_id or proposal.tool_hash != tool_hash:
 		return _reject_transaction(transaction, "stale_or_wrong_tool", started)
-	if proposal.operation == "deposit" and not _dump_gate_active:
+	if proposal.operation == "deposit" and not _dump_gate_active and not _landing_in_progress:
 		return _reject_transaction(transaction, "dump_gate_closed_before_commit", started)
 	if proposal.operation == "deposit" and material_field.bucket_mass_q <= 0:
 		return _reject_transaction(transaction, "bucket_empty", started)
@@ -1800,7 +1896,7 @@ func _commit_surface_deposit_proposal(
 		_capacity_clipped_count += 1
 	_publish_accepted_dump_event(transaction)
 	var visible_landing := _find_sdf_support_world(proposal.release_world)
-	if bool(visible_landing.get("valid", false)):
+	if not _landing_in_progress and bool(visible_landing.get("valid", false)):
 		_accepted_dump_event["landing_world"] = visible_landing["position"]
 	var readiness_started := _diagnostic_clock_usec()
 	_issue_readiness_work(area, data_revision, &"voxel_deposit_surface", probe_world,
@@ -2441,11 +2537,22 @@ func _configure_coverage_index() -> void:
 		_coverage_axis_ranks.append(ranks)
 
 
+func _has_geometry_candidate(candidates: Dictionary, coordinates: Array[Vector3i]) -> bool:
+	# Candidates were collected inside the existing bounded coverage walk.
+	# Intersect with its current-solid result, without a segments x cells scan.
+	for coordinate in coordinates:
+		if candidates.has(coordinate):
+			return true
+	return false
+
+
 func _native_coverage_coordinates(
 	paths: Array[Dictionary],
 	origin: Vector3i,
-	size: Vector3i
+	size: Vector3i,
+	geometry_candidates: Dictionary = {}
 ) -> Array[Vector3i]:
+	geometry_candidates.clear()
 	var unique: Dictionary = {}
 	var bounds_min := _coverage_min
 	var bounds_max := _coverage_min + _coverage_size - Vector3i.ONE
@@ -2458,7 +2565,9 @@ func _native_coverage_coordinates(
 		for segment_index in range(points.size() - 1):
 			var a := points[segment_index]
 			var b := points[segment_index + 1]
-			var distance := a.distance_to(b)
+			var direction := b - a
+			var distance_squared := direction.length_squared()
+			var distance := sqrt(distance_squared)
 			var steps := maxi(1, ceili(distance / NATIVE_COVERAGE_STEP_VOXELS))
 			for step_index in range(steps + 1):
 				var alpha := float(step_index) / float(steps)
@@ -2472,6 +2581,14 @@ func _native_coverage_coordinates(
 						continue
 					if Vector3(coordinate).distance_to(sample) > radius + 0.55:
 						continue
+					# Credit's broad stencil can reach outside the brush. Track strict
+					# geometric inclusion separately, even when this key was seen on
+					# an earlier segment. Leave a small SDF quantization margin.
+					if not geometry_candidates.has(coordinate) and distance_squared > 0.00000001:
+						var closest_alpha := clampf((Vector3(coordinate) - a).dot(direction) / distance_squared, 0.0, 1.0)
+						var exact_radius := lerpf(radii[segment_index], radii[segment_index + 1], closest_alpha)
+						if Vector3(coordinate).distance_to(a + direction * closest_alpha) < exact_radius - 0.02:
+							geometry_candidates[coordinate] = true
 					# Integer keys retain the old decimal-string lexical order so
 					# the capped sample subset and transaction digests stay identical.
 					var key := (x_ranks[coordinate.x - bounds_min.x] * _coverage_size.y \

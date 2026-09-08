@@ -16,6 +16,7 @@ var bucket_capacity_override_m3 := 0.0
 var bucket_capacity_m3 := 0.0
 var bucket_capacity_mass_q := 0
 var bucket_mass_q := 0
+var in_flight_mass_q := 0
 var terrain_mass_delta_q := 0
 var discarded_cut_mass_q := 0
 var conservation_error_q := 0
@@ -45,6 +46,7 @@ func configure(contract: Dictionary, target_generation: int, capacity_override_m
 	bucket_capacity_m3 = capacity
 	bucket_capacity_mass_q = _mass_q(capacity)
 	bucket_mass_q = 0
+	in_flight_mass_q = 0
 	terrain_mass_delta_q = 0
 	discarded_cut_mass_q = 0
 	conservation_error_q = 0
@@ -59,7 +61,26 @@ func configure(contract: Dictionary, target_generation: int, capacity_override_m
 
 
 func remaining_capacity_mass_q() -> int:
-	return maxi(0, bucket_capacity_mass_q - bucket_mass_q)
+	# Reserve room for a failed landing to return its unrepresented remainder.
+	return maxi(0, bucket_capacity_mass_q - bucket_mass_q - in_flight_mass_q)
+
+
+func release_to_flight(mass_q: int) -> bool:
+	if generation < 0 or mass_q <= 0 or mass_q > bucket_mass_q or _mass_balance_q() != 0:
+		return false
+	bucket_mass_q -= mass_q
+	in_flight_mass_q += mass_q
+	conservation_error_q = _mass_balance_q()
+	return true
+
+
+func return_from_flight(mass_q: int) -> bool:
+	if mass_q <= 0 or mass_q > in_flight_mass_q:
+		return false
+	in_flight_mass_q -= mass_q
+	bucket_mass_q += mass_q
+	conservation_error_q = _mass_balance_q()
+	return true
 
 
 func visual_fill_ratio() -> float:
@@ -79,7 +100,7 @@ func set_bucket_capacity_override_for_testing(capacity_override_m3: float) -> Di
 	var next_capacity_mass_q := _mass_q(next_capacity_m3)
 	if next_capacity_mass_q <= 0:
 		return {"accepted": false, "reason": "invalid_capacity_override"}
-	if bucket_mass_q > next_capacity_mass_q:
+	if bucket_mass_q + in_flight_mass_q > next_capacity_mass_q:
 		return {
 			"accepted": false,
 			"reason": "bucket_mass_exceeds_requested_capacity",
@@ -193,6 +214,15 @@ func can_commit_cut(staged: Dictionary) -> bool:
 	return staged_total == accepted and _mass_balance_q() == 0
 
 
+func has_credited_cut_coordinates(coordinates: Array[Vector3i]) -> bool:
+	if coordinates.is_empty() or _mass_balance_q() != 0:
+		return false
+	for coordinate in coordinates:
+		if not _approximate_cut_coverage.has(_key(coordinate)):
+			return false
+	return true
+
+
 func stage_approximate_cut(coordinates: Array[Vector3i], voxel_volume_m3: float, allow_overflow: bool = false) -> Dictionary:
 	if generation < 0 or coordinates.is_empty() or not is_finite(voxel_volume_m3) or voxel_volume_m3 <= 0.0:
 		return {"valid": false, "reason": "invalid_approximate_cut", "accepted_mass_q": 0, "mutations": []}
@@ -298,7 +328,7 @@ func _cut_capture_valid(staged: Dictionary) -> bool:
 
 
 func _mass_balance_q() -> int:
-	return terrain_mass_delta_q + bucket_mass_q + discarded_cut_mass_q
+	return terrain_mass_delta_q + bucket_mass_q + in_flight_mass_q + discarded_cut_mass_q
 
 
 func stage_deposit(cell_changes: Array[Dictionary], requested_mass_q: int, incoming_compaction_q: int = LOOSE_COMPACTION_Q) -> Dictionary:
@@ -595,6 +625,7 @@ func get_status_snapshot(cell_grid: Array = [1, 1, 1], center_of_mass_local: Vec
 		"visual_bucket_capacity_m3": contract_bucket_capacity_m3,
 		"collection_fill_ratio": collection_fill_ratio,
 		"bucket_mass_q": bucket_mass_q,
+		"in_flight_mass_q": in_flight_mass_q,
 		"bucket_volume_m3": volume_for_mass_q(bucket_mass_q),
 		"payload_mass_kg": float(bucket_mass_q) / float(MASS_Q_PER_KG),
 		"fill_ratio": fill_ratio,
