@@ -275,3 +275,36 @@ Optimized native coverage ordering and SDF buffer reuse; added default-off cutti
 ### Next Steps
 
 - None - task complete
+
+
+## Session 62: Complete soil release visuals and recorded bucket residual repair
+
+**Date**: 2026-09-08
+**Task**: Complete soil release visuals and recorded bucket residual repair
+**Branch**: `main`
+
+### Summary
+
+Delivered conserved soil flight and delayed landing, irregular soil visuals, dump completion, geometry-only recuts, continuous lift retention, and tooth-to-floor lip coverage. Recorded live user motion reproduced residual SDF; eight observed targets and five final focused checks pass. User confirmed the issue fully resolved and authorized commit, push, and archive. Representative native commit 16.110 ms; unrelated plugin/worldbuilding/config changes preserved.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `689a70f` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
