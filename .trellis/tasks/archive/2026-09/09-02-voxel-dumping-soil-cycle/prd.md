@@ -1,5 +1,14 @@
 # Voxel dumping and soil cycle
 
+## Closure - 2026-09-08
+
+The user accepted the final behavior and explicitly requested commit and archive.
+Manual acceptance covers soil presentation, expanded SY135 reach, full-bucket
+cutting and unloading changes. Agent evidence remains script parsing and static
+configuration/hash checks; historical unchecked automated/performance gates below
+were superseded by user-owned acceptance, not reported as executed.
+
+
 ## Current acceptance priority — 2026-09-08
 
 Follow-up after the user accepted the visual improvement (checkpoint

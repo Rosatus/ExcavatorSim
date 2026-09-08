@@ -1,5 +1,14 @@
 # Implement - authoritative dump and soil cycle
 
+## Closure - 2026-09-08
+
+The user accepted the final behavior and explicitly requested commit and archive.
+Manual acceptance covers soil presentation, expanded SY135 reach, full-bucket
+cutting and unloading changes. Agent evidence remains script parsing and static
+configuration/hash checks; historical unchecked automated/performance gates below
+were superseded by user-owned acceptance, not reported as executed.
+
+
 ## Current pass — 2026-09-08
 
 Follow-up after user visual acceptance:
@@ -11,7 +20,7 @@ Follow-up after user visual acceptance:
 - [x] Remove the high-outlet Y admission restriction; retain receiving-zone
   checks and free-outlet/cutting safeguards.
 - [x] Parse changed material, transaction and authority scripts; verify rig hash.
-- [ ] User manual check of expanded reach, full-bucket cutting, and high dumping.
+- [x] User accepted expanded reach, full-bucket cutting, and unloading changes.
 
 User authorized direct implementation and requested that final testing and
 visual/runtime acceptance be performed manually by the user. Earlier automated
@@ -29,7 +38,7 @@ pass and their checked boxes do not certify the new algorithm.
 - [x] Godot `--check-only` for the changed authority and presentation scripts.
 - [ ] User manual acceptance: scoop/curl/carry; continuous dumping at one fixed
   spot; moving dump; re-excavate the resulting mound; judge responsiveness.
-- [ ] Archive after user acceptance.
+- [x] User requested archival after acceptance.
 
 - [x] Add typed deposit/settle/compact operations to the existing authority and
   journal; do not create a second soil state.
