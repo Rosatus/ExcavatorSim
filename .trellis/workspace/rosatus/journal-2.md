@@ -208,3 +208,37 @@ Reviewed the Gateway Web changes, preserved protocol DBC bytes, added a cached G
 ### Next Steps
 
 - None - task complete
+
+
+## Session 60: Soil visuals and excavation controls accepted
+
+**Date**: 2026-09-08
+**Task**: Soil visuals and excavation controls accepted
+**Branch**: `main`
+
+### Summary
+
+User accepted soil surface deposition, release visuals, wider SY135 boom/arm limits, full-bucket cutting with explicit discarded-mass accounting, and high-outlet unloading. Task archived at user request. Validation limited to Godot script parsing and static/hash checks; runtime acceptance owned by user. Parallel worldbuilding work remains outside these commits.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6da1a96` | (see git log) |
+| `7192b4f` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

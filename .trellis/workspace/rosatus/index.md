@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 59
-- **Last Active**: 2026-09-04
+- **Total Sessions**: 60
+- **Last Active**: 2026-09-08
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~210 | Active |
+| `journal-2.md` | ~244 | Active |
 | `journal-1.md` | ~1992 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 60 | 2026-09-08 | Soil visuals and excavation controls accepted | `6da1a96`, `7192b4f` | `main` |
 | 59 | 2026-09-04 | Gateway Web and cached distribution wrap-up | `854e471`, `573edc1`, `2c9b770` | `main` |
 | 58 | 2026-09-03 | Continuous voxel bucket cutting accepted | `5695f13`, `32f538e` | `main` |
 | 57 | 2026-09-03 | Voxel work-zone foundation | `b5b483b` | `main` |
