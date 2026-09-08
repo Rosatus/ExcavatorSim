@@ -2,6 +2,13 @@
 
 ## Current acceptance priority — 2026-09-08
 
+Follow-up after the user accepted the visual improvement (checkpoint
+`6da1a96`): widen SY135 boom-down travel by 10 degrees and both arm limits by
+15 degrees; continue cutting at full capacity without increasing retained
+inventory; permit high-outlet dumping into the editable ground zone. Excess
+cut mass is explicitly discarded, not secretly stored or turned into spill VFX.
+Manual acceptance remains with the user.
+
 The user confirms cutting is the main simulation concern and dumping mainly
 serves a believable visual result. The approved replacement must prevent
 persistent soil pieces along the bucket path and grow a broad connected pile

@@ -17,6 +17,8 @@ var pre_sdf_digest := ""
 var post_sdf_digest := ""
 var requested_mass_q := 0
 var accepted_mass_q := 0
+var captured_mass_q := 0
+var discarded_mass_q := 0
 var represented_mass_q := 0
 var mass_discretization_error_q := 0
 var mass_discretization_tolerance_q := 0
@@ -69,6 +71,8 @@ func to_dictionary() -> Dictionary:
 		"post_sdf_digest": post_sdf_digest,
 		"requested_mass_q": requested_mass_q,
 		"accepted_mass_q": accepted_mass_q,
+		"captured_mass_q": captured_mass_q,
+		"discarded_mass_q": discarded_mass_q,
 		"represented_mass_q": represented_mass_q,
 		"mass_discretization_error_q": mass_discretization_error_q,
 		"mass_discretization_tolerance_q": mass_discretization_tolerance_q,

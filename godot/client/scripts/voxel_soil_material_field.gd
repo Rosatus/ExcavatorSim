@@ -17,6 +17,7 @@ var bucket_capacity_m3 := 0.0
 var bucket_capacity_mass_q := 0
 var bucket_mass_q := 0
 var terrain_mass_delta_q := 0
+var discarded_cut_mass_q := 0
 var conservation_error_q := 0
 var _cells: Dictionary = {}
 var _compactable_mobile_cells: Dictionary = {}
@@ -45,6 +46,7 @@ func configure(contract: Dictionary, target_generation: int, capacity_override_m
 	bucket_capacity_mass_q = _mass_q(capacity)
 	bucket_mass_q = 0
 	terrain_mass_delta_q = 0
+	discarded_cut_mass_q = 0
 	conservation_error_q = 0
 	_cells.clear()
 	_compactable_mobile_cells.clear()
@@ -117,8 +119,8 @@ func mobile_bulk_volume_for_mass_q(mass_q: int, compaction_q: int) -> float:
 	return float(maxi(0, mass_q)) / (density * float(MASS_Q_PER_KG)) if density > 0.0 else 0.0
 
 
-func stage_cut(cell_changes: Array[Dictionary], requested_mass_q: int) -> Dictionary:
-	if generation < 0 or requested_mass_q <= 0 or requested_mass_q > remaining_capacity_mass_q():
+func stage_cut(cell_changes: Array[Dictionary], requested_mass_q: int, allow_overflow: bool = false) -> Dictionary:
+	if generation < 0 or requested_mass_q <= 0 or (not allow_overflow and requested_mass_q > remaining_capacity_mass_q()):
 		return {"valid": false, "reason": "invalid_or_full_capacity", "accepted_mass_q": 0, "mutations": []}
 	var mutations: Array[Dictionary] = []
 	var remaining := requested_mass_q
@@ -153,6 +155,8 @@ func stage_cut(cell_changes: Array[Dictionary], requested_mass_q: int) -> Dictio
 		"valid": true,
 		"reason": "staged",
 		"accepted_mass_q": accepted_total,
+		"captured_mass_q": mini(accepted_total, remaining_capacity_mass_q()),
+		"discarded_mass_q": maxi(0, accepted_total - remaining_capacity_mass_q()),
 		"mutations": mutations,
 	}
 
@@ -164,9 +168,10 @@ func commit_cut(staged: Dictionary) -> bool:
 	for value in staged.get("mutations", []):
 		var mutation := value as Dictionary
 		_store_state(String(mutation.get("key", "")), mutation.get("state", {}) as Dictionary)
-	bucket_mass_q += accepted
+	bucket_mass_q += int(staged.get("captured_mass_q", accepted))
+	discarded_cut_mass_q += int(staged.get("discarded_mass_q", 0))
 	terrain_mass_delta_q -= accepted
-	conservation_error_q = terrain_mass_delta_q + bucket_mass_q
+	conservation_error_q = _mass_balance_q()
 	return conservation_error_q == 0
 
 
@@ -174,7 +179,7 @@ func can_commit_cut(staged: Dictionary) -> bool:
 	if not bool(staged.get("valid", false)):
 		return false
 	var accepted := int(staged.get("accepted_mass_q", 0))
-	if accepted <= 0 or accepted > remaining_capacity_mass_q():
+	if accepted <= 0 or not _cut_capture_valid(staged):
 		return false
 	var staged_total := 0
 	for value in staged.get("mutations", []):
@@ -185,10 +190,10 @@ func can_commit_cut(staged: Dictionary) -> bool:
 		if key.is_empty() or state.is_empty() or accepted_cell < 0:
 			return false
 		staged_total += accepted_cell
-	return staged_total == accepted and terrain_mass_delta_q + bucket_mass_q == 0
+	return staged_total == accepted and _mass_balance_q() == 0
 
 
-func stage_approximate_cut(coordinates: Array[Vector3i], voxel_volume_m3: float) -> Dictionary:
+func stage_approximate_cut(coordinates: Array[Vector3i], voxel_volume_m3: float, allow_overflow: bool = false) -> Dictionary:
 	if generation < 0 or coordinates.is_empty() or not is_finite(voxel_volume_m3) or voxel_volume_m3 <= 0.0:
 		return {"valid": false, "reason": "invalid_approximate_cut", "accepted_mass_q": 0, "mutations": []}
 	var unique: Dictionary = {}
@@ -219,9 +224,9 @@ func stage_approximate_cut(coordinates: Array[Vector3i], voxel_volume_m3: float)
 		if desired <= 0:
 			continue
 		requested_mass_q += desired
-		if remaining <= 0:
+		if not allow_overflow and remaining <= 0:
 			continue
-		var accepted := mini(desired, remaining)
+		var accepted := desired if allow_overflow else mini(desired, remaining)
 		var mobile_take := mini(accepted, maxi(0, int(existing.get("mobile_mass_q", 0))))
 		var stable_take := mini(accepted - mobile_take, maxi(0, int(existing.get("stable_mass_q", 0))))
 		existing["mobile_mass_q"] = maxi(0, int(existing.get("mobile_mass_q", 0)) - mobile_take)
@@ -248,7 +253,9 @@ func stage_approximate_cut(coordinates: Array[Vector3i], voxel_volume_m3: float)
 		"accounting_mode": "sparse_coverage_approximate",
 		"requested_mass_q": requested_mass_q,
 		"accepted_mass_q": accepted_total,
-		"capacity_clipped": accepted_total < requested_mass_q,
+		"captured_mass_q": mini(accepted_total, remaining_capacity_mass_q()),
+		"discarded_mass_q": maxi(0, accepted_total - remaining_capacity_mass_q()),
+		"capacity_clipped": accepted_total > remaining_capacity_mass_q() or accepted_total < requested_mass_q,
 		"mutations": mutations,
 	}
 
@@ -257,14 +264,14 @@ func can_commit_approximate_cut(staged: Dictionary) -> bool:
 	if not bool(staged.get("valid", false)) or String(staged.get("accounting_mode", "")) != "sparse_coverage_approximate":
 		return false
 	var accepted := int(staged.get("accepted_mass_q", 0))
-	if accepted <= 0 or accepted > remaining_capacity_mass_q() or _staged_mutation_total(staged) != accepted:
+	if accepted <= 0 or not _cut_capture_valid(staged) or _staged_mutation_total(staged) != accepted:
 		return false
 	for value in staged.get("mutations", []):
 		var mutation := value as Dictionary
 		var coverage_key := String(mutation.get("coverage_key", ""))
 		if coverage_key.is_empty() or _approximate_cut_coverage.has(coverage_key):
 			return false
-	return terrain_mass_delta_q + bucket_mass_q == 0
+	return _mass_balance_q() == 0
 
 
 func commit_approximate_cut(staged: Dictionary) -> bool:
@@ -275,10 +282,23 @@ func commit_approximate_cut(staged: Dictionary) -> bool:
 		var mutation := value as Dictionary
 		_store_state(String(mutation.get("key", "")), mutation.get("state", {}) as Dictionary)
 		_approximate_cut_coverage[String(mutation.get("coverage_key", ""))] = true
-	bucket_mass_q += accepted
+	bucket_mass_q += int(staged.get("captured_mass_q", accepted))
+	discarded_cut_mass_q += int(staged.get("discarded_mass_q", 0))
 	terrain_mass_delta_q -= accepted
-	conservation_error_q = terrain_mass_delta_q + bucket_mass_q
+	conservation_error_q = _mass_balance_q()
 	return conservation_error_q == 0
+
+
+func _cut_capture_valid(staged: Dictionary) -> bool:
+	var removed := int(staged.get("accepted_mass_q", 0))
+	var captured := int(staged.get("captured_mass_q", removed))
+	var discarded := int(staged.get("discarded_mass_q", 0))
+	return captured >= 0 and captured <= remaining_capacity_mass_q() \
+		and discarded >= 0 and captured + discarded == removed
+
+
+func _mass_balance_q() -> int:
+	return terrain_mass_delta_q + bucket_mass_q + discarded_cut_mass_q
 
 
 func stage_deposit(cell_changes: Array[Dictionary], requested_mass_q: int, incoming_compaction_q: int = LOOSE_COMPACTION_Q) -> Dictionary:
@@ -323,7 +343,7 @@ func can_commit_deposit(staged: Dictionary) -> bool:
 	var accepted := int(staged.get("accepted_mass_q", 0))
 	if accepted <= 0 or accepted > bucket_mass_q:
 		return false
-	return _staged_mutation_total(staged) == accepted and terrain_mass_delta_q + bucket_mass_q == 0
+	return _staged_mutation_total(staged) == accepted and _mass_balance_q() == 0
 
 
 func commit_deposit(staged: Dictionary) -> bool:
@@ -334,7 +354,7 @@ func commit_deposit(staged: Dictionary) -> bool:
 	_invalidate_approximate_coverage(staged)
 	bucket_mass_q -= accepted
 	terrain_mass_delta_q += accepted
-	conservation_error_q = terrain_mass_delta_q + bucket_mass_q
+	conservation_error_q = _mass_balance_q()
 	return conservation_error_q == 0
 
 
@@ -393,7 +413,7 @@ func stage_mobile_transfer(removals: Array[Dictionary], additions: Array[Diction
 
 func can_commit_mobile_transfer(staged: Dictionary) -> bool:
 	return bool(staged.get("valid", false)) and int(staged.get("accepted_mass_q", 0)) > 0 \
-		and terrain_mass_delta_q + bucket_mass_q == 0
+		and _mass_balance_q() == 0
 
 
 func commit_mobile_transfer(staged: Dictionary) -> bool:
@@ -401,7 +421,7 @@ func commit_mobile_transfer(staged: Dictionary) -> bool:
 		return false
 	_commit_states(staged)
 	_invalidate_approximate_coverage(staged)
-	conservation_error_q = terrain_mass_delta_q + bucket_mass_q
+	conservation_error_q = _mass_balance_q()
 	return conservation_error_q == 0
 
 
@@ -456,14 +476,14 @@ func stage_compaction(coordinates: Array[Vector3i], compaction_delta_q: int) -> 
 
 func can_commit_compaction(staged: Dictionary) -> bool:
 	return bool(staged.get("valid", false)) and int(staged.get("accepted_mass_q", 0)) > 0 \
-		and terrain_mass_delta_q + bucket_mass_q == 0
+		and _mass_balance_q() == 0
 
 
 func commit_compaction(staged: Dictionary) -> bool:
 	if not can_commit_compaction(staged):
 		return false
 	_commit_states(staged)
-	conservation_error_q = terrain_mass_delta_q + bucket_mass_q
+	conservation_error_q = _mass_balance_q()
 	return conservation_error_q == 0
 
 
@@ -542,7 +562,7 @@ func credit_bucket_mass_for_test(mass_q: int) -> bool:
 		return false
 	bucket_mass_q += mass_q
 	terrain_mass_delta_q -= mass_q
-	conservation_error_q = terrain_mass_delta_q + bucket_mass_q
+	conservation_error_q = _mass_balance_q()
 	return conservation_error_q == 0
 
 
@@ -582,6 +602,8 @@ func get_status_snapshot(cell_grid: Array = [1, 1, 1], center_of_mass_local: Vec
 		"fill_profile": fill_profile,
 		"cell_grid": cell_grid.duplicate(),
 		"terrain_mass_delta_q": terrain_mass_delta_q,
+		"discarded_cut_mass_q": discarded_cut_mass_q,
+		"discarded_cut_volume_m3": volume_for_mass_q(discarded_cut_mass_q),
 		"conservation_error_q": conservation_error_q,
 		"conservation_error_kg": float(conservation_error_q) / float(MASS_Q_PER_KG),
 		"sparse_cell_count": _cells.size(),

@@ -2,6 +2,17 @@
 
 ## Current pass — 2026-09-08
 
+Follow-up after user visual acceptance:
+
+- [x] Commit accepted soil presentation changes as `6da1a96`.
+- [x] Widen SY135 boom/arm descriptor limits and synchronize the catalog hash.
+- [x] Let product cuts exceed capture capacity, with explicit discarded-mass
+  accounting and unchanged maximum bucket inventory.
+- [x] Remove the high-outlet Y admission restriction; retain receiving-zone
+  checks and free-outlet/cutting safeguards.
+- [x] Parse changed material, transaction and authority scripts; verify rig hash.
+- [ ] User manual check of expanded reach, full-bucket cutting, and high dumping.
+
 User authorized direct implementation and requested that final testing and
 visual/runtime acceptance be performed manually by the user. Earlier automated
 gate checklists below are historical; they are not rerun requirements for this

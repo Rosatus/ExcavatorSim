@@ -2555,6 +2555,16 @@ VoxelSoilMaterialField.stage_compaction(coordinates, compaction_delta_q) -> Dict
   center/+X/+Y three-point stencil; changing it is a mass-calibration change,
   not a geometry-quality change. Exact fallback commits retain one-cell mass
   tolerance.
+- Product cutting continues at full capacity. A cut transaction's
+  `accepted_mass_q` is the removed amount; `captured_mass_q` is capped to bucket
+  headroom and `discarded_mass_q` records excess. Both native and exact product
+  executors opt into overflow staging. The generation balance includes the
+  discard sink: `terrain_mass_delta_q + bucket_mass_q + discarded_cut_mass_q`.
+  Deposit, transfer and compaction must all use that balance after overflow;
+  otherwise the first full-bucket cut would break later soil operations.
+- SY135 runtime equipment limits are boom `[-25°, 45°]`, arm `[-60°, 45°]`.
+  The physics descriptor and catalog SHA-256 change together. These runtime
+  tuning values do not modify the separate shared backend calibration.
 - Routine material status exposes `material_state_revision` and a deferred
   digest marker; it must not sort/serialize/hash the complete sparse cell table
   after every accepted cut. `state_digest()` remains an explicit diagnostic
@@ -2597,6 +2607,10 @@ VoxelSoilMaterialField.stage_compaction(coordinates, compaction_delta_q) -> Dict
   cutting; leaving it before commit preserves bucket mass and produces no
   accepted release event. The hash-bound descriptor threshold remains intact;
   diagnostics expose the stricter effective runtime threshold separately.
+- A release point may be above the voxel volume. Validate its horizontal
+  editable footprint and receiving SDF support, not the terrain's upper Y bound
+  against the bucket. Air above the volume must not be sampled as an unloaded
+  solid voxel by the outlet gate. Keep the lower bound and buried-outlet checks.
 - A pending release freezes its opening transform, normalized opening normal,
   derived fall direction, admission tick, and fill ratio. The accepted deposit
   publishes one immutable `voxel-soil-release-event-v1` with separate landing
@@ -2696,7 +2710,8 @@ VoxelSoilMaterialField.stage_compaction(coordinates, compaction_delta_q) -> Dict
 - non-increasing motion sequence -> `stale_motion_sequence`, no mutation
 - stationary/above-ground/separating/teleported sweep -> named rejection, no mutation
 - protected/out-of-zone area -> `protected_or_out_of_zone`, no mutation
-- full bucket -> `bucket_full`, no SDF deletion
+- full bucket -> admitted cut still deletes soil, captures zero, records excess
+  in `discarded_cut_mass_q`; bucket contents stay capped
 - staging/capsule/sample/native-path budget exceeded -> bounded rejection, no mutation
 - native coverage contains no solid/uncredited sample -> `no_sdf_change` or
   `no_accounted_material`, no mutation
@@ -2720,7 +2735,8 @@ VoxelSoilMaterialField.stage_compaction(coordinates, compaction_delta_q) -> Dict
 ### 5. Good/Base/Bad Cases
 
 - Good: accepted fixed-tick teeth/side-edge sweep plus constrained trailing
-  clearance becomes one SDF transaction and equal/opposite terrain/bucket mass.
+  clearance becomes one SDF transaction; removed mass equals captured plus
+  explicitly discarded mass when the bucket is full.
 - Base: several adjacent overlapping 60 Hz inputs coalesce into one ordered
   20 Hz commit with bounded queue depth.
 - Bad: searching the whole queue for an older overlapping proposal reorders

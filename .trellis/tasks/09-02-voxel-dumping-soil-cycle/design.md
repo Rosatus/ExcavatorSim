@@ -2,6 +2,31 @@
 
 ## Current implementation: visual-first surface deposits (2026-09-08)
 
+### Follow-up: reach, saturated capture, and high-outlet release
+
+- SY135's runtime rig now uses boom `[-25°, 45°]` and arm `[-60°, 45°]`.
+  The model catalog hash is updated with the descriptor bytes. Rig identity,
+  joint axes, velocity limits and the separate backend calibration are unchanged.
+- Both product cut executors remove the complete admitted sweep even when
+  capacity is exhausted. Material stages separate removed, captured and
+  discarded mass. `accepted_mass_q` remains total removed cut mass;
+  `captured_mass_q` is capped to remaining capacity and `discarded_mass_q` is
+  the excess. The generation's balance is now
+  `terrain_mass_delta_q + bucket_mass_q + discarded_cut_mass_q == 0`.
+  Deposit, compaction and transfer invariant checks include this explicit sink.
+  Diagnostic material staging defaults retain capacity-limited behavior unless
+  the caller explicitly enables overflow; product cut executors enable it.
+- Code diagnosis found a source-height restriction: `_build_dump_proposal`
+  required the release point itself inside editable Y (upper bound 3.75 m at
+  the product scale), and the outlet gate could read out-of-volume SDF as solid.
+  Both could strand inventory during high unloading until the boom was lowered.
+  Admission now bounds release X/Z and the lower Y limit, permits air above the
+  voxel volume, and continues to require valid in-zone receiving support.
+  This is a code-path diagnosis; reproducing the reported pose is left to the
+  user's manual review. Orientation/free-outlet safeguards remain intact.
+
+### Surface and presentation implementation
+
 The user approved implementation of the reassessment and explicitly owns all
 runtime/visual acceptance. Agent validation is limited to script parsing and
 static change review for this pass. The sections below record previous

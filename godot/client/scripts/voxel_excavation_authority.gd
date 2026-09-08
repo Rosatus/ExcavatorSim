@@ -955,8 +955,6 @@ func _commit_proposal(proposal: VoxelCutProposal) -> VoxelCutTransaction:
 	transaction.transaction_id = _transaction_id(transaction.operation, proposal.sequence, proposal.input_hash)
 	if proposal.generation != generation or proposal.model_id != model_id or proposal.tool_hash != tool_hash:
 		return _reject_transaction(transaction, "stale_or_wrong_tool", started)
-	if material_field.remaining_capacity_mass_q() <= 0:
-		return _reject_transaction(transaction, "bucket_full", started)
 	if not proposal.native_paths.is_empty():
 		return _commit_native_proposal(proposal, transaction, started)
 	var window := _integer_window(proposal.area_voxels)
@@ -989,39 +987,24 @@ func _commit_proposal(proposal: VoxelCutProposal) -> VoxelCutTransaction:
 		return _reject_transaction(transaction, "sub_quantum_change", started)
 	var final_values := full_values
 	var final_cells := full_cells
-	var remaining_mass_q := material_field.remaining_capacity_mass_q()
-	if transaction.requested_mass_q > remaining_mass_q:
-		transaction.capacity_clipped = true
-		_capacity_clipped_count += 1
-		var low := 0.0
-		var high := 1.0
-		for _iteration in CAPACITY_SEARCH_STEPS:
-			var alpha := (low + high) * 0.5
-			var candidate := _blend_values(original, full_values, alpha)
-			var candidate_cells := _cell_changes(original, candidate, size, origin)
-			if material_field.mass_q_for_volume(_sum_removed_volume(candidate_cells)) <= remaining_mass_q:
-				low = alpha
-			else:
-				high = alpha
-		if high <= 0.0:
-			return _reject_transaction(transaction, "bucket_full", started)
-		# Use the first representable slice at or above remaining capacity, then
-		# credit exactly the bounded capacity. The geometric excess is bounded by
-		# the binary-search resolution and the one-cell tolerance below.
-		final_values = _blend_values(original, full_values, high)
-		final_cells = _cell_changes(original, final_values, size, origin)
+	# Geometry continues at full capacity; only captured inventory is capped.
 	var represented_mass_q := material_field.mass_q_for_volume(_sum_removed_volume(final_cells))
-	var accepted_target_q := remaining_mass_q if transaction.capacity_clipped else represented_mass_q
+	var accepted_target_q := represented_mass_q
 	transaction.represented_mass_q = represented_mass_q
 	transaction.mass_discretization_error_q = represented_mass_q - accepted_target_q
 	transaction.mass_discretization_tolerance_q = material_field.mass_q_for_volume(pow(_work_zone.voxel_scale_m, 3.0))
 	if absi(transaction.mass_discretization_error_q) > transaction.mass_discretization_tolerance_q:
 		return _reject_transaction(transaction, "mass_discretization_tolerance", started)
 	_assign_cell_mass(final_cells, accepted_target_q)
-	var material_stage := material_field.stage_cut(final_cells, accepted_target_q)
+	var material_stage := material_field.stage_cut(final_cells, accepted_target_q, true)
 	if not bool(material_stage.get("valid", false)):
 		return _reject_transaction(transaction, String(material_stage.get("reason", "material_stage_failed")), started)
 	transaction.accepted_mass_q = int(material_stage.get("accepted_mass_q", 0))
+	transaction.captured_mass_q = int(material_stage.get("captured_mass_q", transaction.accepted_mass_q))
+	transaction.discarded_mass_q = int(material_stage.get("discarded_mass_q", 0))
+	transaction.capacity_clipped = transaction.discarded_mass_q > 0
+	if transaction.capacity_clipped:
+		_capacity_clipped_count += 1
 	if transaction.accepted_mass_q != accepted_target_q:
 		return _reject_transaction(transaction, "material_geometry_mass_mismatch", started)
 	if not material_field.can_commit_cut(material_stage):
@@ -1090,7 +1073,7 @@ func _commit_native_proposal(
 	transaction.digest_usec += Time.get_ticks_usec() - phase_started
 	var voxel_volume_m3 := pow(_work_zone.voxel_scale_m, 3.0)
 	phase_started = Time.get_ticks_usec()
-	var material_stage := material_field.stage_approximate_cut(coverage_coordinates, voxel_volume_m3)
+	var material_stage := material_field.stage_approximate_cut(coverage_coordinates, voxel_volume_m3, true)
 	if not bool(material_stage.get("valid", false)):
 		return _reject_transaction(transaction, String(material_stage.get("reason", "material_stage_failed")), started_usec)
 	if not material_field.can_commit_approximate_cut(material_stage):
@@ -1099,6 +1082,8 @@ func _commit_native_proposal(
 	transaction.accounting_mode = "sparse_coverage_approximate"
 	transaction.requested_mass_q = int(material_stage.get("requested_mass_q", 0))
 	transaction.accepted_mass_q = int(material_stage.get("accepted_mass_q", 0))
+	transaction.captured_mass_q = int(material_stage.get("captured_mass_q", transaction.accepted_mass_q))
+	transaction.discarded_mass_q = int(material_stage.get("discarded_mass_q", 0))
 	transaction.represented_mass_q = transaction.requested_mass_q
 	transaction.capacity_clipped = bool(material_stage.get("capacity_clipped", false))
 	transaction.mass_discretization_error_q = transaction.requested_mass_q - transaction.accepted_mass_q
@@ -1257,9 +1242,16 @@ func _update_dump_gate_diagnostics(pose_snapshot: Dictionary, delta_s: float) ->
 		_dump_gate_raw_active = false
 	elif _dump_gate_raw_active:
 		var opening := current["opening"] as Transform3D
-		var outlet := WorkZoneConfig.world_to_voxel(opening.origin + opening_normal * 0.12, _work_zone.voxel_scale_m)
-		if _tool.get_voxel_f(Vector3i(roundi(outlet.x), roundi(outlet.y), roundi(outlet.z))) <= 0.0:
+		var outlet_world := opening.origin + opening_normal * 0.12
+		var editable := WorkZoneConfig.editable_world_bounds(_work_zone.voxel_scale_m)
+		# Air above the bounded voxel volume is a valid release source. Querying
+		# unloaded/out-of-volume SDF there can return zero and falsely close it.
+		if outlet_world.y < editable.position.y:
 			_dump_gate_raw_active = false
+		elif outlet_world.y < editable.end.y:
+			var outlet := WorkZoneConfig.world_to_voxel(outlet_world, _work_zone.voxel_scale_m)
+			if _tool.get_voxel_f(Vector3i(roundi(outlet.x), roundi(outlet.y), roundi(outlet.z))) <= 0.0:
+				_dump_gate_raw_active = false
 	if _dump_gate_raw_active:
 		_dump_gate_hold_s = minf(
 			DUMP_GATE_CONFIRMATION_S,
@@ -1287,7 +1279,12 @@ func _build_dump_proposal(pose_snapshot: Dictionary, identity: Dictionary, delta
 	var opening := current.get("opening", Transform3D.IDENTITY) as Transform3D
 	var release_world := opening.origin
 	var release_direction := (opening_normal * 0.65 + Vector3.DOWN * 0.85).normalized()
-	if not WorkZoneConfig.is_world_position_editable(release_world, _work_zone.voxel_scale_m):
+	var editable := WorkZoneConfig.editable_world_bounds(_work_zone.voxel_scale_m)
+	# The receiving terrain must be inside the work zone; the bucket may be
+	# higher than its upper Y bound. This used to strand soil until boom-lowering.
+	if release_world.x < editable.position.x or release_world.x >= editable.end.x \
+			or release_world.z < editable.position.z or release_world.z >= editable.end.z \
+			or release_world.y < editable.position.y:
 		return {"attempted": true, "accepted": false, "reason": "dump_out_of_zone", "release_world": release_world}
 	var support_started_usec := Time.get_ticks_usec()
 	var support := _find_sdf_support_world(release_world)
