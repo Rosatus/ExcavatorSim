@@ -1,8 +1,8 @@
 class_name VoxelSoilOperationProposal
 extends RefCounted
 
-const SCHEMA_VERSION := "voxel-soil-operation-proposal-v1"
-const OPERATIONS := ["deposit", "settle", "compact"]
+const SCHEMA_VERSION := "voxel-soil-operation-proposal-v2"
+const OPERATIONS := ["deposit"]
 
 var generation := -1
 var fixed_tick_begin := -1
@@ -16,7 +16,6 @@ var operation := ""
 var area_voxels := AABB()
 var shapes: Array[Dictionary] = []
 var requested_mass_q := 0
-var compaction_delta_q := 0
 var release_world := Vector3.ZERO
 var deposit_world := Vector3.ZERO
 var release_fill_ratio := 0.0
@@ -41,7 +40,6 @@ static func create(fields: Dictionary) -> VoxelSoilOperationProposal:
 	proposal.operation = String(fields.get("operation", ""))
 	proposal.area_voxels = fields.get("area_voxels", AABB()) as AABB
 	proposal.requested_mass_q = int(fields.get("requested_mass_q", 0))
-	proposal.compaction_delta_q = int(fields.get("compaction_delta_q", 0))
 	proposal.release_world = fields.get("release_world", Vector3.ZERO) as Vector3
 	proposal.deposit_world = fields.get("deposit_world", proposal.release_world) as Vector3
 	proposal.release_fill_ratio = float(fields.get("release_fill_ratio", 0.0))
@@ -83,8 +81,6 @@ func is_valid() -> bool:
 		return false
 	if shapes.is_empty() or requested_mass_q <= 0:
 		return false
-	if operation == "compact" and compaction_delta_q <= 0:
-		return false
 	for shape in shapes:
 		if not _shape_valid(shape):
 			return false
@@ -110,7 +106,6 @@ func to_dictionary() -> Dictionary:
 		"area_voxels": area_voxels,
 		"shapes": shapes.duplicate(true),
 		"requested_mass_q": requested_mass_q,
-		"compaction_delta_q": compaction_delta_q,
 		"release_world": release_world,
 		"deposit_world": deposit_world,
 		"release_fill_ratio": release_fill_ratio,
@@ -135,10 +130,10 @@ func _compute_hash() -> String:
 			float(shape.get("radius_voxels", 0.0)),
 		])
 	var release_basis := release_transform_world.basis
-	var canonical := "%d|%d|%d|%d|%s|%s|%s|%s|%d|%d|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f|%.6f|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f|%d|%d|%d|%s|%s" % [
+	var canonical := "%d|%d|%d|%d|%s|%s|%s|%s|%d|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f|%.6f|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f|%d|%d|%d|%s|%s" % [
 		generation, fixed_tick_begin, fixed_tick_end, sequence,
 		model_id, authority_epoch, tool_hash, operation,
-		requested_mass_q, compaction_delta_q,
+		requested_mass_q,
 		release_world.x, release_world.y, release_world.z,
 		deposit_world.x, deposit_world.y, deposit_world.z,
 		release_fill_ratio,
@@ -169,5 +164,5 @@ static func _shape_valid(shape: Dictionary) -> bool:
 	var a := shape.get("a_voxels", Vector3(INF, INF, INF)) as Vector3
 	var b := shape.get("b_voxels", a) as Vector3
 	var radius := float(shape.get("radius_voxels", 0.0))
-	return mode in ["add", "remove"] and a.is_finite() and b.is_finite() \
+	return mode == "add" and a.is_finite() and b.is_finite() \
 		and is_finite(radius) and radius > 0.0

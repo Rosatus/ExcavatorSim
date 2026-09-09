@@ -44,41 +44,28 @@ func _init() -> void:
 
 	var cycle := MaterialField.new()
 	_expect(cycle.configure(contract, 6), "material cycle field configures", failures)
-	var loose_mass_q := cycle.mass_q_for_loose_volume(cell_volume * 0.25)
-	_expect(cycle.credit_bucket_mass_for_test(loose_mass_q), "test seam credits conserved bucket mass", failures)
+	var deposit_mass_q := cycle.mass_q_for_volume(cell_volume * 0.25)
+	_expect(cycle.credit_bucket_mass_for_test(deposit_mass_q), "test seam credits conserved bucket mass", failures)
 	var deposit_changes: Array[Dictionary] = [{
 		"coordinate": Vector3i(4, 5, 6),
 		"pre_fraction": 0.0,
 		"post_fraction": 0.25,
 		"cell_volume_m3": cell_volume,
-		"added_mass_q": loose_mass_q,
+		"added_mass_q": deposit_mass_q,
 	}]
-	var deposit_stage := cycle.stage_deposit(deposit_changes, loose_mass_q)
-	_expect(bool(deposit_stage.get("valid", false)) and cycle.bucket_mass_q == loose_mass_q, "deposit staging is mutation-free", failures)
+	var deposit_stage := cycle.stage_deposit(deposit_changes, deposit_mass_q)
+	_expect(bool(deposit_stage.get("valid", false)) and cycle.bucket_mass_q == deposit_mass_q, "deposit staging is mutation-free", failures)
 	_expect(cycle.commit_deposit(deposit_stage), "deposit commits atomically", failures)
 	_expect(cycle.bucket_mass_q == 0 and cycle.terrain_mass_delta_q == 0, "deposit reverses bucket credit exactly", failures)
-	_expect(cycle.total_mobile_mass_q() == loose_mass_q and cycle.total_stable_mass_q() == 0, "aggregate material totals expose deposited soil", failures)
+	_expect(cycle.total_stable_mass_q() == deposit_mass_q, "deposit immediately becomes stable terrain", failures)
 	var deposited := cycle.cell_snapshot(Vector3i(4, 5, 6))
-	_expect(int(deposited.get("mobile_mass_q", 0)) == loose_mass_q and int(deposited.get("stable_mass_q", -1)) == 0, "deposit creates mobile soil without stable reclassification", failures)
-	var transfer_q := loose_mass_q / 2
-	var transfer_stage := cycle.stage_mobile_transfer(
-		[{"coordinate": Vector3i(4, 5, 6), "removed_mass_q": transfer_q}],
-		[{"coordinate": Vector3i(5, 4, 6), "pre_fraction": 0.0, "cell_volume_m3": cell_volume, "added_mass_q": transfer_q, "incoming_compaction_q": 0}],
-		transfer_q,
-	)
-	_expect(cycle.commit_mobile_transfer(transfer_stage), "paired repose transfer commits", failures)
-	_expect(cycle.mobile_mass_q_at(Vector3i(4, 5, 6)) + cycle.mobile_mass_q_at(Vector3i(5, 4, 6)) == loose_mass_q, "paired transfer conserves mobile mass", failures)
-	var stable_digest := cycle.state_digest()
-	var compact_mass_q := cycle.mobile_mass_q_at(Vector3i(5, 4, 6))
-	var loose_bulk_volume := cycle.mobile_bulk_volume_for_mass_q(compact_mass_q, cycle.mobile_compaction_q_at(Vector3i(5, 4, 6)))
-	var compact_stage := cycle.stage_compaction([Vector3i(5, 4, 6), Vector3i(99, 99, 99)], 80)
-	_expect(float(compact_stage.get("volume_loss_m3", 0.0)) > 0.0, "compaction stages an explicit bulk-volume reduction", failures)
-	_expect(cycle.commit_compaction(compact_stage), "loose-only compaction commits", failures)
-	_expect(cycle.state_digest() != stable_digest, "compaction changes mobile material state", failures)
-	_expect(cycle.mobile_bulk_volume_for_mass_q(compact_mass_q, cycle.mobile_compaction_q_at(Vector3i(5, 4, 6))) < loose_bulk_volume, "higher compaction reduces equal-mass bulk volume", failures)
-	_expect(cycle.total_mobile_mass_q() == loose_mass_q, "compaction preserves aggregate mobile mass", failures)
-	_expect(cycle.cell_snapshot(Vector3i(99, 99, 99)).is_empty(), "compaction does not create material on untouched stable/empty cells", failures)
-	_expect(cycle.conservation_error_q == 0, "deposit, settle and compact keep exact ledger conservation", failures)
+	_expect(not deposited.has("mobile_mass_q") and not deposited.has("mobile_compaction_q"), "terrain has one stable ledger", failures)
+	var recut := cycle.stage_cut([{"coordinate": Vector3i(4, 5, 6), "removed_mass_q": deposit_mass_q}], deposit_mass_q)
+	_expect(cycle.commit_cut(recut), "deposited terrain can be cut again", failures)
+	_expect(cycle.bucket_mass_q == deposit_mass_q and cycle.total_stable_mass_q() == 0, "re-cut returns exact deposited mass", failures)
+	_expect(cycle.conservation_error_q == 0, "cut deposit re-cut conserves mass", failures)
+	var rejected := cycle.stage_deposit(deposit_changes, deposit_mass_q + 1)
+	_expect(not bool(rejected.get("valid", false)) and cycle.bucket_mass_q == deposit_mass_q, "failed deposit keeps bucket inventory", failures)
 
 	var approximate := MaterialField.new()
 	_expect(approximate.configure(contract, 7, 1000.0), "approximate cut field configures", failures)

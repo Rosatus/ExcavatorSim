@@ -9,10 +9,9 @@ const MaterialField = preload("res://scripts/voxel_soil_material_field.gd")
 const WorkZoneConfig = preload("res://scripts/voxel_work_zone_config.gd")
 const TimingWindow = preload("res://scripts/voxel_timing_window.gd")
 const DepositSurface = preload("res://scripts/soil_deposit_surface.gd")
-const SoilFlight = preload("res://scripts/soil_flight.gd")
 const MAX_DEPOSIT_SURFACE_SAMPLES := 32768
 
-const SCHEMA_VERSION := "voxel-excavation-authority-v2"
+const SCHEMA_VERSION := "voxel-excavation-authority-v3"
 const COMMIT_PERIOD_S := 0.05
 const MAX_QUEUE_DEPTH := 12
 const MAX_JOURNAL_ROWS := 256
@@ -32,12 +31,7 @@ const CAPACITY_SEARCH_STEPS := 14
 const SDF_CHANNEL_MASK := 1 << VoxelBuffer.CHANNEL_SDF
 const VOLUME_EPSILON_M3 := 0.000001
 const MAX_SOIL_QUEUE_DEPTH := 12
-const MAX_SETTLE_FRONTIER := 512
-const MAX_SETTLE_CELLS_PER_COMMIT := 96
 const REPOSE_ANGLE_DEG := 35.0
-const SETTLE_TRANSFER_FRACTION := 0.18
-const MIN_TRACK_SUPPORT_FORCE_N := 1000.0
-const MAX_COMPACTION_DELTA_Q := 80
 const DEPOSIT_MIN_RADIUS_VOXELS := 1.0
 const DEPOSIT_MAX_RADIUS_VOXELS := 4.0
 const DEPOSIT_MAX_HEIGHT_VOXELS := 8.0
@@ -46,12 +40,7 @@ const MIN_DUMP_VOLUME_VOXELS := 0.01
 const DUMP_GATE_CONFIRMATION_S := 0.12
 const DUMP_RELEASE_DOWN_DOT := 0.5
 const DUMP_LANDING_NEIGHBORHOOD_VOXELS := 4.0
-const MAX_CONSECUTIVE_DEPOSIT_COMMITS := 2
-const MAX_COMPACTION_SHAPES_PER_PROPOSAL := 32
-const MAX_COMPACTION_STAGED_SAMPLES := 32768
-const MAX_TRACK_COMPACTION_RECEIPTS := 32
 const READINESS_WORK_TIMEOUT_FRAMES := 600
-const SETTLE_OFFSETS: Array[Vector3i] = [Vector3i.LEFT, Vector3i.RIGHT, Vector3i.FORWARD, Vector3i.BACK]
 const NATIVE_COVERAGE_OFFSETS: Array[Vector3i] = [
 	Vector3i.ZERO,
 	Vector3i.RIGHT,
@@ -78,20 +67,12 @@ var _soil_queue: Array[VoxelSoilOperationProposal] = []
 var _pending_dump: VoxelSoilOperationProposal
 var _pending_dump_elapsed_s := 0.0
 var _pending_dump_key := ""
-var _flights: Array[Dictionary] = []
-var _landing_in_progress := false
 var _release_published_since_step := false
 var _journal: Array[Dictionary] = []
 var _seen_inputs: Dictionary = {}
 var _seen_order: Array[String] = []
-var _seen_track_receipts: Dictionary = {}
-var _seen_track_receipt_order: Array[String] = []
 var _readiness_work: Array[Dictionary] = []
-var _settle_frontier: Array[Vector3i] = []
-var _settle_frontier_seen: Dictionary = {}
 var _commit_accumulator_s := 0.0
-var _prefer_background := false
-var _consecutive_deposit_commits := 0
 var _engaged := false
 var _last_submitted_tick := -1
 var _last_submitted_motion_sequence := -1
@@ -118,11 +99,10 @@ var _native_deposit_committed_count := 0
 var _dump_batch_flush_count := 0
 var _dump_batch_coalesced_count := 0
 var _readiness_coalesced_count := 0
-var _track_compaction_skipped_no_mobile := 0
 var _readiness_retired_stale := 0
 var _readiness_timed_out := 0
 var _rejection_reasons: Dictionary = {}
-var _operation_counts: Dictionary = {"cut": 0, "deposit": 0, "settle": 0, "compact": 0}
+var _operation_counts: Dictionary = {"cut": 0, "deposit": 0}
 var _accepted_dump_event_id := ""
 var _accepted_dump_event: Dictionary = {}
 var _dump_release_world := Vector3.ZERO
@@ -141,6 +121,7 @@ var _rejected_dump_event_id := ""
 var _rejected_dump_world := Vector3.ZERO
 var _proposal_timing_usec := TimingWindow.new()
 var _commit_timing_usec := TimingWindow.new()
+var _rejected_commit_timing_usec := TimingWindow.new()
 var _coverage_timing_usec := TimingWindow.new()
 var _material_timing_usec := TimingWindow.new()
 var _native_edit_timing_usec := TimingWindow.new()
@@ -197,10 +178,6 @@ func set_bucket_capacity_override_for_testing(capacity_override_m3: float) -> Di
 
 
 func clear() -> void:
-	if material_field.in_flight_mass_q > 0:
-		material_field.return_from_flight(material_field.in_flight_mass_q)
-	_flights.clear()
-	_landing_in_progress = false
 	_release_published_since_step = false
 	configured = false
 	generation = -1
@@ -224,14 +201,8 @@ func clear() -> void:
 	_journal.clear()
 	_seen_inputs.clear()
 	_seen_order.clear()
-	_seen_track_receipts.clear()
-	_seen_track_receipt_order.clear()
 	_readiness_work.clear()
-	_settle_frontier.clear()
-	_settle_frontier_seen.clear()
 	_commit_accumulator_s = 0.0
-	_prefer_background = false
-	_consecutive_deposit_commits = 0
 	_engaged = false
 	_last_submitted_tick = -1
 	_last_submitted_motion_sequence = -1
@@ -258,11 +229,10 @@ func clear() -> void:
 	_dump_batch_flush_count = 0
 	_dump_batch_coalesced_count = 0
 	_readiness_coalesced_count = 0
-	_track_compaction_skipped_no_mobile = 0
 	_readiness_retired_stale = 0
 	_readiness_timed_out = 0
 	_rejection_reasons.clear()
-	_operation_counts = {"cut": 0, "deposit": 0, "settle": 0, "compact": 0}
+	_operation_counts = {"cut": 0, "deposit": 0}
 	_accepted_dump_event_id = ""
 	_accepted_dump_event.clear()
 	_dump_release_world = Vector3.ZERO
@@ -389,17 +359,14 @@ func _step_fixed_impl(delta: float) -> Dictionary:
 	if not configured or not is_finite(delta) or delta < 0.0:
 		return {"changed": false, "reason": "authority_unavailable"}
 	_commit_accumulator_s += delta
-	for flight in _flights:
-		flight["remaining_s"] = maxf(0.0, float(flight["remaining_s"]) - delta)
 	if _pending_dump != null:
 		_pending_dump_elapsed_s += delta
 		if _pending_dump_elapsed_s + 0.000001 >= DUMP_BATCH_PERIOD_S:
 			_flush_pending_dump_to_queue()
-	if _queue.is_empty() and _soil_queue.is_empty() and _settle_frontier.is_empty() and _pending_dump == null and _flights.is_empty():
+	if _queue.is_empty() and _soil_queue.is_empty() and _pending_dump == null:
 		return {"changed": false, "reason": "idle"}
-	# Active dumping owns the foreground slot. Do not spend the batching window
-	# committing stale compaction work while a deposit is waiting to flush.
-	if _queue.is_empty() and _pending_dump != null and _soil_operation_queue_depth("deposit") == 0 and _ready_flight_index() < 0:
+	# Wait for the pending dump batch to reach its publication deadline.
+	if _queue.is_empty() and _pending_dump != null and _soil_operation_queue_depth("deposit") == 0:
 		return {
 			"changed": false,
 			"reason": "dump_batch_coalescing",
@@ -409,25 +376,15 @@ func _step_fixed_impl(delta: float) -> Dictionary:
 		return {"changed": false, "reason": "coalescing", "queue_depth": _queue.size() + _soil_queue.size()}
 	_commit_accumulator_s = fmod(_commit_accumulator_s, COMMIT_PERIOD_S)
 	var transaction: VoxelCutTransaction
-	var processed_background := false
-	if _queue.is_empty() and _ready_flight_index() >= 0:
-		transaction = _land_flight(_ready_flight_index())
-	var dump_work_pending := _pending_dump != null or not _flights.is_empty() or _soil_operation_queue_depth("deposit") > 0
-	if transaction == null and not dump_work_pending and _queue.is_empty() and not _settle_frontier.is_empty() and (
-			_prefer_background or (_queue.is_empty() and _soil_queue.is_empty())
-	):
-		var settle_proposal := _build_next_settle_proposal()
-		if settle_proposal != null:
-			transaction = _commit_soil_proposal(settle_proposal)
-			processed_background = true
+	# Continuous settle/compaction is intentionally absent. Deposits commit as
+	# stable repose geometry and remain directly re-diggable.
 	if transaction == null:
 		if _queue.is_empty() and _soil_queue.is_empty():
-			return {"changed": false, "reason": "settle_idle"}
+			return {"changed": false, "reason": "idle"}
 		if _queue.is_empty() and not _soil_queue.is_empty():
 			transaction = _commit_soil_proposal(_dequeue_next_soil_proposal())
 		else:
 			transaction = _commit_proposal(_queue.pop_front())
-	_prefer_background = not processed_background
 	_record_transaction_telemetry(transaction)
 	_last_transaction = transaction.to_dictionary()
 	_append_journal(_last_transaction)
@@ -440,11 +397,7 @@ func _step_fixed_impl(delta: float) -> Dictionary:
 func flush_for_test() -> Dictionary:
 	if _pending_dump != null and not _flush_pending_dump_to_queue():
 		return {"changed": false, "reason": "soil_queue_full"}
-	# Explicit drain helper; normal step_fixed never skips flight time.
-	var advance := COMMIT_PERIOD_S
-	for flight in _flights:
-		advance = maxf(advance, float(flight["remaining_s"]) + COMMIT_PERIOD_S)
-	return step_fixed(advance)
+	return step_fixed(COMMIT_PERIOD_S)
 
 
 func get_payload_snapshot() -> Dictionary:
@@ -470,8 +423,6 @@ func get_visual_snapshot() -> Dictionary:
 	# Detached gameplay projection: no payload, terrain statistics, readiness
 	# scans or timing-window sorting. Effects and audio pull this frequently.
 	return {
-		"flight_queue_depth": _flights.size(),
-		"in_flight_mass_q": material_field.in_flight_mass_q,
 		"last_transaction": _last_transaction.duplicate(true),
 		"accepted_dump_event_id": _accepted_dump_event_id,
 		"accepted_dump_event": _accepted_dump_event.duplicate(true),
@@ -512,8 +463,6 @@ func get_status_snapshot(refresh_diagnostics: bool = false) -> Dictionary:
 		"queue_depth": _queue.size() + _soil_queue.size(),
 		"cut_queue_depth": _queue.size(),
 		"soil_queue_depth": _soil_queue.size(),
-		"flight_queue_depth": _flights.size(),
-		"in_flight_mass_q": material_field.in_flight_mass_q,
 		"queue_capacity": MAX_QUEUE_DEPTH + MAX_SOIL_QUEUE_DEPTH,
 		"cut_queue_capacity": MAX_QUEUE_DEPTH,
 		"soil_queue_capacity": MAX_SOIL_QUEUE_DEPTH,
@@ -530,14 +479,10 @@ func get_status_snapshot(refresh_diagnostics: bool = false) -> Dictionary:
 		"dump_cancelled_count": _dump_cancelled_count,
 		"dump_cancelled_mass_q": _dump_cancelled_mass_q,
 		"last_dump_cancel_reason": _last_dump_cancel_reason,
-		"compaction_queue_depth": _soil_operation_queue_depth("compact"),
-		"dump_admission_policy": "evict_pending_compaction_when_full",
+		"dump_admission_policy": "bounded_deposit_fifo",
 		"peak_queue_depth": _peak_queue_depth,
-		"settle_frontier_depth": _settle_frontier.size(),
-		"settle_frontier_capacity": MAX_SETTLE_FRONTIER,
 		"oldest_age_ticks": oldest_age_ticks,
 		"pending_readiness_count": _readiness_work.size(),
-		"track_compaction_skipped_no_mobile": _track_compaction_skipped_no_mobile,
 		"readiness_retired_stale": _readiness_retired_stale,
 		"readiness_timed_out": _readiness_timed_out,
 		"submitted": _submitted_count,
@@ -609,6 +554,7 @@ func _reset_timing_telemetry() -> void:
 	for window in [
 		_proposal_timing_usec,
 		_commit_timing_usec,
+		_rejected_commit_timing_usec,
 		_coverage_timing_usec,
 		_material_timing_usec,
 		_native_edit_timing_usec,
@@ -620,7 +566,7 @@ func _reset_timing_telemetry() -> void:
 	]:
 		(window as VoxelTimingWindow).clear()
 	_operation_commit_timing.clear()
-	for operation in ["cut", "deposit", "settle", "compact"]:
+	for operation in ["cut", "deposit"]:
 		_operation_commit_timing[operation] = TimingWindow.new()
 
 
@@ -632,7 +578,10 @@ func _record_proposal_telemetry(started_usec: int, allocation_proxy: int) -> voi
 
 
 func _record_transaction_telemetry(transaction: VoxelCutTransaction) -> void:
-	if not diagnostics_enabled or transaction == null or not transaction.accepted():
+	if not diagnostics_enabled or transaction == null:
+		return
+	if not transaction.accepted():
+		_rejected_commit_timing_usec.record(transaction.commit_usec)
 		return
 	_timed_commit_count += 1
 	_commit_timing_usec.record(transaction.commit_usec)
@@ -669,6 +618,7 @@ func _phase_timing_snapshot() -> Dictionary:
 		"window_size": VoxelTimingWindow.DEFAULT_CAPACITY,
 		"proposal_generation": _proposal_timing_usec.snapshot(),
 		"commit": _commit_timing_usec.snapshot(),
+		"rejected_commit": _rejected_commit_timing_usec.snapshot(),
 		"commit_by_operation": operation_commit,
 		"coverage": _coverage_timing_usec.snapshot(),
 		"material_accounting": _material_timing_usec.snapshot(),
@@ -792,8 +742,7 @@ func _stage_pending_dump(proposal: VoxelSoilOperationProposal) -> Dictionary:
 		_pending_dump = merged
 		_dump_batch_coalesced_count += 1
 	if _pending_dump.requested_mass_q >= available_mass_q:
-		# Release during step_fixed so a newborn flight cannot age by a delta
-		# which elapsed before it was published.
+		# Commit a full batch on the next fixed step.
 		_pending_dump_elapsed_s = DUMP_BATCH_PERIOD_S
 	return {"accepted": true, "reason": "dump_pending", "staged": true}
 
@@ -801,69 +750,16 @@ func _stage_pending_dump(proposal: VoxelSoilOperationProposal) -> Dictionary:
 func _flush_pending_dump_to_queue() -> bool:
 	if _pending_dump == null:
 		return true
-	if _flights.size() >= SoilFlight.MAX_RELEASES or _release_published_since_step:
-		return false
 	var fields := _pending_dump.to_dictionary()
-	fields["batch_wait_usec"] = maxi(
-		int(fields.get("batch_wait_usec", 0)),
-		roundi(_pending_dump_elapsed_s * 1000000.0),
-	)
-	var flags := fields.get("quality_flags", []) as Array
-	flags.append("bounded_100ms_batch")
-	fields["quality_flags"] = flags
+	fields["batch_wait_usec"] = roundi(_pending_dump_elapsed_s * 1000000.0)
 	var queued := SoilOperationProposal.create(fields)
-	if not queued.is_valid():
+	if not queued.is_valid() or not _coalesce_or_enqueue_soil(queued):
 		return false
-	var support := _find_sdf_support_world(queued.release_world)
-	if not bool(support.get("valid", false)):
-		return false
-	var landing := support["position"] as Vector3
-	var flight_s := SoilFlight.duration(queued.release_world, landing)
-	if flight_s > SoilFlight.MAX_FLIGHT_S or not material_field.release_to_flight(queued.requested_mass_q):
-		return false
-	_flights.append({"proposal": queued, "remaining_s": flight_s + DUMP_BATCH_PERIOD_S * 0.5})
-	var release := CutTransaction.new()
-	release.transaction_id = "release:%d:%s" % [generation, queued.input_hash]
-	release.generation = generation
-	release.revision = data_revision
-	release.admission_tick = queued.admission_tick
-	release.accepted_mass_q = queued.requested_mass_q
-	release.accepted_volume_m3 = material_field.loose_volume_for_mass_q(queued.requested_mass_q)
-	release.release_world = queued.release_world
-	release.release_transform_world = queued.release_transform_world
-	release.release_normal_world = queued.release_normal_world
-	release.release_direction_world = Vector3.DOWN
-	release.release_fill_ratio = queued.release_fill_ratio
-	release.deposit_world = landing
-	_publish_accepted_dump_event(release)
-	_accepted_dump_event["flight_duration_s"] = flight_s
-	_accepted_dump_event["release_committed"] = true
-	_release_published_since_step = true
 	_pending_dump = null
 	_pending_dump_elapsed_s = 0.0
 	_pending_dump_key = ""
 	_dump_batch_flush_count += 1
 	return true
-
-
-func _ready_flight_index() -> int:
-	for index in _flights.size():
-		if float(_flights[index]["remaining_s"]) <= 0.000001:
-			return index
-	return -1
-
-
-func _land_flight(index: int) -> VoxelCutTransaction:
-	var flight := _flights[index]
-	_flights.remove_at(index)
-	var proposal := flight["proposal"] as VoxelSoilOperationProposal
-	# Synchronous escrow resolution: only this arrival becomes available to the
-	# existing atomic SDF/material executor. Failed/partial deposits return stock.
-	material_field.return_from_flight(proposal.requested_mass_q)
-	_landing_in_progress = true
-	var transaction := _commit_soil_proposal(proposal)
-	_landing_in_progress = false
-	return transaction
 
 
 func _cancel_uncommitted_dumps(reason: String) -> int:
@@ -885,7 +781,6 @@ func _cancel_uncommitted_dumps(reason: String) -> int:
 		_dump_cancelled_count += cancelled_count
 		_dump_cancelled_mass_q += cancelled_mass_q
 		_last_dump_cancel_reason = reason
-		_consecutive_deposit_commits = 0
 	return cancelled_count
 
 
@@ -951,17 +846,17 @@ func _resized_dump_proposal(
 func _deposit_shape_for_mass(requested_mass_q: int, support_world: Vector3) -> Dictionary:
 	if requested_mass_q <= 0 or not support_world.is_finite():
 		return {}
-	var loose_volume_m3 := material_field.loose_volume_for_mass_q(requested_mass_q)
+	var deposit_volume_m3 := material_field.volume_for_mass_q(requested_mass_q)
 	var repose_slope := maxf(0.2, tan(deg_to_rad(REPOSE_ANGLE_DEG)))
 	var minimum_radius_m := _work_zone.voxel_scale_m * DEPOSIT_MIN_RADIUS_VOXELS
 	var maximum_radius_m := _work_zone.voxel_scale_m * DEPOSIT_MAX_RADIUS_VOXELS
 	var radius_world := clampf(
-		pow(maxf(VOLUME_EPSILON_M3, 3.0 * loose_volume_m3 / (PI * repose_slope)), 1.0 / 3.0),
+		pow(maxf(VOLUME_EPSILON_M3, 3.0 * deposit_volume_m3 / (PI * repose_slope)), 1.0 / 3.0),
 		minimum_radius_m,
 		maximum_radius_m,
 	)
 	var height_world := clampf(
-		3.0 * loose_volume_m3 / maxf(PI * radius_world * radius_world, VOLUME_EPSILON_M3),
+		3.0 * deposit_volume_m3 / maxf(PI * radius_world * radius_world, VOLUME_EPSILON_M3),
 		_work_zone.voxel_scale_m,
 		_work_zone.voxel_scale_m * DEPOSIT_MAX_HEIGHT_VOXELS,
 	)
@@ -983,82 +878,17 @@ func _deposit_shape_for_mass(requested_mass_q: int, support_world: Vector3) -> D
 
 
 func _coalesce_or_enqueue_soil(proposal: VoxelSoilOperationProposal) -> bool:
-	if not _soil_queue.is_empty():
-		var index := _soil_queue.size() - 1
-		var pending := _soil_queue[index]
-		var merged_area := pending.area_voxels.merge(proposal.area_voxels)
-		var compaction_merge_is_bounded := proposal.operation != "compact" or ( \
-			pending.area_voxels.intersects(proposal.area_voxels) \
-			and pending.shapes.size() + proposal.shapes.size() <= MAX_COMPACTION_SHAPES_PER_PROPOSAL \
-			and _area_sample_count(merged_area) <= MAX_COMPACTION_STAGED_SAMPLES \
-		)
-		if proposal.operation != "deposit" \
-				and pending.operation == proposal.operation and pending.generation == proposal.generation \
-				and pending.model_id == proposal.model_id and pending.authority_epoch == proposal.authority_epoch \
-				and pending.fixed_tick_end < proposal.fixed_tick_begin \
-				and pending.shapes.size() + proposal.shapes.size() <= MAX_PROPOSAL_CAPSULES \
-				and compaction_merge_is_bounded:
-			_soil_queue[index] = SoilOperationProposal.create({
-				"generation": generation,
-				"fixed_tick_begin": pending.fixed_tick_begin,
-				"fixed_tick_end": proposal.fixed_tick_end,
-				"sequence": proposal.sequence,
-				"model_id": model_id,
-				"authority_epoch": proposal.authority_epoch,
-				"tool_hash": tool_hash,
-				"operation": proposal.operation,
-				"area_voxels": merged_area,
-				"shapes": pending.shapes + proposal.shapes,
-				"requested_mass_q": pending.requested_mass_q + proposal.requested_mass_q,
-				"compaction_delta_q": maxi(pending.compaction_delta_q, proposal.compaction_delta_q),
-				"release_world": proposal.release_world,
-				"deposit_world": proposal.deposit_world,
-				"release_fill_ratio": proposal.release_fill_ratio,
-				"release_transform_world": proposal.release_transform_world,
-				"release_normal_world": proposal.release_normal_world,
-				"release_direction_world": proposal.release_direction_world,
-				"admission_tick": proposal.admission_tick,
-				"quality_flags": pending.quality_flags + proposal.quality_flags + ["coalesced"],
-			})
-			_coalesced_count += 1
-			return true
-	if _soil_queue.size() >= MAX_SOIL_QUEUE_DEPTH:
-		if proposal.operation != "deposit":
-			return false
-		var compact_index := -1
-		for index in range(_soil_queue.size() - 1, -1, -1):
-			if _soil_queue[index].operation == "compact":
-				compact_index = index
-				break
-		if compact_index < 0:
-			return false
-		_soil_queue.remove_at(compact_index)
-		_record_rejection("compaction_evicted_for_dump")
+	# Dump batches are already coalesced before publication. Only deposits may
+	# enter the product soil queue; there is no background compaction work.
+	if proposal.operation != "deposit" or _soil_queue.size() >= MAX_SOIL_QUEUE_DEPTH:
+		return false
 	_soil_queue.append(proposal.duplicate_typed())
 	_peak_queue_depth = maxi(_peak_queue_depth, _queue.size() + _soil_queue.size())
 	return true
 
 
 func _dequeue_next_soil_proposal() -> VoxelSoilOperationProposal:
-	var deposit_index := -1
-	var background_index := -1
-	for index in _soil_queue.size():
-		if _soil_queue[index].operation == "deposit" and deposit_index < 0:
-			deposit_index = index
-		elif _soil_queue[index].operation != "deposit" and background_index < 0:
-			background_index = index
-	var selected_index := 0
-	if deposit_index >= 0 and (
-			background_index < 0 or _consecutive_deposit_commits < MAX_CONSECUTIVE_DEPOSIT_COMMITS
-	):
-		selected_index = deposit_index
-		_consecutive_deposit_commits += 1
-	elif background_index >= 0:
-		selected_index = background_index
-		_consecutive_deposit_commits = 0
-	var selected := _soil_queue[selected_index]
-	_soil_queue.remove_at(selected_index)
-	return selected
+	return _soil_queue.pop_front()
 
 
 func _soil_operation_queue_depth(operation: String) -> int:
@@ -1281,78 +1111,9 @@ func _commit_native_proposal(
 	return transaction
 
 
-func submit_track_compaction(chassis_status: Dictionary) -> Dictionary:
-	if not configured:
-		return {"accepted": false, "reason": "authority_unavailable"}
-	var epoch := String(chassis_status.get("authority_epoch", ""))
-	var tick := int(chassis_status.get("physics_tick", -1))
-	if epoch.is_empty() or tick < 0 or not bool(chassis_status.get("terrain_identity_valid", false)) \
-			or int(chassis_status.get("terrain_generation", -1)) != generation:
-		return {"accepted": false, "reason": "stale_track_identity"}
-	var receipt_identity := "%d|%s|%d" % [generation, epoch, tick]
-	if _seen_track_receipts.has(receipt_identity):
-		_duplicate_count += 1
-		return {"accepted": false, "reason": "duplicate_compaction"}
-	if not material_field.has_compactable_mobile():
-		_track_compaction_skipped_no_mobile += 1
-		return {"accepted": false, "reason": "no_loose_track_contact"}
-	var shapes: Array[Dictionary] = []
-	var total_force := 0.0
-	var area := AABB()
-	var receipt_count := 0
-	for value in chassis_status.get("track_contact_receipts", []):
-		if receipt_count >= MAX_TRACK_COMPACTION_RECEIPTS:
-			break
-		receipt_count += 1
-		var receipt := value as Dictionary
-		if String(receipt.get("support_source", "")) != "voxel_terrain":
-			continue
-		var point := receipt.get("point", Vector3(INF, INF, INF)) as Vector3
-		var force := float(receipt.get("support_force_n", 0.0))
-		var width_m := float(receipt.get("footprint_width_m", 0.0))
-		if not point.is_finite() or not is_finite(force) or not is_finite(width_m) \
-				or force < MIN_TRACK_SUPPORT_FORCE_N or width_m <= 0.0 \
-				or not WorkZoneConfig.is_world_position_editable(point, _work_zone.voxel_scale_m) \
-				or not _work_zone.is_support_ready_at(point):
-			continue
-		var center := WorkZoneConfig.world_to_voxel(point - Vector3.UP * _work_zone.voxel_scale_m * 0.25, _work_zone.voxel_scale_m)
-		var radius := clampf(width_m * 0.22 / _work_zone.voxel_scale_m, 0.75, 2.0)
-		var shape := {"mode": "remove", "a_voxels": center, "b_voxels": center, "radius_voxels": radius}
-		if not _shape_has_compactable_mobile(shape):
-			continue
-		shapes.append(shape)
-		area = _merge_shape_area(area, shape)
-		total_force += force
-	if shapes.is_empty():
-		return {"accepted": false, "reason": "no_loose_track_contact"}
-	var proposal := SoilOperationProposal.create({
-		"generation": generation,
-		"fixed_tick_begin": tick,
-		"fixed_tick_end": tick,
-		"sequence": _next_sequence,
-		"model_id": model_id,
-		"authority_epoch": epoch,
-		"tool_hash": tool_hash,
-		"operation": "compact",
-		"area_voxels": area,
-		"shapes": shapes,
-		"requested_mass_q": maxi(1, roundi(total_force)),
-		"compaction_delta_q": clampi(roundi(total_force / 15000.0), 1, MAX_COMPACTION_DELTA_Q),
-		"release_world": WorkZoneConfig.voxel_to_world(shapes[0].get("a_voxels", Vector3.ZERO), _work_zone.voxel_scale_m),
-		"deposit_world": WorkZoneConfig.voxel_to_world(shapes[0].get("a_voxels", Vector3.ZERO), _work_zone.voxel_scale_m),
-		"quality_flags": ["accepted_voxel_track_receipts", "loose_only"],
-	})
-	_next_sequence += 1
-	if not proposal.is_valid():
-		return {"accepted": false, "reason": "invalid_compaction_proposal"}
-	if _seen_inputs.has(proposal.input_hash):
-		return {"accepted": false, "reason": "duplicate_compaction"}
-	if not _coalesce_or_enqueue_soil(proposal):
-		return {"accepted": false, "reason": "soil_queue_full"}
-	_remember_input(proposal.input_hash)
-	_remember_track_receipt(receipt_identity)
-	_accepted_proposal_count += 1
-	return {"accepted": true, "reason": "compaction_queued", "queue_depth": _queue.size() + _soil_queue.size()}
+func submit_track_compaction(_chassis_status: Dictionary) -> Dictionary:
+	# Track compaction is removed; retain a deterministic legacy seam.
+	return {"accepted": false, "reason": "track_compaction_disabled"}
 
 
 func _update_dump_gate_diagnostics(pose_snapshot: Dictionary, delta_s: float) -> void:
@@ -1406,7 +1167,7 @@ func _minimum_dump_mass_q() -> int:
 	# Surface plans, interpolation and 16-bit SDF cannot represent arbitrarily
 	# small deposits. Retain this sub-visual stock; never cycle it through flight
 	# repeatedly or discard it from the conservation ledger.
-	return maxi(1, material_field.mass_q_for_loose_volume(pow(_work_zone.voxel_scale_m, 3.0) * MIN_DUMP_VOLUME_VOXELS))
+	return maxi(1, material_field.mass_q_for_volume(pow(_work_zone.voxel_scale_m, 3.0) * MIN_DUMP_VOLUME_VOXELS))
 
 
 func _build_dump_proposal(pose_snapshot: Dictionary, identity: Dictionary, delta_s: float) -> Dictionary:
@@ -1475,14 +1236,13 @@ func _build_dump_proposal(pose_snapshot: Dictionary, identity: Dictionary, delta
 		"release_direction_world": release_direction,
 		"admission_tick": int(identity.get("physics_tick", -1)),
 		"support_query_usec": support_query_usec,
-		"quality_flags": ["opening_validated", "sdf_support", "loose_density", "native_repose_profile"],
+		"quality_flags": ["opening_validated", "sdf_support", "stable_terrain", "native_repose_profile"],
 	})
 	return {"attempted": true, "accepted": proposal.is_valid(), "reason": "accepted", "proposal": proposal, "release_world": release_world}
 
 
 func _publish_accepted_dump_event(transaction: VoxelCutTransaction) -> void:
-	if _landing_in_progress:
-		return
+	_release_published_since_step = true
 	_accepted_dump_event_id = transaction.transaction_id
 	_dump_release_world = transaction.release_world
 	_dump_released_fill_ratio = transaction.release_fill_ratio
@@ -1499,6 +1259,9 @@ func _publish_accepted_dump_event(transaction: VoxelCutTransaction) -> void:
 		"release_world": transaction.release_world,
 		"landing_world": transaction.deposit_world,
 		"release_duration_s": DUMP_BATCH_PERIOD_S,
+		"release_committed": true,
+		"terrain_stable": true,
+		"published_usec": Time.get_ticks_usec(),
 		"opening_normal_world": transaction.release_normal_world,
 		"direction_world": transaction.release_direction_world,
 		"fill_ratio": transaction.release_fill_ratio,
@@ -1549,7 +1312,9 @@ func _commit_soil_proposal(proposal: VoxelSoilOperationProposal) -> VoxelCutTran
 	transaction.batch_wait_usec = proposal.batch_wait_usec
 	if proposal.generation != generation or proposal.model_id != model_id or proposal.tool_hash != tool_hash:
 		return _reject_transaction(transaction, "stale_or_wrong_tool", started)
-	if proposal.operation == "deposit" and not _dump_gate_active and not _landing_in_progress:
+	if proposal.operation != "deposit" or not proposal.is_valid():
+		return _reject_transaction(transaction, "unsupported_or_invalid_operation", started)
+	if proposal.operation == "deposit" and not _dump_gate_active:
 		return _reject_transaction(transaction, "dump_gate_closed_before_commit", started)
 	if proposal.operation == "deposit" and material_field.bucket_mass_q <= 0:
 		return _reject_transaction(transaction, "bucket_empty", started)
@@ -1581,7 +1346,7 @@ func _commit_soil_proposal(proposal: VoxelSoilOperationProposal) -> VoxelCutTran
 		var full_mass_q := _sum_added_mass_q(full_cells)
 		var target_q := mini(proposal.requested_mass_q, material_field.bucket_mass_q)
 		transaction.requested_mass_q = target_q
-		transaction.requested_volume_m3 = material_field.loose_volume_for_mass_q(target_q)
+		transaction.requested_volume_m3 = material_field.volume_for_mass_q(target_q)
 		if full_mass_q > target_q:
 			final_values = _fit_values_to_added_mass(original, full_values, size, origin, target_q)
 		else:
@@ -1595,110 +1360,7 @@ func _commit_soil_proposal(proposal: VoxelSoilOperationProposal) -> VoxelCutTran
 		material_stage = material_field.stage_deposit(affected_cells, accepted_target_q)
 		transaction.represented_mass_q = represented_q
 		transaction.mass_discretization_error_q = represented_q - accepted_target_q
-		transaction.mass_discretization_tolerance_q = material_field.mass_q_for_loose_volume(pow(_work_zone.voxel_scale_m, 3.0))
-	elif proposal.operation == "compact":
-		var compact_full_values := original.duplicate()
-		if _apply_soil_shapes(compact_full_values, size, origin, proposal.shapes) <= 0:
-			return _reject_transaction(transaction, "no_sdf_change", started)
-		compact_full_values = _mask_removal_to_pure_mobile(original, compact_full_values, size, origin)
-		var compact_full_cells := _cell_changes(original, compact_full_values, size, origin)
-		var compact_coordinates: Array[Vector3i] = []
-		for change in compact_full_cells:
-			var coordinate := change.get("coordinate", Vector3i.ZERO) as Vector3i
-			if material_field.mobile_mass_q_at(coordinate) > 0 and material_field.stable_mass_q_at(coordinate) == 0:
-				compact_coordinates.append(coordinate)
-		material_stage = material_field.stage_compaction(compact_coordinates, proposal.compaction_delta_q)
-		if not bool(material_stage.get("valid", false)):
-			return _reject_transaction(transaction, String(material_stage.get("reason", "material_stage_failed")), started)
-		var compaction_volume_loss_m3 := float(material_stage.get("volume_loss_m3", 0.0))
-		var full_compaction_capacity_m3 := _sum_removed_volume(compact_full_cells)
-		if compaction_volume_loss_m3 <= VOLUME_EPSILON_M3:
-			return _reject_transaction(transaction, "sub_quantum_compaction", started)
-		if full_compaction_capacity_m3 + VOLUME_EPSILON_M3 < compaction_volume_loss_m3:
-			return _reject_transaction(transaction, "compaction_geometry_capacity", started)
-		final_values = _fit_values_to_removed_volume(
-			original,
-			compact_full_values,
-			size,
-			origin,
-			compaction_volume_loss_m3,
-		)
-		affected_cells = _cell_changes(original, final_values, size, origin)
-		var represented_compaction_volume_m3 := _sum_removed_volume(affected_cells)
-		transaction.requested_mass_q = proposal.requested_mass_q
-		transaction.requested_volume_m3 = compaction_volume_loss_m3
-		transaction.represented_mass_q = int(material_stage.get("accepted_mass_q", 0))
-		transaction.mass_discretization_error_q = material_field.mass_q_for_loose_volume(
-			absf(compaction_volume_loss_m3 - represented_compaction_volume_m3)
-		)
-		transaction.mass_discretization_tolerance_q = material_field.mass_q_for_loose_volume(
-			pow(_work_zone.voxel_scale_m, 3.0)
-		)
-	elif proposal.operation == "settle":
-		var remove_shapes := _shapes_for_mode(proposal.shapes, "remove")
-		var add_shapes := _shapes_for_mode(proposal.shapes, "add")
-		var remove_full_values := original.duplicate()
-		if remove_shapes.is_empty() or add_shapes.is_empty() \
-				or _apply_soil_shapes(remove_full_values, size, origin, remove_shapes) <= 0:
-			return _reject_transaction(transaction, "no_sdf_change", started)
-		remove_full_values = _mask_removal_to_pure_mobile(original, remove_full_values, size, origin)
-		var full_removals := _cell_changes(original, remove_full_values, size, origin)
-		var transfer_q := mini(proposal.requested_mass_q, _sum_removable_mobile_mass_q(full_removals))
-		if transfer_q <= 0:
-			return _reject_transaction(transaction, "settle_no_transfer", started)
-		var removed_values := _fit_values_to_removed_mobile_mass(
-			original,
-			remove_full_values,
-			size,
-			origin,
-			transfer_q,
-		)
-		var removals := _cell_changes(original, removed_values, size, origin)
-		transfer_q = mini(transfer_q, _sum_removable_mobile_mass_q(removals))
-		var add_full_values := removed_values.duplicate()
-		if transfer_q <= 0 or _apply_soil_shapes(add_full_values, size, origin, add_shapes) <= 0:
-			return _reject_transaction(transaction, "settle_no_receiver", started)
-		var full_additions := _cell_additions(removed_values, add_full_values, size, origin)
-		transfer_q = mini(transfer_q, _sum_added_mass_q(full_additions))
-		if transfer_q <= 0:
-			return _reject_transaction(transaction, "settle_no_receiver", started)
-		# Refit both sides to the same accepted fixed-point mass so the SDF and
-		# ledger cannot diverge by a fixed brush volume.
-		removed_values = _fit_values_to_removed_mobile_mass(
-			original,
-			remove_full_values,
-			size,
-			origin,
-			transfer_q,
-		)
-		removals = _cell_changes(original, removed_values, size, origin)
-		add_full_values = removed_values.duplicate()
-		_apply_soil_shapes(add_full_values, size, origin, add_shapes)
-		final_values = _fit_values_to_added_mass(removed_values, add_full_values, size, origin, transfer_q)
-		var additions := _cell_additions(removed_values, final_values, size, origin)
-		transfer_q = mini(
-			transfer_q,
-			mini(_sum_removable_mobile_mass_q(removals), _sum_added_mass_q(additions)),
-		)
-		if transfer_q <= 0:
-			return _reject_transaction(transaction, "settle_sub_quantum", started)
-		_assign_removed_mobile_mass(removals, transfer_q)
-		var donor_compaction_q := _weighted_removed_compaction_q(removals)
-		_assign_added_cell_mass(additions, transfer_q)
-		for addition in additions:
-			addition["incoming_compaction_q"] = donor_compaction_q
-		material_stage = material_field.stage_mobile_transfer(removals, additions, transfer_q)
-		affected_cells = removals + additions
-		transaction.requested_mass_q = proposal.requested_mass_q
-		transaction.requested_volume_m3 = material_field.loose_volume_for_mass_q(proposal.requested_mass_q)
-		transaction.represented_mass_q = transfer_q
-		transaction.mass_discretization_tolerance_q = material_field.mass_q_for_loose_volume(pow(_work_zone.voxel_scale_m, 3.0))
-		var removed_geometry_q := material_field.mass_q_for_loose_volume(_sum_removed_volume(removals))
-		var added_geometry_q := _sum_added_mass_q(additions)
-		transaction.mass_discretization_error_q = maxi(
-			absi(removed_geometry_q - transfer_q),
-			absi(added_geometry_q - transfer_q),
-		)
+		transaction.mass_discretization_tolerance_q = material_field.mass_q_for_volume(pow(_work_zone.voxel_scale_m, 3.0))
 	else:
 		return _reject_transaction(transaction, "unsupported_operation", started)
 	if not bool(material_stage.get("valid", false)):
@@ -1708,13 +1370,10 @@ func _commit_soil_proposal(proposal: VoxelSoilOperationProposal) -> VoxelCutTran
 	transaction.accepted_mass_q = int(material_stage.get("accepted_mass_q", 0))
 	if transaction.accepted_mass_q <= 0:
 		return _reject_transaction(transaction, "no_accounted_material", started)
-	var can_commit := material_field.can_commit_deposit(material_stage) if proposal.operation == "deposit" \
-		else (material_field.can_commit_compaction(material_stage) if proposal.operation == "compact" \
-		else material_field.can_commit_mobile_transfer(material_stage))
+	var can_commit := material_field.can_commit_deposit(material_stage)
 	if not can_commit:
 		return _reject_transaction(transaction, "material_commit_invariant", started)
-	transaction.accepted_volume_m3 = transaction.requested_volume_m3 if proposal.operation == "compact" \
-		else material_field.loose_volume_for_mass_q(transaction.accepted_mass_q)
+	transaction.accepted_volume_m3 = material_field.volume_for_mass_q(transaction.accepted_mass_q)
 	transaction.affected_cells = affected_cells.size()
 	transaction.affected_samples = _changed_sample_count(original, final_values)
 	_write_values(buffer, size, final_values)
@@ -1723,12 +1382,7 @@ func _commit_soil_proposal(proposal: VoxelSoilOperationProposal) -> VoxelCutTran
 		return _reject_transaction(transaction, "unchanged_sdf_digest", started)
 	var pre_hit_y := _ray_surface_y(proposal.deposit_world)
 	_tool.paste(origin, buffer, SDF_CHANNEL_MASK)
-	if proposal.operation == "deposit":
-		material_field.commit_deposit(material_stage)
-	elif proposal.operation == "compact":
-		material_field.commit_compaction(material_stage)
-	else:
-		material_field.commit_mobile_transfer(material_stage)
+	material_field.commit_deposit(material_stage)
 	data_revision += 1
 	transaction.revision = data_revision
 	transaction.commit_usec = _diagnostic_clock_usec() - started
@@ -1738,8 +1392,7 @@ func _commit_soil_proposal(proposal: VoxelSoilOperationProposal) -> VoxelCutTran
 	_affected_cells_total += transaction.affected_cells
 	_commit_usec_total += transaction.commit_usec
 	_commit_usec_max = maxi(_commit_usec_max, transaction.commit_usec)
-	if proposal.operation in ["deposit", "settle"]:
-		_enqueue_settle_cells(affected_cells)
+	# Deposits are finalized as stable repose geometry; never seed a settle frontier.
 	if proposal.operation == "deposit":
 		_publish_accepted_dump_event(transaction)
 	var readiness_started := _diagnostic_clock_usec()
@@ -1789,7 +1442,7 @@ func _commit_surface_deposit_proposal(
 				return _reject_transaction(transaction, "dump_surface_support_unavailable", started_usec)
 			heights.append(WorkZoneConfig.world_to_voxel(support["position"], scale_m).y)
 	var planned := DepositSurface.plan(heights,
-		material_field.loose_volume_for_mass_q(target_mass) / voxel_volume,
+		material_field.volume_for_mass_q(target_mass) / voxel_volume,
 		tan(deg_to_rad(REPOSE_ANGLE_DEG)))
 	if planned.is_empty():
 		return _reject_transaction(transaction, "dump_surface_patch_full", started_usec)
@@ -1830,10 +1483,10 @@ func _commit_surface_deposit_proposal(
 		return _reject_transaction(transaction, "dump_surface_sample_budget", started_usec)
 	if not WorkZoneConfig.editable_world_bounds(scale_m).encloses(world_area) or not _tool.is_area_editable(area):
 		return _reject_transaction(transaction, "dump_surface_out_of_zone", started_usec)
-	var accepted_mass := mini(target_mass, material_field.mass_q_for_loose_volume(represented_volume))
+	var accepted_mass := mini(target_mass, material_field.mass_q_for_volume(represented_volume))
 	if accepted_mass <= 0:
 		return _reject_transaction(transaction, "sub_quantum_change", started_usec)
-	var volume_scale := minf(1.0, material_field.loose_volume_for_mass_q(accepted_mass) / represented_volume)
+	var volume_scale := minf(1.0, material_field.volume_for_mass_q(accepted_mass) / represented_volume)
 	var buffer := VoxelBuffer.new()
 	buffer.set_channel_depth(VoxelBuffer.CHANNEL_SDF, VoxelBuffer.DEPTH_16_BIT)
 	buffer.create(size.x, size.y, size.z)
@@ -1876,8 +1529,8 @@ func _commit_surface_deposit_proposal(
 	transaction.requested_mass_q = proposal.requested_mass_q
 	transaction.accepted_mass_q = accepted_mass
 	transaction.represented_mass_q = accepted_mass
-	transaction.requested_volume_m3 = material_field.loose_volume_for_mass_q(proposal.requested_mass_q)
-	transaction.accepted_volume_m3 = material_field.loose_volume_for_mass_q(accepted_mass)
+	transaction.requested_volume_m3 = material_field.volume_for_mass_q(proposal.requested_mass_q)
+	transaction.accepted_volume_m3 = material_field.volume_for_mass_q(accepted_mass)
 	transaction.capacity_clipped = accepted_mass < proposal.requested_mass_q
 	transaction.affected_samples = changed_samples
 	transaction.affected_cells = changes.size()
@@ -1896,7 +1549,7 @@ func _commit_surface_deposit_proposal(
 		_capacity_clipped_count += 1
 	_publish_accepted_dump_event(transaction)
 	var visible_landing := _find_sdf_support_world(proposal.release_world)
-	if not _landing_in_progress and bool(visible_landing.get("valid", false)):
+	if bool(visible_landing.get("valid", false)):
 		_accepted_dump_event["landing_world"] = visible_landing["position"]
 	var readiness_started := _diagnostic_clock_usec()
 	_issue_readiness_work(area, data_revision, &"voxel_deposit_surface", probe_world,
@@ -1931,7 +1584,7 @@ func _commit_native_deposit_proposal(
 	if deposit_coordinates.is_empty():
 		return _reject_transaction(transaction, "no_deposit_capacity", started_usec)
 	var voxel_volume_m3 := pow(_work_zone.voxel_scale_m, 3.0)
-	var cell_capacity_q := maxi(1, material_field.mass_q_for_loose_volume(voxel_volume_m3))
+	var cell_capacity_q := maxi(1, material_field.mass_q_for_volume(voxel_volume_m3))
 	var accepted_target_q := mini(
 		mini(proposal.requested_mass_q, material_field.bucket_mass_q),
 		deposit_coordinates.size() * cell_capacity_q,
@@ -1949,7 +1602,7 @@ func _commit_native_deposit_proposal(
 			"pre_fraction": 0.0,
 			"post_fraction": float(cell_mass_q) / float(cell_capacity_q),
 			"cell_volume_m3": voxel_volume_m3,
-			"added_volume_m3": material_field.loose_volume_for_mass_q(cell_mass_q),
+			"added_volume_m3": material_field.volume_for_mass_q(cell_mass_q),
 			"added_mass_q": cell_mass_q,
 		})
 		remaining_q -= cell_mass_q
@@ -1967,8 +1620,8 @@ func _commit_native_deposit_proposal(
 	transaction.capacity_clipped = transaction.accepted_mass_q < proposal.requested_mass_q
 	transaction.mass_discretization_error_q = 0
 	transaction.mass_discretization_tolerance_q = cell_capacity_q
-	transaction.requested_volume_m3 = material_field.loose_volume_for_mass_q(proposal.requested_mass_q)
-	transaction.accepted_volume_m3 = material_field.loose_volume_for_mass_q(transaction.accepted_mass_q)
+	transaction.requested_volume_m3 = material_field.volume_for_mass_q(proposal.requested_mass_q)
+	transaction.accepted_volume_m3 = material_field.volume_for_mass_q(transaction.accepted_mass_q)
 	transaction.coverage_new_count = (material_stage.get("mutations", []) as Array).size()
 	transaction.affected_cells = transaction.coverage_new_count
 	transaction.affected_samples = deposit_coordinates.size()
@@ -2227,46 +1880,10 @@ func _fit_values_to_added_mass(before: PackedFloat32Array, full: PackedFloat32Ar
 	return high_values if absi(high_mass_q - target_mass_q) < absi(low_mass_q - target_mass_q) else low_values
 
 
-func _fit_values_to_removed_volume(before: PackedFloat32Array, full: PackedFloat32Array, size: Vector3i, origin: Vector3i, target_volume_m3: float) -> PackedFloat32Array:
-	var low := 0.0
-	var high := 1.0
-	for _iteration in CAPACITY_SEARCH_STEPS:
-		var alpha := (low + high) * 0.5
-		var candidate := _blend_values(before, full, alpha)
-		var volume_m3 := _sum_removed_volume(_cell_changes(before, candidate, size, origin))
-		if volume_m3 <= target_volume_m3:
-			low = alpha
-		else:
-			high = alpha
-	return _blend_values(before, full, low)
-
-
-func _fit_values_to_removed_mobile_mass(before: PackedFloat32Array, full: PackedFloat32Array, size: Vector3i, origin: Vector3i, target_mass_q: int) -> PackedFloat32Array:
-	var low := 0.0
-	var high := 1.0
-	for _iteration in CAPACITY_SEARCH_STEPS:
-		var alpha := (low + high) * 0.5
-		var candidate := _blend_values(before, full, alpha)
-		var mass_q := _sum_removable_mobile_mass_q(_cell_changes(before, candidate, size, origin))
-		if mass_q <= target_mass_q:
-			low = alpha
-		else:
-			high = alpha
-	return _blend_values(before, full, low)
-
-
-func _shapes_for_mode(shapes: Array[Dictionary], mode: String) -> Array[Dictionary]:
-	var result: Array[Dictionary] = []
-	for shape in shapes:
-		if String(shape.get("mode", "")) == mode:
-			result.append(shape.duplicate(true))
-	return result
-
-
 func _sum_added_mass_q(changes: Array[Dictionary]) -> int:
 	var total := 0
 	for change in changes:
-		total += material_field.mass_q_for_loose_volume(float(change.get("added_volume_m3", 0.0)))
+		total += material_field.mass_q_for_volume(float(change.get("added_volume_m3", 0.0)))
 	return total
 
 
@@ -2274,168 +1891,14 @@ func _assign_added_cell_mass(changes: Array[Dictionary], target_mass_q: int) -> 
 	var assigned := 0
 	for index in changes.size():
 		var value := maxi(0, target_mass_q - assigned) if index == changes.size() - 1 else mini(
-			material_field.mass_q_for_loose_volume(float(changes[index].get("added_volume_m3", 0.0))),
+			material_field.mass_q_for_volume(float(changes[index].get("added_volume_m3", 0.0))),
 			maxi(0, target_mass_q - assigned),
 		)
 		changes[index]["added_mass_q"] = value
 		assigned += value
 
 
-func _sum_removable_mobile_mass_q(changes: Array[Dictionary]) -> int:
-	var total := 0
-	for change in changes:
-		var coordinate := change.get("coordinate", Vector3i.ZERO) as Vector3i
-		if material_field.stable_mass_q_at(coordinate) > 0:
-			continue
-		var represented := material_field.mass_q_for_loose_volume(float(change.get("removed_volume_m3", 0.0)))
-		total += mini(material_field.mobile_mass_q_at(coordinate), represented)
-	return total
-
-
-func _assign_removed_mobile_mass(changes: Array[Dictionary], target_mass_q: int) -> void:
-	var assigned := 0
-	for change in changes:
-		var coordinate := change.get("coordinate", Vector3i.ZERO) as Vector3i
-		var represented := material_field.mass_q_for_loose_volume(float(change.get("removed_volume_m3", 0.0)))
-		var value := mini(
-			mini(material_field.mobile_mass_q_at(coordinate), represented),
-			maxi(0, target_mass_q - assigned),
-		)
-		change["removed_mass_q"] = value
-		assigned += value
-		if assigned >= target_mass_q:
-			break
-
-
-func _weighted_removed_compaction_q(changes: Array[Dictionary]) -> int:
-	var weighted := 0
-	var total := 0
-	for change in changes:
-		var removed := maxi(0, int(change.get("removed_mass_q", 0)))
-		if removed <= 0:
-			continue
-		var coordinate := change.get("coordinate", Vector3i.ZERO) as Vector3i
-		weighted += removed * material_field.mobile_compaction_q_at(coordinate)
-		total += removed
-	return int(weighted / total) if total > 0 else MaterialField.LOOSE_COMPACTION_Q
-
-
-func _mask_removal_to_pure_mobile(before: PackedFloat32Array, after: PackedFloat32Array, size: Vector3i, origin: Vector3i) -> PackedFloat32Array:
-	var result := after.duplicate()
-	for z in size.z:
-		for y in size.y:
-			for x in size.x:
-				var index := _index(x, y, z, size)
-				if absf(before[index] - after[index]) <= 0.000001:
-					continue
-				var sample := origin + Vector3i(x, y, z)
-				var mobile_neighbor := false
-				var protected_neighbor := false
-				for dz in [-1, 0]:
-					for dy in [-1, 0]:
-						for dx in [-1, 0]:
-							var cell := sample + Vector3i(dx, dy, dz)
-							var local_cell := cell - origin
-							if local_cell.x < 0 or local_cell.y < 0 or local_cell.z < 0 \
-									or local_cell.x >= size.x - 1 or local_cell.y >= size.y - 1 or local_cell.z >= size.z - 1:
-								continue
-							var cell_solid_fraction := _cell_solid_fraction(
-								before, size, local_cell.x, local_cell.y, local_cell.z
-							)
-							if cell_solid_fraction <= 0.000001:
-								continue
-							var mobile_mass_q := material_field.mobile_mass_q_at(cell)
-							var stable_mass_q := material_field.stable_mass_q_at(cell)
-							if mobile_mass_q > 0 and stable_mass_q == 0:
-								mobile_neighbor = true
-							else:
-								protected_neighbor = true
-				if not mobile_neighbor or protected_neighbor:
-					result[index] = before[index]
-	return result
-
-
-func _enqueue_settle_cells(changes: Array[Dictionary]) -> void:
-	for change in changes:
-		var coordinate := change.get("coordinate", Vector3i.ZERO) as Vector3i
-		if material_field.mobile_mass_q_at(coordinate) <= 0 or material_field.stable_mass_q_at(coordinate) > 0:
-			continue
-		var key := "%d,%d,%d" % [coordinate.x, coordinate.y, coordinate.z]
-		if _settle_frontier_seen.has(key):
-			continue
-		if _settle_frontier.size() >= MAX_SETTLE_FRONTIER:
-			break
-		_settle_frontier.append(coordinate)
-		_settle_frontier_seen[key] = true
-
-
-func _build_next_settle_proposal() -> VoxelSoilOperationProposal:
-	var examined := 0
-	while not _settle_frontier.is_empty() and examined < MAX_SETTLE_CELLS_PER_COMMIT:
-		examined += 1
-		var donor: Vector3i = _settle_frontier.pop_front()
-		_settle_frontier_seen.erase("%d,%d,%d" % [donor.x, donor.y, donor.z])
-		var donor_mass_q := material_field.mobile_mass_q_at(donor)
-		if donor_mass_q <= 0 or material_field.stable_mass_q_at(donor) > 0:
-			continue
-		var receiver := _settle_receiver(donor)
-		if receiver == donor:
-			continue
-		var height_delta_m := float(donor.y - receiver.y) * _work_zone.voxel_scale_m
-		var horizontal_m := Vector2(float(donor.x - receiver.x), float(donor.z - receiver.z)).length() * _work_zone.voxel_scale_m
-		if height_delta_m <= tan(deg_to_rad(REPOSE_ANGLE_DEG)) * horizontal_m:
-			continue
-		var transfer_q := maxi(1, roundi(float(donor_mass_q) * SETTLE_TRANSFER_FRACTION))
-		var donor_center := _solid_point_for_mobile_cell(donor)
-		var receiver_center := Vector3(receiver) + Vector3.ONE * 0.5
-		var shapes: Array[Dictionary] = [
-			{"mode": "remove", "a_voxels": donor_center, "b_voxels": donor_center, "radius_voxels": 0.7},
-			{"mode": "add", "a_voxels": receiver_center, "b_voxels": receiver_center, "radius_voxels": 0.7},
-		]
-		var area := AABB()
-		for shape in shapes:
-			area = _merge_shape_area(area, shape)
-		if not _area_is_editable_world_voxel(area):
-			continue
-		var proposal := SoilOperationProposal.create({
-			"generation": generation,
-			"fixed_tick_begin": maxi(0, _last_submitted_tick),
-			"fixed_tick_end": maxi(0, _last_submitted_tick),
-			"sequence": _next_sequence,
-			"model_id": model_id,
-			"authority_epoch": "settle:%d" % generation,
-			"tool_hash": tool_hash,
-			"operation": "settle",
-			"area_voxels": area,
-			"shapes": shapes,
-			"requested_mass_q": transfer_q,
-			"release_world": WorkZoneConfig.voxel_to_world(donor_center, _work_zone.voxel_scale_m),
-			"deposit_world": WorkZoneConfig.voxel_to_world(receiver_center, _work_zone.voxel_scale_m),
-			"quality_flags": ["paired_transfer", "bounded_frontier", "repose_angle"],
-		})
-		_next_sequence += 1
-		return proposal if proposal.is_valid() else null
-	return null
-
-
-func _settle_receiver(donor: Vector3i) -> Vector3i:
-	var best := donor
-	var best_y := donor.y
-	for offset: Vector3i in SETTLE_OFFSETS:
-		var neighbor: Vector3i = donor + offset
-		var world := WorkZoneConfig.voxel_to_world(Vector3(neighbor) + Vector3(0.5, 4.0, 0.5), _work_zone.voxel_scale_m)
-		var support := _find_sdf_support_world(world)
-		if not bool(support.get("valid", false)):
-			continue
-		var support_voxel := WorkZoneConfig.world_to_voxel(support.get("position", Vector3.ZERO) as Vector3, _work_zone.voxel_scale_m)
-		var receiver_y := floori(support_voxel.y)
-		if receiver_y < best_y:
-			best_y = receiver_y
-			best = Vector3i(neighbor.x, receiver_y, neighbor.z)
-	return best
-
-
-func _solid_point_for_mobile_cell(coordinate: Vector3i) -> Vector3:
+func _solid_point_for_cell(coordinate: Vector3i) -> Vector3:
 	var best := Vector3(coordinate) + Vector3.ONE * 0.5
 	var best_sdf := _tool.get_voxel_f(Vector3i(round(best.x), round(best.y), round(best.z)))
 	for z in 2:
@@ -2455,26 +1918,6 @@ func _merge_shape_area(current: AABB, shape: Dictionary) -> AABB:
 	var radius := float(shape.get("radius_voxels", 0.0)) + 1.0
 	var area := AABB(a.min(b) - Vector3.ONE * radius, a.max(b) - a.min(b) + Vector3.ONE * radius * 2.0)
 	return area if current.size == Vector3.ZERO else current.merge(area)
-
-
-func _shape_has_compactable_mobile(shape: Dictionary) -> bool:
-	var shape_area := _merge_shape_area(AABB(), shape)
-	var minimum := Vector3i(floor(shape_area.position.x), floor(shape_area.position.y), floor(shape_area.position.z))
-	var maximum := Vector3i(ceil(shape_area.end.x), ceil(shape_area.end.y), ceil(shape_area.end.z))
-	for z in range(minimum.z, maximum.z + 1):
-		for y in range(minimum.y, maximum.y + 1):
-			for x in range(minimum.x, maximum.x + 1):
-				if material_field.is_compactable_mobile_at(Vector3i(x, y, z)):
-					return true
-	return false
-
-
-func _area_sample_count(area: AABB) -> int:
-	var window := _integer_window(area)
-	var size := window.get("size", Vector3i.ZERO) as Vector3i
-	if size.x <= 0 or size.y <= 0 or size.z <= 0:
-		return 0
-	return size.x * size.y * size.z
 
 
 func _area_is_editable_world_voxel(area: AABB) -> bool:
@@ -2910,13 +2353,6 @@ func _remember_input(input_hash: String) -> void:
 	_seen_order.append(input_hash)
 	while _seen_order.size() > MAX_JOURNAL_ROWS * 2:
 		_seen_inputs.erase(_seen_order.pop_front())
-
-
-func _remember_track_receipt(identity: String) -> void:
-	_seen_track_receipts[identity] = true
-	_seen_track_receipt_order.append(identity)
-	while _seen_track_receipt_order.size() > MAX_JOURNAL_ROWS * 2:
-		_seen_track_receipts.erase(_seen_track_receipt_order.pop_front())
 
 
 func _append_journal(row: Dictionary) -> void:

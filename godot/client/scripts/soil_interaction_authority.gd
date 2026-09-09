@@ -130,7 +130,7 @@ func step_fixed(
 	tool_snapshot: Dictionary,
 	tool_classification: Dictionary,
 	patch: ActiveSoilPatch,
-	focus_world: Vector3,
+	_focus_world: Vector3,
 	surface_sweep_result: Dictionary = {},
 	terrain_scheduler: TerrainCommitScheduler = null,
 	solver_mode: String = "point_brush_v1"
@@ -160,10 +160,9 @@ func step_fixed(
 		surface_commit["reason"] = "shadow_observed"
 	elif solver_mode == "surface_patch_v2":
 		surface_commit = _activate_surface_patch(delta, tick, tool_snapshot, surface_sweep_result, patch, terrain_scheduler)
-		_schedule_classified_loose_flux(delta, tool_snapshot, tool_classification, patch)
+		# Loose-soil flux was removed from the product model. Surface deposits are stable.
 	_capture_scoop_flux(tick, tool_snapshot, tool_classification, patch)
-	_settle_bucket_cells(tool_snapshot, delta)
-	patch.step_fixed(delta, focus_world, tool_snapshot)
+	# Do not run mobile-soil settling or continuous flux simulation.
 	_consume_patch_settlements(patch, tick)
 	_capture_contained_soil(patch, tick)
 	_overflow_volume_m3 = maxf(0.0, float(patch.get_status_snapshot().get("contained_volume_m3", 0.0)))

@@ -1,10 +1,9 @@
 extends RefCounted
 
-# Shared by authority arrival scheduling and visual particle motion.
+# Decorative particle motion only; never owns soil mass or terrain edits.
 const GRAVITY := 5.5
 const INITIAL_SPEED := 0.7
 const MAX_FLIGHT_S := 4.0
-const MAX_RELEASES := 48
 
 
 static func duration(release: Vector3, landing: Vector3) -> float:

@@ -15,7 +15,7 @@ idempotent local soil transactions, and local hybrid truth.
 - [Godot MCP Development Tool](./godot-mcp.md) — connection checks, safe editor automation, and cross-layer boundaries.
 - [Godot Motion Transport](./motion-transport.md) — WebSocket handshake, JSON normalization, generation guards, input safety, and visual parity.
 - [Validation Budget](./validation-budget.md) — risk-based Agent checks, human-owned visual/runtime review, escalation triggers, and rerun limits.
-- [Soil Release Visuals](./soil-release-visuals.md) — in-flight mass, arrival timing, event lifecycle, and shared soil resources.
+- [Soil Release Visuals](./soil-release-visuals.md) — stable deposit ledger, decorative release events, retired modes, and shared soil resources.
 
 Before changing or extending client code, read `docs/godot-integration.md` and
 the current protocol schemas. Do not copy React/Babylon scene code into the

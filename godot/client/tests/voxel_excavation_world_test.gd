@@ -16,7 +16,6 @@ class TrackReceiptProbe extends TrackedChassisController:
 			"physics_tick": snapshot_reads,
 			"terrain_identity_valid": true,
 			"terrain_generation": -1,
-			"track_contact_receipts": [],
 		}
 
 
@@ -47,8 +46,6 @@ func _run() -> void:
 	_expect(String((selected.get("selected_soil_payload", {}) as Dictionary).get("source", "")) == "voxel_bucket_v1", "selected payload comes from voxel ledger", failures)
 	var voxel_status := selected.get("voxel_excavation", {}) as Dictionary
 	var soil_visual := excavation.get_soil_visual_snapshot()
-	_expect(soil_visual.has("flight_queue_depth") and soil_visual.has("in_flight_mass_q"), "world forwards flight completion fields to presentation", failures)
-	_expect(int(soil_visual["flight_queue_depth"]) == int(voxel_status.get("flight_queue_depth", -1)), "visual flight depth matches owning authority", failures)
 	_expect(not bool(selected.get("voxel_diagnostics_enabled", true)), "world diagnostics default off", failures)
 	_expect((voxel_status.get("phase_timings_usec", {}) as Dictionary).is_empty(), "default world status skips optional diagnostics", failures)
 	var diagnostics_button := scene.get_node("OperatorUI/StatusPanel/Margin/VBox/AdvancedPanel/CuttingDiagnostics") as CheckButton

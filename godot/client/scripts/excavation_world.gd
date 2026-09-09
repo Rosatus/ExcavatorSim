@@ -23,11 +23,11 @@ const TEST_BUCKET_CAPACITY_M3 := 1000.0
 @export var voxel_unlimited_bucket_for_testing := false
 @export var voxel_diagnostics_enabled := false
 @export_enum("loose", "compact", "sand", "damp") var active_soil_material_preset := "loose"
-@export_enum("legacy", "shadow", "active_patch", "voxel") var soil_material_lifecycle_mode := "active_patch"
+@export_enum("voxel") var soil_material_lifecycle_mode := "voxel"
 ## Keep the existing product writer selected until the v2 release candidate has
 ## completed its manual digging gate. Shadow/owner requests apply only at a
 ## clean material-generation boundary through the setter below.
-@export_enum("point_brush_v1", "surface_patch_v2_shadow", "surface_patch_v2", "arcade_stamp_v3", "voxel_bucket_v1") var soil_surface_solver_mode := "point_brush_v1"
+@export_enum("voxel_bucket_v1") var soil_surface_solver_mode := "voxel_bucket_v1"
 @export_enum("low", "balanced", "high") var feedback_quality := "balanced"
 @export var local_tooth_offset := Vector3(0.0, -0.55, 0.0)
 
@@ -116,8 +116,6 @@ func _initialize() -> void:
 		terrain_world.world_reset.connect(_on_world_reset)
 	_soil_authority_modes.set_requested_mode(soil_material_lifecycle_mode)
 	_soil_authority_modes.set_requested_solver_mode(soil_surface_solver_mode)
-	if soil_material_lifecycle_mode != "voxel":
-		_ensure_legacy_runtime(contract)
 	_initialized = true
 	_begin_soil_authority_generation("initialize")
 	excavation_changed.emit(get_status_snapshot())
@@ -135,12 +133,12 @@ func _physics_process(delta: float) -> void:
 		return
 	_bucket_ground_execution_ticks += 1
 	if _selected_soil_mode() == "voxel":
-		if _voxel_authority == null:
+		if _voxel_authority == null or not _soil_authority_modes.can_product_owner_write("voxel"):
 			return
 		# Voxel falling-soil presentation is driven by committed one-shot release
 		# events. Never keep a cut/deposit volume sticky across idle frames.
 		_last_flow_volume_m3 = 0.0
-		_submit_voxel_track_compaction()
+		# Product soil model has no track compaction; dumped soil is stable immediately.
 		if automatic_soil_enabled:
 			_automatic_samples_executed += 1
 			_step_automatic_interaction(delta)
@@ -373,15 +371,9 @@ func set_soil_tool_shadow_enabled(value: bool) -> void:
 		_last_interaction_batch.erase("soil_tool_shadow")
 
 
-func set_active_soil_patch_prototype_enabled(value: bool) -> void:
-	if active_soil_patch_prototype_enabled == value:
-		return
-	active_soil_patch_prototype_enabled = value
-	if value and not _is_arcade_stamp_selected():
-		_ensure_active_soil_patch()
-	elif not value and (_is_arcade_stamp_selected() or _selected_soil_mode() not in ["shadow", "active_patch"]):
-		_reset_active_soil_patch(false)
-	excavation_changed.emit(get_status_snapshot())
+func set_active_soil_patch_prototype_enabled(_value: bool) -> void:
+	active_soil_patch_prototype_enabled = false
+	_reset_active_soil_patch(false)
 
 
 func set_soil_material_lifecycle_mode(value: String) -> bool:
@@ -665,8 +657,6 @@ func get_soil_visual_snapshot() -> Dictionary:
 		"transaction_queued": bool(_last_interaction_batch.get("transaction_queued", false)),
 		"last_transaction": last_transaction if _selected_soil_mode() == "voxel" else last_transaction.duplicate(true),
 		"accepted_dump_event_id": String(visual_source.get("accepted_dump_event_id", "")),
-		"flight_queue_depth": int(visual_source.get("flight_queue_depth", 0)),
-		"in_flight_mass_q": int(visual_source.get("in_flight_mass_q", 0)),
 		"accepted_dump_event": visual_source.get("accepted_dump_event", {}) if _selected_soil_mode() == "voxel" \
 			else (visual_source.get("accepted_dump_event", {}) as Dictionary).duplicate(true),
 		"dump_release_world": visual_source.get("dump_release_world", Vector3.ZERO),
@@ -718,12 +708,6 @@ func _process_voxel_bucket_snapshot(snapshot: Dictionary, delta: float) -> void:
 		"transaction_queued": bool(submission.get("accepted", false)),
 		"queue_depth": int(submission.get("queue_depth", 0)),
 	}
-
-
-func _submit_voxel_track_compaction() -> void:
-	if _voxel_authority == null or not _voxel_authority.configured or _tracked_chassis_controller == null:
-		return
-	_voxel_authority.submit_track_compaction(_tracked_chassis_controller.get_status_snapshot())
 
 
 func _voxel_fixed_identity(snapshot: Dictionary) -> Dictionary:
@@ -1617,12 +1601,12 @@ func _boundary_material_origin() -> Vector3:
 
 func _selected_soil_mode() -> String:
 	var selected := _soil_authority_modes.selected_mode
-	return selected if selected in SoilAuthorityModeController.MODES else "legacy"
+	return selected if selected in SoilAuthorityModeController.MODES else "voxel"
 
 
 func _selected_soil_solver_mode() -> String:
 	var selected := _soil_authority_modes.selected_solver_mode
-	return selected if selected in SoilAuthorityModeController.SOLVER_MODES else "point_brush_v1"
+	return selected if selected in SoilAuthorityModeController.SOLVER_MODES else "voxel_bucket_v1"
 
 
 func _is_arcade_stamp_selected() -> bool:
@@ -1718,55 +1702,30 @@ func _soil_generation_key(reason: String) -> String:
 
 
 func _begin_soil_authority_generation(reason: String) -> bool:
-	if not _soil_authority_modes.set_requested_mode(soil_material_lifecycle_mode):
-		soil_material_lifecycle_mode = "legacy"
-		_soil_authority_modes.set_requested_mode("legacy")
-	if not _soil_authority_modes.set_requested_solver_mode(soil_surface_solver_mode):
-		soil_surface_solver_mode = "point_brush_v1"
-		_soil_authority_modes.set_requested_solver_mode("point_brush_v1")
+	# Migrate old serialized mode requests at a clean generation boundary.
+	soil_material_lifecycle_mode = "voxel"
+	soil_surface_solver_mode = "voxel_bucket_v1"
+	active_soil_patch_prototype_enabled = false
+	_soil_authority_modes.set_requested_mode(soil_material_lifecycle_mode)
+	_soil_authority_modes.set_requested_solver_mode(soil_surface_solver_mode)
 	if not _soil_authority_modes.begin_generation(_soil_generation_key(reason)):
 		return false
-	var selected := _selected_soil_mode()
-	if selected == "voxel":
-		_destroy_legacy_runtime()
-		_reset_soil_interaction_authority()
-		_reset_active_soil_patch(false)
-		_reset_arcade_stamp()
-		if not _ensure_voxel_authority():
-			_reset_voxel_authority()
-			_soil_authority_modes.fallback_initialization_to_legacy("voxel_initialization_failed")
-			soil_material_lifecycle_mode = "legacy"
-			soil_surface_solver_mode = "point_brush_v1"
-			selected = "legacy"
-	if selected != "voxel":
+	_destroy_legacy_runtime()
+	_reset_soil_interaction_authority()
+	_reset_active_soil_patch(false)
+	_reset_arcade_stamp()
+	if not _ensure_voxel_authority():
 		_reset_voxel_authority()
-		var contract := _presentation.get_soil_contract() if _presentation != null else {}
-		if not _ensure_legacy_runtime(contract):
-			return false
-	if selected in ["shadow", "active_patch"]:
-		var initialized := _ensure_arcade_stamp() if _is_arcade_stamp_selected() else (_ensure_active_soil_patch() and _ensure_soil_interaction_authority())
-		if not initialized:
-			_reset_soil_interaction_authority()
-			_reset_active_soil_patch(false)
-			_reset_arcade_stamp()
-			_soil_authority_modes.fallback_initialization_to_legacy("%s_initialization_failed" % selected)
-			soil_material_lifecycle_mode = "legacy"
-			soil_surface_solver_mode = "point_brush_v1"
-			selected = "legacy"
-	if selected == "legacy" and active_soil_patch_prototype_enabled:
-		_ensure_active_soil_patch()
-	if selected == "active_patch" and _parcel_pool != null:
-		_parcel_pool.clear_all()
-	if _is_arcade_stamp_selected():
-		_reset_soil_interaction_authority()
-		_reset_active_soil_patch(false)
+		_soil_authority_modes.report_runtime_failure("voxel_initialization_failed")
+		_last_interaction = "soil_authority_fault"
+		return false
 	return _soil_authority_modes.has_single_product_owner()
 
 
 func _report_active_runtime_failure(reason: String) -> void:
 	if _soil_authority_modes.report_runtime_failure(reason):
-		soil_material_lifecycle_mode = "legacy"
-		soil_surface_solver_mode = "point_brush_v1"
+		soil_material_lifecycle_mode = "voxel"
+		soil_surface_solver_mode = "voxel_bucket_v1"
 		_last_interaction = "soil_authority_fault"
 		if _motion_client != null:
 			_motion_client.clear_bucket_load_feedback()

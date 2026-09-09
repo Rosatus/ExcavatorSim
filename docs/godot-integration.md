@@ -1,5 +1,11 @@
 # Godot Integration Boundary
 
+> Current soil contract (2026-09-09): voxel-only stable deposits replace the
+> historical active/mobile/flight/compaction/settle model described below.
+> See [stable soil contract](../.trellis/spec/frontend/soil-release-visuals.md). Historical soil-mode
+> and flight/compaction sections below are not current product requirements.
+
+
 ## Implemented client baseline
 
 The current client targets Windows desktop with Godot Forward+. It loads the

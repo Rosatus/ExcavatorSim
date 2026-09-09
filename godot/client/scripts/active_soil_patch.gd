@@ -469,7 +469,6 @@ func step_fixed(delta: float, focus_world: Vector3, soil_tool_snapshot: Dictiona
 	if generation < 0:
 		return {"changed": false, "reason": "unconfigured"}
 	var started_us := Time.get_ticks_usec()
-	persistent_field.step_pending_flux()
 	_focus_world = focus_world
 	var bounded_delta := clampf(delta, 0.0, 0.05)
 	var substeps := maxi(1, int(_profile["substeps"]))
@@ -486,8 +485,9 @@ func step_fixed(delta: float, focus_world: Vector3, soil_tool_snapshot: Dictiona
 	return {"changed": not _representatives.is_empty(), "reason": "stepped", "tick_us": _last_tick_us}
 
 
-func schedule_loose_flux(dirty_rect_cells: Rect2i, horizontal_impulse_xz: Vector2) -> bool:
-	return persistent_field.schedule_tool_flux(dirty_rect_cells, horizontal_impulse_xz)
+func schedule_loose_flux(_dirty_rect_cells: Rect2i, _horizontal_impulse_xz: Vector2) -> bool:
+	# Retired compatibility API: no simulation or terrain edits.
+	return false
 
 
 func flush_all() -> Dictionary:

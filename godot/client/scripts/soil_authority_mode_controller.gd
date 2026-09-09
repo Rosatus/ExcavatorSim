@@ -3,22 +3,17 @@ extends RefCounted
 
 ## Locks one material owner for the lifetime of a material generation. Requested
 ## changes are applied only by begin_generation(); runtime faults pause writes
-## and schedule legacy for the next clean generation instead of mixing owners.
+## and retain the voxel selection for the next clean generation.
 
 const SCHEMA_VERSION := "soil-authority-mode-controller-v1"
-const MODES := ["legacy", "shadow", "active_patch", "voxel"]
-const SOLVER_MODES := ["point_brush_v1", "surface_patch_v2_shadow", "surface_patch_v2", "arcade_stamp_v3", "voxel_bucket_v1"]
-const STAGES := ["cut", "bucket_entry", "release", "settle"]
-const PRODUCT_OWNER_BY_MODE := {
-	"legacy": "legacy",
-	"shadow": "legacy",
-	"active_patch": "active_patch",
-	"voxel": "voxel",
-}
+const MODES := ["voxel"]
+const SOLVER_MODES := ["voxel_bucket_v1"]
+const STAGES := ["cut", "bucket_entry", "deposit"]
+const PRODUCT_OWNER_BY_MODE := {"voxel": "voxel"}
 
-var requested_mode := "legacy"
+var requested_mode := "voxel"
 var selected_mode := ""
-var requested_solver_mode := "point_brush_v1"
+var requested_solver_mode := "voxel_bucket_v1"
 var selected_solver_mode := ""
 var generation_key := ""
 var locked := false
@@ -64,25 +59,19 @@ func begin_generation(key: String) -> bool:
 
 
 func fallback_initialization_to_legacy(reason: String) -> bool:
-	if not locked or reason.is_empty():
-		return false
-	selected_mode = "legacy"
-	requested_mode = "legacy"
-	selected_solver_mode = "point_brush_v1"
-	requested_solver_mode = "point_brush_v1"
+	# Retired compatibility seam: pause the voxel writer; never select old soil.
 	initialization_fallback_reason = reason
-	writes_paused = false
-	writer_configuration_valid = bind_product_writers(true, false)
-	return has_single_product_owner() and writer_configuration_valid
+	report_runtime_failure(reason)
+	return false
 
 
 func report_runtime_failure(reason: String) -> bool:
-	if not locked or selected_mode not in ["active_patch", "voxel"] or reason.is_empty():
+	if not locked or selected_mode != "voxel" or reason.is_empty():
 		return false
 	writes_paused = true
 	runtime_failure_reason = reason
-	requested_mode = "legacy"
-	requested_solver_mode = "point_brush_v1"
+	requested_mode = "voxel"
+	requested_solver_mode = "voxel_bucket_v1"
 	return true
 
 
@@ -114,7 +103,7 @@ func has_single_product_owner() -> bool:
 	if owner.is_empty():
 		return false
 	for _stage in STAGES:
-		var count := 1 if owner in ["legacy", "active_patch", "voxel"] else 0
+		var count := 1 if owner == "voxel" else 0
 		if count != 1:
 			return false
 	return true

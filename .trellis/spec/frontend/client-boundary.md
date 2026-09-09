@@ -1,5 +1,11 @@
 # Godot Client Boundary
 
+> Current soil contract (2026-09-09): voxel-only stable deposits replace the
+> historical active/mobile/flight/compaction/settle model described below.
+> See [Soil Release Visuals](./soil-release-visuals.md). Historical soil-mode
+> and flight/compaction sections below are not current product requirements.
+
+
 The client owns Godot scene composition, GLB visual transforms, desktop Forward+ rendering, camera/UI, derived terrain mesh, particles, and profile-selected local physics.
 
 The client consumes Python pose/state and lifecycle messages. In legacy Python
@@ -2798,6 +2804,9 @@ VoxelSoilMaterialField.stage_compaction(coordinates, compaction_delta_q) -> Dict
   without enabling a disabled diagnostic session. Cached responses are detached.
   Only tickets issued in the current diagnostic session contribute latency
   samples; older tickets still finish their collision acknowledgement normally.
+- `phase_timings_usec.rejected_commit` records failed transaction duration in
+  its own bounded window. Successful commit statistics alone cannot diagnose
+  repeated expensive no-ops. It obeys the same default-off/reset behavior.
 - Effects/audio must use the detached voxel `get_visual_snapshot()` projection,
   never full authority status. Full diagnostic caching must not delay gameplay
   payload, transaction/event or live opening fields.

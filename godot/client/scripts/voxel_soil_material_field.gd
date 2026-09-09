@@ -2,28 +2,20 @@ class_name VoxelSoilMaterialField
 extends RefCounted
 
 const MASS_Q_PER_KG := 1000000
-const DEFAULT_COMPACTION_Q := 1000
-const LOOSE_COMPACTION_Q := 0
-const MAX_COMPACTION_Q := 1000
-const LOOSE_DENSITY_RATIO := 0.78
 const APPROXIMATE_CUT_OCCUPANCY_FRACTION := 0.55
 
 var generation := -1
 var material_density_kg_m3 := 0.0
-var loose_density_kg_m3 := 0.0
 var contract_bucket_capacity_m3 := 0.0
 var bucket_capacity_override_m3 := 0.0
 var bucket_capacity_m3 := 0.0
 var bucket_capacity_mass_q := 0
 var bucket_mass_q := 0
-var in_flight_mass_q := 0
 var terrain_mass_delta_q := 0
 var discarded_cut_mass_q := 0
 var conservation_error_q := 0
 var _cells: Dictionary = {}
-var _compactable_mobile_cells: Dictionary = {}
 var _approximate_cut_coverage: Dictionary = {}
-var _mobile_cell_count := 0
 var _state_revision := 0
 var _cached_state_digest_revision := -1
 var _cached_state_digest := ""
@@ -40,20 +32,16 @@ func configure(contract: Dictionary, target_generation: int, capacity_override_m
 		return false
 	generation = target_generation
 	material_density_kg_m3 = density
-	loose_density_kg_m3 = density * LOOSE_DENSITY_RATIO
 	contract_bucket_capacity_m3 = contract_capacity
 	bucket_capacity_override_m3 = capacity_override_m3 if override_valid else 0.0
 	bucket_capacity_m3 = capacity
 	bucket_capacity_mass_q = _mass_q(capacity)
 	bucket_mass_q = 0
-	in_flight_mass_q = 0
 	terrain_mass_delta_q = 0
 	discarded_cut_mass_q = 0
 	conservation_error_q = 0
 	_cells.clear()
-	_compactable_mobile_cells.clear()
 	_approximate_cut_coverage.clear()
-	_mobile_cell_count = 0
 	_state_revision = 0
 	_cached_state_digest_revision = -1
 	_cached_state_digest = ""
@@ -61,26 +49,8 @@ func configure(contract: Dictionary, target_generation: int, capacity_override_m
 
 
 func remaining_capacity_mass_q() -> int:
-	# Reserve room for a failed landing to return its unrepresented remainder.
-	return maxi(0, bucket_capacity_mass_q - bucket_mass_q - in_flight_mass_q)
-
-
-func release_to_flight(mass_q: int) -> bool:
-	if generation < 0 or mass_q <= 0 or mass_q > bucket_mass_q or _mass_balance_q() != 0:
-		return false
-	bucket_mass_q -= mass_q
-	in_flight_mass_q += mass_q
-	conservation_error_q = _mass_balance_q()
-	return true
-
-
-func return_from_flight(mass_q: int) -> bool:
-	if mass_q <= 0 or mass_q > in_flight_mass_q:
-		return false
-	in_flight_mass_q -= mass_q
-	bucket_mass_q += mass_q
-	conservation_error_q = _mass_balance_q()
-	return true
+	# Pending deposits remain in the bucket until terrain commit succeeds.
+	return maxi(0, bucket_capacity_mass_q - bucket_mass_q)
 
 
 func visual_fill_ratio() -> float:
@@ -100,7 +70,7 @@ func set_bucket_capacity_override_for_testing(capacity_override_m3: float) -> Di
 	var next_capacity_mass_q := _mass_q(next_capacity_m3)
 	if next_capacity_mass_q <= 0:
 		return {"accepted": false, "reason": "invalid_capacity_override"}
-	if bucket_mass_q + in_flight_mass_q > next_capacity_mass_q:
+	if bucket_mass_q > next_capacity_mass_q:
 		return {
 			"accepted": false,
 			"reason": "bucket_mass_exceeds_requested_capacity",
@@ -123,21 +93,8 @@ func mass_q_for_volume(volume_m3: float) -> int:
 	return _mass_q(volume_m3)
 
 
-func mass_q_for_loose_volume(volume_m3: float) -> int:
-	return roundi(maxf(0.0, volume_m3) * loose_density_kg_m3 * float(MASS_Q_PER_KG))
-
-
 func volume_for_mass_q(mass_q: int) -> float:
 	return float(mass_q) / (material_density_kg_m3 * float(MASS_Q_PER_KG)) if material_density_kg_m3 > 0.0 else 0.0
-
-
-func loose_volume_for_mass_q(mass_q: int) -> float:
-	return float(mass_q) / (loose_density_kg_m3 * float(MASS_Q_PER_KG)) if loose_density_kg_m3 > 0.0 else 0.0
-
-
-func mobile_bulk_volume_for_mass_q(mass_q: int, compaction_q: int) -> float:
-	var density := _mobile_bulk_density_kg_m3(compaction_q)
-	return float(maxi(0, mass_q)) / (density * float(MASS_Q_PER_KG)) if density > 0.0 else 0.0
 
 
 func stage_cut(cell_changes: Array[Dictionary], requested_mass_q: int, allow_overflow: bool = false) -> Dictionary:
@@ -156,17 +113,12 @@ func stage_cut(cell_changes: Array[Dictionary], requested_mass_q: int, allow_ove
 			existing = {
 				"coordinate": coordinate,
 				"stable_mass_q": _mass_q(pre_volume),
-				"mobile_mass_q": 0,
-				"mobile_compaction_q": DEFAULT_COMPACTION_Q,
 			}
 		var desired := mini(remaining, maxi(0, int(change.get("removed_mass_q", 0))))
-		var mobile_take := mini(desired, int(existing.get("mobile_mass_q", 0)))
-		var stable_take := mini(desired - mobile_take, int(existing.get("stable_mass_q", 0)))
-		var accepted := mobile_take + stable_take
+		var accepted := mini(desired, maxi(0, int(existing.get("stable_mass_q", 0))))
 		if accepted <= 0:
 			continue
-		existing["mobile_mass_q"] = int(existing["mobile_mass_q"]) - mobile_take
-		existing["stable_mass_q"] = int(existing["stable_mass_q"]) - stable_take
+		existing["stable_mass_q"] = int(existing["stable_mass_q"]) - accepted
 		mutations.append({"key": key, "state": existing, "accepted_mass_q": accepted})
 		remaining -= accepted
 	var accepted_total := requested_mass_q - remaining
@@ -245,11 +197,8 @@ func stage_approximate_cut(coordinates: Array[Vector3i], voxel_volume_m3: float,
 			existing = {
 				"coordinate": coordinate,
 				"stable_mass_q": mass_q_for_volume(voxel_volume_m3),
-				"mobile_mass_q": 0,
-				"mobile_compaction_q": DEFAULT_COMPACTION_Q,
 			}
-		var available := maxi(0, int(existing.get("mobile_mass_q", 0))) \
-			+ maxi(0, int(existing.get("stable_mass_q", 0)))
+		var available := maxi(0, int(existing.get("stable_mass_q", 0)))
 		var desired := mini(nominal_cell_mass_q, available)
 		if desired <= 0:
 			continue
@@ -257,10 +206,7 @@ func stage_approximate_cut(coordinates: Array[Vector3i], voxel_volume_m3: float,
 		if not allow_overflow and remaining <= 0:
 			continue
 		var accepted := desired if allow_overflow else mini(desired, remaining)
-		var mobile_take := mini(accepted, maxi(0, int(existing.get("mobile_mass_q", 0))))
-		var stable_take := mini(accepted - mobile_take, maxi(0, int(existing.get("stable_mass_q", 0))))
-		existing["mobile_mass_q"] = maxi(0, int(existing.get("mobile_mass_q", 0)) - mobile_take)
-		existing["stable_mass_q"] = maxi(0, int(existing.get("stable_mass_q", 0)) - stable_take)
+		existing["stable_mass_q"] = maxi(0, int(existing.get("stable_mass_q", 0)) - accepted)
 		mutations.append({
 			"key": key,
 			"coverage_key": key,
@@ -328,16 +274,15 @@ func _cut_capture_valid(staged: Dictionary) -> bool:
 
 
 func _mass_balance_q() -> int:
-	return terrain_mass_delta_q + bucket_mass_q + in_flight_mass_q + discarded_cut_mass_q
+	return terrain_mass_delta_q + bucket_mass_q + discarded_cut_mass_q
 
 
-func stage_deposit(cell_changes: Array[Dictionary], requested_mass_q: int, incoming_compaction_q: int = LOOSE_COMPACTION_Q) -> Dictionary:
+func stage_deposit(cell_changes: Array[Dictionary], requested_mass_q: int) -> Dictionary:
 	if generation < 0 or requested_mass_q <= 0 or requested_mass_q > bucket_mass_q:
 		return {"valid": false, "reason": "invalid_or_empty_bucket", "accepted_mass_q": 0, "mutations": []}
 	var mutations: Array[Dictionary] = []
 	var remaining := requested_mass_q
 	var pending_states: Dictionary = {}
-	var bounded_compaction := clampi(incoming_compaction_q, LOOSE_COMPACTION_Q, MAX_COMPACTION_Q)
 	for change in cell_changes:
 		if remaining <= 0:
 			break
@@ -347,12 +292,7 @@ func stage_deposit(cell_changes: Array[Dictionary], requested_mass_q: int, incom
 		var desired := mini(remaining, maxi(0, int(change.get("added_mass_q", 0))))
 		if desired <= 0:
 			continue
-		var old_mobile := maxi(0, int(existing.get("mobile_mass_q", 0)))
-		var old_compaction := clampi(int(existing.get("mobile_compaction_q", DEFAULT_COMPACTION_Q)), LOOSE_COMPACTION_Q, MAX_COMPACTION_Q)
-		existing["mobile_mass_q"] = old_mobile + desired
-		existing["mobile_compaction_q"] = bounded_compaction if old_mobile <= 0 else int(
-			(old_mobile * old_compaction + desired * bounded_compaction) / (old_mobile + desired)
-		)
+		existing["stable_mass_q"] = maxi(0, int(existing.get("stable_mass_q", 0))) + desired
 		pending_states[key] = existing
 		mutations.append({"key": key, "state": existing.duplicate(true), "accepted_mass_q": desired})
 		remaining -= desired
@@ -388,164 +328,12 @@ func commit_deposit(staged: Dictionary) -> bool:
 	return conservation_error_q == 0
 
 
-func stage_mobile_transfer(removals: Array[Dictionary], additions: Array[Dictionary], requested_mass_q: int) -> Dictionary:
-	if generation < 0 or requested_mass_q <= 0:
-		return {"valid": false, "reason": "invalid_transfer", "accepted_mass_q": 0, "mutations": []}
-	var pending_states: Dictionary = {}
-	var mutations_by_key: Dictionary = {}
-	var remaining_remove := requested_mass_q
-	for change in removals:
-		if remaining_remove <= 0:
-			break
-		var coordinate := change.get("coordinate", Vector3i.ZERO) as Vector3i
-		var key := _key(coordinate)
-		var existing := _state_for_change(change, pending_states)
-		var desired := mini(remaining_remove, maxi(0, int(change.get("removed_mass_q", 0))))
-		var take := mini(desired, maxi(0, int(existing.get("mobile_mass_q", 0))))
-		if take <= 0:
-			continue
-		existing["mobile_mass_q"] = int(existing.get("mobile_mass_q", 0)) - take
-		pending_states[key] = existing
-		mutations_by_key[key] = {"key": key, "state": existing.duplicate(true), "accepted_mass_q": 0}
-		remaining_remove -= take
-	var removed := requested_mass_q - remaining_remove
-	if removed != requested_mass_q:
-		return {"valid": false, "reason": "insufficient_mobile_donor", "accepted_mass_q": 0, "mutations": []}
-	var remaining_add := requested_mass_q
-	for change in additions:
-		if remaining_add <= 0:
-			break
-		var coordinate := change.get("coordinate", Vector3i.ZERO) as Vector3i
-		var key := _key(coordinate)
-		var existing := _state_for_change(change, pending_states)
-		var desired := mini(remaining_add, maxi(0, int(change.get("added_mass_q", 0))))
-		if desired <= 0:
-			continue
-		var old_mobile := maxi(0, int(existing.get("mobile_mass_q", 0)))
-		var donor_compaction := clampi(int(change.get("incoming_compaction_q", LOOSE_COMPACTION_Q)), LOOSE_COMPACTION_Q, MAX_COMPACTION_Q)
-		var old_compaction := clampi(int(existing.get("mobile_compaction_q", DEFAULT_COMPACTION_Q)), LOOSE_COMPACTION_Q, MAX_COMPACTION_Q)
-		existing["mobile_mass_q"] = old_mobile + desired
-		existing["mobile_compaction_q"] = donor_compaction if old_mobile <= 0 else int(
-			(old_mobile * old_compaction + desired * donor_compaction) / (old_mobile + desired)
-		)
-		pending_states[key] = existing
-		mutations_by_key[key] = {"key": key, "state": existing.duplicate(true), "accepted_mass_q": 0}
-		remaining_add -= desired
-	if remaining_add != 0:
-		return {"valid": false, "reason": "insufficient_mobile_receiver", "accepted_mass_q": 0, "mutations": []}
-	var keys := mutations_by_key.keys()
-	keys.sort()
-	var mutations: Array[Dictionary] = []
-	for key_value in keys:
-		mutations.append((mutations_by_key[key_value] as Dictionary).duplicate(true))
-	return {"valid": true, "reason": "staged", "accepted_mass_q": requested_mass_q, "mutations": mutations}
-
-
-func can_commit_mobile_transfer(staged: Dictionary) -> bool:
-	return bool(staged.get("valid", false)) and int(staged.get("accepted_mass_q", 0)) > 0 \
-		and _mass_balance_q() == 0
-
-
-func commit_mobile_transfer(staged: Dictionary) -> bool:
-	if not can_commit_mobile_transfer(staged):
-		return false
-	_commit_states(staged)
-	_invalidate_approximate_coverage(staged)
-	conservation_error_q = _mass_balance_q()
-	return conservation_error_q == 0
-
-
-func stage_compaction(coordinates: Array[Vector3i], compaction_delta_q: int) -> Dictionary:
-	if generation < 0 or compaction_delta_q <= 0:
-		return {"valid": false, "reason": "invalid_compaction", "accepted_mass_q": 0, "mutations": []}
-	var unique: Dictionary = {}
-	for coordinate in coordinates:
-		unique[_key(coordinate)] = coordinate
-	var keys := unique.keys()
-	keys.sort()
-	var mutations: Array[Dictionary] = []
-	var affected_mass_q := 0
-	var volume_loss_m3 := 0.0
-	for key_value in keys:
-		var key := String(key_value)
-		var state := (_cells.get(key, {}) as Dictionary).duplicate(true)
-		var mobile_mass_q := maxi(0, int(state.get("mobile_mass_q", 0)))
-		if state.is_empty() or mobile_mass_q <= 0 or int(state.get("stable_mass_q", 0)) > 0:
-			continue
-		var previous := clampi(int(state.get("mobile_compaction_q", LOOSE_COMPACTION_Q)), LOOSE_COMPACTION_Q, MAX_COMPACTION_Q)
-		var next := mini(MAX_COMPACTION_Q, previous + compaction_delta_q)
-		if next == previous:
-			continue
-		state["mobile_compaction_q"] = next
-		var cell_volume_loss := maxf(
-			0.0,
-			mobile_bulk_volume_for_mass_q(mobile_mass_q, previous)
-				- mobile_bulk_volume_for_mass_q(mobile_mass_q, next),
-		)
-		mutations.append({
-			"key": key,
-			"state": state,
-			"accepted_mass_q": 0,
-			"affected_mass_q": mobile_mass_q,
-			"previous_compaction_q": previous,
-			"next_compaction_q": next,
-			"volume_loss_m3": cell_volume_loss,
-		})
-		affected_mass_q += mobile_mass_q
-		volume_loss_m3 += cell_volume_loss
-	if mutations.is_empty():
-		return {"valid": false, "reason": "no_loose_material", "accepted_mass_q": 0, "mutations": []}
-	return {
-		"valid": true,
-		"reason": "staged",
-		"accepted_mass_q": affected_mass_q,
-		"volume_loss_m3": volume_loss_m3,
-		"mutations": mutations,
-	}
-
-
-func can_commit_compaction(staged: Dictionary) -> bool:
-	return bool(staged.get("valid", false)) and int(staged.get("accepted_mass_q", 0)) > 0 \
-		and _mass_balance_q() == 0
-
-
-func commit_compaction(staged: Dictionary) -> bool:
-	if not can_commit_compaction(staged):
-		return false
-	_commit_states(staged)
-	conservation_error_q = _mass_balance_q()
-	return conservation_error_q == 0
-
-
-func mobile_mass_q_at(coordinate: Vector3i) -> int:
-	return maxi(0, int((_cells.get(_key(coordinate), {}) as Dictionary).get("mobile_mass_q", 0)))
-
-
 func stable_mass_q_at(coordinate: Vector3i) -> int:
 	return maxi(0, int((_cells.get(_key(coordinate), {}) as Dictionary).get("stable_mass_q", 0)))
 
 
-func mobile_compaction_q_at(coordinate: Vector3i) -> int:
-	return clampi(
-		int((_cells.get(_key(coordinate), {}) as Dictionary).get("mobile_compaction_q", LOOSE_COMPACTION_Q)),
-		LOOSE_COMPACTION_Q,
-		MAX_COMPACTION_Q,
-	)
-
-
-func has_compactable_mobile() -> bool:
-	return not _compactable_mobile_cells.is_empty()
-
-
-func is_compactable_mobile_at(coordinate: Vector3i) -> bool:
-	return _compactable_mobile_cells.has(_key(coordinate))
-
-
-func total_mobile_mass_q() -> int:
-	var total := 0
-	for value in _cells.values():
-		total += maxi(0, int((value as Dictionary).get("mobile_mass_q", 0)))
-	return total
+func get_state_revision() -> int:
+	return _state_revision
 
 
 func total_stable_mass_q() -> int:
@@ -553,20 +341,6 @@ func total_stable_mass_q() -> int:
 	for value in _cells.values():
 		total += maxi(0, int((value as Dictionary).get("stable_mass_q", 0)))
 	return total
-
-
-func mobile_cells_snapshot(limit: int = 512) -> Array[Dictionary]:
-	var keys := _cells.keys()
-	keys.sort()
-	var result: Array[Dictionary] = []
-	for key_value in keys:
-		var state := _cells[key_value] as Dictionary
-		if int(state.get("mobile_mass_q", 0)) <= 0:
-			continue
-		result.append(state.duplicate(true))
-		if result.size() >= maxi(0, limit):
-			break
-	return result
 
 
 func all_cells_snapshot(limit: int = 512) -> Array[Dictionary]:
@@ -616,7 +390,6 @@ func get_status_snapshot(cell_grid: Array = [1, 1, 1], center_of_mass_local: Vec
 	return {
 		"generation": generation,
 		"material_density_kg_m3": material_density_kg_m3,
-		"loose_density_kg_m3": loose_density_kg_m3,
 		"contract_bucket_capacity_m3": contract_bucket_capacity_m3,
 		"bucket_capacity_override_m3": bucket_capacity_override_m3,
 		"bucket_capacity_overridden": bucket_capacity_override_m3 > 0.0,
@@ -625,7 +398,6 @@ func get_status_snapshot(cell_grid: Array = [1, 1, 1], center_of_mass_local: Vec
 		"visual_bucket_capacity_m3": contract_bucket_capacity_m3,
 		"collection_fill_ratio": collection_fill_ratio,
 		"bucket_mass_q": bucket_mass_q,
-		"in_flight_mass_q": in_flight_mass_q,
 		"bucket_volume_m3": volume_for_mass_q(bucket_mass_q),
 		"payload_mass_kg": float(bucket_mass_q) / float(MASS_Q_PER_KG),
 		"fill_ratio": fill_ratio,
@@ -638,8 +410,6 @@ func get_status_snapshot(cell_grid: Array = [1, 1, 1], center_of_mass_local: Vec
 		"conservation_error_q": conservation_error_q,
 		"conservation_error_kg": float(conservation_error_q) / float(MASS_Q_PER_KG),
 		"sparse_cell_count": _cells.size(),
-		"mobile_cell_count": _mobile_cell_count,
-		"compactable_mobile_cell_count": _compactable_mobile_cells.size(),
 		"mass_accounting_mode": "hybrid_exact_or_sparse_coverage",
 		"approximate_cut_coverage_cells": _approximate_cut_coverage.size(),
 		"material_state_revision": _state_revision,
@@ -650,11 +420,6 @@ func get_status_snapshot(cell_grid: Array = [1, 1, 1], center_of_mass_local: Vec
 
 func _mass_q(volume_m3: float) -> int:
 	return roundi(maxf(0.0, volume_m3) * material_density_kg_m3 * float(MASS_Q_PER_KG))
-
-
-func _mobile_bulk_density_kg_m3(compaction_q: int) -> float:
-	var alpha := float(clampi(compaction_q, LOOSE_COMPACTION_Q, MAX_COMPACTION_Q)) / float(MAX_COMPACTION_Q)
-	return lerpf(loose_density_kg_m3, material_density_kg_m3, alpha)
 
 
 func _key(coordinate: Vector3i) -> String:
@@ -670,8 +435,6 @@ func _state_for_change(change: Dictionary, pending_states: Dictionary) -> Dictio
 		existing = {
 			"coordinate": coordinate,
 			"stable_mass_q": _mass_q(pre_volume),
-			"mobile_mass_q": 0,
-			"mobile_compaction_q": DEFAULT_COMPACTION_Q,
 		}
 	return existing
 
@@ -702,18 +465,5 @@ func _invalidate_approximate_coverage(staged: Dictionary) -> void:
 
 
 func _store_state(key: String, state: Dictionary) -> void:
-	var previous := _cells.get(key, {}) as Dictionary
-	var previous_mobile := int(previous.get("mobile_mass_q", 0)) > 0
-	var stored := state.duplicate(true)
-	var mobile := int(stored.get("mobile_mass_q", 0)) > 0
-	if previous_mobile != mobile:
-		_mobile_cell_count += 1 if mobile else -1
-	_cells[key] = stored
-	var compactable := mobile \
-		and int(stored.get("stable_mass_q", 0)) <= 0 \
-		and int(stored.get("mobile_compaction_q", LOOSE_COMPACTION_Q)) < MAX_COMPACTION_Q
-	if compactable:
-		_compactable_mobile_cells[key] = true
-	else:
-		_compactable_mobile_cells.erase(key)
+	_cells[key] = state.duplicate(true)
 	_state_revision += 1

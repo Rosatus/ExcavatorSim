@@ -55,8 +55,6 @@ var _active_release_event: Dictionary = {}
 var _last_release_event_id := ""
 var _release_event_elapsed_s := 0.0
 var _release_event_ttl_s := 0.0
-var _voxel_flight_visible := false
-var _completed_flight_clear_count := 0
 
 
 func _ready() -> void:
@@ -148,7 +146,6 @@ func clear_for_generation(generation: int) -> void:
 	_release_event_elapsed_s = 0.0
 	_release_event_ttl_s = 0.0
 	_release_clod_budget = 0.0
-	_voxel_flight_visible = false
 
 
 func get_effect_snapshot() -> Dictionary:
@@ -180,7 +177,6 @@ func get_effect_snapshot() -> Dictionary:
 		"last_release_event_id": _last_release_event_id,
 		"release_event_age_s": _release_event_elapsed_s,
 		"release_event_ttl_s": _release_event_ttl_s,
-		"completed_flight_clears": _completed_flight_clear_count,
 	}
 
 
@@ -353,7 +349,6 @@ func _apply_visual_snapshot(status: Dictionary) -> void:
 	var current: Dictionary = pose.get("current", {})
 	var contract: Dictionary = pose.get("contract", {})
 	_consume_release_event(status, pose)
-	_sync_voxel_flight_completion(status)
 	_update_release_source(status)
 	_update_fill(status, current, contract)
 	_update_flow(status, current, pose)
@@ -387,10 +382,11 @@ func _consume_release_event(status: Dictionary, pose: Dictionary) -> void:
 	if not release_transform.origin.is_finite() or not direction.is_finite() or direction.is_zero_approx():
 		return
 	_last_release_event_id = event_id
-	if String(status.get("soil_material_lifecycle_mode", "")) == "voxel" \
-			and status.has("flight_queue_depth") and int(status["flight_queue_depth"]) == 0:
-		# A late subscriber must not replay an already landed release.
-		return
+	if event.has("published_usec"):
+		var age_s := maxf(0.0, float(Time.get_ticks_usec() - int(event["published_usec"])) / 1000000.0)
+		if age_s > float(event.get("release_duration_s", RELEASE_EVENT_MAX_TTL_S)) + 0.02:
+			# The stable terrain is already committed. Never replay stale decoration.
+			return
 	if not emission_enabled or _budget <= 0:
 		return
 	_active_release_event = event.duplicate(true)
@@ -412,25 +408,6 @@ func _consume_release_event(status: Dictionary, pose: Dictionary) -> void:
 	# Continuous batches must not restart particles already falling in world space.
 	if _flow_particles != null:
 		_flow_particles.amount_ratio = clampf(released_volume / _release_event_ttl_s / 0.65, 0.0, 1.0)
-
-
-func _sync_voxel_flight_completion(status: Dictionary) -> void:
-	if String(status.get("soil_material_lifecycle_mode", "")) != "voxel" or not status.has("flight_queue_depth"):
-		return
-	if int(status["flight_queue_depth"]) > 0:
-		_voxel_flight_visible = true
-		return
-	if not _voxel_flight_visible:
-		return
-	_voxel_flight_visible = false
-	_completed_flight_clear_count += 1
-	_active_release_event.clear()
-	_release_clod_budget = 0.0
-	_clod_spawn_accumulator = 0.0
-	_flow_particles.emitting = false
-	_flow_particles.restart()
-	_flow_particles.emitting = false
-	_reset_clod_pool()
 
 
 func _advance_release_event(delta: float) -> void:

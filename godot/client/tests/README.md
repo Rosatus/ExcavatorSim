@@ -20,6 +20,9 @@ For one focused contract, run the same executable from `godot/client/`:
 & $GodotExe --headless --path . --script res://tests/foundation_scene_test.gd
 ```
 
+Track compaction admission and its dedicated fixture/tests have been removed.
+The excavation authority test retains dumping, idle-terrain and re-cut conservation coverage.
+
 Validate the Terrain3D product default and an actual Windows export from the
 repository root:
 

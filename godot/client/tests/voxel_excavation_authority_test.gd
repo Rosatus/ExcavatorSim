@@ -243,35 +243,7 @@ func _check_commit_contract(zone: VoxelWorkZone, failures: Array[String]) -> voi
 	authority.flush_for_test()
 	_expect(_surface_digest(zone) == digest_after_commit, "rejected input leaves SDF unchanged", failures)
 	_expect(int(authority.get_payload_snapshot().get("bucket_mass_q", -1)) == mass_after_commit, "rejected input leaves mass unchanged", failures)
-	var empty_track_revision := authority.data_revision
-	var empty_track_accepted := int(authority.get_status_snapshot().get("accepted_proposals", 0))
-	var empty_track_started := Time.get_ticks_usec()
-	for empty_track_tick in EMPTY_TRACK_ADMISSION_ITERATIONS:
-		var empty_track_result := authority.submit_track_compaction({
-			"authority_epoch": "stable-ground-admission-test",
-			"physics_tick": 1000 + empty_track_tick,
-			"terrain_identity_valid": true,
-			"terrain_generation": generation,
-			"track_contact_receipts": [{
-				"point": Vector3(0.0, 0.0, 18.0),
-				"support_force_n": 30000.0,
-				"support_source": "voxel_terrain",
-				"footprint_width_m": 0.7,
-			}],
-		})
-		_expect(
-			not bool(empty_track_result.get("accepted", false)) \
-				and String(empty_track_result.get("reason", "")) == "no_loose_track_contact",
-			"stable-ground track receipt is rejected before staging (%d)" % empty_track_tick,
-			failures,
-		)
-	var empty_track_elapsed := Time.get_ticks_usec() - empty_track_started
-	var empty_track_status := authority.get_status_snapshot()
-	_expect(authority.data_revision == empty_track_revision, "stable-ground contacts do not mutate voxel data", failures)
-	_expect(int(empty_track_status.get("soil_queue_depth", -1)) == 0, "stable-ground contacts never enter the soil queue", failures)
-	_expect(int(empty_track_status.get("accepted_proposals", -1)) == empty_track_accepted, "stable-ground contacts do not count as accepted proposals", failures)
-	_expect(int(empty_track_status.get("track_compaction_skipped_no_mobile", 0)) == EMPTY_TRACK_ADMISSION_ITERATIONS, "empty loose-soil admission is observable", failures)
-	_expect(empty_track_elapsed <= EMPTY_TRACK_ADMISSION_BUDGET_USEC, "empty track admission remains constant-time and inside focused-test budget", failures)
+	_expect(String(authority.submit_track_compaction({}).get("reason", "")) == "track_compaction_disabled", "legacy compaction call is disabled", failures)
 	var dump_pose := _dump_pose(contract, Vector3(6.0, 1.5, 24.0), "dump")
 	authority.submit_pose(dump_pose, _identity(generation, 13, 5), Authority.DUMP_GATE_CONFIRMATION_S * 0.49)
 	authority.submit_pose(dump_pose, _identity(generation, 14, 6), Authority.DUMP_GATE_CONFIRMATION_S * 0.49)
@@ -365,108 +337,36 @@ func _check_commit_contract(zone: VoxelWorkZone, failures: Array[String]) -> voi
 	)
 	_expect(int(authority.get_payload_snapshot().get("bucket_mass_q", -1)) == before_outside_mass and authority.data_revision == before_outside_revision, "out-of-zone dump changes neither inventory nor SDF revision", failures)
 	_expect(not String(authority.get_status_snapshot().get("rejected_dump_event_id", "")).is_empty(), "out-of-zone dump publishes deduplicated feedback identity", failures)
-	var mobile_before_settle := authority.material_field.total_mobile_mass_q()
+	var terrain_mass_before_idle := authority.material_field.total_stable_mass_q()
 	var stable_before_settle := _stable_mass_snapshot(authority.material_field)
 	var settle_before := int((authority.get_status_snapshot().get("operation_counts", {}) as Dictionary).get("settle", 0))
 	for _iteration in 16:
 		authority.flush_for_test()
 	var settled_status := authority.get_status_snapshot()
 	_expect(int((settled_status.get("operation_counts", {}) as Dictionary).get("settle", 0)) == settle_before, "native repose mound does not start continuous settle work", failures)
-	_expect(int(settled_status.get("settle_frontier_depth", -1)) == 0, "native deposit leaves no active settle frontier", failures)
 	_expect(int(authority.get_payload_snapshot().get("conservation_error_q", 1)) == 0, "native repose mound preserves exact ledger conservation", failures)
-	_expect(authority.material_field.total_mobile_mass_q() == mobile_before_settle, "idle frames preserve aggregate native-deposit mass", failures)
+	_expect(authority.material_field.total_stable_mass_q() == terrain_mass_before_idle, "idle frames preserve aggregate native-deposit mass", failures)
 	_expect(not _stable_mass_regressed(authority.material_field, stable_before_settle), "native deposition never consumes previously accounted stable ground", failures)
-	var mobile_cells: Array[Dictionary] = []
-	for mobile_value in authority.material_field.mobile_cells_snapshot(128):
-		var candidate_mobile := mobile_value as Dictionary
-		if int(candidate_mobile.get("stable_mass_q", 0)) == 0:
-			if mobile_cells.is_empty() or (candidate_mobile.get("coordinate", Vector3i.ZERO) as Vector3i).y \
-					> ((mobile_cells[0] as Dictionary).get("coordinate", Vector3i.ZERO) as Vector3i).y:
-				mobile_cells = [candidate_mobile]
-	_expect(not mobile_cells.is_empty(), "native repose pile retains mobile material", failures)
-	if not mobile_cells.is_empty():
-		var mobile_coordinate := (mobile_cells[0] as Dictionary).get("coordinate", Vector3i.ZERO) as Vector3i
-		var contact_voxel := authority._solid_point_for_mobile_cell(mobile_coordinate)
+	var stable_cells: Array[Dictionary] = []
+	for stable_value in authority.material_field.all_cells_snapshot(65536):
+		var candidate_stable := stable_value as Dictionary
+		if int(candidate_stable.get("stable_mass_q", 0)) > 0:
+			if stable_cells.is_empty() or (candidate_stable.get("coordinate", Vector3i.ZERO) as Vector3i).y \
+					> ((stable_cells[0] as Dictionary).get("coordinate", Vector3i.ZERO) as Vector3i).y:
+				stable_cells = [candidate_stable]
+	_expect(not stable_cells.is_empty(), "native repose pile retains stable material", failures)
+	if not stable_cells.is_empty():
+		var stable_coordinate := (stable_cells[0] as Dictionary).get("coordinate", Vector3i.ZERO) as Vector3i
+		var contact_voxel := authority._solid_point_for_cell(stable_coordinate)
 		var contact_world := WorkZoneConfig.voxel_to_world(contact_voxel, zone.voxel_scale_m)
 		_expect(await _wait_authority_ready(authority, zone, contact_world), "deposit/settle collision becomes query-ready", failures)
-		var stale_compaction := authority.submit_track_compaction({
-			"authority_epoch": "track-compaction-test",
-			"physics_tick": 28,
-			"terrain_identity_valid": true,
-			"terrain_generation": generation - 1,
-			"track_contact_receipts": [],
-		})
-		_expect(not bool(stale_compaction.get("accepted", false)) and String(stale_compaction.get("reason", "")) == "stale_track_identity", "stale terrain identity cannot compact soil", failures)
-		var weak_compaction := authority.submit_track_compaction({
-			"authority_epoch": "track-compaction-test",
-			"physics_tick": 29,
-			"terrain_identity_valid": true,
-			"terrain_generation": generation,
-			"track_contact_receipts": [{
-				"point": contact_world,
-				"support_force_n": 999.0,
-				"support_source": "voxel_terrain",
-				"footprint_width_m": 0.7,
-			}],
-		})
-		_expect(not bool(weak_compaction.get("accepted", false)) and String(weak_compaction.get("reason", "")) == "no_loose_track_contact", "sub-threshold contact force cannot compact soil", failures)
-		var compaction_submit := authority.submit_track_compaction({
-			"authority_epoch": "track-compaction-test",
-			"physics_tick": 30,
-			"terrain_identity_valid": true,
-			"terrain_generation": generation,
-			"track_contact_receipts": [{
-				"point": contact_world,
-				"normal": Vector3.UP,
-				"track_side": "left",
-				"probe_index": 0,
-				"support_force_n": 30000.0,
-				"support_source": "voxel_terrain",
-				"footprint_width_m": 0.7,
-			}],
-		})
-		_expect(bool(compaction_submit.get("accepted", false)), "accepted voxel track receipt queues compaction", failures)
-		var duplicate_compaction := authority.submit_track_compaction({
-			"authority_epoch": "track-compaction-test",
-			"physics_tick": 30,
-			"terrain_identity_valid": true,
-			"terrain_generation": generation,
-			"track_contact_receipts": [{
-				"point": contact_world,
-				"support_force_n": 30000.0,
-				"support_source": "voxel_terrain",
-				"footprint_width_m": 0.7,
-			}],
-		})
-		_expect(not bool(duplicate_compaction.get("accepted", false)) and String(duplicate_compaction.get("reason", "")) == "duplicate_compaction", "one chassis tick cannot replay track compaction", failures)
-		var mobile_before_compaction := authority.material_field.total_mobile_mass_q()
-		var stable_before_compaction := _stable_mass_snapshot(authority.material_field)
-		var surface_before_compaction := _surface_digest(zone, contact_world)
-		var compact_before := int((authority.get_status_snapshot().get("operation_counts", {}) as Dictionary).get("compact", 0))
-		for _iteration in 8:
-			authority.flush_for_test()
-			if int((authority.get_status_snapshot().get("operation_counts", {}) as Dictionary).get("compact", 0)) > compact_before:
-				break
-		var compact_status := authority.get_status_snapshot()
-		var compact_transaction := compact_status.get("last_transaction", {}) as Dictionary
-		var compact_changed := int((compact_status.get("operation_counts", {}) as Dictionary).get("compact", 0)) > compact_before
-		# A shallow surface deposit can overlap protected stable SDF at every
-		# removal sample. The executor must then reject without eroding it.
-		var compact_protected := String(compact_transaction.get("operation", "")) == "compact" \
-			and String(compact_transaction.get("rejection_reason", "")) == "no_loose_material" \
-			and _surface_digest(zone, contact_world) == surface_before_compaction
-		_expect(compact_changed or compact_protected, "compaction either changes pure loose soil or preserves a protected shallow slab", failures)
-		_expect(int(authority.get_payload_snapshot().get("conservation_error_q", 1)) == 0, "compaction preserves exact ledger conservation", failures)
-		_expect(authority.material_field.total_mobile_mass_q() == mobile_before_compaction, "compaction changes density without deleting mobile mass", failures)
-		_expect(not _stable_mass_regressed(authority.material_field, stable_before_compaction), "track compaction never consumes previously accounted stable ground", failures)
 		var before_recut_mass := int(authority.get_payload_snapshot().get("bucket_mass_q", 0))
-		var mobile_before_recut := authority.material_field.total_mobile_mass_q()
-		var stable_before_recut := _stable_mass_snapshot(authority.material_field)
+		var stable_before_recut := authority.material_field.total_stable_mass_q()
 		var cut_before := int((authority.get_status_snapshot().get("operation_counts", {}) as Dictionary).get("cut", 0))
 		var recut_radius := 0.45
 		var recut_influence := recut_radius + 1.0
 		var recut_capsule := {
-			"source": "deposited_mobile_recut",
+			"source": "deposited_terrain_recut",
 			"a_voxels": contact_voxel,
 			"b_voxels": contact_voxel + Vector3(0.0, 0.0, 0.2),
 			"radius_voxels": recut_radius,
@@ -486,17 +386,16 @@ func _check_commit_contract(zone: VoxelWorkZone, failures: Array[String]) -> voi
 			"capsules": [recut_capsule],
 			"clearance_capsules": [],
 			"probe_world": contact_world,
-			"quality_flags": ["deposited_mobile_recut"],
+			"quality_flags": ["deposited_terrain_recut"],
 		})
-		_expect(recut_proposal.is_valid() and authority._coalesce_or_enqueue(recut_proposal), "settled/compacted pile accepts the authoritative cutter path", failures)
+		_expect(recut_proposal.is_valid() and authority._coalesce_or_enqueue(recut_proposal), "deposited pile accepts the authoritative cutter path", failures)
 		for _iteration in 8:
 			authority.flush_for_test()
 			if int((authority.get_status_snapshot().get("operation_counts", {}) as Dictionary).get("cut", 0)) > cut_before:
 				break
-		_expect(int((authority.get_status_snapshot().get("operation_counts", {}) as Dictionary).get("cut", 0)) > cut_before and int(authority.get_payload_snapshot().get("bucket_mass_q", 0)) > before_recut_mass, "re-cut pile returns mobile mass to the bucket", failures)
-		_expect(authority.material_field.total_mobile_mass_q() < mobile_before_recut, "re-cut consumes deposited mobile soil instead of only native ground", failures)
-		_expect(not _stable_mass_regressed(authority.material_field, stable_before_recut), "re-cut of the pile leaves previously accounted stable ground unchanged", failures)
-		_expect(int(authority.get_payload_snapshot().get("conservation_error_q", 1)) == 0, "full cut/dump/settle/compact/re-cut cycle conserves mass", failures)
+		_expect(int((authority.get_status_snapshot().get("operation_counts", {}) as Dictionary).get("cut", 0)) > cut_before and int(authority.get_payload_snapshot().get("bucket_mass_q", 0)) > before_recut_mass, "re-cut pile returns stable mass to the bucket", failures)
+		_expect(authority.material_field.total_stable_mass_q() < stable_before_recut, "re-cut consumes deposited stable soil instead of only native ground", failures)
+		_expect(int(authority.get_payload_snapshot().get("conservation_error_q", 1)) == 0, "full cut/dump/re-cut cycle conserves mass", failures)
 		var full_dump_submissions := 0
 		while int(authority.get_payload_snapshot().get("bucket_mass_q", 0)) >= authority._minimum_dump_mass_q() and full_dump_submissions < 12:
 			var deposit_before := int((authority.get_status_snapshot().get("operation_counts", {}) as Dictionary).get("deposit", 0))
