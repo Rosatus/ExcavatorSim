@@ -73,6 +73,7 @@ var _linkage_reachable := false
 var _linkage_reason := "uninitialized"
 var _linkage_last_warning_reason := ""
 var _linkage_initialized := false
+signal model_replacing
 signal model_activated(model_id: String, asset_root: Node3D)
 
 
@@ -336,6 +337,8 @@ func _activate_model(model_id: String) -> bool:
 		_presentation_root.add_child(candidate_root)
 		candidate_root.owner = _presentation_root.owner
 		candidate_is_new = true
+	# Allow visual attachments to leave the old asset before replacement or failure.
+	model_replacing.emit()
 	_asset_root = candidate_root
 	_asset_root.visible = true
 	# Direct replacement: hide any other visible model under the presentation
@@ -535,6 +538,14 @@ func _soil_proxy_transform(proxy_name: String) -> Variant:
 	var frame := get_frame_node(String(proxy.get("frame", "")))
 	if frame == null:
 		return null
+	return frame.global_transform * get_soil_proxy_local_transform(proxy_name)
+
+
+func get_soil_proxy_local_transform(proxy_name: String) -> Transform3D:
+	# Shared by world sampling and rigid visual attachments; never sampled from
+	# an old world pose to reconstruct a local offset on a moving frame.
+	var proxies: Dictionary = _soil_contract.get("proxies", {})
+	var proxy: Dictionary = proxies.get(proxy_name, {})
 	var center := _vector3_from_array(proxy.get("center_godot", []))
 	var local_basis := Basis.IDENTITY
 	if proxy.has("up_godot"):
@@ -542,7 +553,7 @@ func _soil_proxy_transform(proxy_name: String) -> Variant:
 		var local_width := Vector3.RIGHT
 		var local_depth := local_width.cross(local_up).normalized()
 		local_basis = Basis(local_width, local_up, local_depth).orthonormalized()
-	return frame.global_transform * Transform3D(local_basis, center)
+	return Transform3D(local_basis, center)
 
 
 func _valid_vector3_array(value: Variant) -> bool:

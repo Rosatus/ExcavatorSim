@@ -12,6 +12,7 @@ const RELEASE_EVENT_MIN_TTL_S := 0.1
 const RELEASE_EVENT_MAX_TTL_S := 0.14
 
 @export var excavation_world_path := NodePath("../TerrainRoot/ExcavationWorld")
+@export var motion_presentation_path := NodePath("../MotionPresentation")
 @export var max_particles := 5000
 @export var emission_enabled := true
 @export var max_clods := 48
@@ -31,6 +32,8 @@ var _fill_surface := BucketFillSurface.new()
 var _generation := -1
 var _budget := 1800
 var _excavation: ExcavationWorld
+var _presentation: MotionPresentation
+var _requires_live_fill_frame := false
 var _clods: Array[RigidBody3D] = []
 var _active_clods: Array[RigidBody3D] = []
 var _free_clods: Array[RigidBody3D] = []
@@ -66,7 +69,50 @@ func _ready() -> void:
 	_build_dust_particles()
 	_build_clod_pool()
 	_build_visual_mound_pool()
+	_presentation = get_node_or_null(motion_presentation_path) as MotionPresentation
+	_requires_live_fill_frame = _presentation != null
+	if _presentation != null:
+		_presentation.model_replacing.connect(_on_fill_model_replacing)
 	_connect_excavation()
+
+
+func _exit_tree() -> void:
+	# The mesh may currently belong to the imported bucket rather than this node.
+	if is_instance_valid(_fill_mesh) and _fill_mesh.get_parent() != self:
+		_fill_mesh.queue_free()
+
+
+func _park_fill_mesh() -> void:
+	if not is_instance_valid(_fill_mesh):
+		_build_fill_mesh()
+	_fill_mesh.visible = false
+	if _fill_mesh.get_parent() != self:
+		_fill_mesh.reparent(self, false)
+	_fill_mesh.transform = Transform3D.IDENTITY
+
+
+func _on_fill_model_replacing() -> void:
+	# Reclaim before replacement, including candidates whose contract fails.
+	_park_fill_mesh()
+	_last_fill_ratio = -1.0
+
+
+func _bind_fill_pose(model_id: String, cavity_contract: Dictionary, current: Dictionary) -> bool:
+	if not is_instance_valid(_presentation):
+		if _requires_live_fill_frame:
+			return false
+		# Isolated compatibility/test consumers can supply explicit world poses.
+		_fill_mesh.global_transform = current["cavity"]
+		return true
+	if model_id != _presentation.get_active_model_id():
+		return false
+	var frame := _presentation.get_frame_node(String(cavity_contract.get("frame", "")))
+	if not is_instance_valid(frame):
+		return false
+	if _fill_mesh.get_parent() != frame:
+		_fill_mesh.reparent(frame, false)
+	_fill_mesh.transform = _presentation.get_soil_proxy_local_transform("cavity")
+	return true
 
 
 func _physics_process(delta: float) -> void:
@@ -135,8 +181,7 @@ func clear_for_generation(generation: int) -> void:
 	if _dust_particles != null:
 		_dust_particles.emitting = false
 		_dust_particles.restart()
-	if _fill_mesh != null:
-		_fill_mesh.visible = false
+	_park_fill_mesh()
 	_last_fill_ratio = -1.0
 	_last_cavity_size = Vector3.ZERO
 	_last_fill_model_id = ""
@@ -161,7 +206,7 @@ func get_effect_snapshot() -> Dictionary:
 		"particles_emitting": _flow_particles != null and _flow_particles.emitting,
 		"dust_node": _dust_particles != null,
 		"dust_emitting": _dust_particles != null and _dust_particles.emitting,
-		"fill_visible": _fill_mesh != null and _fill_mesh.visible,
+		"fill_visible": is_instance_valid(_fill_mesh) and _fill_mesh.visible,
 		"active_clods": _active_clod_count(),
 		"clod_cap": _active_clod_cap,
 		"active_visual_mounds": _active_visual_mound_count(),
@@ -194,7 +239,8 @@ func _build_fill_mesh() -> void:
 	_fill_material.metallic = 0.0
 	_fill_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_fill_material.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
-	_fill_array_mesh = ArrayMesh.new()
+	if _fill_array_mesh == null:
+		_fill_array_mesh = ArrayMesh.new()
 	_fill_mesh.mesh = _fill_array_mesh
 	add_child(_fill_mesh)
 
@@ -485,6 +531,9 @@ func _release_event_from_live_pose(status: Dictionary, pose: Dictionary) -> Dict
 
 
 func _update_fill(status: Dictionary, current: Dictionary, contract: Dictionary) -> void:
+	if not is_instance_valid(_fill_mesh):
+		_build_fill_mesh()
+		_last_fill_ratio = -1.0
 	var fill_ratio := clampf(float(status.get("fill_ratio", 0.0)), 0.0, 1.0)
 	if fill_ratio <= 0.001 or not current.has("cavity"):
 		_fill_mesh.visible = false
@@ -522,9 +571,7 @@ func _update_fill(status: Dictionary, current: Dictionary, contract: Dictionary)
 		_last_cavity_size = cavity_size
 		_last_fill_model_id = model_id
 		_fill_update_accumulator_s = 0.0
-	var cavity_transform: Transform3D = current["cavity"]
-	_fill_mesh.global_transform = cavity_transform
-	_fill_mesh.visible = _fill_array_mesh.get_surface_count() > 0
+	_fill_mesh.visible = _bind_fill_pose(model_id, cavity_contract, current) and _fill_array_mesh.get_surface_count() > 0
 
 
 func _update_flow(status: Dictionary, current: Dictionary, pose: Dictionary) -> void:

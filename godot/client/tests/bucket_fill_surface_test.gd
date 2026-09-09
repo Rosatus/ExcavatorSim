@@ -31,6 +31,14 @@ func _check_model(model: String) -> bool:
 	var surface := FillSurface.new()
 	if not surface.configure(model, Vector3.ONE) or not surface.build_arrays(0.0).is_empty():
 		return _fail("%s profile initialization/empty fill failed" % model)
+	# The front/rear samples cancel symmetric mound relief; the deterministic
+	# ripple can contribute at most 18 mm across the pair.
+	var front_relief: float = surface._surface_relief(0.0, -0.25)
+	var rear_relief: float = surface._surface_relief(0.0, 0.40)
+	if model == "sy135" and front_relief - rear_relief < 0.045:
+		return _fail("SY135 free surface does not advance toward the cutting edge")
+	if model == "sy205" and not is_zero_approx(surface._forward_slope):
+		return _fail("SY135 tilt leaked into SY205")
 	var previous_volume := 0.0
 	var volumes: Array[float] = []
 	for ratio in [0.005, 0.05, 0.25, 0.5, 0.75, 1.0]:
@@ -39,6 +47,9 @@ func _check_model(model: String) -> bool:
 			return _fail("%s positive stock disappeared" % model)
 		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 		var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+		for vertex in vertices:
+			if vertex.y * float(profile["growth_direction_y"]) > float(profile["rim_height"]) + 0.00001:
+				return _fail("%s fill crossed the dry rim at %.3f stock" % [model, ratio])
 		var volume := 0.0
 		var edges: Dictionary = {}
 		for index in range(0, vertices.size(), 3):

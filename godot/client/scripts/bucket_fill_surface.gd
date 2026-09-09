@@ -12,6 +12,7 @@ const CONTACT_OVERLAP_M := 0.002
 var _columns := 0
 var _rows := 0
 var _direction := 1.0
+var _forward_slope := 0.0
 var _x_bounds := Vector2.ZERO
 var _z_bounds := Vector2.ZERO
 var _floors := PackedFloat32Array()
@@ -42,7 +43,9 @@ func configure(model_id: String, cavity_size: Vector3) -> bool:
 	_direction = float(profile["growth_direction_y"])
 	_x_bounds = Vector2(float(profile["x_bounds"][0]), float(profile["x_bounds"][1]))
 	_z_bounds = Vector2(float(profile["z_bounds"][0]), float(profile["z_bounds"][1]))
-	_full_level = float(profile["rim_height"]) - SURFACE_RELIEF_M
+	_forward_slope = tan(deg_to_rad(float(profile.get("surface_forward_tilt_degrees", 0.0))))
+	# Reserve the tilt peak as well as relief so the dry rim still closes the solid.
+	_full_level = float(profile["rim_height"]) - SURFACE_RELIEF_M - absf(_forward_slope) * (_z_bounds.y - _z_bounds.x) * 0.5
 	_minimum_level = INF
 	_full_weight = 0.0
 	_relief.resize(_floors.size())
@@ -172,7 +175,8 @@ func _surface_relief(x: float, z: float) -> float:
 	var nx := (x - (_x_bounds.x + _x_bounds.y) * 0.5) / ((_x_bounds.y - _x_bounds.x) * 0.5)
 	var nz := (z - (_z_bounds.x + _z_bounds.y) * 0.5) / ((_z_bounds.y - _z_bounds.x) * 0.5)
 	var mound := maxf(0.0, (1.0 - nx * nx) * (1.0 - nz * nz))
-	return 0.014 + 0.035 * mound + 0.009 * sin(x * 19.0 + z * 7.0) * sin(z * 13.0 - x * 4.0)
+	var forward_tilt := _forward_slope * ((_z_bounds.x + _z_bounds.y) * 0.5 - z)
+	return forward_tilt + 0.014 + 0.035 * mound + 0.009 * sin(x * 19.0 + z * 7.0) * sin(z * 13.0 - x * 4.0)
 
 
 func _surface_normal(x: float, z: float) -> Vector3:

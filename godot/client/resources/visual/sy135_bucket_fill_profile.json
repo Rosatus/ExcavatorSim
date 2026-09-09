@@ -4,6 +4,7 @@
   "source_sha256": "8e0f478b265bb0f32f7736a0e388f5bb812b7f36c143edeb1553ff86d2d960c9",
   "coordinate_space": "cavity_local",
   "growth_direction_y": -1.0,
+  "surface_forward_tilt_degrees": 6.0,
   "cavity_center_godot": [
     0.0,
     0.32,
