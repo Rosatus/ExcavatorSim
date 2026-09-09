@@ -308,3 +308,36 @@ Delivered conserved soil flight and delayed landing, irregular soil visuals, dum
 ### Next Steps
 
 - None - task complete
+
+
+## Session 63: Stable soil migration completed
+
+**Date**: 2026-09-09
+**Task**: Stable soil migration completed
+**Branch**: `main`
+
+### Summary
+
+Replaced loose soil, compaction and settling with voxel-only stable deposits; preserved cut, bucket accounting and re-cut. User confirmed manual testing complete on 2026-09-09. Automated checks were human-owned and not run by the agent. Archived the migration task; excluded unrelated addon, worldbuilding and local configuration edits.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a288f73` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
