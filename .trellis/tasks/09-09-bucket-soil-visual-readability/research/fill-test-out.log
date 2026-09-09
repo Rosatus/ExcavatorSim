@@ -1,0 +1,6 @@
+Godot Engine v4.7.2.stable.custom_build.ed1daf0bf (2026-08-17 01:18:38 UTC) - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+sy135 volumes m3 (visual only): [0.00155061462187, 0.0140963613268, 0.06754488596201, 0.13489398748266, 0.20112659719022, 0.26941750720168]
+sy205 volumes m3 (visual only): [0.00215884277568, 0.02018432080961, 0.10006674117675, 0.19878201328053, 0.29896082707031, 0.40059098401635]
+bucket_fill_surface_test: PASS

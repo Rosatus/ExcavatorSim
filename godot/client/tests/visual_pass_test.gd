@@ -171,6 +171,10 @@ func _test_scene_visual_nodes() -> int:
 		return _fail("test quality disables disposable soil particles: %s" % test_effects)
 	if not quality.apply_profile("balanced"):
 		return _fail("balanced quality restores worksite context")
+	if not sky.environment.ssao_enabled or sky.environment.ssao_radius > 0.5 or sky.environment.ssao_intensity > 1.0:
+		return _fail("balanced quality keeps occlusion local and restrained inside the bucket")
+	if not is_equal_approx(sky.environment.tonemap_exposure, 0.96):
+		return _fail("bucket readability must not be obtained by raising global exposure")
 	var balanced_site := dressing.get_status_snapshot()
 	if int(balanced_site["visible_cues"]) != 28 or int(balanced_site["shadow_instances"]) <= 0:
 		return _fail("balanced quality applies its context and shadow budget")
@@ -187,6 +191,8 @@ func _test_scene_visual_nodes() -> int:
 		return _fail("leaving test quality restores normal terrain material and effects budget")
 	if not quality.apply_profile("high") or not sky.clouds_enabled or not sky.fog_enabled or not sky.sun.shadow_enabled:
 		return _fail("high quality restores bounded Sky3D atmosphere and shadows")
+	if not sky.environment.ssao_enabled or sky.environment.ssao_radius > 0.5 or sky.environment.ssao_intensity > 1.0:
+		return _fail("high quality restores contact-scale bucket occlusion after profile switching")
 	var high_site := dressing.get_status_snapshot()
 	if int(high_site["visible_cues"]) != 45 or int(high_site["collision_objects"]) != 0 or not bool(high_site["code_native"]):
 		return _fail("high quality exposes all code-native cues without collision")

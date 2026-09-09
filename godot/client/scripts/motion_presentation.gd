@@ -6,6 +6,7 @@ extends Node3D
 ## same post-step physics snapshot drives both the visual pivots and truth output.
 
 const MODEL_CATALOG_PATH := "res://resources/models/model_catalog.json"
+const BucketVisualMaterials = preload("res://scripts/bucket_visual_materials.gd")
 const RIGID_BASIS_TOLERANCE := 0.001
 const JOINT_ORIGIN_TOLERANCE_M := 0.002
 const JOINT_AXIS_RESIDUAL_TOLERANCE := 0.001
@@ -362,6 +363,7 @@ func _activate_model(model_id: String) -> bool:
 			previous.queue_free()
 	_active_model_id = model_id
 	_restore_rest_pose()
+	BucketVisualMaterials.apply(_asset_root, _manifest, model_id)
 	model_activated.emit(model_id, _asset_root)
 	return true
 

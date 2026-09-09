@@ -35,6 +35,45 @@ Voxel mode must not use continuous-flow fallback or decorative ground mound mesh
 Reset clears presentation history. Fill/ground retain shared texture resources and
 existing fill/pool/cadence budgets.
 
+## Contained bucket fill
+
+`SoilEffects` delegates mesh construction to `bucket_fill_surface.gd`:
+`configure(model_id, cavity_size) -> bool`, `build_arrays(fill_ratio) -> Array`.
+It consumes inventory only. The measured `sy135_bucket_fill_profile.json` and
+`sy205_bucket_fill_profile.json` resources use `bucket-fill-profile-v1`, carry
+the source GLB SHA-256 and cavity center/up, and store a 25×33 lining-height grid
+in cavity-local coordinates. Heights are measured along `growth_direction_y`:
+**SY135 -Y, SY205 +Y**. The proxy's `up_godot` is not a universal visual growth
+direction, and `floor_wear_plate` is not an inner-surface marker.
+
+A bounded volume estimate selects one rising soil level; deterministic relief
+does not change seed with stock. Clip each sampled triangle where the surface
+meets the lining; join the top and bottom there instead of creating a floating
+box or rectangular skirt. Shared edge intersections use canonical endpoint
+order, and Godot clockwise winding must agree with the supplied outward normals.
+At most 2 mm of internal contact overlap hides seams. The volume is a visual
+approximation and never recalibrates nominal bucket capacity or ledger mass.
+
+Keep the existing 10 Hz rebuild gate, 5% stock quantum, ArrayMesh reuse and local
+triplanar soil textures. First positive sub-quantum stock must still create a
+thin layer. Empty/invalid snapshots hide fill and invalidate first-fill state;
+model changes rebuild with that model's profile. Unknown named models fail
+closed; only anonymous compatibility/test snapshots use the generic bowl.
+
+`BucketVisualMaterials.apply()` duplicates the original SY135 bucket surface
+material per activated instance, replacing its near-black untextured paint with
+rough dark steel. SY205 keeps its original atlas. Do not mutate imported/shared
+resources or use self-illumination to disguise black lining. `VisualEnvironment`
+keeps contact-scale SSAO (0.4 m / intensity 0.8), existing exposure and profile
+enable/disable behavior; it does not add a bucket light.
+
+Focused checks: `bucket_fill_surface_test.gd` covers source hash, independent
+imported-mesh ray contacts, closed clockwise solids, low stock, monotonic volume,
+determinism, invalidation and material isolation; `model_switch_test.gd` covers
+the real material activation hook; existing soil-effects and visual-pass tests
+cover cadence, resource reuse and quality restoration. Appearance remains a
+human Forward+ check under `validation-budget.md`.
+
 ## Mode retirement
 
 Only `voxel` / `voxel_bucket_v1` are selectable. Old serialized requests normalize

@@ -1,0 +1,10 @@
+WARNING: instance_reset_physics_interpolation() is deprecated.
+   at: RenderingServer::_instance_reset_physics_interpolation_bind_compat_104269 (D:\a\godot_voxel\godot_voxel\servers\rendering\rendering_server.compat.inc:62)
+   GDScript backtrace (most recent call first):
+       [0] _ensure_terrain_node (res://scripts/terrain3d_adapter.gd:348)
+       [1] apply_pending (res://scripts/terrain3d_adapter.gd:171)
+       [2] _apply_pending_deferred (res://scripts/terrain3d_adapter.gd:318)
+WARNING: 10 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: ObjectDB::cleanup (core\object\object.cpp:2536)
+ERROR: 3 resources still in use at exit (run with --verbose for details).
+   at: ResourceCache::clear (core\io\resource.cpp:822)

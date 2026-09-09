@@ -90,7 +90,8 @@ func _run() -> void:
 	var live_current := live_pose["current"] as Dictionary
 	live_current["opening"] = Transform3D(Basis.IDENTITY, Vector3(100.0, 100.0, 100.0))
 	effects.apply_visual_snapshot_for_test(frozen_release)
-	if not effects._flow_particles.global_position.is_equal_approx(Vector3(3.0, 1.76, 4.0)):
+	# Stable-release decoration starts 5 cm outside the frozen opening.
+	if not effects._flow_particles.global_position.is_equal_approx(Vector3(3.0, 1.95, 4.0)):
 		return _fail("delayed release presentation reconstructed the source from the live bucket pose")
 	var release_status := effects.get_effect_snapshot()
 	var release_ttl := float(release_status.get("release_event_ttl_s", 0.0))

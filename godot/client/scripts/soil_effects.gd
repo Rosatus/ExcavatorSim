@@ -2,6 +2,7 @@ class_name SoilEffects
 extends Node3D
 
 const VisualResources = preload("res://scripts/soil_visual_resources.gd")
+const BucketFillSurface = preload("res://scripts/bucket_fill_surface.gd")
 const SoilFlight = preload("res://scripts/soil_flight.gd")
 
 const VISUAL_SNAPSHOT_PERIOD_S := 1.0 / 30.0
@@ -25,6 +26,8 @@ var _fill_array_mesh: ArrayMesh
 var _fill_material: StandardMaterial3D
 var _last_fill_ratio := -1.0
 var _last_cavity_size := Vector3.ZERO
+var _last_fill_model_id := ""
+var _fill_surface := BucketFillSurface.new()
 var _generation := -1
 var _budget := 1800
 var _excavation: ExcavationWorld
@@ -136,6 +139,7 @@ func clear_for_generation(generation: int) -> void:
 		_fill_mesh.visible = false
 	_last_fill_ratio = -1.0
 	_last_cavity_size = Vector3.ZERO
+	_last_fill_model_id = ""
 	_fill_update_accumulator_s = FILL_UPDATE_PERIOD_S
 	_snapshot_poll_accumulator_s = 0.0
 	_reset_clod_pool()
@@ -186,6 +190,7 @@ func _build_fill_mesh() -> void:
 	_fill_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	_fill_mesh.visible = false
 	_fill_material = VisualResources.surface_material()
+	_fill_material.vertex_color_use_as_albedo = true
 	_fill_material.metallic = 0.0
 	_fill_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_fill_material.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
@@ -483,12 +488,13 @@ func _update_fill(status: Dictionary, current: Dictionary, contract: Dictionary)
 	var fill_ratio := clampf(float(status.get("fill_ratio", 0.0)), 0.0, 1.0)
 	if fill_ratio <= 0.001 or not current.has("cavity"):
 		_fill_mesh.visible = false
-		_last_fill_ratio = 0.0
+		_last_fill_ratio = -1.0
 		return
 	var cavity_contract: Dictionary = (contract.get("proxies", {}) as Dictionary).get("cavity", {})
 	var raw_size: Variant = cavity_contract.get("size_m", [])
 	if not raw_size is Array or (raw_size as Array).size() != 3:
 		_fill_mesh.visible = false
+		_last_fill_ratio = -1.0
 		return
 	var cavity_size := Vector3(float(raw_size[0]), float(raw_size[1]), float(raw_size[2]))
 	var quantized_fill_ratio := clampf(
@@ -496,26 +502,29 @@ func _update_fill(status: Dictionary, current: Dictionary, contract: Dictionary)
 		0.0,
 		1.0,
 	)
-	var fill_height := cavity_size.y * clampf(pow(quantized_fill_ratio, 0.72), 0.08, 1.0)
+	if quantized_fill_ratio <= 0.0:
+		quantized_fill_ratio = fill_ratio
+	var model_id := String(contract.get("model_id", ""))
 	var cavity_changed := not cavity_size.is_equal_approx(_last_cavity_size)
+	var model_changed := model_id != _last_fill_model_id
 	var first_fill := _last_fill_ratio < 0.0
 	var quantized_changed := absf(quantized_fill_ratio - _last_fill_ratio) + 0.000001 >= FILL_RATIO_QUANTUM
-	if cavity_changed or first_fill or (
+	if cavity_changed or model_changed or first_fill or (
 		quantized_changed and _fill_update_accumulator_s + 0.000001 >= FILL_UPDATE_PERIOD_S
 	):
-		_rebuild_fill_surface(
-			cavity_size,
-			fill_height,
-			quantized_fill_ratio,
-			status.get("fill_profile", PackedFloat32Array()),
-			status.get("cell_grid", [1, 1, 1])
-		)
+		if cavity_changed or model_changed or first_fill:
+			if not _fill_surface.configure(model_id, cavity_size):
+				_fill_mesh.visible = false
+				_last_fill_ratio = -1.0
+				return
+		_rebuild_fill_surface(quantized_fill_ratio)
 		_last_fill_ratio = quantized_fill_ratio
 		_last_cavity_size = cavity_size
+		_last_fill_model_id = model_id
 		_fill_update_accumulator_s = 0.0
 	var cavity_transform: Transform3D = current["cavity"]
 	_fill_mesh.global_transform = cavity_transform
-	_fill_mesh.visible = true
+	_fill_mesh.visible = _fill_array_mesh.get_surface_count() > 0
 
 
 func _update_flow(status: Dictionary, current: Dictionary, pose: Dictionary) -> void:
@@ -742,134 +751,10 @@ func _spawn_noise(sequence: int, salt: int) -> float:
 	return float(value & 0xffff) / 32767.5 - 1.0
 
 
-func _rebuild_fill_surface(
-	cavity_size: Vector3,
-	fill_height: float,
-	fill_ratio: float,
-	profile_value: Variant,
-	grid_value: Variant
-) -> void:
-	var columns := 7
-	var rows := 5
-	if grid_value is Array and (grid_value as Array).size() == 3:
-		columns = maxi(2, int(grid_value[0]))
-		rows = maxi(2, int(grid_value[2]))
-	var profile := profile_value as PackedFloat32Array if profile_value is PackedFloat32Array else PackedFloat32Array()
-	var bottom_y := -0.48 * cavity_size.y
-	var top_points: Array[Vector3] = []
-	for row in rows:
-		var z_unit := float(row) / float(rows - 1)
-		var z := lerpf(-0.43 * cavity_size.z, 0.43 * cavity_size.z, z_unit)
-		for column in columns:
-			var x_unit := float(column) / float(columns - 1)
-			var x := lerpf(-0.45 * cavity_size.x, 0.45 * cavity_size.x, x_unit)
-			var normalized_x := absf(x) / maxf(0.001, 0.45 * cavity_size.x)
-			var normalized_z := absf(z) / maxf(0.001, 0.43 * cavity_size.z)
-			var mound := maxf(0.0, 1.0 - 0.55 * normalized_x * normalized_x - 0.38 * normalized_z * normalized_z)
-			var heaping := lerpf(0.04, 0.22, clampf((fill_ratio - 0.55) / 0.45, 0.0, 1.0))
-			var local_fill := fill_ratio
-			var profile_index := row * columns + column
-			if profile_index < profile.size():
-				local_fill = clampf(profile[profile_index], 0.0, 1.0)
-			var local_height := cavity_size.y * clampf(pow(local_fill, 0.72), 0.02, 1.0)
-			var y := clampf(
-				-0.5 * cavity_size.y + maxf(local_height, 0.15 * fill_height) * (0.82 + heaping * mound),
-				bottom_y + 0.02 * cavity_size.y,
-				0.48 * cavity_size.y,
-			)
-			top_points.append(Vector3(x, y, z))
-	var vertices: Array[Vector3] = []
-	var normals: Array[Vector3] = []
-	var indices: Array[int] = []
-	for row in rows - 1:
-		for column in columns - 1:
-			var top_left := row * columns + column
-			var top_right := top_left + 1
-			var bottom_left := (row + 1) * columns + column
-			var bottom_right := bottom_left + 1
-			_append_fill_triangle(vertices, normals, indices, top_points[top_left], top_points[bottom_left], top_points[top_right])
-			_append_fill_triangle(vertices, normals, indices, top_points[top_right], top_points[bottom_left], top_points[bottom_right])
-	var x_min := -0.45 * cavity_size.x
-	var x_max := 0.45 * cavity_size.x
-	var z_min := -0.43 * cavity_size.z
-	var z_max := 0.43 * cavity_size.z
-	var bottom_front_left := Vector3(x_min, bottom_y, z_min)
-	var bottom_front_right := Vector3(x_max, bottom_y, z_min)
-	var bottom_back_left := Vector3(x_min, bottom_y, z_max)
-	var bottom_back_right := Vector3(x_max, bottom_y, z_max)
-	_append_fill_triangle(vertices, normals, indices, bottom_front_left, bottom_front_right, bottom_back_left)
-	_append_fill_triangle(vertices, normals, indices, bottom_front_right, bottom_back_right, bottom_back_left)
-	for column in columns - 1:
-		_append_fill_quad(
-			vertices, normals, indices,
-			top_points[column], top_points[column + 1],
-			Vector3(top_points[column].x, bottom_y, z_min),
-			Vector3(top_points[column + 1].x, bottom_y, z_min),
-		)
-		var back_left := (rows - 1) * columns + column
-		_append_fill_quad(
-			vertices, normals, indices,
-			top_points[back_left + 1], top_points[back_left],
-			Vector3(top_points[back_left + 1].x, bottom_y, z_max),
-			Vector3(top_points[back_left].x, bottom_y, z_max),
-		)
-	for row in rows - 1:
-		var left_top := row * columns
-		var left_bottom := (row + 1) * columns
-		_append_fill_quad(
-			vertices, normals, indices,
-			top_points[left_bottom], top_points[left_top],
-			Vector3(x_min, bottom_y, top_points[left_bottom].z),
-			Vector3(x_min, bottom_y, top_points[left_top].z),
-		)
-		var right_top := row * columns + columns - 1
-		var right_bottom := (row + 1) * columns + columns - 1
-		_append_fill_quad(
-			vertices, normals, indices,
-			top_points[right_top], top_points[right_bottom],
-			Vector3(x_max, bottom_y, top_points[right_top].z),
-			Vector3(x_max, bottom_y, top_points[right_bottom].z),
-		)
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = PackedVector3Array(vertices)
-	arrays[Mesh.ARRAY_NORMAL] = PackedVector3Array(normals)
-	arrays[Mesh.ARRAY_INDEX] = PackedInt32Array(indices)
-	if _fill_array_mesh == null:
-		_fill_array_mesh = ArrayMesh.new()
-		_fill_mesh.mesh = _fill_array_mesh
-	else:
-		_fill_array_mesh.clear_surfaces()
-	_fill_array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	_fill_array_mesh.surface_set_material(0, _fill_material)
+func _rebuild_fill_surface(fill_ratio: float) -> void:
+	var arrays := _fill_surface.build_arrays(fill_ratio)
+	_fill_array_mesh.clear_surfaces()
+	if not arrays.is_empty():
+		_fill_array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		_fill_array_mesh.surface_set_material(0, _fill_material)
 	_fill_rebuild_count += 1
-
-
-func _append_fill_quad(
-	vertices: Array[Vector3],
-	normals: Array[Vector3],
-	indices: Array[int],
-	top_a: Vector3,
-	top_b: Vector3,
-	bottom_a: Vector3,
-	bottom_b: Vector3
-) -> void:
-	_append_fill_triangle(vertices, normals, indices, top_a, bottom_a, top_b)
-	_append_fill_triangle(vertices, normals, indices, top_b, bottom_a, bottom_b)
-
-
-func _append_fill_triangle(
-	vertices: Array[Vector3],
-	normals: Array[Vector3],
-	indices: Array[int],
-	a: Vector3,
-	b: Vector3,
-	c: Vector3
-) -> void:
-	var normal := (b - a).cross(c - a).normalized()
-	if not normal.is_finite() or normal.is_zero_approx():
-		normal = Vector3.UP
-	var base := vertices.size()
-	vertices.append_array([a, b, c])
-	normals.append_array([normal, normal, normal])
-	indices.append_array([base, base + 1, base + 2])

@@ -32,6 +32,8 @@ func _run() -> void:
 		return _finish(host, 1)
 	if _check(_visible_model_count(presentation_root) == 1, "SY135 activation is not singular") != 0:
 		return _finish(host, 1)
+	if not _check_bucket_material(presentation, "sy135"):
+		return _finish(host, 1)
 	var fixture := _read_json(SY135_FIXTURE)
 	for pose_name in ["zero", "swing_positive_90", "boom_only", "arm_only", "bucket_only", "asymmetric"]:
 		if _check(presentation.apply_pose_for_test(fixture["poses"][pose_name]), "SY135 pose failed: %s" % pose_name) != 0:
@@ -82,6 +84,8 @@ func _run() -> void:
 		return _finish(host, 1)
 	if _check(_visible_model_count(presentation_root) == 1, "SY205 activation is not singular") != 0:
 		return _finish(host, 1)
+	if not _check_bucket_material(presentation, "sy205"):
+		return _finish(host, 1)
 	if _check(presentation.get_soil_contract().get("model_id", "") == "sy205", "SY205 soil contract is unavailable") != 0:
 		return _finish(host, 1)
 	client.model_changed.emit("sy135")
@@ -91,9 +95,31 @@ func _run() -> void:
 		return _finish(host, 1)
 	if _check(_visible_model_count(presentation_root) == 1, "reactivation left multiple visuals") != 0:
 		return _finish(host, 1)
+	if not _check_bucket_material(presentation, "sy135"):
+		return _finish(host, 1)
 
 	print("SY205/SY135 presentation switching contract passed.")
 	_finish(host, 0)
+
+
+func _check_bucket_material(presentation: MotionPresentation, model_id: String) -> bool:
+	var bucket := presentation.get_frame_node("bucket_link").get_node("bucket") as MeshInstance3D
+	for surface in bucket.mesh.get_surface_count():
+		var source := bucket.mesh.surface_get_material(surface) as StandardMaterial3D
+		var active := bucket.get_active_material(surface) as StandardMaterial3D
+		if model_id == "sy135":
+			# Cover the real activation hook, including a return from the atlas model.
+			if _check(active != source and active.albedo_color.get_luminance() > source.albedo_color.get_luminance() * 2.0
+					and active.roughness > 0.7 and not active.emission_enabled,
+					"SY135 activation did not restore an isolated readable steel material") != 0:
+				return false
+			if _check(source.albedo_color.get_luminance() < 0.1 and source.roughness < 0.4,
+					"SY135 imported material was mutated") != 0:
+				return false
+		elif _check(active == source and source.albedo_texture != null,
+				"SY205 activation lost its original atlas material") != 0:
+			return false
+	return true
 
 
 func _visible_model_count(root: Node3D) -> int:

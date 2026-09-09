@@ -76,8 +76,10 @@ func apply_profile(profile_name: String) -> bool:
 	environment.tonemap_white = 5.5
 	environment.glow_enabled = profile == "high"
 	environment.ssao_enabled = profile != "low"
-	environment.ssao_radius = 1.25
-	environment.ssao_intensity = 1.62
+	# Keep occlusion near contacts instead of applying a metre-wide darkening
+	# kernel across an entire bucket-sized cavity in balanced/high.
+	environment.ssao_radius = 0.4
+	environment.ssao_intensity = 0.8
 	environment.adjustment_enabled = true
 	environment.adjustment_brightness = 1.01
 	environment.adjustment_contrast = 1.06
