@@ -407,3 +407,36 @@ Implemented measured SY135/SY205 lining profiles, natural contained fill growth,
 ### Next Steps
 
 - None - task complete
+
+
+## Session 66: SY135 fill tilt and rigid bucket following
+
+**Date**: 2026-09-09
+**Task**: SY135 fill tilt and rigid bucket following
+**Branch**: `main`
+
+### Summary
+
+Implemented 6-degree SY135 forward fill tilt and bucket-frame inherited attachment to eliminate snapshot phase lag. Added replacement-before-validation cleanup and regressions for stale poses, model switching, failure recovery and both teardown orders. Five focused Godot tests passed. User requested commit, push and archive; unrelated work remains untouched.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `65dedd7` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
