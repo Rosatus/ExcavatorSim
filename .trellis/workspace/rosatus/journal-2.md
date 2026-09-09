@@ -374,3 +374,36 @@ Implemented automatic entry, Esc/gamepad pause menu, confirmed reset, persistent
 ### Next Steps
 
 - None - task complete
+
+
+## Session 65: Bucket soil shape and cavity visibility
+
+**Date**: 2026-09-09
+**Task**: Bucket soil shape and cavity visibility
+**Branch**: `main`
+
+### Summary
+
+Implemented measured SY135/SY205 lining profiles, natural contained fill growth, per-instance bucket material correction and contact-scale SSAO. Five focused Godot tests passed; existing scene cleanup warnings documented. User accepted the result and requested commit, push and archive. Updated visual contract and archived current task; unrelated plugin, configuration and worldbuilding changes remain untouched.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b5b6264` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 64
+- **Total Sessions**: 65
 - **Last Active**: 2026-09-09
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~376 | Active |
+| `journal-2.md` | ~409 | Active |
 | `journal-1.md` | ~1992 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 65 | 2026-09-09 | Bucket soil shape and cavity visibility | `b5b6264` | `main` |
 | 64 | 2026-09-09 | Game menu and control HUD completed | `bb4bb58` | `main` |
 | 63 | 2026-09-09 | Stable soil migration completed | `a288f73` | `main` |
 | 62 | 2026-09-08 | Complete soil release visuals and recorded bucket residual repair | `689a70f` | `main` |
