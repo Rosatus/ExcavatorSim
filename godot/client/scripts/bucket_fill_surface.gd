@@ -12,7 +12,8 @@ const CONTACT_OVERLAP_M := 0.002
 var _columns := 0
 var _rows := 0
 var _direction := 1.0
-var _forward_slope := 0.0
+var _body_opening := Plane()
+var _has_body_opening := false
 var _x_bounds := Vector2.ZERO
 var _z_bounds := Vector2.ZERO
 var _floors := PackedFloat32Array()
@@ -43,9 +44,19 @@ func configure(model_id: String, cavity_size: Vector3) -> bool:
 	_direction = float(profile["growth_direction_y"])
 	_x_bounds = Vector2(float(profile["x_bounds"][0]), float(profile["x_bounds"][1]))
 	_z_bounds = Vector2(float(profile["z_bounds"][0]), float(profile["z_bounds"][1]))
-	_forward_slope = tan(deg_to_rad(float(profile.get("surface_forward_tilt_degrees", 0.0))))
-	# Reserve the tilt peak as well as relief so the dry rim still closes the solid.
-	_full_level = float(profile["rim_height"]) - SURFACE_RELIEF_M - absf(_forward_slope) * (_z_bounds.y - _z_bounds.x) * 0.5
+	var rim: Array = profile.get("body_opening_rim_cavity_local", [])
+	_has_body_opening = rim.size() == 4
+	_full_level = float(profile["rim_height"]) - SURFACE_RELIEF_M
+	if _has_body_opening:
+		var points: Array[Vector3] = []
+		for point in rim:
+			points.append(Vector3(point[0], point[1], point[2]))
+		_body_opening = Plane(points[0], points[1], points[2])
+		if absf(_body_opening.normal.y) < 0.001:
+			return false
+		# The measured body rim excludes teeth. Move the free plane inward by
+		# the existing clearance, without rotating or translating the lining.
+		_full_level = _direction * _body_opening.d / _body_opening.normal.y - SURFACE_RELIEF_M / absf(_body_opening.normal.y)
 	_minimum_level = INF
 	_full_weight = 0.0
 	_relief.resize(_floors.size())
@@ -172,11 +183,12 @@ func _position(sample: Vector4, top: bool) -> Vector3:
 
 
 func _surface_relief(x: float, z: float) -> float:
+	if _has_body_opening:
+		return -_direction * (_body_opening.normal.x * x + _body_opening.normal.z * z) / _body_opening.normal.y
 	var nx := (x - (_x_bounds.x + _x_bounds.y) * 0.5) / ((_x_bounds.y - _x_bounds.x) * 0.5)
 	var nz := (z - (_z_bounds.x + _z_bounds.y) * 0.5) / ((_z_bounds.y - _z_bounds.x) * 0.5)
 	var mound := maxf(0.0, (1.0 - nx * nx) * (1.0 - nz * nz))
-	var forward_tilt := _forward_slope * ((_z_bounds.x + _z_bounds.y) * 0.5 - z)
-	return forward_tilt + 0.014 + 0.035 * mound + 0.009 * sin(x * 19.0 + z * 7.0) * sin(z * 13.0 - x * 4.0)
+	return 0.014 + 0.035 * mound + 0.009 * sin(x * 19.0 + z * 7.0) * sin(z * 13.0 - x * 4.0)
 
 
 func _surface_normal(x: float, z: float) -> Vector3:

@@ -74,7 +74,7 @@ the real material activation hook; existing soil-effects and visual-pass tests
 cover cadence, resource reuse and quality restoration. Appearance remains a
 human Forward+ check under `validation-budget.md`.
 
-## Rigid fill attachment and forward tilt
+## Rigid fill attachment and surface orientation
 
 ### Scope / trigger
 Contained fill must move with the rendered bucket, including between physics
@@ -85,7 +85,9 @@ samples. A 30 Hz soil snapshot must never throttle rigid attachment transforms.
   shares the validated local proxy transform with world sampling.
 - `MotionPresentation.model_replacing` fires before the candidate becomes active,
   including candidates whose mapping validation fails.
-- Optional profile `surface_forward_tilt_degrees` defaults to 0; SY135 starts at 6.
+- Optional `body_opening_rim_cavity_local` contains four measured body mouth
+  corners, excluding teeth. SY135 uses these to define its free-surface plane;
+  profiles without them retain the existing deterministic mound relief.
 
 ### Contracts
 SoilEffects owns the fill resource but parents the node to the active cavity
@@ -97,10 +99,20 @@ candidates also leave it parked. Mismatched-model snapshots hide fill. Effects
 teardown frees its externally parented node; model-first teardown guards freed
 references and preserves ArrayMesh reuse. Only isolated consumers without a
 presentation use explicit world poses; losing a bound presentation fails closed.
-Forward cavity -Z receives tan(angle)*(z_mid-z) in relief. Normals, volume
-inversion and mesh share it. Reserve abs(tan(angle))*z_span/2 below the prior
-full level for dry-rim closure. Do not tilt the lining or imported transforms.
-Visual full volume may change; ledger capacity does not. SY205 keeps zero tilt.
+SY135 uses unchanged-source bucket vertices 60/64/68/71: the body cutting lip
+and opposite rim. Tooth tips 74/83 are excluded. The resulting cavity-local
+outward normal is (0,-0.8046611205,0.5937343524), with 36.422459 degrees of
+inclination from cavity XZ. The semantic opening proxy is not the visual rim.
+Derive the plane equation from these corners; normals, volume inversion and
+mesh use the same slope. Full stock sits 65 mm inside this plane along its
+normal. Stock changes plane offset, not orientation. Preserve measured lining
+heights and attachment transforms; synthetic dry/missing-ray profile samples
+sit 40 mm outside the body mouth plane at each sample's Z to close the solid.
+Only those synthetic samples change from the old constant -0.04 boundary.
+The earlier arbitrary 6-degree tilt and proxy-parallel plane were superseded;
+their runtime options and tests are removed. SY135 retains texture/color soil
+detail on a planar top. SY205 retains its existing relief and profile bytes.
+Visual full volume may change; ledger capacity does not.
 
 ### Validation / error matrix
 | Condition | Expected |
@@ -121,8 +133,9 @@ Bad: increasing poll Hz or adding lerp to hide independent pose sampling.
 `bucket_fill_follow_test.gd`: two real models, between-tick ancestor/bucket
 motion without fresh snapshots, old model/world snapshots, unchanged rebuild
 count, reset/refill, failed candidate recovery and both teardown orders.
-`bucket_fill_surface_test.gd`: forward trend, rim cap, contact, closure,
-monotonic growth, determinism and zero SY205 slope.
+`bucket_fill_surface_test.gd`: SY135 coplanarity and body-mouth normal alignment,
+imported rim anchors (2 mm import tolerance), rim clearance, lining contact,
+closure, monotonic growth, determinism and unchanged SY205 relief.
 `model_switch_test.gd`: proxy-transform refactor retains frame parity.
 
 ### Wrong vs correct

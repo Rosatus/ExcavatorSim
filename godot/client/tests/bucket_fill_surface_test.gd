@@ -31,14 +31,13 @@ func _check_model(model: String) -> bool:
 	var surface := FillSurface.new()
 	if not surface.configure(model, Vector3.ONE) or not surface.build_arrays(0.0).is_empty():
 		return _fail("%s profile initialization/empty fill failed" % model)
-	# The front/rear samples cancel symmetric mound relief; the deterministic
-	# ripple can contribute at most 18 mm across the pair.
-	var front_relief: float = surface._surface_relief(0.0, -0.25)
-	var rear_relief: float = surface._surface_relief(0.0, 0.40)
-	if model == "sy135" and front_relief - rear_relief < 0.045:
-		return _fail("SY135 free surface does not advance toward the cutting edge")
-	if model == "sy205" and not is_zero_approx(surface._forward_slope):
-		return _fail("SY135 tilt leaked into SY205")
+	if model == "sy205" and surface._has_body_opening:
+		return _fail("SY135 body opening leaked into SY205")
+	# Independent source-geometry mouth corners, not the semantic opening proxy
+	# or tooth tips. The imported-mesh check below verifies these anchors too.
+	var body_lip := Vector3(0.456849992, -0.542064007, -0.307206563)
+	var body_rear := Vector3(-0.456849992, 0.036077282, 0.476321989)
+	var opening_normal := Vector3.RIGHT.cross(body_rear - body_lip).normalized()
 	var previous_volume := 0.0
 	var volumes: Array[float] = []
 	for ratio in [0.005, 0.05, 0.25, 0.5, 0.75, 1.0]:
@@ -48,9 +47,11 @@ func _check_model(model: String) -> bool:
 		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 		var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
 		for vertex in vertices:
-			if vertex.y * float(profile["growth_direction_y"]) > float(profile["rim_height"]) + 0.00001:
+			var crossed_rim := opening_normal.dot(vertex - body_lip) > -0.06499 if model == "sy135" else vertex.y * float(profile["growth_direction_y"]) > float(profile["rim_height"]) + 0.00001
+			if crossed_rim:
 				return _fail("%s fill crossed the dry rim at %.3f stock" % [model, ratio])
 		var volume := 0.0
+		var top_height := NAN
 		var edges: Dictionary = {}
 		for index in range(0, vertices.size(), 3):
 			var a := vertices[index]
@@ -61,6 +62,14 @@ func _check_model(model: String) -> bool:
 				return _fail("%s emitted invalid/degenerate geometry" % model)
 			if face_normal.normalized().dot(normals[index] + normals[index + 1] + normals[index + 2]) <= 0.0:
 				return _fail("%s winding and lighting normals disagree" % model)
+			if model == "sy135" and face_normal.y * float(profile["growth_direction_y"]) > 0.0:
+				if is_nan(top_height):
+					top_height = opening_normal.dot(a)
+				for point in [a, b, c]:
+					if absf(opening_normal.dot(point) - top_height) > 0.00001:
+						return _fail("SY135 soil top is not one plane")
+				if face_normal.normalized().dot(opening_normal) < 0.9999:
+					return _fail("SY135 soil plane is not parallel to the bucket opening")
 			volume += a.dot(b.cross(c)) / 6.0
 			for edge in [[a, b], [b, c], [c, a]]:
 				var key_a := _point_key(edge[0])
@@ -120,6 +129,17 @@ func _check_imported_contact(mesh_node: MeshInstance3D, contract: Dictionary, pr
 	var arrays := mesh_node.mesh.surface_get_arrays(0)
 	var positions: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+	if profile["model_id"] == "sy135":
+		var rim: Array = profile["body_opening_rim_cavity_local"]
+		for corner in 4:
+			var raw: Array = rim[corner]
+			var expected := Vector3(raw[0], raw[1], raw[2])
+			# Godot may reorder/weld source vertices during import.
+			var nearest := INF
+			for position in positions:
+				nearest = minf(nearest, (mesh_to_cavity * position).distance_to(expected))
+			if nearest > 0.002:
+				return _fail("SY135 opening anchor no longer matches the imported body rim: %s m" % nearest)
 	var direction := float(profile["growth_direction_y"])
 	var samples := 0
 	# Independently intersect the imported triangles, not the baked JSON mesh.
