@@ -418,12 +418,12 @@ func controls_visible_status(scene: Node3D) -> Dictionary:
 	var ui := scene.get_node_or_null("OperatorUI") as MotionOperatorUI
 	if ui == null:
 		return {"achieved": false, "finding": "production operator UI is unavailable"}
-	var guide := ui.get_node_or_null("GuidePanel") as Control
-	var hint := ui.get_node_or_null("StatusPanel/Margin/VBox/ControlHint") as Label
+	var guide := ui.get_control_for_test("controls_page") as Control
+	var hint := ui.get_control_for_test("control_hint") as Label
 	ui.show_control_guide()
 	await scene.get_tree().process_frame
 	var copy := _visible_label_copy(ui)
-	var required := ["WASD", "IJKL", "R/F", "Y/H", "Tracks", "boom", "bucket", "Camera", "F8"]
+	var required := ["WASD", "IJKL", "R/F", "Y/H", "履带", "大臂", "铲斗", "视角", "F8"]
 	var missing: Array[String] = []
 	for token in required:
 		if token not in copy:

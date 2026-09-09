@@ -168,7 +168,7 @@ func _check_quality_clamp(camera: CameraRig) -> void:
 
 func _check_hud_integration(camera: CameraRig, ui: MotionOperatorUI) -> void:
 	camera.set_mode(CameraRig.MODE_WORK_TOOL)
-	var selector := ui.get_node("StatusPanel/Margin/VBox/CameraRow/Selector") as OptionButton
+	var selector := ui.get_control_for_test("camera_selector") as OptionButton
 	if String(selector.get_item_metadata(selector.selected)) != CameraRig.MODE_WORK_TOOL:
 		_fail("HUD did not report the active work-tool camera mode")
 	selector.select(0)

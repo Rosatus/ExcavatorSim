@@ -27,8 +27,8 @@ func _run() -> void:
 	else:
 		if client.connection_state != MotionClient.STATE_DISCONNECTED:
 			_fail("offline startup attempted a transport connection")
-		if session.lifecycle != ProductSession.LIFECYCLE_STOPPED:
-			_fail("offline startup did not begin stopped")
+		if session.lifecycle != ProductSession.LIFECYCLE_RUNNING:
+			_fail("offline product startup did not auto-start")
 		if presentation.get_active_model_id() != "sy205":
 			_fail("offline startup did not activate SY205")
 		if client.get_equipment_model_id() != "sy205":

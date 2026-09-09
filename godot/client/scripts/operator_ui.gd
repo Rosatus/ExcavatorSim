@@ -1,6 +1,9 @@
 class_name MotionOperatorUI
 extends CanvasLayer
 
+const MenuLayout := preload("res://scripts/game_menu_layout.gd")
+const GameSkin := preload("res://scripts/game_ui_theme.gd")
+
 const UIStrings := preload("res://scripts/operator_ui_strings.gd")
 const CONFIG_PATH := "user://operator_ui.cfg"
 const CONFIG_SECTION := "onboarding"
@@ -30,7 +33,16 @@ var _awaiting_model_id := ""
 var _awaiting_generation := -1
 var _soil_generation_key := ""
 var _current_fill_ratio := 0.0
-var _panel_collapsed := false
+var _panel_collapsed := true
+var _menu: Dictionary = {}
+var _menu_owns_pause := false
+var _resume_after_menu := false
+var _menu_refresh_elapsed := 0.0
+var _menu_visual_time := 0.0
+var _page_tween: Tween
+var _saved_mouse_mode := Input.MOUSE_MODE_VISIBLE
+var _hud: ControlInputHUD
+var _menu_tween: Tween
 var _quality_before_test := "balanced"
 var _ignore_quality_toggle := false
 
@@ -67,11 +79,7 @@ var _ignore_quality_toggle := false
 const GATEWAY_CONFIG_PATH := "user://ict_config.cfg"
 @onready var _bucket_volume_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/BucketVolume
 @onready var _advanced_panel: VBoxContainer = $StatusPanel/Margin/VBox/AdvancedPanel
-@onready var _start_button: Button = $StatusPanel/Margin/VBox/Actions/Start
-@onready var _pause_button: Button = $StatusPanel/Margin/VBox/Actions/Pause
 @onready var _reset_button: Button = $StatusPanel/Margin/VBox/Actions/Reset
-@onready var _guide_button: Button = $StatusPanel/Margin/VBox/Tools/Guide
-@onready var _advanced_button: CheckButton = $StatusPanel/Margin/VBox/Tools/Advanced
 @onready var _mute_audio_button: CheckButton = $StatusPanel/Margin/VBox/Tools/MuteAudio
 @onready var _test_graphics_button: CheckButton = $StatusPanel/Margin/VBox/Tools/TestGraphics
 @onready var _bucket_passthrough_button: CheckButton = $StatusPanel/Margin/VBox/Tools/BucketPassthrough
@@ -93,15 +101,15 @@ func _ready() -> void:
 	_camera = get_node_or_null(camera_path) as CameraRig
 	_feedback = get_node_or_null(feedback_path) as MachineFeedback
 	_visual_quality = get_node_or_null(visual_quality_path) as VisualQualityController
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	_confirmation.theme = GameSkin.create()
+	_confirmation.ok_button_text = "确认"
+	_confirmation.cancel_button_text = "取消"
 	_apply_static_copy()
 	_configure_model_selector()
 	_configure_camera_selector()
 	_panel_toggle_button.pressed.connect(_on_panel_toggle_pressed)
-	_start_button.pressed.connect(_on_start_pressed)
-	_pause_button.pressed.connect(_on_pause_pressed)
 	_reset_button.pressed.connect(_on_reset_pressed)
-	_guide_button.pressed.connect(show_control_guide)
-	_advanced_button.toggled.connect(_on_advanced_toggled)
 	_mute_audio_button.toggled.connect(_on_audio_muted)
 	_test_graphics_button.toggled.connect(_on_test_graphics_toggled)
 	_bucket_passthrough_button.toggled.connect(_on_bucket_passthrough_toggled)
@@ -113,6 +121,7 @@ func _ready() -> void:
 	_load_gateway_config()
 	_guide_close_button.pressed.connect(_on_guide_closed)
 	_reset_view_button.pressed.connect(_on_reset_view_pressed)
+	_confirmation.window_input.connect(_on_confirmation_input)
 	_confirmation.confirmed.connect(_on_destructive_confirmed)
 	_confirmation.canceled.connect(_on_destructive_canceled)
 	if _excavation_world != null:
@@ -132,10 +141,19 @@ func _ready() -> void:
 	var can_bridge := _can_bridge()
 	if can_bridge != null and can_bridge.has_signal("ict_link_status_changed"):
 		can_bridge.connect("ict_link_status_changed", _on_pc001_link_status_changed)
-	_advanced_panel.visible = false
-	_set_panel_collapsed(false)
+	_menu = MenuLayout.build(self)
+	_hud = $ControlInputHUD as ControlInputHUD
+	_advanced_panel.visible = true
+	(_menu["resume"] as Button).pressed.connect(_on_panel_toggle_pressed)
+	(_menu["tabs"] as TabContainer).tab_changed.connect(_on_menu_tab_changed)
+	(_menu["tabs"] as TabContainer).get_tab_bar().focus_mode = Control.FOCUS_ALL
+	get_viewport().size_changed.connect(_layout_menu)
+	(_menu["hardware"] as Control).resized.connect(_layout_menu)
+	_layout_menu()
+	_set_panel_collapsed(true)
 	_sync_test_graphics_toggle()
-	_guide_panel.visible = not _guide_was_dismissed()
+	_guide_panel.visible = false
+	call_deferred("_start_product_gameplay")
 	_refresh_prompt_copy()
 	_refresh()
 	_refresh_model_selector()
@@ -144,11 +162,7 @@ func _ready() -> void:
 func _apply_static_copy() -> void:
 	_title_label.text = UIStrings.TITLE
 	_automatic_soil_hint.text = UIStrings.SOIL_AUTOMATIC_HINT
-	_start_button.text = UIStrings.BUTTON_START
-	_pause_button.text = UIStrings.BUTTON_PAUSE
 	_reset_button.text = UIStrings.BUTTON_RESET
-	_guide_button.text = UIStrings.BUTTON_GUIDE
-	_advanced_button.text = UIStrings.BUTTON_ADVANCED
 	_mute_audio_button.text = UIStrings.BUTTON_MUTE_AUDIO
 	_test_graphics_button.text = UIStrings.BUTTON_TEST_GRAPHICS
 	_test_graphics_button.tooltip_text = "Use an untextured black/white terrain grid and hide site dressing."
@@ -160,16 +174,137 @@ func _apply_static_copy() -> void:
 	_guide_recovery_label.text = UIStrings.GUIDE_RECOVERY
 	_guide_close_button.text = UIStrings.BUTTON_CLOSE
 	_reset_view_button.text = UIStrings.BUTTON_RESET_VIEW
-	_panel_toggle_button.tooltip_text = "Hide or restore the operator control panel"
+	_panel_toggle_button.tooltip_text = "Esc / 手柄菜单键：打开作业菜单"
 
 
-func _process(_delta: float) -> void:
-	if Input.is_action_just_pressed("motion_start"):
+func _start_product_gameplay() -> void:
+	# Product entry point only; low-level session reset/compatibility stays stopped.
+	if _is_local_authority() and _panel_collapsed and _product_session != null and _product_session.last_error.is_empty():
 		_on_start_pressed()
-	if Input.is_action_just_pressed("motion_pause"):
-		_on_pause_pressed()
-	if Input.is_action_just_pressed("motion_reset"):
+
+
+func _process(delta: float) -> void:
+	if _panel_collapsed:
+		return
+	_menu_visual_time += delta
+	(_menu["atmosphere"] as ShaderMaterial).set_shader_parameter("ui_time", _menu_visual_time)
+	_menu_refresh_elapsed += delta
+	if _menu_refresh_elapsed >= 0.2:
+		_menu_refresh_elapsed = 0.0
+		_refresh_can_status()
+
+
+func get_control_for_test(id: String) -> Control:
+	# Stable semantic seam; the visual hierarchy may evolve independently.
+	return {
+		"bucket_passthrough": _bucket_passthrough_button,
+		"camera_selector": _camera_selector,
+		"gateway_restart": _gateway_button,
+		"gateway_port": _gateway_port_edit,
+		"completion": _completion_label,
+		"ict_indicator": _pc001_handshake_lamp.get_parent(),
+		"ict_lamp": _pc001_handshake_lamp,
+		"ict_label": _pc001_handshake_label,
+		"cutting_diagnostics": _cutting_diagnostics_button,
+		"control_hint": _control_hint,
+		"controls_page": (_menu["tabs"] as TabContainer).get_tab_control(1),
+	}.get(id) as Control
+
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventJoypadButton or (event is InputEventJoypadMotion and absf(event.axis_value) > 0.3):
+		_set_prompt_mode("gamepad")
+	elif event is InputEventKey or event is InputEventMouseButton:
+		_set_prompt_mode("keyboard")
+	var toggle: bool = (event is InputEventKey and event.keycode == KEY_ESCAPE and event.pressed and not event.echo) or (event is InputEventJoypadButton and event.button_index == JOY_BUTTON_START and event.pressed)
+	var back: bool = event is InputEventJoypadButton and event.button_index == JOY_BUTTON_B and event.pressed
+	if toggle or (back and not _panel_collapsed):
+		get_viewport().set_input_as_handled()
+		if _confirmation.visible:
+			_confirmation.hide()
+			_on_destructive_canceled()
+		else:
+			_on_panel_toggle_pressed()
+	elif not _panel_collapsed and event is InputEventJoypadButton and event.pressed and event.button_index in [JOY_BUTTON_LEFT_SHOULDER, JOY_BUTTON_RIGHT_SHOULDER]:
+		var tabs := _menu["tabs"] as TabContainer
+		tabs.current_tab = wrapi(tabs.current_tab + (-1 if event.button_index == JOY_BUTTON_LEFT_SHOULDER else 1), 0, tabs.get_tab_count())
+		get_viewport().set_input_as_handled()
+	elif not _panel_collapsed and not _confirmation.visible and _menu_navigation_direction(event) != 0:
+		_move_menu_focus(_menu_navigation_direction(event))
+		get_viewport().set_input_as_handled()
+	elif event is InputEventKey and event.keycode == KEY_F8 and event.pressed and not event.echo:
+		get_viewport().set_input_as_handled()
 		_on_reset_pressed()
+
+
+func _menu_navigation_direction(event: InputEvent) -> int:
+	if event is InputEventJoypadButton and event.pressed:
+		if event.button_index == JOY_BUTTON_DPAD_DOWN:
+			return 1
+		if event.button_index == JOY_BUTTON_DPAD_UP:
+			return -1
+	if event is InputEventKey and event.pressed:
+		if event.keycode == KEY_DOWN or (event.keycode == KEY_TAB and not event.shift_pressed):
+			return 1
+		if event.keycode == KEY_UP or (event.keycode == KEY_TAB and event.shift_pressed):
+			return -1
+	return 0
+
+
+func _move_menu_focus(direction: int) -> void:
+	var tabs := _menu["tabs"] as TabContainer
+	var controls: Array[Control] = [_menu["resume"] as Control, tabs.get_tab_bar()]
+	_collect_menu_focus(tabs.get_current_tab_control(), controls)
+	var index := controls.find(get_viewport().gui_get_focus_owner())
+	controls[wrapi(index + direction, 0, controls.size())].grab_focus()
+
+
+func _collect_menu_focus(node: Node, result: Array[Control]) -> void:
+	if node is Control and not (node as Control).is_visible_in_tree():
+		return
+	if node is BaseButton and not (node as BaseButton).disabled:
+		result.append(node as Control)
+	elif node is LineEdit:
+		result.append(node as Control)
+	for child in node.get_children():
+		_collect_menu_focus(child, result)
+
+
+func _layout_menu() -> void:
+	if _menu.is_empty():
+		return
+	var viewport_size := get_viewport().get_visible_rect().size
+	(_menu["atmosphere"] as ShaderMaterial).set_shader_parameter("aspect_ratio", viewport_size.x / maxf(viewport_size.y, 1.0))
+	var dock_width := (_menu["hardware"] as Control).size.x
+	var available_left := dock_width + 56.0
+	var extent := Vector2(clampf(viewport_size.x - available_left - 28.0, 1.0, 760.0), clampf(viewport_size.y - 48.0, 1.0, 660.0))
+	var center_shift := available_left / 2.0 - 14.0
+	_status_panel.offset_left = center_shift - extent.x / 2.0
+	_status_panel.offset_right = center_shift + extent.x / 2.0
+	_status_panel.offset_top = -extent.y / 2.0
+	_status_panel.offset_bottom = extent.y / 2.0
+	_panel_toggle_button.position = Vector2(28, viewport_size.y - 70)
+	_panel_toggle_button.size = Vector2(160, 42)
+
+
+func _on_menu_tab_changed(_index: int) -> void:
+	if _page_tween != null:
+		_page_tween.kill()
+	var tabs := _menu["tabs"] as TabContainer
+	for index in range(tabs.get_tab_count()):
+		tabs.get_tab_control(index).modulate.a = 1.0
+	var page := tabs.get_current_tab_control()
+	page.modulate.a = 0.65
+	_page_tween = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_page_tween.tween_property(page, "modulate:a", 1.0, 0.16)
+	# The tab bar keeps controller focus; Down enters the selected page.
+	(_menu["tabs"] as TabContainer).get_tab_bar().grab_focus()
+
+
+func _exit_tree() -> void:
+	if _menu_owns_pause and get_tree() != null:
+		get_tree().paused = false
+		Input.mouse_mode = _saved_mouse_mode
 
 
 func _on_test_graphics_toggled(enabled: bool) -> void:
@@ -247,13 +382,6 @@ func is_test_graphics_enabled_for_test() -> bool:
 	return _test_graphics_button.button_pressed
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventJoypadButton or event is InputEventJoypadMotion:
-		_set_prompt_mode("gamepad")
-	elif event is InputEventKey or event is InputEventMouse:
-		_set_prompt_mode("keyboard")
-
-
 func _configure_model_selector() -> void:
 	_model_selector.clear()
 	_model_selector.add_item(UIStrings.model_name("sy205"))
@@ -315,13 +443,15 @@ func _on_pause_pressed() -> void:
 
 
 func _on_reset_pressed() -> void:
+	_set_panel_collapsed(false)
 	if _confirmation.visible:
 		return
 	_pending_action = "reset"
 	_pending_model_id = ""
-	_confirmation.title = "Reset work session"
+	_confirmation.title = "重新开始作业"
 	_confirmation.dialog_text = UIStrings.reset_confirmation()
 	_confirmation.popup_centered()
+	_confirmation.get_cancel_button().grab_focus()
 
 
 func _on_model_selected(index: int) -> void:
@@ -332,9 +462,10 @@ func _on_model_selected(index: int) -> void:
 		return
 	_pending_action = "model_switch"
 	_pending_model_id = model_id
-	_confirmation.title = "Change excavator model"
+	_confirmation.title = "切换挖掘机"
 	_confirmation.dialog_text = UIStrings.model_confirmation(model_id)
 	_confirmation.popup_centered()
+	_confirmation.get_cancel_button().grab_focus()
 
 
 func _on_destructive_confirmed() -> void:
@@ -359,20 +490,32 @@ func _on_destructive_confirmed() -> void:
 			accepted = false
 	_pending_action = ""
 	_pending_model_id = ""
+	if accepted:
+		_resume_after_menu = true
+		_set_panel_collapsed(true)
 	if not accepted:
 		_completion_label.text = "Action could not be completed. Open Advanced for details."
 		_awaiting_action = ""
 	_refresh()
 
 
+func _on_confirmation_input(event: InputEvent) -> void:
+	var back: bool = event is InputEventJoypadButton and event.pressed and event.button_index in [JOY_BUTTON_B, JOY_BUTTON_START]
+	if back:
+		_confirmation.set_input_as_handled()
+		_confirmation.hide()
+		_on_destructive_canceled()
+
+
 func _on_destructive_canceled() -> void:
 	_pending_action = ""
 	_pending_model_id = ""
 	_refresh_model_selector()
+	(_menu["resume"] as Button).grab_focus()
 
 
 func _on_advanced_toggled(pressed: bool) -> void:
-	_advanced_panel.visible = pressed
+	(_menu["tabs"] as TabContainer).current_tab = 2 if pressed else 0
 
 
 func _on_can_output_pressed() -> void:
@@ -496,7 +639,7 @@ func _refresh_can_status() -> void:
 				_can_status_label.text = "CAN Gateway: failed (%s)" % gateway_error
 			else:
 				_can_status_label.text = "CAN Gateway: offline"
-			_can_output_button.text = "开始记录 CAN（离线，点击重试）"
+			_can_output_button.text = "开始记录 CAN"
 			_can_output_button.button_pressed = false
 			_timed_can_button.disabled = true
 		1:
@@ -581,12 +724,50 @@ func _on_panel_toggle_pressed() -> void:
 
 
 func _set_panel_collapsed(collapsed: bool) -> void:
+	var changed := collapsed != _panel_collapsed
 	_panel_collapsed = collapsed
-	_status_panel.visible = not collapsed
-	_panel_toggle_button.text = UIStrings.BUTTON_EXPAND_PANEL if collapsed else UIStrings.BUTTON_COLLAPSE_PANEL
-	_panel_toggle_button.tooltip_text = "Restore the operator control panel" if collapsed else "Hide the operator control panel"
-	_panel_toggle_button.position = Vector2(16.0, 16.0) if collapsed else Vector2(382.0, 22.0)
-	_panel_toggle_button.size = Vector2(110.0, 32.0) if collapsed else Vector2(94.0, 28.0)
+	if _menu.is_empty():
+		return
+	(_menu["root"] as Control).visible = not collapsed
+	_hud.visible = collapsed
+	_panel_toggle_button.visible = collapsed
+	_panel_toggle_button.text = "Esc  /  菜单"
+	_panel_toggle_button.focus_mode = Control.FOCUS_NONE
+	_panel_toggle_button.theme = GameSkin.create()
+	if not changed:
+		return
+	if _camera != null:
+		_camera.set_menu_input_blocked(not collapsed)
+	if not collapsed:
+		_saved_mouse_mode = Input.mouse_mode
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		_resume_after_menu = String(_authority_status().get("lifecycle", "stopped")) == "running" and not get_tree().paused
+		if _resume_after_menu:
+			_on_pause_pressed()
+		if _motion_client != null:
+			_motion_client.set_focused(false)
+		_menu_owns_pause = not get_tree().paused
+		get_tree().paused = true
+		(_menu["resume"] as Button).grab_focus()
+		if _menu_tween != null:
+			_menu_tween.kill()
+		(_menu["root"] as Control).modulate.a = 0.0
+		_menu_tween = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+		_menu_tween.tween_property(_menu["root"], "modulate:a", 1.0, 0.22).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	else:
+		_confirmation.hide()
+		if _menu_owns_pause:
+			get_tree().paused = false
+		_menu_owns_pause = false
+		Input.mouse_mode = _saved_mouse_mode
+		if _motion_client != null:
+			_motion_client.set_focused(get_window().has_focus())
+		if _resume_after_menu:
+			_on_start_pressed()
+		_resume_after_menu = false
+		var focus := get_viewport().gui_get_focus_owner()
+		if focus != null:
+			focus.release_focus()
 
 
 func set_panel_collapsed_for_test(collapsed: bool) -> void:
@@ -603,11 +784,12 @@ func _on_audio_muted(pressed: bool) -> void:
 
 
 func show_control_guide() -> void:
-	_guide_panel.visible = true
+	_set_panel_collapsed(false)
+	(_menu["tabs"] as TabContainer).current_tab = 1
 
 
 func _on_guide_closed() -> void:
-	_guide_panel.visible = false
+	(_menu["tabs"] as TabContainer).current_tab = 0
 	var config := ConfigFile.new()
 	config.load(CONFIG_PATH)
 	config.set_value(CONFIG_SECTION, CONFIG_GUIDE_DISMISSED, true)
@@ -785,7 +967,7 @@ func _refresh_soil() -> void:
 	var operation := _derive_operation(status, fill_ratio)
 	_operation_label.text = UIStrings.operation_text(operation)
 	_operation_label.add_theme_color_override("font_color", _operation_color(operation))
-	_bucket_status_label.text = "Bucket %s   %d%%" % [UIStrings.fill_text(fill_ratio), roundi(fill_ratio * 100.0)]
+	_bucket_status_label.text = "斗载   %d%%     /     %.2f m³" % [roundi(fill_ratio * 100.0), volume]
 	_bucket_fill.value = fill_ratio * 100.0
 	var dig := _excavation_world.get_dig_diagnostics()
 	var capacity_suffix := " (unlimited collection test)" if bool(status.get("voxel_unlimited_bucket_for_testing", false)) else ""
@@ -827,6 +1009,7 @@ func _refresh_warning(status: Dictionary, lifecycle: String, connection: String)
 		if not bool(chassis_status.get("neutral_armed", true)) or not bool(chassis_status.get("track_neutral_armed", true)):
 			warnings.append(UIStrings.WARNING_NEUTRAL)
 	_warning_label.text = UIStrings.WARNING_NONE if warnings.is_empty() else " • ".join(PackedStringArray(warnings))
+	_warning_label.visible = not warnings.is_empty()
 	_warning_label.add_theme_color_override("font_color", Color("73d99b") if warnings.is_empty() else Color("ffc45b"))
 
 
@@ -836,10 +1019,10 @@ func _maybe_complete_action(status: Dictionary) -> void:
 	var generation := int(status.get("generation", -1))
 	var model_id := String(status.get("active_model_id", ""))
 	if _awaiting_action == "reset" and generation > _awaiting_generation:
-		_completion_label.text = "Work session reset complete. Return controls to neutral, then press Start."
+		_completion_label.text = "Work session reset complete. Return controls to neutral to continue."
 		_awaiting_action = ""
 	elif _awaiting_action == "model_switch" and model_id == _awaiting_model_id and generation > _awaiting_generation:
-		_completion_label.text = "%s ready. Return controls to neutral, then press Start." % UIStrings.model_name(model_id)
+		_completion_label.text = "%s ready. Return controls to neutral to continue." % UIStrings.model_name(model_id)
 		_awaiting_action = ""
 
 
@@ -899,8 +1082,10 @@ func _operation_color(value: String) -> Color:
 
 
 func _refresh_prompt_copy() -> void:
+	if _hud != null:
+		_hud.set_prompt_mode(_prompt_mode)
 	_control_hint.text = UIStrings.CONTROL_HINT_GAMEPAD if _prompt_mode == "gamepad" else UIStrings.CONTROL_HINT_KEYBOARD
-	_guide_device_label.text = "Current input: GAMEPAD" if _prompt_mode == "gamepad" else "Current input: KEYBOARD + MOUSE"
+	_guide_device_label.text = "当前输入：手柄" if _prompt_mode == "gamepad" else "当前输入：键盘与鼠标"
 	_guide_controls_label.text = UIStrings.GUIDE_GAMEPAD if _prompt_mode == "gamepad" else UIStrings.GUIDE_KEYBOARD
 
 

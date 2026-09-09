@@ -28,7 +28,7 @@ func _run() -> void:
 	var terrain_collider := scene.get_node_or_null("TerrainRoot/TerrainCollider") as TerrainCollider
 	var effects := scene.get_node_or_null("SoilEffects") as SoilEffects
 	var operator_ui := scene.get_node_or_null("OperatorUI") as MotionOperatorUI
-	var mode_button := scene.get_node_or_null("OperatorUI/StatusPanel/Margin/VBox/Tools/BucketPassthrough") as CheckButton
+	var mode_button := (scene.get_node("OperatorUI") as MotionOperatorUI).get_control_for_test("bucket_passthrough") as CheckButton
 	if (
 		session == null
 		or chassis == null

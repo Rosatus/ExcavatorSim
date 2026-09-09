@@ -359,7 +359,7 @@ theme_override_constants/separation = 7
 [node name="Title" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=1505076524]
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
-text = "EXCAVATOR CONTROL"
+text = "作业菜单"
 
 [node name="Header" type="HBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=1020691274]
 layout_mode = 2
@@ -425,7 +425,7 @@ text = "Reset View  C"
 custom_minimum_size = Vector2(0, 36)
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.8, 0.35, 1)
-text = "Machine stopped — review the controls, then press Start."
+text = "设备准备中"
 autowrap_mode = 2
 
 [node name="Completion" type="Label" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=1109058595]
@@ -437,16 +437,6 @@ autowrap_mode = 2
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="Start" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Actions" unique_id=412998898]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Start  F6"
-
-[node name="Pause" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Actions" unique_id=170636265]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Pause  F7"
-
 [node name="Reset" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Actions" unique_id=48827271]
 layout_mode = 2
 size_flags_horizontal = 3
@@ -455,16 +445,6 @@ text = "Reset  F8"
 [node name="Tools" type="HBoxContainer" parent="OperatorUI/StatusPanel/Margin/VBox" unique_id=616826466]
 layout_mode = 2
 theme_override_constants/separation = 6
-
-[node name="Guide" type="Button" parent="OperatorUI/StatusPanel/Margin/VBox/Tools" unique_id=922858547]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Controls"
-
-[node name="Advanced" type="CheckButton" parent="OperatorUI/StatusPanel/Margin/VBox/Tools" unique_id=1199970035]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Advanced"
 
 [node name="MuteAudio" type="CheckButton" parent="OperatorUI/StatusPanel/Margin/VBox/Tools" unique_id=1921746845]
 layout_mode = 2

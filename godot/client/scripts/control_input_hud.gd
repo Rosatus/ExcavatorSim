@@ -1,118 +1,117 @@
 class_name ControlInputHUD
 extends PanelContainer
 
-const ACTION_TILE_PATHS := {
-	"operator_arm_extend": NodePath("Margin/VBox/Sticks/LeftStick/Grid/W"),
-	"operator_swing_left": NodePath("Margin/VBox/Sticks/LeftStick/Grid/A"),
-	"operator_arm_retract": NodePath("Margin/VBox/Sticks/LeftStick/Grid/S"),
-	"operator_swing_right": NodePath("Margin/VBox/Sticks/LeftStick/Grid/D"),
-	"operator_boom_lower": NodePath("Margin/VBox/Sticks/RightStick/Grid/I"),
-	"operator_bucket_curl": NodePath("Margin/VBox/Sticks/RightStick/Grid/J"),
-	"operator_boom_raise": NodePath("Margin/VBox/Sticks/RightStick/Grid/K"),
-	"operator_bucket_dump": NodePath("Margin/VBox/Sticks/RightStick/Grid/L"),
-	"track_left_forward": NodePath("Margin/VBox/Tracks/LeftTrack/Keys/R"),
-	"track_left_reverse": NodePath("Margin/VBox/Tracks/LeftTrack/Keys/F"),
-	"track_right_forward": NodePath("Margin/VBox/Tracks/RightTrack/Keys/Y"),
-	"track_right_reverse": NodePath("Margin/VBox/Tracks/RightTrack/Keys/H"),
-}
-const KEY_TILE_PATHS := {
-	KEY_W: NodePath("Margin/VBox/Sticks/LeftStick/Grid/W"),
-	KEY_A: NodePath("Margin/VBox/Sticks/LeftStick/Grid/A"),
-	KEY_S: NodePath("Margin/VBox/Sticks/LeftStick/Grid/S"),
-	KEY_D: NodePath("Margin/VBox/Sticks/LeftStick/Grid/D"),
-	KEY_I: NodePath("Margin/VBox/Sticks/RightStick/Grid/I"),
-	KEY_J: NodePath("Margin/VBox/Sticks/RightStick/Grid/J"),
-	KEY_K: NodePath("Margin/VBox/Sticks/RightStick/Grid/K"),
-	KEY_L: NodePath("Margin/VBox/Sticks/RightStick/Grid/L"),
-	KEY_R: NodePath("Margin/VBox/Tracks/LeftTrack/Keys/R"),
-	KEY_F: NodePath("Margin/VBox/Tracks/LeftTrack/Keys/F"),
-	KEY_Y: NodePath("Margin/VBox/Tracks/RightTrack/Keys/Y"),
-	KEY_H: NodePath("Margin/VBox/Tracks/RightTrack/Keys/H"),
-}
-
-const IDLE_BACKGROUND := Color(0.075, 0.105, 0.135, 0.88)
-const IDLE_BORDER := Color(0.25, 0.43, 0.55, 0.9)
-const IDLE_TEXT := Color(0.78, 0.85, 0.9, 1.0)
-const ACTIVE_BACKGROUND := Color(0.08, 0.55, 0.32, 0.96)
-const ACTIVE_BORDER := Color(0.42, 1.0, 0.68, 1.0)
-const ACTIVE_TEXT := Color(0.95, 1.0, 0.97, 1.0)
-
+const GameSkin := preload("res://scripts/game_ui_theme.gd")
+const GROUP_ACTIONS := [
+	["operator_swing_left", "operator_swing_right", "operator_arm_extend", "operator_arm_retract"],
+	["operator_bucket_curl", "operator_bucket_dump", "operator_boom_lower", "operator_boom_raise"],
+	["track_left_forward", "track_left_reverse", "track_right_forward", "track_right_reverse"],
+]
+const KEY_COPY := ["W", "A", "S", "D", "I", "J", "K", "L", "R", "F", "Y", "H"]
+const PAD_COPY := ["L ↑", "L ←", "L ↓", "L →", "R ↑", "R ←", "R ↓", "R →", "LT", "LB", "RT", "RB"]
+const ACTIONS := [
+	"operator_arm_extend", "operator_swing_left", "operator_arm_retract", "operator_swing_right",
+	"operator_boom_lower", "operator_bucket_curl", "operator_boom_raise", "operator_bucket_dump",
+	"track_left_forward", "track_left_reverse", "track_right_forward", "track_right_reverse",
+]
+var _prompt_mode := "keyboard"
+var _keys: Dictionary = {}
 var _tiles: Dictionary = {}
-var _idle_style: StyleBoxFlat
-var _active_style: StyleBoxFlat
-
+var _footer: Label
+var _idle: StyleBoxFlat
+var _pressed: StyleBoxFlat
 
 func _ready() -> void:
-	process_mode = Node.PROCESS_MODE_ALWAYS
-	_idle_style = _make_tile_style(IDLE_BACKGROUND, IDLE_BORDER)
-	_active_style = _make_tile_style(ACTIVE_BACKGROUND, ACTIVE_BORDER)
-	_set_mouse_ignore_recursive(self)
-	_refresh_action_tiles()
-	refresh_input_state_for_test()
+	theme = GameSkin.create()
+	add_theme_stylebox_override("panel", GameSkin.box(Color(0.10, 0.135, 0.155, 0.84), 10, 16))
+	_idle = GameSkin.box(Color("293137"), 5, 4)
+	_pressed = GameSkin.box(Color("69522d"), 5, 4)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 10)
+	add_child(column)
+	var title := _label("操纵辅助 · ISO", 12)
+	column.add_child(title)
+	var tracks := HBoxContainer.new()
+	tracks.name = "Tracks"
+	column.add_child(tracks)
+	for index in range(8, 12):
+		tracks.add_child(_tile(index, ["左前进", "左后退", "右前进", "右后退"][index - 8]))
+	var sticks := HBoxContainer.new()
+	sticks.name = "Sticks"
+	column.add_child(sticks)
+	for side in range(2):
+		var stick := VBoxContainer.new()
+		stick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		sticks.add_child(stick)
+		stick.add_child(_label("回转 / 小臂" if side == 0 else "大臂 / 铲斗", 13))
+		var grid := GridContainer.new()
+		grid.columns = 3
+		grid.add_theme_constant_override("h_separation", 4)
+		grid.add_theme_constant_override("v_separation", 4)
+		stick.add_child(grid)
+		for cell in range(9):
+			var direction: int = {1: 0, 3: 1, 7: 2, 5: 3}.get(cell, -1)
+			if direction >= 0:
+				grid.add_child(_tile(side * 4 + direction))
+			else:
+				var empty := _label("L" if side == 0 else "R", 12) if cell == 4 else Control.new()
+				empty.custom_minimum_size = Vector2(48, 32)
+				grid.add_child(empty)
+	_footer = _label("", 12)
+	column.add_child(_footer)
+	set_prompt_mode(_prompt_mode)
+	_ignore_mouse(self)
 
+func _tile(index: int, caption: String = "") -> PanelContainer:
+	var tile := PanelContainer.new()
+	tile.custom_minimum_size = Vector2(48, 32)
+	tile.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tile.add_theme_stylebox_override("panel", _idle)
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 2)
+	tile.add_child(content)
+	var key := _label("", 15)
+	key.add_theme_color_override("font_color", GameSkin.ACCENT)
+	content.add_child(key)
+	if not caption.is_empty():
+		content.add_child(_label(caption, 11))
+	_keys[ACTIONS[index]] = key
+	_tiles[ACTIONS[index]] = tile
+	return tile
+
+func _label(copy: String, font_size: int) -> Label:
+	var label := Label.new()
+	label.text = copy
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", font_size)
+	return label
+
+func set_prompt_mode(mode: String) -> void:
+	_prompt_mode = mode
+	if _keys.is_empty():
+		return
+	var copy := KEY_COPY if mode == "keyboard" else PAD_COPY
+	for index in range(ACTIONS.size()):
+		(_keys[ACTIONS[index]] as Label).text = copy[index]
+	_footer.text = "1–5 切换视角 · C 复位" if mode == "keyboard" else "十字键 切换视角 · R3 复位"
 
 func _process(_delta: float) -> void:
 	refresh_input_state_for_test()
 
-
 func refresh_input_state_for_test() -> void:
-	_refresh_action_tiles()
 	for action in _tiles:
 		var active := InputMap.has_action(action) and Input.is_action_pressed(action)
-		_set_tile_active(_tiles[action] as PanelContainer, active)
-
+		var tile := _tiles[action] as PanelContainer
+		if bool(tile.get_meta("active", not active)) != active:
+			tile.set_meta("active", active)
+			tile.add_theme_stylebox_override("panel", _pressed if active else _idle)
 
 func is_action_highlighted_for_test(action: String) -> bool:
-	var tile := _tiles.get(action) as PanelContainer
-	return tile != null and bool(tile.get_meta("input_active", false))
+	return _tiles.has(action) and bool((_tiles[action] as Control).get_meta("active", false))
 
-
-func get_action_tile_for_test(action: String) -> PanelContainer:
-	_refresh_action_tiles()
-	return _tiles.get(action) as PanelContainer
-
-
-func _refresh_action_tiles() -> void:
-	var next_tiles := {}
-	for action in ACTION_TILE_PATHS:
-		var tile_path := ACTION_TILE_PATHS[action] as NodePath
-		var tile := get_node_or_null(tile_path) as PanelContainer
-		if tile != null:
-			next_tiles[action] = tile
-	if next_tiles == _tiles:
-		return
-	for tile in _tiles.values():
-		_set_tile_active(tile as PanelContainer, false)
-	_tiles = next_tiles
-	for tile in _tiles.values():
-		_set_tile_active(tile as PanelContainer, false)
-
-
-func _set_tile_active(tile: PanelContainer, active: bool) -> void:
-	if bool(tile.get_meta("input_active", not active)) == active:
-		return
-	tile.set_meta("input_active", active)
-	tile.add_theme_stylebox_override("panel", _active_style if active else _idle_style)
-	var label := tile.get_child(0) as Label if tile.get_child_count() > 0 else null
-	if label != null:
-		label.add_theme_color_override("font_color", ACTIVE_TEXT if active else IDLE_TEXT)
-
-
-func _set_mouse_ignore_recursive(node: Node) -> void:
+func _ignore_mouse(node: Node) -> void:
 	if node is Control:
 		(node as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	for child in node.get_children():
-		_set_mouse_ignore_recursive(child)
-
-
-func _make_tile_style(background: Color, border: Color) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = background
-	style.border_color = border
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(5)
-	style.content_margin_left = 3.0
-	style.content_margin_top = 3.0
-	style.content_margin_right = 3.0
-	style.content_margin_bottom = 3.0
-	return style
+		_ignore_mouse(child)

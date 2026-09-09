@@ -208,12 +208,8 @@ func _run() -> void:
 			_check(await _wait_ict_handshake(bridge, true),
 				"accepted PC001 socket reaches the Godot heartbeat state")
 			await process_frame
-			var ict_status_label := scene.get_node_or_null(
-				"OperatorUI/StatusPanel/Margin/VBox/Tools/PC001HandshakeStatus/Label"
-			) as Label
-			var ict_status_lamp := scene.get_node_or_null(
-				"OperatorUI/StatusPanel/Margin/VBox/Tools/PC001HandshakeStatus/Lamp"
-			) as Panel
+			var ict_status_label := (scene.get_node("OperatorUI") as MotionOperatorUI).get_control_for_test("ict_label") as Label
+			var ict_status_lamp := (scene.get_node("OperatorUI") as MotionOperatorUI).get_control_for_test("ict_lamp") as Panel
 			_check(
 				ict_status_label != null and ict_status_label.text == "已握手"
 				and ict_status_lamp != null

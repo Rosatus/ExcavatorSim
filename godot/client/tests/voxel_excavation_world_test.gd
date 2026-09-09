@@ -48,7 +48,7 @@ func _run() -> void:
 	var soil_visual := excavation.get_soil_visual_snapshot()
 	_expect(not bool(selected.get("voxel_diagnostics_enabled", true)), "world diagnostics default off", failures)
 	_expect((voxel_status.get("phase_timings_usec", {}) as Dictionary).is_empty(), "default world status skips optional diagnostics", failures)
-	var diagnostics_button := scene.get_node("OperatorUI/StatusPanel/Margin/VBox/AdvancedPanel/CuttingDiagnostics") as CheckButton
+	var diagnostics_button := (scene.get_node("OperatorUI") as MotionOperatorUI).get_control_for_test("cutting_diagnostics") as CheckButton
 	_expect(not diagnostics_button.button_pressed, "Advanced diagnostic control defaults off", failures)
 	var material_before_toggle := excavation._voxel_authority.get_payload_snapshot()
 	var revision_before_toggle := excavation._voxel_authority.data_revision

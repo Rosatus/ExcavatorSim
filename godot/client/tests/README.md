@@ -88,3 +88,5 @@ cd E:\projects\ExcavatorSim
 pixi run backend-smoke
 pixi run verify
 ```
+
+Game menu and HUD: run `operator_ui_test.gd` and `control_input_hud_test.gd` for auto-entry, modal pause ownership, gamepad focus, confirmed reset and desktop viewport bounds. `camera_workflow_test.gd`, `ict_status_indicator_test.gd` and `gateway_restart_ui_test.gd` cover the relocated controls. Human acceptance covers visual clarity and gamepad feel.

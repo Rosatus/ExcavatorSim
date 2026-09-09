@@ -1,7 +1,6 @@
 extends SceneTree
 
 const MAIN_SCENE := "res://scenes/main.tscn"
-const INDICATOR_PATH := "OperatorUI/StatusPanel/Margin/VBox/Tools/PC001HandshakeStatus"
 
 var failures: Array[String] = []
 
@@ -22,9 +21,9 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 	var ui := scene.get_node_or_null("OperatorUI") as MotionOperatorUI
-	var indicator := scene.get_node_or_null(INDICATOR_PATH) as HBoxContainer
-	var lamp := scene.get_node_or_null(INDICATOR_PATH + "/Lamp") as Panel
-	var label := scene.get_node_or_null(INDICATOR_PATH + "/Label") as Label
+	var indicator := ui.get_control_for_test("ict_indicator") as HBoxContainer
+	var lamp := ui.get_control_for_test("ict_lamp") as Panel
+	var label := ui.get_control_for_test("ict_label") as Label
 	if ui == null or indicator == null or lamp == null or label == null:
 		_fail("PC001 handshake indicator nodes are missing beside the operator controls")
 	else:

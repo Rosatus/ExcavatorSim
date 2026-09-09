@@ -66,6 +66,7 @@ var _pitch := 0.3
 var _focus_height_m := 1.8
 var _mode_minimum_m := 3.0
 var _dragging := false
+var _menu_input_blocked := false
 var _initialized := false
 var _current_focus := Vector3.ZERO
 var _desired_position := Vector3.ZERO
@@ -104,7 +105,14 @@ func _process(delta: float) -> void:
 		_step_camera(delta, false)
 
 
+func set_menu_input_blocked(blocked: bool) -> void:
+	_menu_input_blocked = blocked
+	_dragging = false
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	if _menu_input_blocked:
+		return
 	for action in CAMERA_ACTIONS:
 		if event.is_action_pressed(action):
 			set_mode(String((CAMERA_ACTIONS[action] as Dictionary)["mode"]))

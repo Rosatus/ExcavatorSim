@@ -82,6 +82,8 @@ var _last_segment_path := ""
 
 
 func _ready() -> void:
+	# Gateway supervision remains responsive in the pause menu.
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	process_physics_priority = 110
 	if auto_spawn and DisplayServer.get_name() != "headless":
 		spawn_gateway()
@@ -110,6 +112,10 @@ func _physics_process(delta: float) -> void:
 	_service_gateway_lifecycle()
 	_expire_ict_handshake_if_stale()
 	_expire_ict_result_if_stale()
+	if get_tree().paused:
+		# Paused simulation must not publish repeated stale physical samples.
+		_accum = 0.0
+		return
 	_accum += delta
 	if _accum < 1.0 / EMIT_HZ:
 		return

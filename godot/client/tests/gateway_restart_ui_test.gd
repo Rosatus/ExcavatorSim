@@ -19,25 +19,19 @@ func _run() -> void:
 	if ui == null or bridge == null:
 		_fail("Gateway restart UI integration nodes are missing")
 	else:
-		var button := ui.get_node(
-			"StatusPanel/Margin/VBox/Tools/GatewayRestartButton"
-		) as Button
+		var button := ui.get_control_for_test("gateway_restart") as Button
 		if button.toggle_mode or button.disabled or button.text != "启动 Gateway":
 			_fail("offline Gateway control is not an enabled momentary start action")
 		var before_endpoint := bridge.get_desired_tcp_endpoint_for_test() as Dictionary
 		var before_pid := int(bridge.get_gateway_pid_for_test())
-		var port := ui.get_node(
-			"StatusPanel/Margin/VBox/AdvancedPanel/GatewayPort"
-		) as LineEdit
+		var port := ui.get_control_for_test("gateway_port") as LineEdit
 		port.text = "70000"
 		ui._on_gateway_restart_pressed()
 		if bridge.get_desired_tcp_endpoint_for_test() != before_endpoint:
 			_fail("invalid Gateway endpoint mutated desired endpoint")
 		if int(bridge.get_gateway_pid_for_test()) != before_pid:
 			_fail("invalid Gateway endpoint changed the owned process")
-		var completion := ui.get_node(
-			"StatusPanel/Margin/VBox/Completion"
-		) as Label
+		var completion := ui.get_control_for_test("completion") as Label
 		if "Gateway endpoint invalid" not in completion.text:
 			_fail("invalid Gateway endpoint did not produce stable UI feedback")
 

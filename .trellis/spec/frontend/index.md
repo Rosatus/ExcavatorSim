@@ -11,6 +11,8 @@ idempotent local soil transactions, and local hybrid truth.
 
 ## Guideline
 
+- [Game Menu and Driving HUD](./game-menu-hud.md) — automatic entry, modal input/pause ownership, controller navigation and hardware supervision.
+
 - [Client Boundary](./client-boundary.md) — ownership, transport, derived terrain, and local physics rules.
 - [Godot MCP Development Tool](./godot-mcp.md) — connection checks, safe editor automation, and cross-layer boundaries.
 - [Godot Motion Transport](./motion-transport.md) — WebSocket handshake, JSON normalization, generation guards, input safety, and visual parity.
