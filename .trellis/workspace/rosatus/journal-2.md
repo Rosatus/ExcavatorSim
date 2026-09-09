@@ -341,3 +341,36 @@ Replaced loose soil, compaction and settling with voxel-only stable deposits; pr
 ### Next Steps
 
 - None - task complete
+
+
+## Session 64: Game menu and control HUD completed
+
+**Date**: 2026-09-09
+**Task**: Game menu and control HUD completed
+**Branch**: `main`
+
+### Summary
+
+Implemented automatic entry, Esc/gamepad pause menu, confirmed reset, persistent CAN/Gateway/TCP controls, device-aware cross-layout HUD and restrained animated background. Removed persistent machine/payload panel per user review. Five focused contracts passed with relevant follow-up reruns and parser checks. User authorized commit, push and archive; no separate GPU visual or comprehensive gamepad-feel pass claimed. Unrelated addon, worldbuilding and local configuration changes excluded.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bb4bb58` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
