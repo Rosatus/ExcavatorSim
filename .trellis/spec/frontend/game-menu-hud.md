@@ -22,3 +22,24 @@ Manual acceptance: restart the main scene, drive immediately, open/close with Es
 `menu_atmosphere.gdshader` provides low-contrast contours and slow warm/cool gradients. Its `ui_time` is advanced by the visible menu, independently of paused simulation. No background animation runs during driving. Entry/page tweens use pause-processing mode; rapid page changes restore previous page opacity before replacing the tween. HUD surfaces remain static to preserve readable input feedback. Headless UI tests do not prove GPU visual quality.
 
 Latest UI refinement: the persistent machine/operation/bucket DrivingHUD is removed. Those readouts live in Advanced. HardwareDock and lower-right control HUD remain persistent during driving.
+
+## Performance recording (2026-09-10)
+
+`PerformanceCapture` is an opt-in root observer. Advanced tools and F12 start/stop
+a bounded capture; F10 marks a hitch without changing gameplay. The small recording
+badge is visible only while recording and ignores mouse input. Existing menu pause,
+controller focus and destructive confirmation ownership remain unchanged. Recording
+enables lightweight clocks, without additional diagnostic SDF reads. It preserves
+the full-diagnostics setting and locks its checkbox during capture. Focus-transition
+signals exclude the affected interval, including changes between process callbacks.
+Save errors retain the buffer and expose retry rather than silently
+starting over. Normal scene exit saves; abrupt termination cannot guarantee a trace.
+
+No per-frame world snapshots, JSON serialization or file writes: late `_process`
+captures numeric rows, a signal observes all voxel physics steps, and context polling
+is capped at four Hz. Diagnostics remain observational and cannot become authority
+time. Main-viewport GPU/CPU reports may lag; wall frame interval includes waits.
+See [capture schema and usage](../../../docs/performance-capture.md).
+
+Focused checks: `performance_capture_test.gd`, recording assertions in
+`operator_ui_test.gd`, and `tools/tests/test_analyze_performance_capture.py`.

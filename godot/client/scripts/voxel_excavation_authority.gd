@@ -56,6 +56,8 @@ var model_id := ""
 var tool_hash := ""
 var last_error := ""
 var diagnostics_enabled := false
+## Recording can time existing operations without enabling diagnostic SDF reads.
+var performance_timing_enabled := false
 var cutter := BucketCutter.new()
 var material_field := MaterialField.new()
 
@@ -139,6 +141,8 @@ var _coverage_size := Vector3i.ZERO
 var _coverage_axis_ranks: Array[PackedInt32Array] = []
 var _coverage_buffer: VoxelBuffer
 var _coverage_buffer_size := Vector3i.ZERO
+var _contact_buffer: VoxelBuffer
+var _contact_buffer_size := Vector3i.ZERO
 
 
 func configure(work_zone: VoxelWorkZone, contract: Dictionary, target_generation: int, capacity_override_m3: float = 0.0) -> bool:
@@ -192,6 +196,8 @@ func clear() -> void:
 	_coverage_axis_ranks.clear()
 	_coverage_buffer = null
 	_coverage_buffer_size = Vector3i.ZERO
+	_contact_buffer = null
+	_contact_buffer_size = Vector3i.ZERO
 	_contract.clear()
 	_queue.clear()
 	_soil_queue.clear()
@@ -309,6 +315,9 @@ func submit_pose(pose_snapshot: Dictionary, identity: Dictionary, delta_s: float
 			"pending_dump": _pending_dump != null,
 		}
 	proposal_started_usec = _diagnostic_clock_usec()
+	# No edits occur inside build_proposal. Share repeated rounded contact cells
+	# only within this call, never across ticks, commits or generation changes.
+	var contact_samples: Dictionary = {}
 	var result := cutter.build_proposal(
 		pose_snapshot,
 		generation,
@@ -317,6 +326,8 @@ func submit_pose(pose_snapshot: Dictionary, identity: Dictionary, delta_s: float
 		epoch,
 		_engaged,
 		_sample_sdf_world,
+		_sample_contact_sdf_world.bind(contact_samples),
+		_has_solid_contact_voxels,
 	)
 	var cut_candidate := result.get("proposal") as VoxelCutProposal
 	_record_proposal_telemetry(
@@ -542,7 +553,7 @@ func get_status_snapshot(refresh_diagnostics: bool = false) -> Dictionary:
 
 
 func _diagnostic_clock_usec() -> int:
-	return Time.get_ticks_usec() if diagnostics_enabled else 0
+	return Time.get_ticks_usec() if diagnostics_enabled or performance_timing_enabled else 0
 
 
 func _reset_timing_telemetry() -> void:
@@ -578,12 +589,15 @@ func _record_proposal_telemetry(started_usec: int, allocation_proxy: int) -> voi
 
 
 func _record_transaction_telemetry(transaction: VoxelCutTransaction) -> void:
-	if not diagnostics_enabled or transaction == null:
+	if transaction == null or (not diagnostics_enabled and not performance_timing_enabled):
 		return
 	if not transaction.accepted():
-		_rejected_commit_timing_usec.record(transaction.commit_usec)
+		if diagnostics_enabled:
+			_rejected_commit_timing_usec.record(transaction.commit_usec)
 		return
 	_timed_commit_count += 1
+	if not diagnostics_enabled:
+		return
 	_commit_timing_usec.record(transaction.commit_usec)
 	_record_nonzero_timing(_coverage_timing_usec, transaction.coverage_usec)
 	_record_nonzero_timing(_material_timing_usec, transaction.material_usec)
@@ -2019,15 +2033,20 @@ func _native_coverage_coordinates(
 				var center := Vector3i(roundi(sample.x), roundi(sample.y), roundi(sample.z))
 				for offset in NATIVE_COVERAGE_OFFSETS:
 					var coordinate := center + offset
+					# A strict candidate was already inserted into unique on its first
+					# visit. Later samples cannot change either membership or ordering.
+					if geometry_candidates.has(coordinate):
+						continue
 					if coordinate.x < bounds_min.x or coordinate.y < bounds_min.y or coordinate.z < bounds_min.z \
 							or coordinate.x > bounds_max.x or coordinate.y > bounds_max.y or coordinate.z > bounds_max.z:
 						continue
 					if Vector3(coordinate).distance_to(sample) > radius + 0.55:
 						continue
 					# Credit's broad stencil can reach outside the brush. Track strict
-					# geometric inclusion separately, even when this key was seen on
-					# an earlier segment. Leave a small SDF quantization margin.
-					if not geometry_candidates.has(coordinate) and distance_squared > 0.00000001:
+					# geometric inclusion separately. A prior failed check cannot skip
+					# this segment, whose radius may include the same coordinate.
+					# Leave a small SDF quantization margin.
+					if distance_squared > 0.00000001:
 						var closest_alpha := clampf((Vector3(coordinate) - a).dot(direction) / distance_squared, 0.0, 1.0)
 						var exact_radius := lerpf(radii[segment_index], radii[segment_index + 1], closest_alpha)
 						if Vector3(coordinate).distance_to(a + direction * closest_alpha) < exact_radius - 0.02:
@@ -2235,6 +2254,59 @@ func _changed_sample_count(before: PackedFloat32Array, after: PackedFloat32Array
 		if absf(before[index] - after[index]) > 0.000001:
 			changed += 1
 	return changed
+
+
+func _has_solid_contact_voxels(samples: Dictionary) -> bool:
+	if not configured or _tool == null or samples.is_empty():
+		return false
+	var points := samples.keys()
+	var minimum: Vector3i = points[0]
+	var maximum := minimum
+	for point: Vector3i in points:
+		minimum = minimum.min(point)
+		maximum = maximum.max(point)
+	var origin := minimum - Vector3i.ONE
+	var size := maximum - minimum + Vector3i.ONE * 3
+	# The halo proves precisely the same per-probe neighborhood validity as the
+	# scalar sampler. Near unloaded/bounded edges use individual checks instead
+	# of rejecting otherwise-valid probes because their larger box is unavailable.
+	if size.x * size.y * size.z > MAX_STAGED_SAMPLES \
+			or not _tool.is_area_editable(AABB(Vector3(origin), Vector3(size))):
+		for point: Vector3i in points:
+			if _tool.is_area_editable(AABB(Vector3(point - Vector3i.ONE), Vector3.ONE * 3.0)) \
+					and _tool.get_voxel_f(point) <= 0.0:
+				return true
+		return false
+	if _contact_buffer == null:
+		_contact_buffer = VoxelBuffer.new()
+		_contact_buffer.set_channel_depth(VoxelBuffer.CHANNEL_SDF, VoxelBuffer.DEPTH_16_BIT)
+	if _contact_buffer_size != size:
+		_contact_buffer.create(size.x, size.y, size.z)
+		_contact_buffer_size = size
+	# Reuse allocation only: always refresh SDF after preceding cuts/deposits.
+	_tool.copy(origin, _contact_buffer, SDF_CHANNEL_MASK, false)
+	for point: Vector3i in points:
+		var local := point - origin
+		if _contact_buffer.get_voxel_f(local.x, local.y, local.z, VoxelBuffer.CHANNEL_SDF) <= 0.0:
+			return true
+	return false
+
+
+func _sample_contact_sdf_world(world_position: Vector3, samples: Dictionary) -> Dictionary:
+	if not configured or _tool == null or not world_position.is_finite():
+		return {"valid": false}
+	var voxel_position := WorkZoneConfig.world_to_voxel(world_position, _work_zone.voxel_scale_m)
+	var point := Vector3i(round(voxel_position.x), round(voxel_position.y), round(voxel_position.z))
+	if samples.has(point):
+		return samples[point]
+	# Preserve the full sampler's three-cell neighborhood validity, including
+	# unloaded/boundary cells. Only the six unused gradient reads are omitted.
+	var point_area := AABB(Vector3(point - Vector3i.ONE), Vector3.ONE * 3.0)
+	var sample := {"valid": false}
+	if _tool.is_area_editable(point_area):
+		sample = {"valid": true, "sdf": _tool.get_voxel_f(point)}
+	samples[point] = sample
+	return sample
 
 
 func _sample_sdf_world(world_position: Vector3) -> Dictionary:

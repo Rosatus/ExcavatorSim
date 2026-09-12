@@ -55,6 +55,8 @@ try {
         "voxel_soil_material_field_test.gd",
         "voxel_excavation_authority_test.gd",
         "voxel_cutting_performance_test.gd",
+        "voxel_lift_contact_performance_test.gd",
+        "voxel_cut_proposal_hash_test.gd",
         "soil_effects_visual_mound_test.gd",
         "soil_release_visual_quality_test.gd",
         "soil_dump_completion_test.gd",

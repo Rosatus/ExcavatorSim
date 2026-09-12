@@ -3,6 +3,7 @@ extends CanvasLayer
 
 const MenuLayout := preload("res://scripts/game_menu_layout.gd")
 const GameSkin := preload("res://scripts/game_ui_theme.gd")
+const Capture := preload("res://scripts/performance_capture.gd")
 
 const UIStrings := preload("res://scripts/operator_ui_strings.gd")
 const CONFIG_PATH := "user://operator_ui.cfg"
@@ -24,6 +25,12 @@ var _chassis: TrackedChassisController
 var _camera: CameraRig
 var _feedback: MachineFeedback
 var _visual_quality: VisualQualityController
+var _performance_capture: Capture
+var _capture_button: Button
+var _capture_marker_button: Button
+var _capture_folder_button: Button
+var _capture_status: Label
+var _capture_badge: Label
 var _prompt_mode := "keyboard"
 var _ignore_model_selection := false
 var _pending_action := ""
@@ -101,6 +108,7 @@ func _ready() -> void:
 	_camera = get_node_or_null(camera_path) as CameraRig
 	_feedback = get_node_or_null(feedback_path) as MachineFeedback
 	_visual_quality = get_node_or_null(visual_quality_path) as VisualQualityController
+	_performance_capture = get_node_or_null("../PerformanceCapture") as Capture
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_confirmation.theme = GameSkin.create()
 	_confirmation.ok_button_text = "确认"
@@ -142,6 +150,7 @@ func _ready() -> void:
 	if can_bridge != null and can_bridge.has_signal("ict_link_status_changed"):
 		can_bridge.connect("ict_link_status_changed", _on_pc001_link_status_changed)
 	_menu = MenuLayout.build(self)
+	_build_capture_controls()
 	_hud = $ControlInputHUD as ControlInputHUD
 	_advanced_panel.visible = true
 	(_menu["resume"] as Button).pressed.connect(_on_panel_toggle_pressed)
@@ -206,12 +215,25 @@ func get_control_for_test(id: String) -> Control:
 		"ict_lamp": _pc001_handshake_lamp,
 		"ict_label": _pc001_handshake_label,
 		"cutting_diagnostics": _cutting_diagnostics_button,
+		"performance_capture": _capture_button,
+		"performance_marker": _capture_marker_button,
+		"performance_folder": _capture_folder_button,
+		"performance_status": _capture_status,
 		"control_hint": _control_hint,
 		"controls_page": (_menu["tabs"] as TabContainer).get_tab_control(1),
 	}.get(id) as Control
 
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and not _confirmation.visible:
+		if event.keycode == KEY_F12:
+			_on_capture_pressed()
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_F10 and _performance_capture != null and _performance_capture.recording:
+			_performance_capture.add_marker()
+			get_viewport().set_input_as_handled()
+			return
 	if event is InputEventJoypadButton or (event is InputEventJoypadMotion and absf(event.axis_value) > 0.3):
 		_set_prompt_mode("gamepad")
 	elif event is InputEventKey or event is InputEventMouseButton:
@@ -358,10 +380,94 @@ func _on_cutting_diagnostics_toggled(enabled: bool) -> void:
 
 
 func _sync_cutting_diagnostics_toggle() -> void:
-	_cutting_diagnostics_button.disabled = _excavation_world == null
+	_cutting_diagnostics_button.disabled = _excavation_world == null or (_performance_capture != null and _performance_capture.recording)
 	_cutting_diagnostics_button.set_pressed_no_signal(
 		_excavation_world != null and _excavation_world.voxel_diagnostics_enabled
 	)
+
+
+func _build_capture_controls() -> void:
+	var group := VBoxContainer.new()
+	_advanced_panel.add_child(group)
+	_capture_button = Button.new()
+	_capture_button.text = "开始性能录制 · F12"
+	group.add_child(_capture_button)
+	_capture_button.pressed.connect(_on_capture_pressed)
+	_capture_marker_button = Button.new()
+	_capture_marker_button.text = "标记卡顿 · F10"
+	group.add_child(_capture_marker_button)
+	_capture_marker_button.pressed.connect(func():
+		if _performance_capture != null:
+			_performance_capture.add_marker()
+	)
+	_capture_folder_button = Button.new()
+	_capture_folder_button.text = "打开性能文件目录"
+	group.add_child(_capture_folder_button)
+	_capture_folder_button.pressed.connect(_on_capture_folder_pressed)
+	_capture_status = Label.new()
+	_capture_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	group.add_child(_capture_status)
+	_capture_badge = Label.new()
+	_capture_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_capture_badge.add_theme_color_override("font_color", GameSkin.ACCENT)
+	_capture_badge.add_theme_color_override("font_shadow_color", Color.BLACK)
+	_capture_badge.add_theme_constant_override("shadow_offset_x", 1)
+	_capture_badge.add_theme_constant_override("shadow_offset_y", 1)
+	add_child(_capture_badge)
+	_capture_badge.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	_capture_badge.offset_left = -350
+	_capture_badge.offset_right = -24
+	_capture_badge.offset_top = 20
+	_capture_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	if _performance_capture != null:
+		_performance_capture.state_changed.connect(_refresh_capture_status)
+	_refresh_capture_status()
+
+
+func _on_capture_pressed() -> void:
+	if _performance_capture == null:
+		return
+	var status := _performance_capture.get_capture_status()
+	if _performance_capture.recording:
+		_performance_capture.stop_capture()
+	elif bool(status.get("unsaved", false)):
+		_performance_capture.save_capture()
+	else:
+		_performance_capture.start_capture()
+	_refresh_capture_status()
+
+
+func _on_capture_folder_pressed() -> void:
+	var directory := ProjectSettings.globalize_path(Capture.OUTPUT_DIR)
+	DirAccess.make_dir_recursive_absolute(directory)
+	var error := OS.shell_open(directory)
+	if error != OK:
+		_capture_status.text = "无法打开目录：%s" % directory
+
+
+func _refresh_capture_status() -> void:
+	if _capture_button == null:
+		return
+	_capture_button.disabled = _performance_capture == null
+	_capture_marker_button.disabled = _performance_capture == null or not _performance_capture.recording
+	_capture_badge.visible = _performance_capture != null and _performance_capture.recording
+	_sync_cutting_diagnostics_toggle()
+	if _performance_capture == null:
+		_capture_status.text = "性能录制不可用"
+		return
+	var status := _performance_capture.get_capture_status()
+	_capture_button.text = "停止并保存性能录制 · F12" if _performance_capture.recording else ("重试保存性能录制" if bool(status["unsaved"]) else "开始性能录制 · F12")
+	if _performance_capture.recording:
+		_capture_badge.text = "● 性能录制 %ds · 标记 %d · F12 停止" % [int(status["elapsed_s"]), int(status["markers"])]
+		_capture_status.text = "录制中，最长 3 分钟（含菜单时间）。返回驾驶复现卡顿，F10 标记，F12 停止并保存。"
+	elif not String(status["error"]).is_empty():
+		_capture_status.text = String(status["error"])
+	elif not String(status["path"]).is_empty():
+		_capture_status.text = "已保存：%s\n把这个 JSON 文件交给我分析。" % status["path"]
+		if int(status["active_frames"]) == 0:
+			_capture_status.text += "\n本次没有有效驾驶帧，请返回驾驶并保持窗口焦点后再录制。"
+	else:
+		_capture_status.text = "记录帧耗时与挖掘阶段，停止后保存 JSON。建议先空闲 10 秒，再挖掘和卸土。"
 
 
 func _sync_test_graphics_toggle() -> void:

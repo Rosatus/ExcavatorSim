@@ -1,6 +1,7 @@
 extends "res://tests/voxel_excavation_authority_test.gd"
 
 const LegacyCoverage = preload("res://tests/fixtures/legacy_voxel_coverage.gd")
+const PreMemoizedCoverage = preload("res://tests/fixtures/pre_memoized_voxel_coverage.gd")
 const TIMING_KEYS := ["commit_usec_max", "coverage_usec", "material_usec", "native_edit_usec", "digest_usec", "readiness_issue_usec"]
 
 
@@ -29,6 +30,17 @@ func _run() -> void:
 	var disabled_spy := StatusSpy.new()
 	var enabled := await _run_cadence(PackedFloat32Array([0.05]), true, enabled_spy)
 	var disabled := await _run_cadence(PackedFloat32Array([0.01, 0.01, 0.03]), false, disabled_spy)
+	var timing_spy := StatusSpy.new()
+	timing_spy.performance_timing_enabled = true
+	var timing_only := await _run_cadence(PackedFloat32Array([0.05]), false, timing_spy)
+	_expect(int(timing_only.get("commit_usec_max", 0)) > 0 and int(timing_only.get("coverage_usec", 0)) > 0, "recording clocks measure real cutting without full diagnostics", failures)
+	_expect(timing_spy.native_digest_reads == 0 and not timing_spy.diagnostics_enabled, "recording does not enable diagnostic SDF sampling", failures)
+	var timing_result := timing_only.duplicate()
+	var no_timing_result := disabled.duplicate()
+	for key in TIMING_KEYS:
+		timing_result.erase(key)
+		no_timing_result.erase(key)
+	_expect(timing_result == no_timing_result, "recording clocks preserve geometry, ledger and queue results", failures)
 	var enabled_result := enabled.duplicate()
 	var disabled_result := disabled.duplicate()
 	for key in TIMING_KEYS:
@@ -43,12 +55,34 @@ func _run() -> void:
 	_expect(not enabled.is_empty() and enabled_result == disabled_result, "diagnostic switch preserves real SDF, ledger, queue and cadence outcome", failures)
 	_expect(int(enabled.get("commit_usec_max", 0)) > 0, "enabled diagnostics measure a real native commit", failures)
 	print("CUTTING_OPTIMIZED %s" % JSON.stringify(enabled))
+	await _check_paired_commits(failures)
 	if failures.is_empty():
 		print("Voxel cutting performance and optional diagnostics passed.")
 	else:
 		for failure in failures:
 			push_error(failure)
 	quit(0 if failures.is_empty() else 1)
+
+
+func _check_paired_commits(failures: Array[String]) -> void:
+	var commits: Array[Array] = [[], []]
+	var coverage: Array[Array] = [[], []]
+	var reference_result: Dictionary = {}
+	for iteration in 5:
+		for offset in 2:
+			var choice := (iteration + offset) % 2
+			var subject: VoxelExcavationAuthority = PreMemoizedCoverage.new() if choice == 0 else Authority.new()
+			var result := await _run_cadence(PackedFloat32Array([0.05]), true, subject)
+			commits[choice].append(int(result.get("commit_usec_max", 0)))
+			coverage[choice].append(int(result.get("coverage_usec", 0)))
+			for key in TIMING_KEYS:
+				result.erase(key)
+			if reference_result.is_empty():
+				reference_result = result
+			_expect(not result.is_empty() and result == reference_result, "paired real commits preserve geometry, ledger and cadence", failures)
+	for series in commits + coverage:
+		series.sort()
+	print("PAIRED_COMMITS %s" % JSON.stringify({"samples_per_version": 5, "before_commit_median_usec": commits[0][2], "after_commit_median_usec": commits[1][2], "before_coverage_median_usec": coverage[0][2], "after_coverage_median_usec": coverage[1][2]}))
 
 
 func _check_optional_diagnostics(failures: Array[String]) -> void:
@@ -141,6 +175,8 @@ func _check_coverage_equivalence(scale_m: float, failures: Array[String]) -> voi
 	var authority := Authority.new()
 	var legacy := LegacyCoverage.new()
 	_expect(authority.configure(zone, contract, 1) and legacy.configure(zone, contract, 1), "coverage authorities configure", failures)
+	var reference := PreMemoizedCoverage.new()
+	_expect(reference.configure(zone, contract, 1), "geometry reference configures", failures)
 	var bounds := WorkZoneConfig.voxel_bounds(scale_m)
 	var origin := Vector3i(bounds.position)
 	var size := Vector3i(bounds.size)
@@ -164,6 +200,31 @@ func _check_coverage_equivalence(scale_m: float, failures: Array[String]) -> voi
 	var capped := authority._native_coverage_coordinates(wide, origin, size)
 	_expect(capped.size() == Authority.MAX_NATIVE_COVERAGE_CELLS, "large fixture reaches solid coverage cap", failures)
 	_expect(capped == legacy._native_coverage_coordinates(wide, origin, size), "probe and solid caps retain exact legacy lexical subset", failures)
+	# Compare strict geometry candidates as well as credit, including overlapping
+	# segments with different radii and a zero-length segment. Failed inclusion on
+	# one segment must not suppress a later valid inclusion on the same coordinate.
+	var overlap: Array[Dictionary] = []
+	for index in 24:
+		var path := _path(Vector3(-12, -2, -12), Vector3(12, -2, 12))
+		path["radii_voxels"] = PackedFloat32Array([0.4 + (index % 3), 2.0])
+		overlap.append(path)
+	overlap.append(_path(Vector3.ZERO, Vector3.ZERO))
+	for paths in [simple, wide, overlap, boundary]:
+		var expected_geometry: Dictionary = {}
+		var actual_geometry: Dictionary = {}
+		_expect(authority._native_coverage_coordinates(paths, origin, size, actual_geometry) == reference._native_coverage_coordinates(paths, origin, size, expected_geometry), "memoization preserves capped coverage", failures)
+		_expect(actual_geometry == expected_geometry, "memoization preserves strict geometry candidates", failures)
+	var paired: Array[Array] = [[], []]
+	for iteration in 7:
+		for offset in 2:
+			var choice := (iteration + offset) % 2
+			var subject: VoxelExcavationAuthority = reference if choice == 0 else authority
+			var started := Time.get_ticks_usec()
+			subject._native_coverage_coordinates(overlap, origin, size)
+			paired[choice].append(Time.get_ticks_usec() - started)
+	for series in paired:
+		series.sort()
+	print("MEMOIZED_COVERAGE_COMPARISON %s" % JSON.stringify({"voxel_scale_m": scale_m, "before_median_usec": paired[0][3], "after_median_usec": paired[1][3], "paths": overlap.size()}))
 
 	var before := authority._native_coverage_coordinates(simple, origin, size)
 	var buffer_id := authority._coverage_buffer.get_instance_id()

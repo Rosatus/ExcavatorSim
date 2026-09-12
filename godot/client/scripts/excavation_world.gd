@@ -2,6 +2,7 @@ class_name ExcavationWorld
 extends Node3D
 
 signal excavation_changed(status: Dictionary)
+signal performance_step_sampled(sample: Dictionary)
 
 const SOIL_PROXY_ORDER := ["cutting_edge", "opening", "cavity", "shell", "rear_support"]
 const VoxelAuthority = preload("res://scripts/voxel_excavation_authority.gd")
@@ -32,6 +33,7 @@ const TEST_BUCKET_CAPACITY_M3 := 1000.0
 @export var local_tooth_offset := Vector3(0.0, -0.55, 0.0)
 
 var terrain_world: TerrainWorld
+var performance_capture_enabled := false
 var terrain_collider: TerrainCollider
 var voxel_work_zone: VoxelWorkZone
 var terrain_scheduler: TerrainCommitScheduler
@@ -135,6 +137,7 @@ func _physics_process(delta: float) -> void:
 	if _selected_soil_mode() == "voxel":
 		if _voxel_authority == null or not _soil_authority_modes.can_product_owner_write("voxel"):
 			return
+		var capture_start := Time.get_ticks_usec() if performance_capture_enabled else 0
 		# Voxel falling-soil presentation is driven by committed one-shot release
 		# events. Never keep a cut/deposit volume sticky across idle frames.
 		_last_flow_volume_m3 = 0.0
@@ -142,14 +145,28 @@ func _physics_process(delta: float) -> void:
 		if automatic_soil_enabled:
 			_automatic_samples_executed += 1
 			_step_automatic_interaction(delta)
+		var capture_after_input := Time.get_ticks_usec() if performance_capture_enabled else 0
 		_soil_steps_executed += 1
 		var voxel_result := _voxel_authority.step_fixed(delta)
+		var capture_after_step := Time.get_ticks_usec() if performance_capture_enabled else 0
 		if bool(voxel_result.get("changed", false)):
 			var transaction := voxel_result.get("transaction", {}) as Dictionary
 			_last_interaction = "dump" if String(transaction.get("operation", "cut")) == "deposit" else String(transaction.get("operation", "cut"))
 		if bool(voxel_result.get("changed", false)) or bool(voxel_result.get("release_changed", false)):
 			excavation_changed.emit(get_status_snapshot())
 		_queue_backend_feedback()
+		if performance_capture_enabled:
+			var capture_end := Time.get_ticks_usec()
+			performance_step_sampled.emit({
+				"physics_frame": Engine.get_physics_frames(),
+				"process_frame": Engine.get_process_frames(),
+				"ended_usec": capture_end,
+				"automatic_usec": capture_after_input - capture_start,
+				"step_usec": capture_after_step - capture_after_input,
+				"publish_usec": capture_end - capture_after_step,
+				"total_usec": capture_end - capture_start,
+				"transaction": voxel_result.get("transaction", {}),
+			})
 		return
 	if soil_state == null or terrain_scheduler == null:
 		return
@@ -363,6 +380,33 @@ func set_voxel_diagnostics_enabled(enabled: bool) -> void:
 	elif voxel_work_zone != null:
 		voxel_work_zone.readiness.set_diagnostics_enabled(enabled)
 	excavation_changed.emit(get_status_snapshot())
+
+
+func set_performance_capture_enabled(enabled: bool) -> void:
+	performance_capture_enabled = enabled
+	if _voxel_authority != null:
+		_voxel_authority.performance_timing_enabled = enabled
+
+
+func get_performance_context() -> Dictionary:
+	# Recorder calls at four Hz, never once per rendered frame. Keep the general
+	# world/UI projection (and its unrelated subsystem snapshots) out of this path.
+	if _voxel_authority == null:
+		return {"available": false}
+	var status := _voxel_authority.get_status_snapshot()
+	var result := {
+		"available": true, "voxel_scale_m": voxel_work_zone.voxel_scale_m if voxel_work_zone != null else 0.0,
+		"automatic_soil_enabled": automatic_soil_enabled, "bucket_ground_bypassed": _bucket_ground_bypassed(),
+		"unlimited_bucket_for_testing": voxel_unlimited_bucket_for_testing, "diagnostics_enabled": voxel_diagnostics_enabled,
+	}
+	for key in ["model_id", "generation", "data_revision", "mesh_revision", "collision_revision", "queue_depth", "pending_readiness_count", "readiness_timed_out", "committed", "rejected", "engaged", "bucket_mass_q", "fill_ratio", "conservation_error_q", "phase_timings_usec", "voxel_statistics", "readiness"]:
+		result[key] = status.get(key)
+	# Full diagnostics remain at the user's setting. Capture only observes these
+	# low-rate counters; it does not enable per-transaction SDF digests or sorting.
+	if not voxel_diagnostics_enabled and voxel_work_zone != null:
+		result["voxel_statistics"] = voxel_work_zone.terrain.get_statistics() if voxel_work_zone.terrain != null else {}
+		result["readiness"] = voxel_work_zone.readiness.get_status_snapshot()
+	return result
 
 
 func set_soil_tool_shadow_enabled(value: bool) -> void:
@@ -1649,6 +1693,7 @@ func _ensure_voxel_authority() -> bool:
 	_reset_voxel_authority()
 	_voxel_authority = VoxelAuthority.new()
 	_voxel_authority.set_diagnostics_enabled(voxel_diagnostics_enabled)
+	_voxel_authority.performance_timing_enabled = performance_capture_enabled
 	var capacity_override := TEST_BUCKET_CAPACITY_M3 if voxel_unlimited_bucket_for_testing else 0.0
 	return _voxel_authority.configure(
 		voxel_work_zone,

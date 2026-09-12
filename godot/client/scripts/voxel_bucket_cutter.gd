@@ -53,7 +53,9 @@ func build_proposal(
 	sequence: int,
 	authority_epoch: String,
 	was_engaged: bool,
-	sdf_sampler: Callable
+	sdf_sampler: Callable,
+	contact_sampler: Callable = Callable(),
+	batch_contact_sampler: Callable = Callable()
 ) -> Dictionary:
 	var rejected := {
 		"accepted": false,
@@ -124,7 +126,9 @@ func build_proposal(
 	# has left the soil. Never use this continuation to start an unengaged cut.
 	var finishing_lift := false
 	if was_engaged and model_id == "sy135":
-		finishing_lift = _has_lift_exit_contact(tool_snapshot, sdf_sampler)
+		# Exit contact needs occupancy only; the leading edge still needs normals.
+		finishing_lift = _has_lift_exit_contact(tool_snapshot,
+			contact_sampler if contact_sampler.is_valid() else sdf_sampler, true, batch_contact_sampler)
 	# Contact decides whether this frame cuts; the geometric exit decides
 	# when the episode ends. Clearing one frame must not disable later contact.
 	var retain_lift := was_engaged and model_id == "sy135" \
@@ -227,7 +231,12 @@ func _has_upward_motion(tool_snapshot: Dictionary) -> bool:
 	return maxf(current.origin.y - previous.origin.y, current_edge.y - previous_edge.y) > MIN_INTO_MATERIAL_M
 
 
-func _has_lift_exit_contact(tool_snapshot: Dictionary, sdf_sampler: Callable, require_lift: bool = true) -> bool:
+func _has_lift_exit_contact(
+	tool_snapshot: Dictionary,
+	sdf_sampler: Callable,
+	require_lift: bool = true,
+	batch_sampler: Callable = Callable()
+) -> bool:
 	var inner := _find_region(tool_snapshot, "inner_shell")
 	var dimensions := _box_half_dimensions(inner)
 	if dimensions == Vector3.ZERO:
@@ -236,6 +245,8 @@ func _has_lift_exit_contact(tool_snapshot: Dictionary, sdf_sampler: Callable, re
 	var current := inner.get("current_transform", Transform3D.IDENTITY) as Transform3D
 	if require_lift and not _has_upward_motion(tool_snapshot):
 		return false
+	var direct_samples := 0
+	var pending_voxels: Dictionary = {}
 	# Use the world-vertical lower envelope, not the box's local +Y face.
 	# The latter may be airborne while the rotated bottom is still in soil.
 	for alpha in [0.0, 0.5, 1.0]:
@@ -251,10 +262,20 @@ func _has_lift_exit_contact(tool_snapshot: Dictionary, sdf_sampler: Callable, re
 			var steps := clampi(ceili(absf(top_y - lower.y) / voxel_scale_m), 1, 32)
 			for step in range(steps + 1):
 				var point := Vector3(lower.x, lerpf(lower.y, top_y, float(step) / steps), lower.z)
+				# Keep the cheap early exit when the first probes already touch soil.
+				# Otherwise collect exactly the old rounded samples and read them in
+				# one bounded batch, instead of thousands of script/native calls.
+				if batch_sampler.is_valid() and direct_samples >= 8:
+					if not point.is_finite():
+						continue
+					var voxel := WorkZoneConfig.world_to_voxel(point, voxel_scale_m)
+					pending_voxels[Vector3i(round(voxel.x), round(voxel.y), round(voxel.z))] = true
+					continue
+				direct_samples += 1
 				var value: Variant = sdf_sampler.call(point)
 				if value is Dictionary and bool(value.get("valid", false)) and float(value.get("sdf", INF)) <= 0.0:
 					return true
-	return false
+	return bool(batch_sampler.call(pending_voxels)) if not pending_voxels.is_empty() else false
 
 
 func _segment_sweep_capsules(region: Dictionary, clearance: bool) -> Array[Dictionary]:

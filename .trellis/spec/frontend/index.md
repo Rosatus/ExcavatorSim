@@ -11,6 +11,16 @@ idempotent local soil transactions, and local hybrid truth.
 
 ## Guideline
 
+### Model maintenance priority (2026-09-10)
+
+SY135 is the primary maintained product model. Future features, performance work,
+fixes and representative validation should target SY135 by default. SY205 does
+not require dedicated maintenance or a parallel validation matrix unless the
+user explicitly requests it. Preserve its existing behavior when editing shared
+code; this policy does not authorize removing SY205 or deliberately breaking it.
+
+
+
 - [Game Menu and Driving HUD](./game-menu-hud.md) — automatic entry, modal input/pause ownership, controller navigation and hardware supervision.
 
 - [Client Boundary](./client-boundary.md) — ownership, transport, derived terrain, and local physics rules.

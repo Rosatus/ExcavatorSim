@@ -1,7 +1,7 @@
 class_name VoxelCutProposal
 extends RefCounted
 
-const SCHEMA_VERSION := "voxel-cut-proposal-v1"
+const SCHEMA_VERSION := "voxel-cut-proposal-v2"
 
 var generation := -1
 var fixed_tick_begin := -1
@@ -17,6 +17,9 @@ var clearance_capsules: Array[Dictionary] = []
 var native_paths: Array[Dictionary] = []
 var probe_world := Vector3.ZERO
 var quality_flags: Array[String] = []
+
+var _hash_source_snapshot: Array = []
+var _hash_value := ""
 
 
 static func create(fields: Dictionary) -> VoxelCutProposal:
@@ -88,32 +91,45 @@ func to_dictionary() -> Dictionary:
 
 
 func _compute_hash() -> String:
-	var rows: Array[String] = []
+	# Creation, cutter admission, authority admission and commit validate the same
+	# large path repeatedly. A detached snapshot detects nested mutations before
+	# reusing the digest, including changes to packed point/radius arrays.
+	var source: Array = [generation, fixed_tick_begin, fixed_tick_end, sequence,
+		model_id, authority_epoch, tool_hash, capsules, clearance_capsules, native_paths]
+	if not _hash_value.is_empty() and source == _hash_source_snapshot:
+		return _hash_value
+	_hash_value = _compute_uncached_hash()
+	_hash_source_snapshot = source.duplicate(true)
+	return _hash_value
+
+
+func _compute_uncached_hash() -> String:
+	# Internal v2 identity uses ordered fields and native packed-array bytes.
+	# Text formatting every point dominated creation and coalescing even when
+	# repeated validation was cached. Never serialize caller dictionaries: their
+	# key insertion order must not change the identity of the same geometry.
+	var rows: Array = []
 	for capsule in capsules + clearance_capsules:
-		var a := capsule.get("a_voxels", Vector3.ZERO) as Vector3
-		var b := capsule.get("b_voxels", Vector3.ZERO) as Vector3
-		rows.append("%s|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f|%.6f" % [
+		rows.append([
 			String(capsule.get("source", "")),
-			a.x, a.y, a.z, b.x, b.y, b.z,
+			capsule.get("a_voxels", Vector3.ZERO) as Vector3,
+			capsule.get("b_voxels", Vector3.ZERO) as Vector3,
 			float(capsule.get("radius_voxels", 0.0)),
 		])
 	for path in native_paths:
-		var points := path.get("points_voxels", PackedVector3Array()) as PackedVector3Array
-		var radii := path.get("radii_voxels", PackedFloat32Array()) as PackedFloat32Array
-		var values: Array[String] = []
-		for index in points.size():
-			var point := points[index]
-			values.append("%.6f,%.6f,%.6f,%.6f" % [point.x, point.y, point.z, radii[index]])
-		rows.append("native:%s|%s|%s" % [
+		rows.append([
 			String(path.get("path_id", "")),
-			"%s:%s" % [String(path.get("role", "")), ",".join(path.get("components", []) as Array)],
-			";".join(values),
+			String(path.get("role", "")),
+			PackedStringArray(path.get("components", []) as Array),
+			path.get("points_voxels", PackedVector3Array()) as PackedVector3Array,
+			path.get("radii_voxels", PackedFloat32Array()) as PackedFloat32Array,
 		])
-	var canonical := "%d|%d|%d|%d|%s|%s|%s|%s" % [
-		generation, fixed_tick_begin, fixed_tick_end, sequence,
-		model_id, authority_epoch, tool_hash, ";".join(rows),
-	]
-	return canonical.sha256_text()
+	var canonical := var_to_bytes([SCHEMA_VERSION, generation, fixed_tick_begin,
+		fixed_tick_end, sequence, model_id, authority_epoch, tool_hash, rows])
+	var digest := HashingContext.new()
+	digest.start(HashingContext.HASH_SHA256)
+	digest.update(canonical)
+	return digest.finish().hex_encode()
 
 
 static func _capsule_valid(capsule: Dictionary) -> bool:
@@ -125,12 +141,20 @@ static func _capsule_valid(capsule: Dictionary) -> bool:
 
 static func _normalized_native_path(source: Dictionary) -> Dictionary:
 	var points := PackedVector3Array()
-	for value in source.get("points_voxels", []):
-		if value is Vector3:
-			points.append(value as Vector3)
+	var source_points: Variant = source.get("points_voxels", [])
+	if source_points is PackedVector3Array:
+		points = (source_points as PackedVector3Array).duplicate()
+	else:
+		for value in source_points:
+			if value is Vector3:
+				points.append(value as Vector3)
 	var radii := PackedFloat32Array()
-	for value in source.get("radii_voxels", []):
-		radii.append(float(value))
+	var source_radii: Variant = source.get("radii_voxels", [])
+	if source_radii is PackedFloat32Array:
+		radii = (source_radii as PackedFloat32Array).duplicate()
+	else:
+		for value in source_radii:
+			radii.append(float(value))
 	return {
 		"path_id": String(source.get("path_id", "")),
 		"role": String(source.get("role", "")),

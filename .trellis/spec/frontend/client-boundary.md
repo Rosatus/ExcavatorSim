@@ -2545,6 +2545,20 @@ VoxelSoilMaterialField.stage_compaction(coordinates, compaction_delta_q) -> Dict
 
 ### 3. Contracts
 
+- Cut proposals use internal `voxel-cut-proposal-v2` identities: SHA-256 over
+  ordered fields serialized with `var_to_bytes`, retaining native packed point
+  and radius arrays. Do not serialize caller dictionaries or format every point
+  as decimal text. Dictionary insertion order must not affect identity. The
+  digest cache compares a detached deep snapshot and must detect nested packed
+  geometry/identity changes. V1 text hashes are historical, not reusable v2
+  identities; proposals are generation-local, not a persisted replay protocol.
+  Preserve geometry, fixed-input order, deduplication and ledger behavior.
+- SY135 lift contact retains the exact scalar rounded probe set. It may use a
+  few scalar probes for early contact, then deduplicate and batch the remaining
+  points. A one-voxel halo must satisfy the original 3x3x3 validity rule. If the
+  complete window is unavailable or exceeds the staging bound, check points
+  individually so valid contact is not lost. Reuse buffer allocation only;
+  refresh SDF on each call after cuts/deposits and release buffers on clear.
 - The cutter consumes the hash-bound SY205/SY135 `soil_tool` snapshot and
   produces typed, immutable proposals in local voxel coordinates. SY135
   proposals carry native packed point/radius paths for the authorized leading

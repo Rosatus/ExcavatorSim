@@ -1,5 +1,7 @@
 [gd_scene format=3 uid="uid://bt370y5j1aq7a"]
 
+[ext_resource type="Script" path="res://scripts/performance_capture.gd" id="40_performance_capture"]
+
 [ext_resource type="Shader" uid="uid://cvd0x7lon1ur6" path="res://addons/sky_3d/shaders/SkyMaterial.gdshader" id="1_pm3ni"]
 [ext_resource type="PackedScene" uid="uid://7oyt2ryn4oiy" path="res://assets/visual/SY205_excavator_godot.glb" id="1_sy205"]
 [ext_resource type="Script" uid="uid://b5bdgxlnxonou" path="res://scripts/motion_client.gd" id="2_motion_client"]
@@ -334,6 +336,9 @@ script = ExtResource("16_truth_publisher")
 
 [node name="MachineFeedback" type="Node" parent="." unique_id=1997508795]
 script = ExtResource("19_machine_feedback")
+
+[node name="PerformanceCapture" type="Node" parent="."]
+script = ExtResource("40_performance_capture")
 
 [node name="OperatorUI" type="CanvasLayer" parent="." unique_id=232332145]
 script = ExtResource("4_operator_ui")
