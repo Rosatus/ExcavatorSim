@@ -782,11 +782,11 @@ func _set_gateway_button(bridge: Node) -> void:
 				if bridge.is_gateway_restart_pending() else "Gateway 停止中…"
 			_gateway_button.disabled = true
 		"failed":
-			_gateway_button.text = "重试启动 Gateway"
+			_gateway_button.text = "重启 Gateway（异常，请重启）"
 			_gateway_button.disabled = false
 		_:
-			_gateway_button.text = "重启 Gateway" if bridge.is_gateway_online() \
-				else ("重试启动 Gateway" if not String(bridge.get_last_gateway_error()).is_empty() else "启动 Gateway")
+			_gateway_button.text = "重启 Gateway（异常，请重启）" \
+				if bridge.is_gateway_restart_required() else "重启 Gateway"
 			_gateway_button.disabled = false
 
 

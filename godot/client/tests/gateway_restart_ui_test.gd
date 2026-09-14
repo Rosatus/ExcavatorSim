@@ -20,8 +20,8 @@ func _run() -> void:
 		_fail("Gateway restart UI integration nodes are missing")
 	else:
 		var button := ui.get_control_for_test("gateway_restart") as Button
-		if button.toggle_mode or button.disabled or button.text != "启动 Gateway":
-			_fail("offline Gateway control is not an enabled momentary start action")
+		if button.toggle_mode or button.disabled or button.text != "重启 Gateway（异常，请重启）":
+			_fail("unowned/offline Gateway did not expose restart warning")
 		var before_endpoint := bridge.get_desired_tcp_endpoint_for_test() as Dictionary
 		var before_pid := int(bridge.get_gateway_pid_for_test())
 		var port := ui.get_control_for_test("gateway_port") as LineEdit
@@ -47,9 +47,29 @@ func _run() -> void:
 		bridge.set("_gateway_lifecycle", 3)
 		bridge.set("_restart_after_stop", false)
 		ui._refresh_can_status()
-		if button.disabled or button.text != "重试启动 Gateway":
+		if button.disabled or button.text != "重启 Gateway（异常，请重启）":
 			_fail("FAILED lifecycle did not expose the retry action")
 		bridge.set("_gateway_lifecycle", 0)
+		bridge.set("_last_heartbeat_ms", Time.get_ticks_msec())
+		ui._refresh_can_status()
+		if button.text != "重启 Gateway（异常，请重启）":
+			_fail("external heartbeat without an owned PID hid the warning")
+		# Use the current live process as a liveness fixture; never stop or kill it.
+		bridge.set("_gateway_pid", OS.get_process_id())
+		ui._refresh_can_status()
+		if button.text != "重启 Gateway":
+			_fail("healthy owned Gateway did not clear the warning")
+		bridge.set("_last_heartbeat_ms", -1)
+		ui._refresh_can_status()
+		if button.text != "重启 Gateway（异常，请重启）":
+			_fail("missing heartbeat did not restore the warning")
+		bridge.set("_gateway_pid", 2147483647)
+		bridge.set("_last_heartbeat_ms", Time.get_ticks_msec())
+		ui._refresh_can_status()
+		if button.text != "重启 Gateway（异常，请重启）":
+			_fail("dead owned PID with an external heartbeat hid the warning")
+		bridge.set("_gateway_pid", -1)
+		bridge.set("_last_heartbeat_ms", -1)
 
 	scene.queue_free()
 	await process_frame

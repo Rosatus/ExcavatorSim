@@ -288,6 +288,16 @@ func is_gateway_restart_pending() -> bool:
 	return _gateway_lifecycle == GatewayLifecycle.STOPPING and _restart_after_stop
 
 
+func is_gateway_restart_required() -> bool:
+	if _gateway_lifecycle in [GatewayLifecycle.STARTING, GatewayLifecycle.STOPPING]:
+		return false
+	# Heartbeats alone do not establish ownership: an older/external Gateway
+	# can still broadcast after this instance's child failed to bind its ports.
+	return _gateway_lifecycle == GatewayLifecycle.FAILED \
+		or _gateway_pid <= 0 or not OS.is_process_running(_gateway_pid) \
+		or not is_gateway_online()
+
+
 ## --- process supervision ---
 
 ## Returns [executable, args...] for launching the gateway, or empty when the
