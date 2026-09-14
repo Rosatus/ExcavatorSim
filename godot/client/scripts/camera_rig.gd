@@ -211,9 +211,14 @@ func _step_camera(delta: float, snap: bool) -> void:
 	var focus := _resolve_focus()
 	var reference := _reference if is_instance_valid(_reference) else _target
 	var rear := reference.global_basis.z
+	# SY205 faces +Z, as declared by its tracks and cab. Orbit around the
+	# actual vehicle rear/right instead of assuming every asset faces -Z.
+	var heading_sign := -1.0 if _active_model_id == "sy205" else 1.0
+	rear *= heading_sign
 	rear.y = 0.0
 	rear = rear.normalized() if rear.length_squared() > 0.0001 else Vector3.BACK
 	var right := reference.global_basis.x
+	right *= heading_sign
 	right.y = 0.0
 	right = right.normalized() if right.length_squared() > 0.0001 else Vector3.RIGHT
 	var horizontal_direction := (rear * cos(_yaw) + right * sin(_yaw)).normalized()

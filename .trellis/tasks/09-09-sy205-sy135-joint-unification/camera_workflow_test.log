@@ -1,0 +1,10 @@
+Godot Engine v4.7.2.stable.custom_build.ed1daf0bf (2026-08-17 01:18:38 UTC) - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+Camera workflow contract passed for SY205 and SY135.
+WARNING: instance_reset_physics_interpolation() is deprecated.
+   at: RenderingServer::_instance_reset_physics_interpolation_bind_compat_104269 (D:\a\godot_voxel\godot_voxel\servers\rendering\rendering_server.compat.inc:62)
+   GDScript backtrace (most recent call first):
+       [0] _ensure_terrain_node (res://scripts/terrain3d_adapter.gd:348)
+       [1] apply_pending (res://scripts/terrain3d_adapter.gd:171)
+       [2] _apply_pending_deferred (res://scripts/terrain3d_adapter.gd:318)

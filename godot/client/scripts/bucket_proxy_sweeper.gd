@@ -19,6 +19,7 @@ var model_id := ""
 var proxy_version := ""
 
 var _terrain_collider: TerrainCollider
+var _static_map_root: Node3D
 var _terrain_mask := 1
 var _proxy_contracts: Dictionary = {}
 var _shapes: Dictionary = {}
@@ -31,10 +32,11 @@ func configure(
 	model: String,
 	soil_contract: Dictionary,
 	terrain_collider: TerrainCollider,
-	terrain_collision_mask: int
+	terrain_collision_mask: int,
+	static_map_root: Node3D = null
 ) -> bool:
 	reset()
-	if model.is_empty() or terrain_collider == null or terrain_collision_mask <= 0:
+	if model.is_empty() or (terrain_collider == null and static_map_root == null) or terrain_collision_mask <= 0:
 		return false
 	var proxies := soil_contract.get("proxies", {}) as Dictionary
 	for proxy_name in PROXY_ORDER:
@@ -53,6 +55,7 @@ func configure(
 	model_id = model
 	proxy_version = "%s:%s" % [String(soil_contract.get("schema_version", "")), model]
 	_terrain_collider = terrain_collider
+	_static_map_root = static_map_root
 	_terrain_mask = terrain_collision_mask
 	configured = true
 	return true
@@ -63,6 +66,7 @@ func reset() -> void:
 	model_id = ""
 	proxy_version = ""
 	_terrain_collider = null
+	_static_map_root = null
 	_terrain_mask = 1
 	_cut_band_m = SHALLOW_CUT_OVERLAP_M
 	_proxy_contracts.clear()
@@ -97,10 +101,13 @@ func sweep(
 	):
 		base["quality_flags"] = ["bucket_query_unavailable"]
 		return base
-	if (
-		_terrain_collider == null or not _terrain_collider.available
-		or _terrain_collider.get_applied_identity() != terrain_identity
-	):
+	var identity_valid := (
+		_static_map_root.is_inside_tree() and terrain_identity == Vector2i.ZERO
+		if is_instance_valid(_static_map_root) else
+		_terrain_collider != null and _terrain_collider.available
+		and _terrain_collider.get_applied_identity() == terrain_identity
+	)
+	if not identity_valid:
 		base["quality_flags"] = ["bucket_query_terrain_identity_mismatch"]
 		return base
 	var segment_count := _segment_count(previous_bucket_frame, candidate_bucket_frame)
@@ -304,6 +311,12 @@ func _first_terrain_hit(hits: Array[Dictionary]) -> Dictionary:
 	for hit_value in hits:
 		var hit := hit_value as Dictionary
 		var collider := hit.get("collider") as Node
+		if is_instance_valid(_static_map_root):
+			if collider != null and _static_map_root.is_ancestor_of(collider):
+				return hit
+			var ground := _static_map_root.get_node_or_null("Ground") as Terrain3D
+			if ground != null and hit.get("rid", RID()) == ground.collision.get_rid():
+				return hit
 		if collider != null and _terrain_collider != null and _terrain_collider.is_ancestor_of(collider):
 			return hit
 	return {}

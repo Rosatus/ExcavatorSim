@@ -17,21 +17,21 @@
   "proxies": {
     "cutting_edge": {
       "frame": "bucket_link",
-      "center_godot": [0.0, -1.0, -1.04],
-      "direction_godot": [0.0, -0.35, -0.93675],
-      "half_width_m": 0.62
+      "center_godot": [0.005, 1.156, -0.99],
+      "direction_godot": [0, 0.939693, -0.34202],
+      "half_width_m": 0.56
     },
     "top_edge": {
       "frame": "bucket_link",
-      "center_godot": [0.0, -0.38, 0.2],
+      "center_godot": [0.005, 0.03, -0.02],
       "half_width_m": 0.62
     },
     "opening": {
       "frame": "bucket_link",
-      "center_godot": [0.0, -0.7, -0.5],
-      "normal_godot": [0.0, -0.707107, 0.707107],
-      "up_godot": [0.0, 0.707107, 0.707107],
-      "size_m": [1.24, 1.02]
+      "center_godot": [0.005, 0.593, -0.505],
+      "normal_godot": [0, 0.6526733755283154, 0.7576394029328691],
+      "up_godot": [0, 0.6526733755283154, 0.7576394029328691],
+      "size_m": [1.24, 1.4861951419648767]
     },
     "cavity": {
       "frame": "bucket_link",
@@ -41,15 +41,15 @@
     },
     "shell": {
       "frame": "bucket_link",
-      "center_godot": [0.0, -0.36, 0.12],
-      "up_godot": [0.0, 0.707107, 0.707107],
-      "size_m": [1.16, 0.18, 0.62],
-      "evidence": "tuned_from_validated_bucket_local_aabb"
+      "center_godot": [0, 0.35, -1.035],
+      "up_godot": [0, 0.15, -0.9886859966642595],
+      "size_m": [1.16, 0.16, 0.72],
+      "evidence": "imported_bucket_link_mesh_shell_2026_09_09"
     },
     "rear_support": {
       "frame": "bucket_link",
-      "center_godot": [0.0, -0.3, 0.2],
-      "radius_m": 0.28
+      "center_godot": [0, -0.26, -0.44],
+      "radius_m": 0.15
     }
   },
   "bucket_tool": {
@@ -69,63 +69,63 @@
       {
         "region_id": "teeth_main_edge",
         "kind": "teeth",
-        "center_godot": [0.0, -1.0, -1.04],
-        "outward_normal_godot": [0.0, -0.35, -0.93675],
-        "shape": {"kind": "segment", "axis_godot": [1.0, 0.0, 0.0], "half_length_m": 0.62, "radius_m": 0.045},
+        "center_godot": [0.005, 1.156, -0.99],
+        "outward_normal_godot": [0, 0.939693, -0.34202],
+        "shape": {"kind": "segment", "axis_godot": [1.0, 0.0, 0.0], "half_length_m": 0.56, "radius_m": 0.045},
         "stable_soil_roles": ["cut"],
         "active_soil_roles": []
       },
       {
         "region_id": "left_side_cutter",
         "kind": "side_cutter",
-        "center_godot": [-0.6, -0.72, -0.58],
+        "center_godot": [-0.6, 0.593, -0.505],
         "outward_normal_godot": [-1.0, 0.0, 0.0],
-        "shape": {"kind": "segment", "axis_godot": [0.0, 0.707107, 0.707107], "half_length_m": 0.5, "radius_m": 0.04},
+        "shape": {"kind": "segment", "axis_godot": [0, 0.7576394029328691, -0.6526733755283154], "half_length_m": 0.7430975709824383, "radius_m": 0.04},
         "stable_soil_roles": ["side_cut"],
         "active_soil_roles": []
       },
       {
         "region_id": "right_side_cutter",
         "kind": "side_cutter",
-        "center_godot": [0.6, -0.72, -0.58],
+        "center_godot": [0.6, 0.593, -0.505],
         "outward_normal_godot": [1.0, 0.0, 0.0],
-        "shape": {"kind": "segment", "axis_godot": [0.0, 0.707107, 0.707107], "half_length_m": 0.5, "radius_m": 0.04},
+        "shape": {"kind": "segment", "axis_godot": [0, 0.7576394029328691, -0.6526733755283154], "half_length_m": 0.7430975709824383, "radius_m": 0.04},
         "stable_soil_roles": ["side_cut"],
         "active_soil_roles": []
       },
       {
         "region_id": "floor_wear_plate",
         "kind": "floor",
-        "center_godot": [0.0, -0.62, -0.55],
-        "outward_normal_godot": [0.0, -0.707107, -0.707107],
-        "shape": {"kind": "box", "size_m": [1.12, 0.08, 0.78]},
+        "center_godot": [0, -0.15, -0.6],
+        "outward_normal_godot": [0, -0.707107, -0.707107],
+        "shape": {"kind": "box", "size_m": [1.12, 0.08, 0.6]},
         "stable_soil_roles": ["scrape", "grade"],
         "active_soil_roles": []
       },
       {
         "region_id": "outer_back",
         "kind": "outer_shell",
-        "center_godot": [0.0, -0.36, 0.12],
-        "outward_normal_godot": [0.0, -0.707107, 0.707107],
-        "shape": {"kind": "box", "size_m": [1.16, 0.18, 0.62]},
+        "center_godot": [0, 0.35, -1.035],
+        "outward_normal_godot": [0, 0.15, -0.9886859966642595],
+        "shape": {"kind": "box", "size_m": [1.16, 0.16, 0.72]},
         "stable_soil_roles": ["push", "back_drag", "grade", "compact"],
         "active_soil_roles": []
       },
       {
         "region_id": "outer_left_side",
         "kind": "outer_shell",
-        "center_godot": [-0.58, -0.45, -0.35],
+        "center_godot": [-0.6, 0.38, -0.64],
         "outward_normal_godot": [-1.0, 0.0, 0.0],
-        "shape": {"kind": "box", "size_m": [0.08, 0.65, 0.95]},
+        "shape": {"kind": "box", "size_m": [0.08, 1.2, 0.7]},
         "stable_soil_roles": ["side_cut", "push", "grade"],
         "active_soil_roles": []
       },
       {
         "region_id": "outer_right_side",
         "kind": "outer_shell",
-        "center_godot": [0.58, -0.45, -0.35],
+        "center_godot": [0.6, 0.38, -0.64],
         "outward_normal_godot": [1.0, 0.0, 0.0],
-        "shape": {"kind": "box", "size_m": [0.08, 0.65, 0.95]},
+        "shape": {"kind": "box", "size_m": [0.08, 1.2, 0.7]},
         "stable_soil_roles": ["side_cut", "push", "grade"],
         "active_soil_roles": []
       },
@@ -141,9 +141,9 @@
       {
         "region_id": "opening",
         "kind": "opening",
-        "center_godot": [0.0, -0.7, -0.5],
-        "outward_normal_godot": [0.0, -0.707107, 0.707107],
-        "shape": {"kind": "plane", "size_m": [1.24, 1.02], "width_axis_godot": [1.0, 0.0, 0.0], "height_axis_godot": [0.0, 0.707107, 0.707107]},
+        "center_godot": [0.005, 0.593, -0.505],
+        "outward_normal_godot": [0, 0.6526733755283154, 0.7576394029328691],
+        "shape": {"kind": "plane", "size_m": [1.24, 1.4861951419648767], "width_axis_godot": [1.0, 0.0, 0.0], "height_axis_godot": [0, 0.7576394029328691, -0.6526733755283154]},
         "stable_soil_roles": [],
         "active_soil_roles": ["entry", "spill", "dump"]
       }

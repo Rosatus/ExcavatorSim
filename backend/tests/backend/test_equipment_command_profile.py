@@ -30,7 +30,7 @@ def test_profile_locks_operator_semantics_and_model_signs() -> None:
         "arm_retract",
         "bucket_dump",
     )
-    assert profile.signs_for("sy205") == (-1.0, -1.0, -1.0, 1.0)
+    assert profile.signs_for("sy205") == (-1.0, 1.0, 1.0, -1.0)
     assert profile.signs_for("sy135") == (-1.0, 1.0, 1.0, -1.0)
 
 

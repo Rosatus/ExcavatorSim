@@ -1,0 +1,74 @@
+Pixi task (lint-backend in default): ruff check backend/src backend/tests backend/scripts
+All checks passed!
+
+Pixi task (typecheck-backend in default): mypy backend/src backend/scripts
+Success: no issues found in 49 source files
+
+Pixi task (test-backend in default): python -m pytest backend/tests/backend
+============================= test session starts =============================
+platform win32 -- Python 3.11.15, pytest-9.1.1, pluggy-1.6.0
+rootdir: E:\projects\ExcavatorSim
+configfile: pyproject.toml
+plugins: asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 195 items
+
+backend\tests\backend\test_calibration.py ...                            [  1%]
+backend\tests\backend\test_cli.py ..                                     [  2%]
+backend\tests\backend\test_control.py ....                               [  4%]
+backend\tests\backend\test_equipment_command_profile.py .....            [  7%]
+backend\tests\backend\test_exchange.py ...                               [  8%]
+backend\tests\backend\test_gateway_runtime.py ...                        [ 10%]
+backend\tests\backend\test_generate_sy205_urdf.py ....................   [ 20%]
+backend\tests\backend\test_input_router.py .......                       [ 24%]
+backend\tests\backend\test_model.py .......                              [ 27%]
+backend\tests\backend\test_model_registry.py ....                        [ 29%]
+backend\tests\backend\test_model_web.py .                                [ 30%]
+backend\tests\backend\test_product_soak.py .......                       [ 33%]
+backend\tests\backend\test_production.py ............                    [ 40%]
+backend\tests\backend\test_protocol.py ..............                    [ 47%]
+backend\tests\backend\test_recording.py ........                         [ 51%]
+backend\tests\backend\test_replay.py ....                                [ 53%]
+backend\tests\backend\test_rrd.py ....                                   [ 55%]
+backend\tests\backend\test_runtime.py .........                          [ 60%]
+backend\tests\backend\test_sensor_gateway.py .......                     [ 63%]
+backend\tests\backend\test_shadow_state.py .......                       [ 67%]
+backend\tests\backend\test_simulation.py ....                            [ 69%]
+backend\tests\backend\test_state.py ...                                  [ 70%]
+backend\tests\backend\test_sy205_joint_contract.py ..........            [ 75%]
+backend\tests\backend\test_terrain.py ...........                        [ 81%]
+backend\tests\backend\test_terrain_controller.py .....                   [ 84%]
+backend\tests\backend\test_terrain_excavation.py ................        [ 92%]
+backend\tests\backend\test_visual_assets.py .......                      [ 95%]
+backend\tests\backend\test_web.py ........                               [100%]
+
+============================ 195 passed in 17.48s =============================
+
+Pixi task (test-godot-toolchain in default): python -m pytest tools/tests tools/can_gateway/tests/test_build_manifest.py
+============================= test session starts =============================
+platform win32 -- Python 3.11.15, pytest-9.1.1, pluggy-1.6.0
+rootdir: E:\projects\ExcavatorSim
+configfile: pyproject.toml
+plugins: asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 24 items
+
+tools\tests\test_build_gateway_dist.py .......                           [ 29%]
+tools\tests\test_godot_voxel_toolchain.py ..........                     [ 70%]
+tools\can_gateway\tests\test_build_manifest.py ......s                   [100%]
+
+=========================== short test summary info ===========================
+SKIPPED [1] tools\can_gateway\tests\test_build_manifest.py:180: symlink creation is not permitted
+======================== 23 passed, 1 skipped in 1.91s ========================
+
+Pixi task (lint-godot-toolchain in default): ruff check tools/godot_voxel_toolchain.py tools/build_manifest.py tools/tests tools/can_gateway/tests/test_build_manifest.py
+All checks passed!
+
+Pixi task (typecheck-godot-toolchain in default): mypy tools/godot_voxel_toolchain.py tools/build_manifest.py
+Success: no issues found in 2 source files
+
+Pixi task (verify-provenance in default): python backend/scripts/verify_provenance.py
+ERROR: godot/client/resources/protocol/equipment-command-profile-v1.json: SHA-256 mismatch (21fb25f57397b992111f52501086efaab0e865951856d8537431c87015ef4f4a != 5057dcba49feb5c31ccbaa0e99bc3b50d03655f643203b5a5177ed0358535034)
+ERROR: protocol/equipment-command-profile-v1.json: SHA-256 mismatch (21fb25f57397b992111f52501086efaab0e865951856d8537431c87015ef4f4a != 84ecd8f883ddffbd9e17101bd9e900959be997d5e6b156bdedc2cbb2f00c7e22)
+ERROR: godot/client/scripts/equipment_command_profile_hash.gd: SHA-256 mismatch (39299d87ae4da4226b862ead1cdd61262fc104bcd69f185a453e6a74d1e6afc5 != 2aa1719937a42e19d43ace007d4276a2cd908e6b03ff847ea5a9afc666afa694)
+ERROR: protocol/equipment-command-profile-v1.json: SHA-256 mismatch (21fb25f57397b992111f52501086efaab0e865951856d8537431c87015ef4f4a != 84ecd8f883ddffbd9e17101bd9e900959be997d5e6b156bdedc2cbb2f00c7e22)

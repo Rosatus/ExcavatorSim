@@ -109,6 +109,8 @@ func step_fixed(delta: float, height_sampler: Callable) -> bool:
 	var next_yaw := wrapf(yaw_radians + yaw_rate * delta, -PI, PI)
 	var yaw_basis := Basis(Vector3.UP, next_yaw)
 	var forward := -yaw_basis.z
+	if _parameters.get("local_forward_axis", "-Z") == "+Z":
+		forward = -forward
 	var next_origin := chassis_transform.origin + forward * average_speed * last_traction * delta
 
 	var next_support := _sample_support(next_origin, next_yaw, height_sampler)
@@ -142,6 +144,8 @@ func get_status_snapshot() -> Dictionary:
 
 
 static func validate_parameters(parameters: Dictionary) -> bool:
+	if not ["-Z", "+Z"].has(parameters.get("local_forward_axis", "-Z")):
+		return false
 	if not parameters.has_all(REQUIRED_FIELDS):
 		return false
 	for field in REQUIRED_FIELDS:
@@ -199,6 +203,9 @@ func _sample_support(origin: Vector3, yaw: float, height_sampler: Callable) -> D
 	var yaw_basis := Basis(Vector3.UP, yaw)
 	var right := yaw_basis.x.normalized()
 	var forward := (-yaw_basis.z).normalized()
+	if _parameters.get("local_forward_axis", "-Z") == "+Z":
+		forward = -forward
+		right = -right
 	var front_offset := float(_parameters["support_front_offset_m"])
 	var rear_offset := float(_parameters["support_rear_offset_m"])
 	var left_offset := float(_parameters["support_left_offset_m"])
@@ -239,6 +246,8 @@ func _apply_support(support: Dictionary, yaw: float, delta: float) -> bool:
 	var weight := 1.0 - exp(-float(_parameters["support_response_hz"]) * delta)
 	_support_up = _support_up.lerp(target_up, clampf(weight, 0.0, 1.0)).normalized()
 	var yaw_forward := -Basis(Vector3.UP, yaw).z
+	# Reconstruct the asset basis, whose -Z axis is independent of travel
+	# convention. Support samples above already use vehicle front/right.
 	var forward := yaw_forward.slide(_support_up).normalized()
 	if forward.length_squared() < 0.5:
 		forward = yaw_forward

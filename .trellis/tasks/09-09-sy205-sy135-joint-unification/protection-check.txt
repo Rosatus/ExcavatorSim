@@ -1,0 +1,1 @@
+96 protected files unchanged versus HEAD (line endings normalized); SY135 profile/catalog entries identical.

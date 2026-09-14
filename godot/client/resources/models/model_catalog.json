@@ -14,9 +14,9 @@
       "parity_fixture_path": "res://tests/fixtures/sy205_frame_parity_cases.json",
       "parity_fixture_sha256": "aa5e8e75d5e74c6693dfeb258b77ce6341b064fce1eefc7c82b4c2ad848851c6",
       "soil_contract_path": "res://resources/models/sy205_soil_contract.json",
-      "soil_contract_sha256": "ade6b4f126046faa239a3aae62e98e00eb2ad86977eb50a5350502b7b431560a",
+      "soil_contract_sha256": "0ba604144ea7cc1ed7bb37479a3effb9a2826df921823ccd04b03e39261913fe",
       "physics_rig_path": "res://resources/physics/sy205_physics_rig.json",
-      "physics_rig_sha256": "cb0528597b0e688f04f607883a034ab1041f87becd07faae1298544c15334255",
+      "physics_rig_sha256": "248cf8cbe2818e1e7702a5ab444ee34b990909ac3f5bced505135e04f5dbae42",
       "tracked_locomotion": {
         "track_gauge_m": 2.2,
         "contact_length_m": 3.4,
@@ -34,7 +34,8 @@
         "slope_slip": 0.55,
         "turn_slip": 0.18,
         "minimum_traction": 0.18,
-        "support_response_hz": 8.0
+        "support_response_hz": 8.0,
+        "local_forward_axis": "+Z"
       }
     },
     {

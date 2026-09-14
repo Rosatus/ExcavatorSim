@@ -22,11 +22,11 @@
     "sy205": {
       "semantic_to_joint_signs": [
         -1,
-        -1,
-        -1,
-        1
+        1,
+        1,
+        -1
       ],
-      "evidence": "Corrected SY205 physical-key direction matrix and isolated joint-coordinate trace."
+      "evidence": "Uses the SY135 canonical joint signs; SY205 asset-coordinate differences are isolated in its rig axis declarations."
     },
     "sy135": {
       "semantic_to_joint_signs": [

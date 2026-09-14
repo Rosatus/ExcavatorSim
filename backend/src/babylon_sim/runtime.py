@@ -114,9 +114,6 @@ class RuntimeController:
         if profile not in ("legacy", "motion-only"):
             raise ValueError(f"unknown runtime profile: {profile}")
         self.profile = profile
-        self.model = model
-        self.calibration = calibration
-        self.simulator = Simulator(model, calibration)
         selected_model_id = model_id
         if selected_model_id is None:
             matches = [
@@ -129,6 +126,16 @@ class RuntimeController:
                     "runtime model version must resolve to one equipment command profile"
                 )
             selected_model_id = matches[0]
+        if selected_model_id == "sy205":
+            from .sy205_joint_contract import adapt_sy205_model, sy205_runtime_calibration
+
+            model = adapt_sy205_model(model)
+            calibration = sy205_runtime_calibration(calibration)
+        self.model = model
+        self.calibration = calibration
+        # The legacy terrain classifier consumes asset curl posture, not q.
+        self._reverse_bucket_posture = selected_model_id == "sy205"
+        self.simulator = Simulator(model, calibration)
         command_profile = load_equipment_command_profile()
         self.input_router = InputRouter(
             clock=clock,
@@ -165,7 +172,7 @@ class RuntimeController:
                 # Preserve the selected descriptor identity for replay.  Loading
                 # the same URDF without its explicit version silently applies
                 # the SY205 compatibility default to SY135 recordings.
-                ExcavatorModel.from_urdf(
+                type(model).from_urdf(
                     model.urdf_path,
                     model_version=model.model_version,
                 ),
@@ -529,6 +536,13 @@ class RuntimeController:
                 for name in ("tooth_left", "tooth_center", "tooth_right")
             )
             bucket_limit = self.calibration.joint_limits[-1]
+            bucket_posture = normalized_joint(
+                state.joint_position[-1],
+                bucket_limit.min_position,
+                bucket_limit.max_position,
+            )
+            if self._reverse_bucket_posture:
+                bucket_posture = 1.0 - bucket_posture
             self.terrain.submit_live_edit(
                 TerrainEditInput(
                     recording_epoch=self.recording.recording_epoch,
@@ -537,11 +551,7 @@ class RuntimeController:
                     stream_epoch=self._stream_epoch,
                     previous_teeth=teeth,  # type: ignore[arg-type]
                     current_teeth=teeth,  # type: ignore[arg-type]
-                    bucket_joint_normalized=normalized_joint(
-                        state.joint_position[-1],
-                        bucket_limit.min_position,
-                        bucket_limit.max_position,
-                    ),
+                    bucket_joint_normalized=bucket_posture,
                     reset_bucket=reset_bucket,
                 )
             )

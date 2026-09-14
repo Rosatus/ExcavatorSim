@@ -1,0 +1,32 @@
+{
+  "id": "sy205-sy135-joint-unification",
+  "name": "sy205-sy135-joint-unification",
+  "title": "Align SY205 joint semantics and limits with SY135",
+  "description": "以 SY135 为不可变基准，规划 SY205 关节语义、近似限位与共享参数统一；保护 SY135 gateway 物理量链路。",
+  "status": "in_progress",
+  "dev_type": "fullstack",
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "rosatus",
+  "assignee": "rosatus",
+  "createdAt": "2026-09-09",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "protocol/equipment-command-profile-v1.json",
+    "godot/client/resources/physics/sy205_physics_rig.json",
+    "godot/client/resources/physics/sy135_physics_rig.json",
+    "godot/client/scripts/kinematic_articulation_state.gd",
+    "backend/scripts/sync_equipment_command_profile.py"
+  ],
+  "notes": "SY205 bucket geometry, [-20,95] range and spawn/external camera heading corrected; Jolt and compatibility heading share +Z. Automated checks and SY135 protection/parity passed; pending human contact/camera review. No commit/archive.",
+  "meta": {}
+}

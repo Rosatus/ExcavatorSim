@@ -98,6 +98,7 @@ func _check_model_modes(camera: CameraRig, session: ProductSession, presentation
 			continue
 		camera.force_camera_update_for_test(1.0)
 		var snapshot := camera.get_view_snapshot_for_test()
+		_check_heading(camera, presentation, model_id, mode, snapshot)
 		if String(snapshot.get("mode", "")) != mode or String(snapshot.get("model_id", "")) != model_id:
 			_fail("%s did not retain %s mode identity" % [model_id, mode])
 		if not bool(snapshot.get("finite", false)):
@@ -118,6 +119,31 @@ func _check_model_modes(camera: CameraRig, session: ProductSession, presentation
 			_fail("%s cab mode did not make its upper shell transparent" % model_id)
 		elif mode != CameraRig.MODE_CAB and transparent_surfaces != 0:
 			_fail("%s %s retained cab transparency" % [model_id, mode])
+
+
+func _check_heading(camera: CameraRig, presentation: MotionPresentation, model_id: String, mode: String, snapshot: Dictionary) -> void:
+	var reference_name := "upper_structure_link" if mode in [CameraRig.MODE_OPERATOR, CameraRig.MODE_CAB] else "base_link"
+	var reference := presentation.get_frame_node(reference_name)
+	if reference == null:
+		return
+	var forward := reference.global_basis.z * (1.0 if model_id == "sy205" else -1.0)
+	forward.y = 0.0
+	forward = forward.normalized()
+	if mode == CameraRig.MODE_CAB:
+		if (-camera.global_basis.z).dot(forward) < 0.98:
+			_fail("%s cab does not look toward the machine front" % model_id)
+		return
+	var right := forward.cross(Vector3.UP).normalized()
+	var yaw := float(snapshot["yaw"])
+	var expected := -forward * cos(yaw) + right * sin(yaw)
+	var focus := reference.global_position
+	# Work-tool focus follows the bucket, while heading still follows the base.
+	if mode == CameraRig.MODE_WORK_TOOL:
+		focus = presentation.get_frame_node("bucket_link").global_position
+	var observed := (snapshot["desired_position"] as Vector3) - focus
+	observed.y = 0.0
+	if observed.normalized().dot(expected) < 0.999:
+		_fail("%s %s orbits around the wrong machine heading" % [model_id, mode])
 
 
 func _check_orbit_and_reset(camera: CameraRig) -> void:

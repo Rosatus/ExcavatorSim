@@ -2,4 +2,4 @@
 class_name EquipmentCommandProfileHash
 extends RefCounted
 
-const SHA256 := "5057dcba49feb5c31ccbaa0e99bc3b50d03655f643203b5a5177ed0358535034"
+const SHA256 := "21fb25f57397b992111f52501086efaab0e865951856d8537431c87015ef4f4a"

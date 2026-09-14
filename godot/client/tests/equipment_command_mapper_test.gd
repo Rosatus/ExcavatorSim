@@ -1,7 +1,7 @@
 extends SceneTree
 
 const EXPECTED_SIGNS := {
-	"sy205": Vector4(-1.0, -1.0, -1.0, 1.0),
+	"sy205": Vector4(-1.0, 1.0, 1.0, -1.0),
 	"sy135": Vector4(-1.0, 1.0, 1.0, -1.0),
 }
 const EXPECTED_OPERATOR_AXES := {
@@ -33,6 +33,7 @@ func _run() -> void:
 	if _binding_signature() != first_bindings:
 		_fail("model switching mutated operator device bindings")
 	_check_model_mapping()
+	_check_sy205_physical_directions()
 	var invalid := EquipmentCommandMapper.new("res://resources/protocol/missing.json")
 	if invalid.configure_model("sy205") or invalid.get_last_error().is_empty():
 		_fail("missing profile did not fail closed")
@@ -105,6 +106,55 @@ func _check_model_mapping() -> void:
 		if not mapper.read_operator_axes().is_equal_approx(EXPECTED_OPERATOR_AXES[action]):
 			_fail("operator action did not produce canonical axis: %s" % action)
 		Input.action_release(action)
+
+
+func _check_sy205_physical_directions() -> void:
+	# Exercise commands through FK, not just the profile's scalar signs. SY205
+	# has baked geometry facing +Z: common positive boom/arm coordinates must
+	# rotate its imported hinges around -X; curl uses the opposite direction.
+	var descriptor := PhysicsRigDescriptor.load_for_model("sy205")
+	if descriptor == null or not descriptor.is_valid_for("sy205", descriptor.model_version()):
+		_fail("SY205 direction fixture rejected its rig/catalog hash")
+		return
+	var mapper := EquipmentCommandMapper.new()
+	mapper.configure_model("sy205")
+	var frames := ["upper_structure_link", "boom_link", "arm_link", "bucket_link"]
+	var parents := ["base_link", "upper_structure_link", "boom_link", "arm_link"]
+	var expected_asset_signs := [-1.0, -1.0, -1.0, 1.0]
+	for index in 4:
+		for direction in [-1.0, 1.0]:
+			var state := KinematicArticulationState.new()
+			state.configure(descriptor.to_dictionary(), Transform3D.IDENTITY)
+			var rest := state.accepted_frames()
+			state.set_commands(Vector4.ZERO)
+			state.accept_step(state.propose_step(1.0 / 60.0, Transform3D.IDENTITY, true), 1.0)
+			var operator := Vector4.ZERO
+			operator[index] = direction
+			state.set_commands(mapper.to_joint_axes(operator))
+			for _tick in 30:
+				state.accept_step(state.propose_step(1.0 / 60.0, Transform3D.IDENTITY, true), 1.0)
+			var moved := state.accepted_frames()
+			var before: Transform3D = (rest[parents[index]] as Transform3D).affine_inverse() * (rest[frames[index]] as Transform3D)
+			var after: Transform3D = (moved[parents[index]] as Transform3D).affine_inverse() * (moved[frames[index]] as Transform3D)
+			var delta := before.basis.inverse() * after.basis
+			var angle := atan2(delta.z.x, delta.x.x) if index == 0 else atan2(delta.y.z, delta.y.y)
+			if angle * direction * float(expected_asset_signs[index]) <= 0.001:
+				_fail("SY205 %s operator direction %s reversed physical FK: %s" % [frames[index], direction, angle])
+			if index == 1 and direction > 0.0 and (moved["arm_link"] as Transform3D).origin.y <= (rest["arm_link"] as Transform3D).origin.y:
+				_fail("SY205 K did not physically raise the boom endpoint")
+			if index == 2 and direction > 0.0 and (moved["bucket_link"] as Transform3D).origin.z <= (rest["bucket_link"] as Transform3D).origin.z:
+				_fail("SY205 W did not extend the bucket endpoint forward")
+			if index > 0:
+				var limits := descriptor.joints()[index]["limit_rad"] as Array
+				for _tick in 700:
+					state.accept_step(state.propose_step(1.0 / 60.0, Transform3D.IDENTITY, true), 1.0)
+					var position := float(state.joint_states()[index]["position_rad"])
+					if position < float(limits[0]) or position > float(limits[1]):
+						_fail("SY205 %s escaped its common-coordinate limits" % frames[index])
+				var end := float(state.joint_states()[index]["position_rad"])
+				var expected_end := float(limits[1] if mapper.to_joint_axes(operator)[index] > 0.0 else limits[0])
+				if absf(end - expected_end) > 0.001:
+					_fail("SY205 %s did not reach the intended end of its shared travel" % frames[index])
 
 
 func _binding_signature() -> Dictionary:

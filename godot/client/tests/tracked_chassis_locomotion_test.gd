@@ -63,10 +63,16 @@ func _test_model_contracts() -> int:
 func _test_fixed_step_motion() -> int:
 	var state := _configured_state("sy205")
 	var flat := func(_point: Vector2) -> float: return 0.0
+	var baseline := _configured_state("sy135")
+	baseline.set_commands(1.0, 1.0)
+	for _index in 60:
+		baseline.step_fixed(STEP, flat)
+	if _check(baseline.chassis_transform.origin.z < -0.2, "SY135 lost its unchanged -Z travel convention") != 0:
+		return 1
 	state.set_commands(1.0, 1.0)
 	for _index in 60:
 		state.step_fixed(STEP, flat)
-	if _check(state.chassis_transform.origin.z < -0.2, "straight command did not move forward") != 0:
+	if _check(state.chassis_transform.origin.z > 0.2, "SY205 straight command did not move toward its +Z front") != 0:
 		return 1
 	if _check(absf(state.yaw_radians) < 0.0001, "straight command introduced yaw") != 0:
 		return 1
@@ -110,6 +116,13 @@ func _test_fixed_step_motion() -> int:
 
 
 func _test_support_and_bounds() -> int:
+	var sy205 := _configured_state("sy205")
+	var front_slope := func(point: Vector2) -> float: return point.y * 0.1
+	sy205.set_commands(0.4, 0.4)
+	for _index in 60:
+		sy205.step_fixed(STEP, front_slope)
+	if _check(sy205.chassis_transform.basis.z.y > 0.05 and sy205.chassis_transform.origin.z > 0.0, "SY205 +Z travel/support heading diverged on slope") != 0:
+		return 1
 	var state := _configured_state("sy135")
 	var slope := func(point: Vector2) -> float: return point.y * 0.1
 	state.set_commands(0.4, 0.4)

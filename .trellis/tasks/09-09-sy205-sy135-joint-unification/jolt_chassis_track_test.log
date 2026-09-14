@@ -1,0 +1,22 @@
+Godot Engine v4.7.2.stable.custom_build.ed1daf0bf (2026-08-17 01:18:38 UTC) - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+jolt_chassis_track_test: sy205 settle heave_rms=0.0002 tilt_rms=0.0000 height_span=0.0001 switches=1 support=(105350.0, 105350.0) posture=0.000deg clearance=0.0547
+jolt_chassis_track_test: sy205 drive heave_rms=0.0000 tilt_rms=0.0000 height_span=0.0000 switches=1 velocity=(0.0, -0.000002, 1.434918)
+jolt_chassis_track_test: sy205 peak fixed step=968 usec
+jolt_chassis_track_test: sy205 brake speed 1.4349 -> 0.0000 linear=(-0.0, -0.000002, 0.0) angular=(0.0, 0.0, 0.0) contacts=(4,4) support=(105350.0,105350.0) switches=1
+jolt_chassis_track_test: sy135 settle heave_rms=0.0002 tilt_rms=0.0000 height_span=0.0001 switches=1 support=(70903.0, 70903.0) posture=0.000deg clearance=0.0667
+jolt_chassis_track_test: sy135 drive heave_rms=0.0000 tilt_rms=0.0000 height_span=0.0000 switches=1 velocity=(0.0, -0.000002, -1.532829)
+jolt_chassis_track_test: sy135 peak fixed step=1000 usec
+jolt_chassis_track_test: sy135 brake speed 1.5328 -> 0.0000 linear=(0.0, -0.000002, 0.0) angular=(-0.0, -0.0, -0.0) contacts=(4,4) support=(70903.0,70903.0) switches=1
+jolt_chassis_track_test: slope start=(-0.0, 0.106783, 0.011213) finish=(0.0, -1.514763, 8.592828) forward=8.705 linear=(0.0, -1.995576, 1.143537) angular=(0.112543, 0.0, -0.0) contacts=(0,0) support=(0.0,0.0) switches=1 flags=["linear_speed_clamped", "no_track_contact"]
+ERROR: slope traversal did not gain height
+   at: VariantUtilityFunctions::push_error (core\variant\variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _run (res://tests/jolt_chassis_track_test.gd:29)
+       [1] _test_slope_and_obstacle (res://tests/jolt_chassis_track_test.gd:456)
+ERROR: slope traversal lost a complete track contact set
+   at: VariantUtilityFunctions::push_error (core\variant\variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _run (res://tests/jolt_chassis_track_test.gd:29)
+       [1] _test_slope_and_obstacle (res://tests/jolt_chassis_track_test.gd:456)
