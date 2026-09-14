@@ -1,8 +1,12 @@
 # Implementation Plan
 
+## Execution status (2026-09-08)
+
+Godot 地编基线、样板及全场结构检查已完成；结果见 research/implementation-result.md。最终人工视觉验收仍 pending，任务保持 in_progress。下方原始清单包含尚未完成的精修和验收要求，以结果记录为本轮交付依据。
+
 ## Preconditions
 
-- [ ] 用户批准本 PRD / design / implementation summary 后再运行 `task.py start`。
+- [x] 2026-09-08 用户批准 Godot 优先执行；Blender 工作记录到需求列表。
 - [ ] 实施前完整读取 `.trellis/spec/frontend/client-boundary.md`、`.trellis/spec/frontend/godot-mcp.md`、`.trellis/spec/frontend/validation-budget.md` 与 `docs/godot-integration.md`。
 - [ ] 记录开始时 `git status`，把另一位 agent 的所有既有修改视为只读；不 stage、不格式化、不回退这些文件。
 - [ ] 确认当前 `godot/client` MCP session；若仍在运行产品主场景，不对它执行任何写操作。
@@ -17,6 +21,9 @@
 Rollback point: 删除 workbench 目录和本地 junction/cache；产品客户端应无 diff。
 
 ## Phase B — Terrain and circulation blockout
+
+- [ ] 在全场扩展前完成代表性道路/接缝/可挖工作面样板：显式禁用 Terrain3D background，检查边界高度、独占碰撞、局部移除和基础资源预算。
+- [ ] 在样板中试用少量 GLB，导入耗时或资源压力不可接受时保留代理并记录 Blender 需求；不等待最终全场才观察成本。
 
 - [ ] 创建 3×3、64 m region 的 Terrain3D 独立数据集和可重复 source height maps，保留中央 region 未分配。
 - [ ] 创建有限 VoxelTerrain、SDF generator、土层和边界诊断；完成一次局部 `VoxelTool` 移除 smoke。

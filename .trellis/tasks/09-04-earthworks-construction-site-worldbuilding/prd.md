@@ -13,6 +13,10 @@
 
 ## Requirements
 
+### 2026-09-08 execution decision
+
+用户批准优先执行 Godot 地编。Godot 保存地图布局、地形、材质、灯光与审阅相机；实施中发现需要 Blender 建模、UV、烘焙或减面的工作，先记录到 `blender-requirements.md` 并使用代理继续，不在本轮执行 Blender 工作。先验证代表性接缝/工作面样板，再扩展全场。最终视觉验收仍由用户完成。
+
 ### R1. Development isolation
 
 - 新地图必须位于仓库内独立的 Godot worldbuilding workbench 中，拥有独立的 `project.godot`、`.godot` 缓存、场景入口、地形数据与本地素材缓存。

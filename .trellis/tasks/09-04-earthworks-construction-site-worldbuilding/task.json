@@ -3,7 +3,7 @@
   "name": "earthworks-construction-site-worldbuilding",
   "title": "Earthworks construction-site worldbuilding",
   "description": "Build a standalone, from-scratch Godot earthworks construction-site scene using Terrain3D, Voxel Tools, and curated construction GLB assets without connecting it to the product main scene.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

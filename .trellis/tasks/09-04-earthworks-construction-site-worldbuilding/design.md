@@ -42,6 +42,7 @@ godot/worldbuilding/earthworks_site/
 - Terrain3D 使用自己的 `terrain_data/`、`terrain_assets.tres` 和 `terrain_material.tres`，不共享产品 terrain data。
 - 首轮采用 `region_size = 64`、`vertex_spacing = 1 m`，构成约 `192 m × 192 m` 的 3×3 region 场地。
 - 中央完整 64 m × 64 m region 不分配给 Terrain3D；外围 8 个 region 承担硬地表。这样中央区在 Terrain3D 侧天然无可见面、无碰撞，不依赖像素级 hole mask 与 VoxelTerrain 对齐。
+- 必须显式设置 Terrain3DMaterial.world_background = NONE；未分配 region 本身不保证没有背景渲染。样板检查覆盖原始表面和局部挖除后的接缝，并预留不可编辑边缘，避免开挖暴露硬地表外沿。
 - 外围地貌由 source height map/可重复生成的 tool 脚本形成：南侧入口缓坡、东西设备坪、北侧堆料高地、边缘排水坡和背景土坡。道路最大常规纵坡目标 8%，短坡不超过 12%。
 
 ### 2.2 Editable earth cell
@@ -98,6 +99,8 @@ godot/worldbuilding/earthworks_site/
 ## 6. Authoring and authority
 
 - 地形 source maps、site layout constants 和 asset catalog 是可复现输入；`.godot/imported` 永远不是源。
+- Godot-first：生成工具仅生成初始地形与独立基础场景；发布后的 Terrain3D 数据和 Godot 场景保存人工修改。重新生成必须显式调用，拒绝默认覆盖已有成品；人工布景放在独立场景层，不由启动脚本重建。Blender 待办记录到任务的 blender-requirements.md。
+- 0.25 m/voxel 是地编预览参数，不能宣称等同产品默认 0.125 m 精度。地图规模与未来正式挖掘精度的联合预算留给迁移任务验证。
 - Terrain3D 是硬地表权威，VoxelTerrain 是中央可挖体积权威；任何 transition mesh 只负责边缘结构，不冒充第二份土体。
 - workbench 不接现有 `ExcavationWorld`、土量账本或 Jolt 产品链。局部挖除 smoke 只使用 `VoxelTool` 验证体积可编辑与下方无 Terrain3D。
 - MCP 是开发工具，不是运行时依赖。场景文件、source maps、catalog 和脚本必须能通过 headless Godot 复现和验证。
