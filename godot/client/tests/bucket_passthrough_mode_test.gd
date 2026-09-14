@@ -64,6 +64,7 @@ func _exercise_mode(
 	mode_button: CheckButton,
 ) -> void:
 	var initial_session := session.get_status_snapshot()
+	_assert_no_emission(effects, "cold startup")
 	if String(initial_session.get("bucket_ground_mode", "")) != BucketGroundInteractionMode.NORMAL:
 		_fail("application did not start in normal bucket-ground mode")
 	if session.request_bucket_ground_mode("invalid"):
@@ -82,6 +83,7 @@ func _exercise_mode(
 	await physics_frame
 	await physics_frame
 	var active := session.get_status_snapshot()
+	_assert_no_emission(effects, "pass-through entry")
 	var soil_active := excavation.get_status_snapshot()
 	var chassis_active := chassis.get_status_snapshot()
 	if String(active.get("bucket_ground_mode", "")) != BucketGroundInteractionMode.PASSTHROUGH:
@@ -121,6 +123,7 @@ func _exercise_mode(
 	var jolt_after := chassis.get_status_snapshot().get("bucket_ground_interaction", {}) as Dictionary
 	var soil_after := excavation.get_status_snapshot().get("bucket_ground_interaction", {}) as Dictionary
 	var effects_after := effects.get_effect_snapshot()
+	_assert_no_emission(effects, "pass-through trace")
 	if int(jolt_after.get("query_executed", -1)) != int(jolt_before.get("query_executed", -2)):
 		_fail("bucket sweep executed during pass-through trace")
 	if int(jolt_after.get("query_bypassed", 0)) <= int(jolt_before.get("query_bypassed", 0)):
@@ -194,6 +197,12 @@ func _assert_same_terrain(before: Dictionary, after: Dictionary, label: String) 
 		or String(before.get("snapshot_sha256", "")) != String(after.get("snapshot_sha256", "missing"))
 	):
 		_fail("%s mutated persistent terrain identity or bytes" % label)
+
+
+func _assert_no_emission(effects: SoilEffects, context: String) -> void:
+	var snapshot := effects.get_effect_snapshot()
+	if bool(snapshot.get("particles_emitting", false)) or bool(snapshot.get("dust_emitting", false)):
+		_fail("%s left soil particles emitting" % context)
 
 
 func _fail(message: String) -> void:

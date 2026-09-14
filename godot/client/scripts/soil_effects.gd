@@ -175,12 +175,14 @@ func clear_for_generation(generation: int) -> void:
 	if generation < _generation:
 		return
 	_generation = generation
+	# restart() clears live particles but also enables emission again.
+	# Leave both emitters stopped even when pass-through skips future updates.
 	if _flow_particles != null:
-		_flow_particles.emitting = false
 		_flow_particles.restart()
+		_flow_particles.emitting = false
 	if _dust_particles != null:
-		_dust_particles.emitting = false
 		_dust_particles.restart()
+		_dust_particles.emitting = false
 	_park_fill_mesh()
 	_last_fill_ratio = -1.0
 	_last_cavity_size = Vector3.ZERO
