@@ -240,7 +240,8 @@ channel、实际接收频率和新鲜度。该工具只接收，不参与 Gatewa
 
 - `gateway.py` — 收包循环 + 帧率调度 + 冒烟模式 + sink 分派（CSV/SocketCAN/TCP）
 - `conventions.py` — 包解析 / 四元数→ZYX 欧拉 / ENU→大地坐标 / 行走语义
-- `qml_profile.py` / `qml_compat.py` — 严格 profile/标定加载与 QML 数学逆投影
+- `calibration.py` — 独立标定层：GuideSystem 同构 `CalibrationParams` + TOML 加载 + 全部标定量变换
+- `qml_profile.py` / `qml_compat.py` — 严格 profile 加载与 QML 数学逆投影（标定量一律经 `calibration`）
 - `resources/` — SHA-256 绑定的 QML profile 与 ground-truth calibration
 - `csv_writer.py` — CANape CSV 方言（UTF-8-sig，被对方 read_can_csv 消费）
 - `sinks.py` — FrameSink 抽象：CsvFrameSink / SocketCanSink（AF_CAN 直发）

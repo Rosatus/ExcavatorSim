@@ -1,8 +1,10 @@
-"""Strict QML compatibility-profile and calibration loading.
+"""Strict QML compatibility-profile loading.
 
 The reference QML repository is an offline oracle only. Runtime profiles and
 calibration bytes live with the gateway and are SHA-256 bound so a field
-calibration change cannot silently alter emitted CAN semantics.
+calibration change cannot silently alter emitted CAN semantics. The calibration
+document itself is owned by `calibration.py`, which also owns every formula that
+consumes it; this module only binds a profile to those bytes.
 """
 
 from __future__ import annotations
@@ -15,6 +17,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from calibration import CalibrationError, CalibrationParams, parse_calibration
+
 BUILTIN_PROFILE = "builtin:qml-sy135-ground-truth"
 BUILTIN_PROFILE_FILE = "qml_sy135_ground_truth.toml"
 
@@ -24,29 +28,12 @@ class QmlProfileError(ValueError):
 
 
 @dataclass(frozen=True)
-class QmlCalibration:
-    car_pitch_error_deg: float
-    car_roll_error_deg: float
-    car_yaw_error_deg: float
-    boom_pitch_error_deg: float
-    arm_pitch_error_deg: float
-    bucket_pitch_error_deg: float
-    go_vehicle_m: tuple[float, float, float]
-    length_mn_m: float
-    length_nq_m: float
-    length_qk_m: float
-    length_mk_m: float
-    angle_nqf_deg: float
-    angle_kqv_deg: float
-
-
-@dataclass(frozen=True)
 class QmlCompatibilityProfile:
     version: int
     target: str
     model_id: str
     calibration_sha256: str
-    calibration: QmlCalibration
+    calibration: CalibrationParams
     neutral_qml_deg: tuple[float, float, float]
     joint_signs: tuple[float, float, float]
     neutral_relation_deg: tuple[float, float, float, float]
@@ -107,9 +94,9 @@ def load_qml_profile(
         )
     try:
         calibration_doc = tomllib.loads(calibration_bytes.decode("utf-8"))
-    except (UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
+        calibration = parse_calibration(calibration_doc)
+    except (UnicodeDecodeError, tomllib.TOMLDecodeError, CalibrationError) as exc:
         raise QmlProfileError(f"invalid QML calibration {calibration_path}: {exc}") from exc
-    calibration = _parse_calibration(calibration_doc)
 
     frames = _table(profile_doc, "frames")
     required_frames = {"body_imu": "upper", "rtk_attitude": "upper", "slew_center": "upper"}
@@ -169,34 +156,6 @@ def load_qml_profile(
         source_path=profile_path,
         calibration_path=calibration_path,
     )
-
-
-def _parse_calibration(doc: dict[str, Any]) -> QmlCalibration:
-    angle = _table(doc, "angle")
-    car = _table(doc, "imu_car")
-    component = _table(doc, "imu_component")
-    length = _table(doc, "length")
-    offset = _table(doc, "offset")
-    result = QmlCalibration(
-        car_pitch_error_deg=_number(car, "pitch"),
-        car_roll_error_deg=_number(car, "roll"),
-        car_yaw_error_deg=_number(car, "yaw"),
-        boom_pitch_error_deg=_number(component, "pitch_boom"),
-        arm_pitch_error_deg=_number(component, "pitch_arm"),
-        bucket_pitch_error_deg=_number(component, "pitch_bucket"),
-        go_vehicle_m=(
-            _number(offset, "GO_Tx"),
-            _number(offset, "GO_Ty"),
-            _number(offset, "GO_Tz"),
-        ),
-        length_mn_m=_positive(length, "m_lMN"),
-        length_nq_m=_positive(length, "m_lNQ"),
-        length_qk_m=_positive(length, "m_lQK"),
-        length_mk_m=_positive(length, "m_lMK"),
-        angle_nqf_deg=_number(angle, "m_angNQF"),
-        angle_kqv_deg=_number(angle, "m_angKQV"),
-    )
-    return result
 
 
 def _load_toml(path: Path, label: str) -> dict[str, Any]:

@@ -2,7 +2,9 @@
 
 This module implements the inverse of the immutable GuideSystem 3D pipeline:
 Godot upper/link transforms -> parser-reported IMU/RTK values -> QML Exca,
-joint angles and slew-center position.
+joint angles and slew-center position. Calibration is a separate stage
+(`calibration.py`): this module only frames the geometry and alignment, and
+delegates every calibrated quantity to that stage.
 """
 
 from __future__ import annotations
@@ -10,6 +12,12 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from calibration import (
+    CalibrationError,
+    invert_sensor2ang,
+    main_antenna_enu,
+    wire_body_angles,
+)
 from conventions import (
     METERS_PER_DEG_LAT,
     ORIGIN_ALT_M,
@@ -18,7 +26,7 @@ from conventions import (
     TelemetrySample,
     quat_to_yup_euler_deg,
 )
-from qml_profile import QmlCalibration, QmlCompatibilityProfile
+from qml_profile import QmlCompatibilityProfile
 
 Matrix3 = tuple[
     tuple[float, float, float],
@@ -40,8 +48,10 @@ Q_QML_HEADING_ZERO: Matrix3 = (
 )
 
 
-class QmlMappingError(ValueError):
-    """A telemetry pose cannot be represented by the bound QML contract."""
+# Calibration and projection violate the same contract ("this sample cannot be
+# represented"), so they share one failure type and callers keep a single
+# `except QmlMappingError` clause.
+QmlMappingError = CalibrationError
 
 
 @dataclass(frozen=True)
@@ -101,12 +111,9 @@ class QmlCanMapper:
             exca, self.profile.gimbal_cosine_tolerance
         )
         calibration = self.profile.calibration
-        # GuidancePeriodicService adapts parser R/P before lib_kin:
-        #   bodyIMUR = -parser_pitch, bodyIMUP = parser_roll
-        # Therefore the parser-facing inverse is P-car_roll, R+car_pitch.
-        wire_body_pitch = body_pitch - calibration.car_roll_error_deg
-        wire_body_roll = body_roll + calibration.car_pitch_error_deg
-        wire_heading = wrap_degrees(body_heading - calibration.car_yaw_error_deg)
+        wire_body_pitch, wire_body_roll, wire_heading = wire_body_angles(
+            body_pitch, body_roll, body_heading, calibration
+        )
 
         joint_delta_deg = self._joint_deltas(sample)
         neutral = self.profile.neutral_qml_deg
@@ -117,7 +124,12 @@ class QmlCanMapper:
             neutral[2] + signs[2] * joint_delta_deg[2],
         )
         boom_pitch, arm_pitch, bucket_pitch = invert_sensor2ang(
-            body_pitch, qml_joints, self.profile
+            body_pitch,
+            qml_joints,
+            calibration,
+            mnq_range_deg=self.profile.bucket_mnq_range_deg,
+            tolerance_deg=self.profile.bucket_tolerance_deg,
+            forward_error_deg=self.profile.joint_forward_error_deg,
         )
 
         imu_rpy: dict[str, tuple[float, float, float]] = {
@@ -132,7 +144,7 @@ class QmlCanMapper:
             imu_rpy[link] = (roll, reported_pitch, yaw)
 
         slew_center_enu = godot_point_to_enu(upper.origin_m)
-        main_enu = _vec_sub(slew_center_enu, _mat_vec(exca, calibration.go_vehicle_m))
+        main_enu = main_antenna_enu(slew_center_enu, exca, calibration)
         vice_enu = _vec_add(
             main_enu,
             _mat_vec(exca, self.profile.vice_offset_vehicle_m),
@@ -217,110 +229,6 @@ def extract_qml_body_angles(
     pitch_rad = math.atan2(exca[2][1], exca[2][2])
     heading = wrap_degrees(-math.degrees(alpha) - 90.0)
     return math.degrees(pitch_rad), math.degrees(roll_rad), heading
-
-
-def invert_sensor2ang(
-    body_phi_pitch_deg: float,
-    qml_joint_deg: tuple[float, float, float],
-    profile: QmlCompatibilityProfile,
-) -> tuple[float, float, float]:
-    calibration = profile.calibration
-    boom_phi, arm_phi, bucket_phi = qml_joint_deg
-    boom_pitch = calibration.boom_pitch_error_deg - body_phi_pitch_deg - boom_phi
-    arm_pitch = (
-        boom_pitch
-        - calibration.boom_pitch_error_deg
-        + calibration.arm_pitch_error_deg
-        + 180.0
-        - arm_phi
-    )
-    mnq = invert_bucket_phi(bucket_phi, calibration, profile)
-    bucket_pitch = (
-        arm_pitch + calibration.bucket_pitch_error_deg - calibration.arm_pitch_error_deg - mnq
-    )
-    roundtrip = sensor2ang_from_reported(
-        body_phi_pitch_deg,
-        boom_pitch,
-        arm_pitch,
-        bucket_pitch,
-        calibration,
-    )
-    errors = [
-        abs(actual - expected) for actual, expected in zip(roundtrip, qml_joint_deg, strict=True)
-    ]
-    if max(errors) > profile.joint_forward_error_deg:
-        raise QmlMappingError(f"Sensor2Ang inverse forward error too large: {errors}")
-    return boom_pitch, arm_pitch, bucket_pitch
-
-
-def sensor2ang_from_reported(
-    body_phi_pitch_deg: float,
-    boom_pitch_deg: float,
-    arm_pitch_deg: float,
-    bucket_pitch_deg: float,
-    calibration: QmlCalibration,
-) -> tuple[float, float, float]:
-    boom_imu = -boom_pitch_deg
-    arm_imu = -arm_pitch_deg
-    bucket_imu = -bucket_pitch_deg
-    boom_phi = boom_imu + calibration.boom_pitch_error_deg - body_phi_pitch_deg
-    arm_phi = 180.0 - (
-        boom_imu + calibration.boom_pitch_error_deg - arm_imu - calibration.arm_pitch_error_deg
-    )
-    mnq = (
-        bucket_imu + calibration.bucket_pitch_error_deg - arm_imu - calibration.arm_pitch_error_deg
-    )
-    return boom_phi, arm_phi, bucket_phi_from_mnq(mnq, calibration)
-
-
-def bucket_phi_from_mnq(mnq_deg: float, calibration: QmlCalibration) -> float:
-    mn = calibration.length_mn_m
-    nq = calibration.length_nq_m
-    qk = calibration.length_qk_m
-    mk = calibration.length_mk_m
-    mq_sq = mn * mn + nq * nq - 2.0 * nq * mn * math.cos(math.radians(mnq_deg))
-    mq = math.sqrt(max(0.0, mq_sq))
-    if mq <= 1e-12:
-        raise QmlMappingError("QML bucket linkage produced a zero MQ length")
-    cos_mqn = _clamp_unit((mq * mq + nq * nq - mn * mn) / (2.0 * mq * nq))
-    cos_kqm = _clamp_unit((qk * qk + mq * mq - mk * mk) / (2.0 * qk * mq))
-    return (
-        360.0
-        - calibration.angle_nqf_deg
-        - math.degrees(math.acos(cos_kqm) + math.acos(cos_mqn))
-        - calibration.angle_kqv_deg
-    )
-
-
-def invert_bucket_phi(
-    target_phi_deg: float,
-    calibration: QmlCalibration,
-    profile: QmlCompatibilityProfile,
-) -> float:
-    low, high = profile.bucket_mnq_range_deg
-    low_value = bucket_phi_from_mnq(low, calibration)
-    high_value = bucket_phi_from_mnq(high, calibration)
-    increasing = high_value > low_value
-    minimum, maximum = sorted((low_value, high_value))
-    if not minimum <= target_phi_deg <= maximum:
-        raise QmlMappingError(
-            f"bucket target {target_phi_deg:.6f} deg outside invertible range "
-            f"[{minimum:.6f}, {maximum:.6f}]"
-        )
-    for _iteration in range(80):
-        middle = (low + high) * 0.5
-        value = bucket_phi_from_mnq(middle, calibration)
-        if abs(value - target_phi_deg) <= profile.bucket_tolerance_deg:
-            return middle
-        if (value < target_phi_deg) == increasing:
-            low = middle
-        else:
-            high = middle
-    result = (low + high) * 0.5
-    error = abs(bucket_phi_from_mnq(result, calibration) - target_phi_deg)
-    if error > profile.bucket_tolerance_deg:
-        raise QmlMappingError(f"bucket inverse did not converge: error={error:.9g} deg")
-    return result
 
 
 def quat_to_matrix(quaternion: Quaternion) -> Matrix3:
@@ -409,10 +317,6 @@ def _require_finite(label: str, values: tuple[float, ...]) -> None:
         raise QmlMappingError(f"{label} contains a non-finite value")
 
 
-def _clamp_unit(value: float) -> float:
-    return max(-1.0, min(1.0, value))
-
-
 def _transpose(matrix: Matrix3) -> Matrix3:
     return (
         (matrix[0][0], matrix[1][0], matrix[2][0]),
@@ -442,7 +346,3 @@ def _mat_vec(matrix: Matrix3, vector: Vector3) -> Vector3:
 
 def _vec_add(left: Vector3, right: Vector3) -> Vector3:
     return left[0] + right[0], left[1] + right[1], left[2] + right[2]
-
-
-def _vec_sub(left: Vector3, right: Vector3) -> Vector3:
-    return left[0] - right[0], left[1] - right[1], left[2] - right[2]

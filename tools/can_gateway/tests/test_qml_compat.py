@@ -13,6 +13,7 @@ TOOLS_DIR = Path(__file__).resolve().parents[1]
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
+from calibration import sensor2ang_from_reported  # noqa: E402
 from conventions import BodyPose, TelemetrySample, basis_forward_from_quat  # noqa: E402
 from encoders.ruifen_imu import RUFINEN_IDS, reported_rpy  # noqa: E402
 from encoders.sinan_rtk import RTK_IDS_ORDERED, decode_heading, decode_status  # noqa: E402
@@ -23,7 +24,6 @@ from qml_compat import (  # noqa: E402
     QmlMappingError,
     extract_qml_body_angles,
     qml_exca_from_godot_quaternion,
-    sensor2ang_from_reported,
 )
 from qml_profile import (  # noqa: E402
     BUILTIN_PROFILE,
@@ -136,8 +136,8 @@ class QmlPoseMappingTest(unittest.TestCase):
         calibration = self.profile.calibration
         # GuidancePeriodicService constructs IMUInput(-parser_pitch,
         # parser_roll, ..., A900), then lib_kin applies calibration.
-        self.assertAlmostEqual(body_pitch + calibration.car_roll_error_deg, 0.0, places=6)
-        self.assertAlmostEqual(body_roll - calibration.car_pitch_error_deg, 0.0, places=6)
+        self.assertAlmostEqual(body_pitch + calibration.roll_error_IMU_Car, 0.0, places=6)
+        self.assertAlmostEqual(body_roll - calibration.pitch_error_IMU_Car, 0.0, places=6)
         self.assertAlmostEqual(body_yaw, 0.0, places=6)
 
         reported = tuple(projection.imu_rpy_deg[name][1] for name in ("boom", "arm", "bucket"))
@@ -266,7 +266,7 @@ class QmlGatewayIntegrationTest(unittest.TestCase):
 
         calibration = self.profile.calibration
         decoded_qml_joints = sensor2ang_from_reported(
-            decoded_rpy["body"][1] + calibration.car_roll_error_deg,
+            decoded_rpy["body"][1] + calibration.roll_error_IMU_Car,
             decoded_rpy["boom"][1],
             decoded_rpy["arm"][1],
             decoded_rpy["bucket"][1],
