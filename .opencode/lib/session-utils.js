@@ -7,114 +7,23 @@ import { debugLog } from "./trellis-context.js"
 
 const PYTHON_CMD = platform() === "win32" ? "python" : "python"
 
-const FIRST_REPLY_NOTICE = `<first-reply-notice>
-On the first visible assistant reply in this session, briefly acknowledge that Trellis SessionStart context loaded.
-Choose the acknowledgment language in this order:
-1. Use the language of the user's current request (the user message that triggered this reply).
-2. If that request has no clear natural language, use an explicitly established project communication language.
-3. If neither provides a language, output the language-neutral fallback exactly: \`Trellis SessionStart ✓\`.
-Continue directly with the user's request after the acknowledgment.
-The acknowledgment must not alter the language used for the remainder of the response.
-This notice is one-shot: do not repeat it after the first visible assistant reply in this session.
-</first-reply-notice>`
-
-function hasCuratedJsonlEntry(jsonlPath) {
-  try {
-    const content = readFileSync(jsonlPath, "utf-8")
-    for (const rawLine of content.split(/\r?\n/)) {
-      const line = rawLine.trim()
-      if (!line) continue
-      try {
-        const row = JSON.parse(line)
-        if (row && typeof row === "object" && typeof row.file === "string" && row.file) {
-          return true
-        }
-      } catch {
-        // Ignore malformed line
-      }
-    }
-  } catch {
-    return false
-  }
-  return false
-}
-
 function getTaskStatus(ctx, platformInput = null) {
   const active = ctx.getActiveTask(platformInput)
   const taskRef = active.taskPath
-  if (!taskRef) {
-    return (
-      "Status: NO ACTIVE TASK\n" +
-      "Next-Action: Classify the current turn before creating any Trellis task. " +
-      "Simple conversation / small task asks only whether this turn should create a Trellis task. " +
-      "Complex task asks whether task creation and planning are allowed."
-    )
-  }
-
+  if (!taskRef) return "Status: NO ACTIVE TASK\nNext: Work directly for small requests; track sustained work within existing authorization."
   const taskDir = ctx.resolveTaskDir(taskRef)
-
   if (active.stale || !taskDir || !existsSync(taskDir)) {
-    return `Status: STALE POINTER\nTask: ${taskRef}\nNext-Action: Task directory not found. Run: python ./.trellis/scripts/task.py finish`
+    return `Status: STALE POINTER\nTask: ${taskRef}\nNext: Inspect this session pointer before clearing it with task.py finish.`
   }
-
-  let taskData = {}
-  const taskJsonPath = join(taskDir, "task.json")
-  if (existsSync(taskJsonPath)) {
-    try {
-      taskData = JSON.parse(readFileSync(taskJsonPath, "utf-8"))
-    } catch {
-      // Ignore parse errors
-    }
-  }
-
-  const taskTitle = taskData.title || taskRef
-  const taskStatus = taskData.status || "unknown"
-
-  if (taskStatus === "completed") {
-    return `Status: COMPLETED\nTask: ${taskTitle}\nNext-Action: Run /trellis:finish-work. If the working tree is dirty, return to Phase 3.4 first.`
-  }
-
-  const hasPrd = existsSync(join(taskDir, "prd.md"))
-  const hasDesign = existsSync(join(taskDir, "design.md"))
-  const hasImplementPlan = existsSync(join(taskDir, "implement.md"))
-  const artifactNames = ["prd.md", "design.md", "implement.md", "implement.jsonl", "check.jsonl"]
-  const present = artifactNames.filter(name => existsSync(join(taskDir, name)))
-  if (existsSync(join(taskDir, "research"))) present.push("research/")
-  const presentLine = present.length > 0 ? present.join(", ") : "(none)"
-  const implementJsonl = join(taskDir, "implement.jsonl")
-  const checkJsonl = join(taskDir, "check.jsonl")
-  const jsonlReady =
-    (!existsSync(implementJsonl) || hasCuratedJsonlEntry(implementJsonl)) &&
-    (!existsSync(checkJsonl) || hasCuratedJsonlEntry(checkJsonl))
-
-  if (taskStatus === "planning" && !hasPrd) {
-    return `Status: PLANNING\nTask: ${taskTitle}\nPresent: ${presentLine}\nNext-Action: Load trellis-brainstorm and write prd.md. Stay in planning.`
-  }
-
-  if (taskStatus === "planning") {
-    const missingComplex = []
-    if (!hasDesign) missingComplex.push("design.md")
-    if (!hasImplementPlan) missingComplex.push("implement.md")
-    const nextBits = []
-    if (missingComplex.length > 0) {
-      nextBits.push(
-        `Lightweight task can request start review with PRD-only; complex task must add ${missingComplex.join(", ")} before start`,
-      )
-    } else {
-      nextBits.push("Planning artifacts are present; ask for review before `task.py start`")
-    }
-    if (!jsonlReady) {
-      nextBits.push("curate `implement.jsonl` and `check.jsonl` before sub-agent mode start")
-    }
-    return `Status: PLANNING\nTask: ${taskTitle}\nPresent: ${presentLine}\nNext-Action: ${nextBits.join("; ")}. Do not enter implementation until the user confirms start.`
-  }
-
-  return (
-    `Status: ${String(taskStatus).toUpperCase()}\nTask: ${taskTitle}\n` +
-    `Present: ${presentLine}\n` +
-    "Next-Action: Follow the matching per-turn workflow-state. " +
-    "Implementation/check context order is jsonl entries -> `prd.md` -> `design.md if present` -> `implement.md if present`."
-  )
+  let data = {}
+  try { data = JSON.parse(readFileSync(join(taskDir, "task.json"), "utf-8")) } catch { /* Missing metadata */ }
+  const status = data.status || "unknown"
+  const next = status === "planning"
+    ? "Read goal/current milestone; start if ready and authorized. Optional documents do not block."
+    : status === "completed"
+      ? "Hand off/archive completed work; no commit or new checks for bookkeeping."
+      : "Read prd.md and implement.md/Progress if recovering, reconcile code and continue Next using valid evidence."
+  return `Status: ${String(status).toUpperCase()}\nTask: ${data.title || taskRef}\nNext: ${next}`
 }
 
 function loadTrellisConfig(directory, contextKey = null) {
@@ -378,7 +287,6 @@ export function buildSessionContext(ctx, platformInput = null) {
   parts.push(`<session-context>
 Trellis compact SessionStart context. Use it to orient the session; load details on demand.
 </session-context>`)
-  parts.push(FIRST_REPLY_NOTICE)
 
   const legacyWarning = checkLegacySpec(directory, config)
   if (legacyWarning) {
@@ -427,9 +335,9 @@ Trellis compact SessionStart context. Use it to orient the session; load details
 
   parts.push("<guidelines>")
   parts.push(
-    "Task context order for implementation/check: jsonl entries -> `prd.md` -> " +
-    "`design.md if present` -> `implement.md if present`. Missing optional artifacts " +
-    "are skipped for lightweight tasks.\n"
+    "Only the main agent implements or fixes. Use .trellis/delegation.md for delegation. " +
+    "Read missing relevant requirements/checkpoint and contracts on demand; manifests " +
+    "are discovery paths, not mandatory preload lists.\n"
   )
 
   if (paths.length > 0) {

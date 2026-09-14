@@ -231,8 +231,7 @@ def _get_task_status(trellis_dir: Path, hook_input: dict) -> str:
     if not active.task_path:
         return (
             "Status: NO ACTIVE TASK\n"
-            "Next: Classify the current turn and ask for task-creation consent "
-            "before creating any Trellis task."
+            "Next: Work directly for small requests; track sustained work within existing authorization."
         )
 
     task_ref = active.task_path
@@ -261,40 +260,12 @@ def _get_task_status(trellis_dir: Path, hook_input: dict) -> str:
             "or start a new task."
         )
 
-    has_prd = (task_dir / "prd.md").is_file()
-    has_design = (task_dir / "design.md").is_file()
-    has_implement = (task_dir / "implement.md").is_file()
-    present = [
-        name
-        for name in ("prd.md", "design.md", "implement.md", "implement.jsonl", "check.jsonl")
-        if (task_dir / name).is_file()
-    ]
-    present_line = ", ".join(present) if present else "none"
-
-    if not has_prd:
-        return (
-            f"Status: PLANNING\nTask: {task_title}\nPresent: {present_line}\n"
-            "Next: Load trellis-brainstorm and write prd.md. Stay in planning."
-        )
-
-    if task_status == "planning":
-        if has_design and has_implement:
-            next_action = "Review planning artifacts with the user before `task.py start`."
-        else:
-            next_action = (
-                "Lightweight task can ask for start review with PRD-only; "
-                "complex task must add design.md and implement.md before `task.py start`."
-            )
-        return (
-            f"Status: PLANNING\nTask: {task_title}\nPresent: {present_line}\n"
-            f"Next: {next_action}"
-        )
-
-    return (
-        f"Status: {task_status.upper()}\nTask: {task_title}\nPresent: {present_line}\n"
-        "Next: Follow the matching per-turn workflow-state. Context order is jsonl entries, "
-        "prd.md, design.md if present, implement.md if present."
+    next_action = (
+        "Read goal/current milestone; if ready and authorized, start and proceed. Optional documents do not block."
+        if task_status == "planning" else
+        "Read prd.md and implement.md/Progress if recovering, reconcile code, then continue Next using valid evidence."
     )
+    return f"Status: {str(task_status).upper()}\nTask: {task_title}\nNext: {next_action}"
 
 
 def _run_git(repo_root: Path, args: list[str]) -> str:

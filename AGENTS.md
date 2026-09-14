@@ -1,3 +1,5 @@
+Only the main agent implements and fixes. Subagents explore and verify under [.trellis/delegation.md](.trellis/delegation.md).
+
 <!-- TRELLIS:START -->
 # Trellis Instructions
 

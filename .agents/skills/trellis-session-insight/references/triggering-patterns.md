@@ -1,6 +1,6 @@
 # Triggering Patterns
 
-Verbatim user phrasings that should make an AI reach for `trellis mem`. Calibrate instinct against these — if a user message hits one of these patterns and you do not reach for `mem`, you probably missed an obvious recall.
+Examples of possible historical questions. First use available context and task checkpoints. Search mem only for missing historical evidence or an explicit request for the original dialogue; a phrase match is not an obligation.
 
 Patterns are grouped by the *intent* behind the phrasing, not the surface words. The same intent shows up in different languages and registers.
 
@@ -80,7 +80,7 @@ The user explicitly wants to look back at this task — not as a forced step, on
 - "记一下这次踩的坑"
 - "复盘下这个任务"
 
-Reach: identify the current task's session id (from `.trellis/.runtime/sessions/*.json` or `mem list --task <task-dir>`), then `extract <id> --phase brainstorm` and `--phase implement`. Present a summary — surface concrete file:line citations where possible. Whether to also write the summary somewhere (PRD, spec, notes file) is the user's call; offer, don't auto-write.
+Reach: identify the current task's session id (from `.trellis/.runtime/sessions/*.json` or `mem list --task <task-dir>`), then `extract <id> --phase brainstorm` and `--phase implement`. Present a summary — surface concrete file:line citations where possible. Persist useful findings within existing authorization without duplicating the checkpoint.
 
 ## Anti-patterns: do NOT reach for `mem` here
 
@@ -90,4 +90,4 @@ Reach: identify the current task's session id (from `.trellis/.runtime/sessions/
 - "What's the latest npm version of Y?" → call `npm view`.
 - "Fix this bug." → debug. Reach for `mem` only if you suspect prior context exists; otherwise it is noise.
 
-The bar stays: would a senior teammate ask "didn't we already talk about this?" before answering? If yes, reach for `mem`. If no, don't.
+The bar stays: is historical evidence needed and missing from the available context? If not, skip mem.

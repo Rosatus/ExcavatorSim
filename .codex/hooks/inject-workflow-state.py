@@ -26,6 +26,7 @@ each platform's hooks directory via writeSharedHooks() at init time.
 
 Silent exit 0 cases (no output):
   - No .trellis/ directory found (not a Trellis project)
+  - No active task for the supplied session
   - task.json malformed or missing status
 """
 from __future__ import annotations
@@ -60,14 +61,6 @@ if sys.platform.startswith("win"):
             except Exception:
                 pass  # Optional Windows stream setup; keep hook startup non-fatal.
 from typing import Optional
-
-
-# Bootstrap notice for Codex while the session has no active task. Codex does not
-# get the full SessionStart overview; this short reminder points the main session
-# at the start skill once and leaves the per-turn state block compact.
-CODEX_NO_TASK_BOOTSTRAP_NOTICE = """<trellis-bootstrap>
-If you have not already loaded Trellis context this session, read the `trellis-start` skill once.
-</trellis-bootstrap>"""
 
 
 # ---------------------------------------------------------------------------
@@ -142,7 +135,10 @@ def _resolve_active_task(root: Path, input_data: dict):
         sys.path.insert(0, str(scripts_dir))
     from common.active_task import resolve_active_task  # type: ignore[import-not-found]
 
-    return resolve_active_task(root, input_data, platform=_detect_platform(input_data))
+    return resolve_active_task(
+        root, input_data, platform=_detect_platform(input_data),
+        allow_single_session_fallback=False, allow_environment_context=False,
+    )
 
 
 def get_active_task(root: Path, input_data: dict) -> Optional[tuple[str, str, str]]:
@@ -165,6 +161,9 @@ def get_active_task(root: Path, input_data: dict) -> Optional[tuple[str, str, st
     except (json.JSONDecodeError, OSError):
         return None
 
+    if not isinstance(data, dict):
+        return None
+
     task_id = data.get("id") or task_dir.name
     status = data.get("status", "")
     if not isinstance(status, str) or not status:
@@ -173,7 +172,7 @@ def get_active_task(root: Path, input_data: dict) -> Optional[tuple[str, str, st
 
 
 # ---------------------------------------------------------------------------
-# Breadcrumb loading: parse workflow.md, fall back to hardcoded defaults
+# Breadcrumb loading: parse workflow.md, with a generic missing-tag fallback
 # ---------------------------------------------------------------------------
 
 # Supports STATUS values with letters, digits, underscores, hyphens
@@ -207,98 +206,6 @@ def load_breadcrumbs(root: Path) -> dict[str, str]:
         if body:
             result[status] = body
     return result
-
-
-def _read_trellis_config(root: Path) -> dict:
-    """Load .trellis/config.yaml via the bundled trellis_config helper.
-
-    The helper lives in .trellis/scripts/common; the hook lives outside the
-    scripts tree, so we extend sys.path before importing.
-    """
-    scripts_dir = root / ".trellis" / "scripts"
-    if str(scripts_dir) not in sys.path:
-        sys.path.insert(0, str(scripts_dir))
-    try:
-        from common.trellis_config import read_trellis_config  # type: ignore[import-not-found]
-    except Exception:
-        return {}
-    try:
-        return read_trellis_config(root)
-    except Exception:
-        return {}
-
-
-def _resolve_codex_dispatch_mode(config: dict) -> str:
-    """Normalize `codex.dispatch_mode` from .trellis/config.yaml to "auto" or "inline".
-
-    Defaults to `auto`. The legacy `sub-agent` value is an alias for `auto`.
-    Any other explicit value (including invalid ones) falls back to `inline`
-    without per-turn warnings. Shared by `_codex_mode_banner` (the per-turn
-    banner) and `resolve_breadcrumb_key` (the breadcrumb tag key) so the two
-    stay in lockstep.
-    """
-    mode = "auto"
-    if isinstance(config, dict):
-        codex_cfg = config.get("codex")
-        if isinstance(codex_cfg, dict):
-            cfg_mode = str(codex_cfg.get("dispatch_mode", mode)).strip().lower()
-            if cfg_mode == "inline":
-                mode = "inline"
-            elif cfg_mode in ("auto", "sub-agent"):
-                mode = "auto"
-            else:
-                mode = "inline"
-    return mode
-
-
-def _codex_mode_banner(config: dict) -> str:
-    """Emit a `<codex-mode>` banner for the additionalContext payload.
-
-    Reads `codex.dispatch_mode` from .trellis/config.yaml; defaults to
-    `auto`, which dispatches Trellis sub-agents using native Codex context
-    injection with a child-side fallback. This does not rely on inherited
-    parent transcripts: `fork_turns` remains caller-controlled, and
-    fresh-history sub-agents still receive their explicit delegated task and
-    inherited session configuration. `inline` is an explicit opt-out; the
-    legacy `sub-agent` value is an alias for `auto`. Invalid explicit values
-    fall back to `inline` without per-turn warnings. The banner makes the
-    active mode explicit to Codex AI per turn, complementing the workflow-state
-    body which is per-status. Mode tells AI which dispatch protocol to follow;
-    workflow-state tells AI what step it's at.
-    """
-    mode = _resolve_codex_dispatch_mode(config)
-    if mode == "auto":
-        meaning = (
-            "auto: implement/check work defaults to Trellis sub-agents; native Codex "
-            "context injection is preferred and child-side loading is the fallback. "
-            "The main session still coordinates, clarifies, updates specs, commits, and finishes."
-        )
-    else:
-        meaning = (
-            "inline: the main session implements/checks directly; "
-            "do not dispatch implement/check sub-agents."
-        )
-    return f"<codex-mode>{meaning}</codex-mode>"
-
-
-def resolve_breadcrumb_key(
-    status: str, platform: str | None, config: dict
-) -> str:
-    """Pick the breadcrumb tag key based on Codex dispatch_mode.
-
-    Codex defaults to ``auto`` and therefore uses the ordinary ``<status>``
-    breadcrumb for native SubagentStart dispatch with child-side fallback;
-    it does not depend on an inherited parent transcript. ``inline`` selects
-    the parallel ``<status>-inline`` tag; ``sub-agent`` remains an alias for
-    ``auto``. Invalid explicit values fall back to inline without per-turn
-    warnings.
-
-    Non-codex platforms return the plain status unchanged.
-    """
-    if platform == "codex":
-        mode = _resolve_codex_dispatch_mode(config)
-        return f"{status}-inline" if mode == "inline" else status
-    return status
 
 
 def build_breadcrumb(
@@ -369,37 +276,22 @@ def main() -> int:
     data = _load_hook_input()
 
     cwd_str = data.get("cwd") or os.getcwd()
+    if not isinstance(cwd_str, str):
+        return 0
     cwd = Path(cwd_str)
 
     root = find_trellis_root(cwd)
     if root is None:
         return 0  # not a Trellis project
 
-    templates = load_breadcrumbs(root)
-    platform = _detect_platform(data)
-    config = _read_trellis_config(root)
     task = get_active_task(root, data)
     if task is None:
-        # No active task — still emit a breadcrumb nudging AI toward
-        # trellis-brainstorm + task.py create when user describes real work.
-        no_task_key = resolve_breadcrumb_key("no_task", platform, config)
-        breadcrumb = build_breadcrumb(
-            None, "no_task", templates, breadcrumb_key=no_task_key
-        )
-    else:
-        task_id, status, source = task
-        status_key = resolve_breadcrumb_key(status, platform, config)
-        source_for_breadcrumb = None if platform == "codex" else source
-        breadcrumb = build_breadcrumb(
-            task_id, status, templates, source_for_breadcrumb, breadcrumb_key=status_key
-        )
-    if platform == "codex":
-        parts: list[str] = []
-        if task is None:
-            parts.append(CODEX_NO_TASK_BOOTSTRAP_NOTICE)
-        parts.append(_codex_mode_banner(config))
-        parts.append(breadcrumb)
-        breadcrumb = "\n\n".join(parts)
+        return 0  # No workflow policy injection for discussion or untracked work.
+
+    templates = load_breadcrumbs(root)
+    platform = _detect_platform(data)
+    task_id, status, source = task
+    breadcrumb = build_breadcrumb(task_id, status, templates, source)
 
     # Kiro (CLI userPromptSubmit / IDE promptSubmit) adds a hook's stdout
     # directly to the conversation context — no JSON envelope. Emit the bare

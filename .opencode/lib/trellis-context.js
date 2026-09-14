@@ -95,14 +95,15 @@ export class TrellisContext {
     return existsSync(join(this.directory, ".trellis"))
   }
 
-  getContextKey(platformInput = null) {
-    const override = stringValue(process.env.TRELLIS_CONTEXT_ID)
-    if (override) {
-      return sanitizeKey(override) || hashValue(override)
+  getContextKey(platformInput = null, { allowEnvironmentContext = true } = {}) {
+    // CLI/pull consumers may use environment identity. Interactive hooks must
+    // opt out so a server process cannot override the incoming session ID.
+    if (allowEnvironmentContext) {
+      const override = stringValue(process.env.TRELLIS_CONTEXT_ID)
+      if (override) return sanitizeKey(override) || hashValue(override)
+      const runID = stringValue(process.env.OPENCODE_RUN_ID)
+      if (runID) return buildContextKey("opencode", "session", runID)
     }
-
-    const runID = stringValue(process.env.OPENCODE_RUN_ID)
-    if (runID) return buildContextKey("opencode", "session", runID)
 
     const input = platformInput && typeof platformInput === "object" ? platformInput : null
     if (!input) return null

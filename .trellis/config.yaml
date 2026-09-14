@@ -30,7 +30,7 @@ max_journal_lines: 2000
 #
 # Accepts: true / false / yes / no / 1 / 0 / on / off (case-insensitive).
 #
-# session_auto_commit: true
+session_auto_commit: false
 
 #-------------------------------------------------------------------------------
 # Task Lifecycle Hooks
@@ -110,3 +110,57 @@ channel:
 #
 # codex:
 #   dispatch_mode: auto  # or "inline"; legacy alias: "sub-agent"
+
+# Local main-session workflow; bounded exploration/review remains available.
+codex:
+  dispatch_mode: inline
+
+# Exact local policy files; review upstream changes manually.
+update:
+  skip:
+    - .agents/skills/trellis-before-dev/SKILL.md
+    - .agents/skills/trellis-brainstorm/SKILL.md
+    - .agents/skills/trellis-break-loop/SKILL.md
+    - .agents/skills/trellis-check/SKILL.md
+    - .agents/skills/trellis-continue/SKILL.md
+    - .agents/skills/trellis-finish-work/SKILL.md
+    - .agents/skills/trellis-start/SKILL.md
+    - .agents/skills/trellis-update-spec/SKILL.md
+    - .agents/skills/trellis-channel/SKILL.md
+    - .agents/skills/trellis-channel/references/workflows.md
+    - .agents/skills/trellis-channel/references/workers.md
+    - .agents/skills/trellis-session-insight/SKILL.md
+    - .agents/skills/trellis-session-insight/references/triggering-patterns.md
+    - .codex/agents/trellis-check.toml
+    - .codex/agents/trellis-implement.toml
+    - .codex/agents/trellis-research.toml
+    - .codex/hooks/inject-workflow-state.py
+    - .codex/hooks/inject-subagent-context.py
+    - .codex/hooks/session-start.py
+    - .opencode/agents/trellis-check.md
+    - .opencode/agents/trellis-implement.md
+    - .opencode/agents/trellis-research.md
+    - .opencode/commands/trellis/continue.md
+    - .opencode/commands/trellis/finish-work.md
+    - .opencode/commands/trellis/start.md
+    - .opencode/lib/session-utils.js
+    - .opencode/lib/trellis-context.js
+    - .opencode/plugins/inject-subagent-context.js
+    - .opencode/plugins/inject-workflow-state.js
+    - .opencode/skills/trellis-before-dev/SKILL.md
+    - .opencode/skills/trellis-brainstorm/SKILL.md
+    - .opencode/skills/trellis-break-loop/SKILL.md
+    - .opencode/skills/trellis-check/SKILL.md
+    - .opencode/skills/trellis-update-spec/SKILL.md
+    - .opencode/skills/trellis-channel/SKILL.md
+    - .opencode/skills/trellis-session-insight/SKILL.md
+    - .trellis/agents/check.md
+    - .trellis/agents/implement.md
+    - .trellis/config.yaml
+    - .trellis/customization.md
+    - .trellis/scripts/common/task_store.py
+    - .trellis/spec/backend/index.md
+    - .trellis/spec/backend/quality-guidelines.md
+    - .trellis/spec/guides/index.md
+    - .trellis/validation.md
+    - .trellis/workflow.md

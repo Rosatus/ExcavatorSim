@@ -1,12 +1,10 @@
 # Workflows
 
-Use these patterns by intent. Prefer durable channels for multi-round work and
-`channel run` for one-shot questions.
+Use these patterns after selecting channel for cross-tool processes or durable records. Ordinary one-shot or multi-turn delegation uses native tools. Follow the project delegation policy for role permissions.
 
 ## Pattern A: Multi-round Brainstorm
 
-Use when the user says "和 codex/claude 讨论一下", "brainstorm", or "拉一个 agent
-进来一起看".
+Use when deliberation needs a cross-tool peer process or a durable shared record.
 
 ```bash
 trellis channel create brainstorm-storage-layer --by main \
@@ -14,8 +12,6 @@ trellis channel create brainstorm-storage-layer --by main \
 
 trellis channel spawn brainstorm-storage-layer \
   --agent architect --provider codex \
-  --file .trellis/tasks/05-XX-storage-adapter/prd.md \
-  --file .trellis/tasks/05-XX-storage-adapter/design.md \
   --as cx-arch --timeout 30m
 
 trellis channel send brainstorm-storage-layer \
@@ -25,30 +21,13 @@ trellis channel wait brainstorm-storage-layer \
   --as main --kind done --from cx-arch --timeout 10m
 ```
 
-Do not stop after one answer. Read the answer, identify vague areas, send a
-new probe, and repeat until the result is executable.
+Read the response and continue only for unresolved material questions. Stop when the decision has sufficient evidence. Depending on the task, useful probes include scope boundaries, contracts, alternatives, operational risks and verification; there is no minimum round structure. Request concrete sources where precision matters.
 
-Minimum round structure:
+The discussion brief supplies the current goal, relevant acceptance, known evidence and source paths. Attach full documents only if necessary for this assignment.
 
-1. Direction split: should this live in an existing mechanism or a new one?
-2. MVP boundary: v1, v2, and what would force v2 back into v1.
-3. Data contract: events, schema, metadata, state source of truth, compatibility.
-4. CLI / UX contract: command names, flags, errors, defaults, ambiguity.
-5. Cross-layer risk and tests: shared helpers, drift points, release-blocking tests.
+## Pattern B: Channel Reviewer
 
-Optional rounds:
-
-- Operations: logs, debugging, stuck workers, kill/restart, recovery.
-- Migration/release: breaking status, manifest, changelog, docs-site.
-- Opposition review: ask the peer agent to argue against the current plan.
-
-Every probe should request concrete file paths, commands, schema, rejected
-alternatives, and release-blocking issues. Reject hedging when a decision is
-needed.
-
-## Pattern B: Implement / Check Agent
-
-Use when the user asks to dispatch implementation or review work.
+Use when review specifically needs a channel peer process or durable findings. Supply a bounded brief with the current goal, relevant acceptance, exact task path, scope and existing evidence.
 
 ```bash
 TASK=.trellis/tasks/05-12-foo
@@ -56,10 +35,6 @@ trellis channel create cr-foo --task "$TASK" --by main
 
 trellis channel spawn cr-foo \
   --agent check \
-  --jsonl "$TASK/check.jsonl" \
-  --file "$TASK/prd.md" \
-  --file "$TASK/design.md" \
-  --file "$TASK/implement.md" \
   --cwd "$PWD" --timeout 15m
 
 trellis channel send cr-foo --as main --to check --text-file /tmp/cr-brief.md
@@ -67,23 +42,19 @@ trellis channel wait cr-foo --as main --kind done --from check --timeout 15m
 trellis channel messages cr-foo --kind message --from check --tag final_answer
 ```
 
-For implement work, use `--agent implement` and send an implementation brief.
-For check work, include the exact diff scope, relevant specs, and validation
-already run.
+Include the exact diff scope, relevant spec paths and validation already run in the brief. The worker reads missing relevant sections on demand. Only attach files or manifests when their full contents are useful for this bounded assignment.
 
 ## Pattern C: Parallel Reviewers
 
-Use one channel and distinct worker names.
+When a channel is needed, use one channel and distinct worker names.
 
 ```bash
 trellis channel create cr-feature --by main --ephemeral
 
 trellis channel spawn cr-feature --agent check \
-  --jsonl "$TASK/check.jsonl" --file "$TASK/prd.md" --file "$TASK/design.md" \
   --timeout 15m
 
 trellis channel spawn cr-feature --agent check --provider codex --as check-cx \
-  --jsonl "$TASK/check.jsonl" --file "$TASK/prd.md" --file "$TASK/design.md" \
   --timeout 15m
 
 trellis channel send cr-feature --as main --to check --text-file /tmp/cr-brief.md

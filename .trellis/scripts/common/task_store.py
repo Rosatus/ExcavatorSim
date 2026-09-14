@@ -194,8 +194,16 @@ def _default_prd_content(title: str, description: str | None = None) -> str:
 ## Notes
 
 - Keep `prd.md` focused on requirements, constraints, and acceptance criteria.
-- Lightweight tasks can remain PRD-only.
-- For complex tasks, add `design.md` for technical design and `implement.md` for execution planning before `task.py start`.
+- Detail the current milestone; keep later milestones as outcomes, dependencies and acceptance.
+- Separate `design.md` / `implement.md` are optional; use them when they improve clarity or recovery.
+
+## Progress
+
+- Current milestone: TBD
+- Completed / pending: TBD
+- Decisions and evidence: TBD
+- Blockers: TBD
+- Next: TBD
 """
 
 

@@ -1,6 +1,6 @@
 ---
 name: trellis-session-insight
-description: "Reach into past AI conversation history through the `trellis mem` CLI. Use whenever the user asks 'how did we solve X last time', 'have we discussed this before', 'what was the decision on X', 'remind me what we did in this task', '上次怎么解的', '之前讨论过吗', '想起一段对话', or when starting a brainstorm that overlaps prior work, debugging a familiar bug, continuing a task across sessions, or doing a finish-work review. Returns raw past dialogue; decide for the moment whether to update spec, append to task notes, quote inline in the answer, or just internalize."
+description: "Retrieve past conversation decisions with trellis mem when relevant history is missing from current context, task checkpoints or project files. Use for explicit historical recall or a concrete unresolved historical question; not automatically for brainstorm, continuation or finish-work."
 ---
 
 # Trellis Session Insight
@@ -17,7 +17,7 @@ Nothing in `mem` is uploaded. All reads are local.
 
 ## When to reach for it
 
-The bar is "would a senior teammate ask 'didn't we already talk about this?'" — those are the moments. Some concrete patterns:
+Use only when a concrete historical question remains unanswered by current context, task checkpoints and project files, or the user explicitly requests original past dialogue. Phase names and familiar topics alone are not triggers. Possible cases:
 
 - **Brainstorm rerun risk.** Starting a new task that touches an area the user has been in before, and you want to check whether a decision was already made — before re-asking the user.
 - **Familiar-bug debugging.** The current bug pattern feels like one the user reported / fixed before. Pulling the relevant past session can save a full debugging loop.
@@ -40,7 +40,7 @@ If none of these apply, don't call `mem`. It is a tool, not a ceremony.
 Treat the output as **raw material**, not a deliverable. Once you have it, decide based on the live conversation:
 
 - **Quote inline in your reply** if a specific past exchange answers the user's current question — and cite the session-id / phase so the user can verify.
-- **Update `<task>/prd.md` or `<task>/design.md`** if `mem` surfaced a load-bearing decision that should have been written down but wasn't. Surface the proposed edit to the user first.
+- **Update `<task>/prd.md` or `<task>/design.md`** if `mem` surfaced a load-bearing decision that should have been written down but wasn't. Record it within existing authorization; ask only if it changes an unresolved user commitment.
 - **Append to a task-local notes file** (e.g. `<task>/notes.md` or extending an existing one) if the finding belongs to the current task's record but doesn't fit the PRD.
 - **Update `.trellis/spec/`** if the finding is a project-wide convention or gotcha that would help future tasks. Run the `trellis-update-spec` skill for that — `session-insight` ends at the discovery.
 - **Just absorb it** for the next few turns and answer better, without writing anything. This is often the right move for one-off recall.
@@ -72,7 +72,7 @@ Phase slicing (`--phase brainstorm|implement|all`) cuts the session at `task.py 
 
 ## Triggering patterns
 
-`references/triggering-patterns.md` lists more verbatim user phrasings (English + Chinese) that should make you think "reach for `mem`" — keep that handy when training instinct.
+`references/triggering-patterns.md` gives examples for ambiguous recall requests. Load it only when needed; wording alone does not override the missing-context requirement.
 
 ## Out of scope
 

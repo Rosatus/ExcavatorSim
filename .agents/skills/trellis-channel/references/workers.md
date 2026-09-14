@@ -11,7 +11,7 @@ and translates its output back into channel events.
 trellis channel create impl-task --by dispatcher --cwd /path/to/repo
 trellis channel spawn impl-task --provider codex --as codex-impl --timeout 30m
 
-echo "Implement the schema for table X per .trellis/.../prd.md" \
+echo "Review the schema proposal for table X; return findings without edits" \
   | trellis channel send impl-task --as dispatcher --to codex-impl --stdin
 
 trellis channel wait impl-task --as dispatcher --from codex-impl --kind done --timeout 30m
@@ -48,7 +48,7 @@ The success event `spawned` records `pid`, `provider`, `agent`, the injected
 match `[A-Za-z0-9._-]+`. The default Trellis install ships two cards:
 
 - `.trellis/agents/check.md` — code-quality reviewer.
-- `.trellis/agents/implement.md` — coding worker for implementation runs.
+- `.trellis/agents/implement.md` — role permissions come from the local card; do not infer write permission from its name.
 
 ```yaml
 ---
@@ -63,7 +63,7 @@ markdown body becomes the worker's system-prompt role. Cards do **not**
 auto-attach task files — context must be injected explicitly per spawn (see
 below).
 
-Always inspect project cards before spawning a named agent:
+Read a project card before first use if its current permissions are not already known:
 
 ```bash
 ls .trellis/agents
@@ -88,15 +88,12 @@ Limits enforced by the loader:
 - 500 KB total assembled-context warning to stderr.
 - Path-traversal jail: all resolved paths must stay under `--cwd`.
 
-Example spawning a check agent against a task directory:
+Prefer a bounded dispatch brief containing goal, acceptance, scope, task/spec paths and existing evidence. Do not attach the whole PRD/design/plan/manifest by default. When a specific small document is necessary in full, an explicit attachment looks like:
 
 ```bash
 TASK=.trellis/tasks/05-13-example
 trellis channel spawn cr-example --agent check --provider codex --as check-cx \
-  --file "$TASK/prd.md" \
-  --file "$TASK/design.md" \
-  --file "$TASK/implement.md" \
-  --jsonl "$TASK/check.jsonl" \
+  --file "$TASK/research/review-brief.md" \
   --cwd "$PWD" --timeout 30m
 ```
 

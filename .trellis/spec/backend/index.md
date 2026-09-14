@@ -23,7 +23,7 @@ not publish product pose and the shadow boundary remains observational.
 
 Pre-development checklist:
 
-- Read the task `prd.md`, `design.md`, and `implement.md` before changing authority behavior.
+- Read task requirements/current plan and applicable authority contracts; separate design/implement files are optional.
 - Search for existing protocol, terrain, and lifecycle helpers before adding a new one.
 - Keep wire identifiers and serialized hashes stable unless a versioned protocol task explicitly changes them.
-- Run `pixi run verify` after backend changes.
+- Choose focused checks using `.trellis/validation.md` and `quality-guidelines.md`; use aggregate verify only when its full scope is justified.

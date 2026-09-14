@@ -2,7 +2,7 @@
 
 ## Required checks
 
-Run `pixi run verify`, which executes Ruff, strict mypy, the backend pytest suite, provenance validation, and standalone-path validation. Keep documentation and protocol schemas in English.
+Follow `.trellis/validation.md`: select applicable Ruff/strict mypy checks and focused pytest coverage. `pixi run verify` aggregates static checks, the full backend suite, provenance and standalone-path checks; use it for broad changes or release/explicit acceptance, not each edit. Preserve provenance triggers below. Keep documentation and protocol schemas in English.
 
 ## Determinism and immutability
 
@@ -22,7 +22,7 @@ Terrain edits must be deterministic for identical baseline, input, and sample se
 
 ## Tests
 
-Add a focused regression beside the owning module. For cross-layer changes cover both the typed protocol boundary and the state transition. For worker/lifecycle changes prove reset, close, stale generation, and replay behavior. Use existing fixtures under `backend/tests/fixtures/` rather than creating alternate baselines.
+Add a focused regression beside the owning module when a meaningful behavior/failure mode is not already covered. For cross-layer changes cover both the typed protocol boundary and the state transition. For worker/lifecycle changes prove reset, close, stale generation, and replay behavior. Use existing fixtures under `backend/tests/fixtures/` rather than creating alternate baselines.
 
 ## Generated asset provenance
 

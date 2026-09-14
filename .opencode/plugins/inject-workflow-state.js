@@ -62,12 +62,14 @@ function loadBreadcrumbs(directory) {
  * Get (taskId, status) from active task, or null if no active task.
  */
 function getActiveTask(ctx, platformInput = null) {
-  const active = ctx.getActiveTask(platformInput)
-  const taskRef = active.taskPath
+  const contextKey = ctx.getContextKey(platformInput, { allowEnvironmentContext: false })
+  if (!contextKey) return null
+  const context = ctx.readContext(contextKey)
+  const taskRef = ctx.normalizeTaskRef(context?.current_task || "")
   if (!taskRef) return null
   const taskDir = ctx.resolveTaskDir(taskRef)
-  if (active.stale || !taskDir || !existsSync(taskDir)) {
-    return { id: taskRef.split("/").pop(), status: "stale", source: active.source }
+  if (!taskDir || !existsSync(taskDir)) {
+    return { id: taskRef.split("/").pop(), status: "stale" }
   }
   const taskJsonPath = join(taskDir, "task.json")
   if (!existsSync(taskJsonPath)) return null
@@ -76,7 +78,7 @@ function getActiveTask(ctx, platformInput = null) {
     const status = typeof data.status === "string" ? data.status : ""
     if (!status) return null
     const id = data.id || taskRef.split("/").pop()
-    return { id, status, source: active.source }
+    return { id, status }
   } catch {
     return null
   }
@@ -124,11 +126,10 @@ export default async ({ directory }) => {
           if (!ctx.isTrellisProject()) {
             return
           }
-          const templates = loadBreadcrumbs(directory)
           const task = getActiveTask(ctx, input)
-          const breadcrumb = task
-            ? buildBreadcrumb(task.id, task.status, templates, task.source)
-            : buildBreadcrumb(null, "no_task", templates)
+          if (!task) return
+          const templates = loadBreadcrumbs(directory)
+          const breadcrumb = buildBreadcrumb(task.id, task.status, templates)
 
           const parts = output?.parts || []
           const textPartIndex = parts.findIndex(

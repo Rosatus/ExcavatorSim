@@ -63,20 +63,13 @@ These guides help you **ask the right questions before coding**.
 2. **Ignoring design comments**: Flagging intentional behavior documented in code comments as bugs
 3. **Variable misreading**: Not tracing a variable to its actual definition (e.g., Map keyed by path vs name)
 
-**Verification rule**: Every CRITICAL/WARNING finding must be verified against the actual code before prioritizing. Budget ~35% false-positive rate for AI reviews.
+**Verification rule**: Every CRITICAL/WARNING finding must be verified against the actual code before prioritizing. Do not assume a fixed false-positive rate.
 
 ---
 
-## Pre-Modification Rule (CRITICAL)
+## Scoped impact search
 
-> **Before changing ANY value, ALWAYS search first!**
-
-```bash
-# Search for the value you're about to change
-grep -r "value_to_change" .
-```
-
-This single habit prevents most "forgot to update X" bugs.
+Search definitions/consumers when changing shared contracts, identifiers or configuration meaning. Use `rg` in affected areas first; a local value edit does not require a whole-repo search.
 
 ---
 
