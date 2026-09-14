@@ -19,6 +19,7 @@ config/icon="res://icon.svg"
 
 [autoload]
 
+MapCatalog="*res://scripts/map_catalog.gd"
 CanTelemetryBridge="*res://scripts/can_telemetry_bridge.gd"
 _mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
 
@@ -52,6 +53,7 @@ auto_reconnect=false
 [physics]
 
 3d/physics_engine="Jolt Physics"
+jolt_physics_3d/limits/max_bodies=32768
 
 [rendering]
 

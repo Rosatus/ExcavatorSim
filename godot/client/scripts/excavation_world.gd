@@ -16,6 +16,7 @@ const TEST_BUCKET_CAPACITY_M3 := 1000.0
 @export var tracked_chassis_controller_path := NodePath("../../ChassisMotionRoot")
 @export var soil_effects_path := NodePath("../../SoilEffects")
 @export var automatic_soil_enabled := true
+@export var simulation_enabled := true
 @export var debug_manual_controls := false
 @export var hero_clods_enabled := true
 @export var backend_feedback_enabled := false
@@ -89,6 +90,8 @@ func _ready() -> void:
 
 
 func _initialize() -> void:
+	if not simulation_enabled:
+		return
 	if _initialized:
 		return
 	terrain_world = get_node_or_null(terrain_world_path) as TerrainWorld
@@ -775,8 +778,9 @@ func _voxel_fixed_identity(snapshot: Dictionary) -> Dictionary:
 		and epoch == String(chassis.get("authority_epoch", "")) \
 		and physics_tick == int(chassis.get("physics_tick", -1)) \
 		and motion_sequence == int(chassis.get("bucket_motion_sequence", -1)) \
-		and int(query.get("terrain_generation", -1)) == terrain_world.terrain_state.world_generation \
-		and int(query.get("terrain_revision", -1)) == terrain_world.terrain_state.terrain_revision
+		and bool(chassis.get("terrain_identity_valid", false)) \
+		and int(query.get("terrain_generation", -1)) == int(chassis.get("terrain_generation", -2)) \
+		and int(query.get("terrain_revision", -1)) == int(chassis.get("terrain_revision", -2))
 	if not identity_valid:
 		return {}
 	return {

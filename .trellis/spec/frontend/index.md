@@ -20,8 +20,10 @@ user explicitly requests it. Preserve its existing behavior when editing shared
 code; this policy does not authorize removing SY205 or deliberately breaking it.
 
 
+- [Model Joint Semantics](./model-joint-semantics.md) — SY135 reference, SY205 asset-axis adaptation, shared limits and physical-direction regression.
 
 - [Game Menu and Driving HUD](./game-menu-hud.md) — automatic entry, modal input/pause ownership, controller navigation and hardware supervision.
+- [Optional Map Packs](./optional-map-packs.md) — isolated map sources, pack loading, static-map driving and scene reload lifecycle.
 
 - [Client Boundary](./client-boundary.md) — ownership, transport, derived terrain, and local physics rules.
 - [Godot MCP Development Tool](./godot-mcp.md) — connection checks, safe editor automation, and cross-layer boundaries.

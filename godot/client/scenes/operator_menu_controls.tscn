@@ -1,0 +1,338 @@
+[gd_scene format=3]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_operator_panel"]
+bg_color = Color(0.025, 0.04, 0.055, 0.9)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.24, 0.55, 0.7, 0.72)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+shadow_color = Color(0, 0, 0, 0.5)
+shadow_size = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ict_lamp"]
+bg_color = Color(1, 1, 1, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_fill_background"]
+bg_color = Color(0.1, 0.14, 0.17, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_fill_foreground"]
+bg_color = Color(0.78, 0.52, 0.22, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_guide_panel"]
+bg_color = Color(0.025, 0.04, 0.055, 0.97)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.31, 0.7, 0.86, 0.9)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+shadow_color = Color(0, 0, 0, 0.65)
+shadow_size = 12
+
+[node name="OperatorMenuControls" type="Node"]
+
+[node name="StatusPanel" type="PanelContainer" parent="." unique_id=1551506648]
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 486.0
+offset_bottom = 500.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_operator_panel")
+
+[node name="Margin" type="MarginContainer" parent="StatusPanel" unique_id=2021519112]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="VBox" type="VBoxContainer" parent="StatusPanel/Margin" unique_id=107301372]
+layout_mode = 2
+theme_override_constants/separation = 7
+
+[node name="Title" type="Label" parent="StatusPanel/Margin/VBox" unique_id=1505076524]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "作业菜单"
+
+[node name="Header" type="HBoxContainer" parent="StatusPanel/Margin/VBox" unique_id=1020691274]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="ModelSelector" type="OptionButton" parent="StatusPanel/Margin/VBox/Header" unique_id=880138627]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="LifecycleBadge" type="Label" parent="StatusPanel/Margin/VBox/Header" unique_id=455621928]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "STOPPED"
+horizontal_alignment = 2
+vertical_alignment = 1
+
+[node name="Operation" type="Label" parent="StatusPanel/Margin/VBox" unique_id=1945445983]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "READY TO WORK"
+
+[node name="BucketStatus" type="Label" parent="StatusPanel/Margin/VBox" unique_id=39009725]
+layout_mode = 2
+text = "Bucket EMPTY   0%"
+
+[node name="BucketFill" type="ProgressBar" parent="StatusPanel/Margin/VBox" unique_id=752042152]
+custom_minimum_size = Vector2(0, 12)
+layout_mode = 2
+theme_override_styles/background = SubResource("StyleBoxFlat_fill_background")
+theme_override_styles/fill = SubResource("StyleBoxFlat_fill_foreground")
+show_percentage = false
+
+[node name="ControlHint" type="Label" parent="StatusPanel/Margin/VBox" unique_id=1676260264]
+layout_mode = 2
+text = "WASD left stick · IJKL right stick · R/F left track · Y/H right track"
+autowrap_mode = 2
+
+[node name="AutomaticSoilHint" type="Label" parent="StatusPanel/Margin/VBox" unique_id=1657688566]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.82, 0.88, 1)
+theme_override_font_sizes/font_size = 12
+text = "Use the bucket edge and shell directly—cut, carry and dump are automatic."
+autowrap_mode = 2
+
+[node name="CameraRow" type="HBoxContainer" parent="StatusPanel/Margin/VBox" unique_id=58704173]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Mode" type="Label" parent="StatusPanel/Margin/VBox/CameraRow" unique_id=1009255860]
+layout_mode = 2
+text = "VIEW"
+vertical_alignment = 1
+
+[node name="Selector" type="OptionButton" parent="StatusPanel/Margin/VBox/CameraRow" unique_id=2014120382]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ResetView" type="Button" parent="StatusPanel/Margin/VBox/CameraRow" unique_id=450435478]
+layout_mode = 2
+text = "Reset View  C"
+
+[node name="Warning" type="Label" parent="StatusPanel/Margin/VBox" unique_id=1990971092]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.8, 0.35, 1)
+text = "设备准备中"
+autowrap_mode = 2
+
+[node name="Completion" type="Label" parent="StatusPanel/Margin/VBox" unique_id=1109058595]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.45, 0.92, 0.6, 1)
+autowrap_mode = 2
+
+[node name="Actions" type="HBoxContainer" parent="StatusPanel/Margin/VBox" unique_id=985692533]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Reset" type="Button" parent="StatusPanel/Margin/VBox/Actions" unique_id=48827271]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Reset  F8"
+
+[node name="Tools" type="HBoxContainer" parent="StatusPanel/Margin/VBox" unique_id=616826466]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="MuteAudio" type="CheckButton" parent="StatusPanel/Margin/VBox/Tools" unique_id=1921746845]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Mute Audio"
+
+[node name="TestGraphics" type="CheckButton" parent="StatusPanel/Margin/VBox/Tools" unique_id=1809170051]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Test Grid"
+
+[node name="BucketPassthrough" type="CheckButton" parent="StatusPanel/Margin/VBox/Tools"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "铲斗穿透地面"
+
+[node name="CANOutputToggle" type="Button" parent="StatusPanel/Margin/VBox/Tools"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "CAN 输出"
+toggle_mode = true
+
+[node name="GatewayRestartButton" type="Button" parent="StatusPanel/Margin/VBox/Tools"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "启动 Gateway"
+disabled = true
+
+[node name="PC001HandshakeStatus" type="HBoxContainer" parent="StatusPanel/Margin/VBox/Tools"]
+custom_minimum_size = Vector2(76, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="Lamp" type="Panel" parent="StatusPanel/Margin/VBox/Tools/PC001HandshakeStatus"]
+custom_minimum_size = Vector2(12, 12)
+layout_mode = 2
+mouse_filter = 2
+self_modulate = Color(0.937255, 0.32549, 0.313726, 1)
+theme_override_styles/panel = SubResource("StyleBoxFlat_ict_lamp")
+
+[node name="Label" type="Label" parent="StatusPanel/Margin/VBox/Tools/PC001HandshakeStatus"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 10
+text = "未连接"
+vertical_alignment = 1
+
+[node name="TimedCANTrigger" type="Button" parent="StatusPanel/Margin/VBox/Tools"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "发送 CAN 触发帧"
+tooltip_text = "发送 0x18FFF100：01 00 00 00 00 00 00 00，50 Hz 持续 10 秒"
+disabled = true
+
+[node name="AdvancedPanel" type="VBoxContainer" parent="StatusPanel/Margin/VBox" unique_id=780181745]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 3
+
+[node name="Connection" type="Label" parent="StatusPanel/Margin/VBox/AdvancedPanel" unique_id=1573557741]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Connection: disconnected"
+
+[node name="Authority" type="Label" parent="StatusPanel/Margin/VBox/AdvancedPanel" unique_id=1315170415]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Authority: Godot/Jolt local"
+
+[node name="Lifecycle" type="Label" parent="StatusPanel/Margin/VBox/AdvancedPanel" unique_id=1302050459]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Lifecycle: stopped"
+
+[node name="Diagnostics" type="Label" parent="StatusPanel/Margin/VBox/AdvancedPanel" unique_id=119507650]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Input ACK: —"
+
+[node name="CANStatus" type="Label" parent="StatusPanel/Margin/VBox/AdvancedPanel"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "CAN Gateway: offline"
+
+[node name="GatewayHost" type="LineEdit" parent="StatusPanel/Margin/VBox/AdvancedPanel"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+placeholder_text = "Gateway TCP 监听地址，默认 0.0.0.0"
+
+[node name="GatewayPort" type="LineEdit" parent="StatusPanel/Margin/VBox/AdvancedPanel"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+placeholder_text = "Gateway TCP 端口，默认 5678"
+
+[node name="UnlimitedBucketCapacity" type="CheckButton" parent="StatusPanel/Margin/VBox/AdvancedPanel"]
+layout_mode = 2
+text = "无限收集斗容（测试）"
+
+[node name="CuttingDiagnostics" type="CheckButton" parent="StatusPanel/Margin/VBox/AdvancedPanel" unique_id=2088439654]
+layout_mode = 2
+text = "切削性能诊断"
+
+[node name="BucketVolume" type="Label" parent="StatusPanel/Margin/VBox/AdvancedPanel" unique_id=2114908316]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Bucket soil diagnostics"
+autowrap_mode = 2
+
+[node name="PanelToggle" type="Button" parent="." unique_id=447274004]
+offset_left = 382.0
+offset_top = 22.0
+offset_right = 476.0
+offset_bottom = 50.0
+text = "Hide panel"
+
+[node name="GuidePanel" type="PanelContainer" parent="." unique_id=1770164644]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -370.0
+offset_top = -245.0
+offset_right = 370.0
+offset_bottom = 245.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_guide_panel")
+
+[node name="Margin" type="MarginContainer" parent="GuidePanel" unique_id=1528492702]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 20
+
+[node name="VBox" type="VBoxContainer" parent="GuidePanel/Margin" unique_id=275425250]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="GuidePanel/Margin/VBox" unique_id=86566389]
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+text = "Quick operator guide"
+
+[node name="Intro" type="Label" parent="GuidePanel/Margin/VBox" unique_id=1097564688]
+layout_mode = 2
+text = "Digging and dumping happen automatically from physical bucket contact."
+autowrap_mode = 2
+
+[node name="Device" type="Label" parent="GuidePanel/Margin/VBox" unique_id=1026925881]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Current input: KEYBOARD + MOUSE"
+
+[node name="Controls" type="Label" parent="GuidePanel/Margin/VBox" unique_id=1249625243]
+layout_mode = 2
+text = "Controls"
+autowrap_mode = 2
+
+[node name="Recovery" type="Label" parent="GuidePanel/Margin/VBox" unique_id=718089701]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.8, 0.35, 1)
+text = "Reset and model changes clear the current work session."
+autowrap_mode = 2
+
+[node name="Close" type="Button" parent="GuidePanel/Margin/VBox" unique_id=1021691228]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+text = "Continue"
+
+[node name="DestructiveConfirmation" type="ConfirmationDialog" parent="." unique_id=744847489]
+title = "Confirm action"
+initial_position = 1
+size = Vector2i(560, 240)
+ok_button_text = "Confirm"
+dialog_text = "This action starts a fresh work session."

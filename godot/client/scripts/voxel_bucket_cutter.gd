@@ -2,6 +2,8 @@ class_name VoxelBucketCutter
 extends RefCounted
 
 const CutProposal = preload("res://scripts/voxel_cut_proposal.gd")
+var layout := preload("res://scripts/voxel_zone_layout.gd").new()
+
 const WorkZoneConfig = preload("res://scripts/voxel_work_zone_config.gd")
 
 const MAX_TELEPORT_M := 2.0
@@ -27,7 +29,8 @@ var validation_error := ""
 var _contract: Dictionary = {}
 
 
-func configure(contract: Dictionary, scale_m: float) -> bool:
+func configure(contract: Dictionary, scale_m: float, zone_layout = null) -> bool:
+	layout = zone_layout if zone_layout != null else preload("res://scripts/voxel_zone_layout.gd").new()
 	configured = false
 	validation_error = ""
 	var candidate_model := String(contract.get("model_id", ""))
@@ -213,10 +216,10 @@ func _within_lift_exit_envelope(tool_snapshot: Dictionary) -> bool:
 	if half == Vector3.ZERO or not current.is_finite():
 		return false
 	var bounds := current * AABB(-half, half * 2.0)
-	if bounds.position.y < WorkZoneConfig.INITIAL_SURFACE_Y:
+	if bounds.position.y < layout.INITIAL_SURFACE_Y:
 		return true
 	for point in _lip_bridge_points(tool_snapshot, 1.0):
-		if point.y < WorkZoneConfig.INITIAL_SURFACE_Y:
+		if point.y < layout.INITIAL_SURFACE_Y:
 			return true
 	return false
 
@@ -254,11 +257,11 @@ func _has_lift_exit_contact(
 		var lower_points := _roof_lower_points(transform, dimensions)
 		lower_points.append_array(_lip_bridge_points(tool_snapshot, float(alpha)))
 		for lower in lower_points:
-			if lower.y > WorkZoneConfig.INITIAL_SURFACE_Y:
+			if lower.y > layout.INITIAL_SURFACE_Y:
 				continue
 			# Check the same vertical column emitted by cleanup. Surface-only
 			# contact misses thin remnants after the original roof was removed.
-			var top_y := WorkZoneConfig.INITIAL_SURFACE_Y - voxel_scale_m * 0.25
+			var top_y := layout.INITIAL_SURFACE_Y - voxel_scale_m * 0.25
 			var steps := clampi(ceili(absf(top_y - lower.y) / voxel_scale_m), 1, 32)
 			for step in range(steps + 1):
 				var point := Vector3(lower.x, lerpf(lower.y, top_y, float(step) / steps), lower.z)
@@ -268,7 +271,7 @@ func _has_lift_exit_contact(
 				if batch_sampler.is_valid() and direct_samples >= 8:
 					if not point.is_finite():
 						continue
-					var voxel := WorkZoneConfig.world_to_voxel(point, voxel_scale_m)
+					var voxel := layout.world_to_voxel(point, voxel_scale_m)
 					pending_voxels[Vector3i(round(voxel.x), round(voxel.y), round(voxel.z))] = true
 					continue
 				direct_samples += 1
@@ -397,7 +400,7 @@ func _lip_bridge_paths(tool_snapshot: Dictionary, finishing_lift: bool) -> Array
 	var transforms := _sweep_transforms(_find_region(tool_snapshot, "floor_wear_plate"))
 	var surface := PackedVector3Array()
 	var roof := PackedVector3Array()
-	var cutoff := WorkZoneConfig.INITIAL_SURFACE_Y - (0.0 if finishing_lift else voxel_scale_m * 1.5)
+	var cutoff := layout.INITIAL_SURFACE_Y - (0.0 if finishing_lift else voxel_scale_m * 1.5)
 	for index in transforms.size():
 		var points := _lip_bridge_points(tool_snapshot, float(index) / maxi(1, transforms.size() - 1))
 		if index % 2 == 1:
@@ -406,7 +409,7 @@ func _lip_bridge_paths(tool_snapshot: Dictionary, finishing_lift: bool) -> Array
 			_append_distinct_path_point(surface, point)
 			if point.y >= cutoff:
 				continue
-			var upper := Vector3(point.x, WorkZoneConfig.INITIAL_SURFACE_Y + voxel_scale_m * 0.5, point.z)
+			var upper := Vector3(point.x, layout.INITIAL_SURFACE_Y + voxel_scale_m * 0.5, point.z)
 			var reverse := (roof.size() / 2) % 2 == 1
 			_append_distinct_path_point(roof, upper if reverse else point)
 			_append_distinct_path_point(roof, point if reverse else upper)
@@ -418,7 +421,7 @@ func _lip_bridge_paths(tool_snapshot: Dictionary, finishing_lift: bool) -> Array
 
 
 func _append_distinct_path_point(points: PackedVector3Array, world: Vector3) -> void:
-	var point := WorkZoneConfig.world_to_voxel(world, voxel_scale_m)
+	var point := layout.world_to_voxel(world, voxel_scale_m)
 	if points.is_empty() or points[points.size() - 1].distance_squared_to(point) > 0.00000001:
 		points.append(point)
 
@@ -433,7 +436,7 @@ func _region_swept_path(region: Dictionary, role: String) -> Dictionary:
 	for sample_index in sample_count:
 		for point_offset in points_per_sample:
 			var source_index := point_offset if sample_index % 2 == 0 else points_per_sample - 1 - point_offset
-			points.append(WorkZoneConfig.world_to_voxel(
+			points.append(layout.world_to_voxel(
 				swept[sample_index * points_per_sample + source_index],
 				voxel_scale_m,
 			))
@@ -473,11 +476,11 @@ func _box_surface_paths(
 				var transform := transforms[sample_index]
 				var first_z := -dimensions.z * 0.92 if sample_index % 2 == 0 else dimensions.z * 0.92
 				var second_z := -first_z
-				points.append(WorkZoneConfig.world_to_voxel(
+				points.append(layout.world_to_voxel(
 					transform * Vector3(dimensions.x * width_fraction, dimensions.y * height_fraction, first_z),
 					voxel_scale_m,
 				))
-				points.append(WorkZoneConfig.world_to_voxel(
+				points.append(layout.world_to_voxel(
 					transform * Vector3(dimensions.x * width_fraction, dimensions.y * height_fraction, second_z),
 					voxel_scale_m,
 				))
@@ -534,8 +537,8 @@ func _overburden_cleanup_paths(inner_region: Dictionary, finishing_lift: bool = 
 	var dimensions := _box_half_dimensions(inner_region)
 	if dimensions == Vector3.ZERO:
 		return result
-	var cleanup_top_y := WorkZoneConfig.INITIAL_SURFACE_Y + voxel_scale_m * 0.5
-	var cutoff_y := WorkZoneConfig.INITIAL_SURFACE_Y if finishing_lift else WorkZoneConfig.INITIAL_SURFACE_Y - voxel_scale_m * 1.5
+	var cleanup_top_y := layout.INITIAL_SURFACE_Y + voxel_scale_m * 0.5
+	var cutoff_y := layout.INITIAL_SURFACE_Y if finishing_lift else layout.INITIAL_SURFACE_Y - voxel_scale_m * 1.5
 	var points := PackedVector3Array()
 	for transform in _sweep_transforms(inner_region):
 		for lower in _roof_lower_points(transform, dimensions):
@@ -545,8 +548,8 @@ func _overburden_cleanup_paths(inner_region: Dictionary, finishing_lift: bool = 
 			# Alternate vertical direction so connections remain inside the
 			# sampled lower-envelope/roof region. Do not emit degenerate pairs.
 			var reverse := (points.size() / 2) % 2 == 1
-			points.append(WorkZoneConfig.world_to_voxel(upper if reverse else lower, voxel_scale_m))
-			points.append(WorkZoneConfig.world_to_voxel(lower if reverse else upper, voxel_scale_m))
+			points.append(layout.world_to_voxel(upper if reverse else lower, voxel_scale_m))
+			points.append(layout.world_to_voxel(lower if reverse else upper, voxel_scale_m))
 	if points.size() >= 2:
 		result.append(_native_path("overburden:lower_envelope", "overburden_cleanup", points, NATIVE_OVERBURDEN_RADIUS_VOXELS))
 	return result
@@ -640,8 +643,8 @@ func _has_native_role(paths: Array[Dictionary], role: String) -> bool:
 func _append_capsule(result: Array[Dictionary], a_world: Vector3, b_world: Vector3, radius_voxels: float, source: String) -> void:
 	result.append({
 		"kind": "capsule",
-		"a_voxels": WorkZoneConfig.world_to_voxel(a_world, voxel_scale_m),
-		"b_voxels": WorkZoneConfig.world_to_voxel(b_world, voxel_scale_m),
+		"a_voxels": layout.world_to_voxel(a_world, voxel_scale_m),
+		"b_voxels": layout.world_to_voxel(b_world, voxel_scale_m),
 		"radius_voxels": radius_voxels,
 		"source": source,
 	})
@@ -663,9 +666,9 @@ func _capsule_bounds(capsules: Array[Dictionary]) -> AABB:
 
 
 func _area_is_editable(area_voxels: AABB) -> bool:
-	var minimum_world := WorkZoneConfig.voxel_to_world(area_voxels.position, voxel_scale_m)
-	var maximum_world := WorkZoneConfig.voxel_to_world(area_voxels.end, voxel_scale_m)
-	var editable := WorkZoneConfig.editable_world_bounds(voxel_scale_m)
+	var minimum_world := layout.voxel_to_world(area_voxels.position, voxel_scale_m)
+	var maximum_world := layout.voxel_to_world(area_voxels.end, voxel_scale_m)
+	var editable := layout.editable_world_bounds(voxel_scale_m)
 	return editable.has_point(minimum_world) and editable.has_point(maximum_world - Vector3.ONE * 0.0001)
 
 

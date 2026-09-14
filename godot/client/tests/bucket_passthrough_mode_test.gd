@@ -6,8 +6,10 @@ const TRACE_FRAMES := 24
 var failures: Array[String] = []
 
 
-func _init() -> void:
-	call_deferred("_run")
+func _initialize() -> void:
+	# Load before the first frame, as the product entry point does. Deferring
+	# this hides mode requests racing deferred soil/model initialization.
+	_run()
 
 
 func _run() -> void:
@@ -65,13 +67,24 @@ func _exercise_mode(
 ) -> void:
 	var initial_session := session.get_status_snapshot()
 	_assert_no_emission(effects, "cold startup")
-	if String(initial_session.get("bucket_ground_mode", "")) != BucketGroundInteractionMode.NORMAL:
-		_fail("application did not start in normal bucket-ground mode")
+	if session.lifecycle != ProductSession.LIFECYCLE_RUNNING or not session.last_error.is_empty():
+		_fail("cold startup did not enter running state: %s" % session.last_error)
+	if String(initial_session.get("bucket_ground_mode", "")) != BucketGroundInteractionMode.PASSTHROUGH:
+		_fail("training did not start in pass-through mode")
+	if not mode_button.button_pressed or mode_button.text != "铲斗穿透地面":
+		_fail("training toggle did not show its localized enabled state")
+	if mode_button.get_parent().get_parent().name != "设备与设置":
+		_fail("pass-through toggle is not on the settings page")
+	mode_button.emit_signal("toggled", false)
+	await physics_frame
+	await physics_frame
+	if session.bucket_ground_mode != BucketGroundInteractionMode.NORMAL:
+		_fail("training default could not be disabled manually")
 	if session.request_bucket_ground_mode("invalid"):
 		_fail("invalid bucket-ground mode was accepted")
 	var terrain_before := terrain_world.terrain_state.surface_snapshot()
 	var material_before := int(excavation.get_status_snapshot().get("material_generation", -1))
-	if not mode_button.tooltip_text.contains("clears bucket soil"):
+	if not mode_button.tooltip_text.contains("清空斗内土量"):
 		_fail("game UI did not disclose destructive material clearing")
 	mode_button.emit_signal("toggled", true)
 	var requested := session.get_status_snapshot()

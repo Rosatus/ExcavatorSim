@@ -8,6 +8,8 @@ Esc / gamepad Start toggles the menu. The UI processes while SceneTree is paused
 
 Navigation: Up/Down or D-pad traverses visible enabled controls; Tab/Shift+Tab follows the same order; A/Enter activates; B returns; LB/RB changes pages. Scroll containers follow focused controls. Keyboard/mouse and meaningful controller input switch prompts; analog noise does not.
 
+The main scene stores only the OperatorUI owner and ControlInputHUD. `operator_menu_controls.tscn` supplies runtime-only controls instantiated before onready binding; do not instance the pre-composition menu layout into main.tscn, where it would expose obsolete panels in the editor.
+
 `game_menu_layout.gd` owns composition and `game_ui_theme.gd` owns the charcoal, warm-white and amber visual tokens. Settings, controls and engineering tools are separate scrollable pages. Driving HUD is mouse-transparent; the lower-right HUD uses two side-by-side directional crosses with four track keys above. All twelve actions have independent highlights and keyboard/gamepad labels. CAN recording, Gateway restart and TCP connection indicator remain in the upper-left HardwareDock during gameplay and menus; the menu reserves space beside it. Tests use `get_control_for_test(id)` semantic lookups because layout reparents controls after binding.
 
 CAN supervision runs while paused: heartbeat, shutdown/start deadlines and ICT replies continue; physical telemetry samples are not emitted while simulation is paused. The menu refreshes hardware status at 5 Hz.

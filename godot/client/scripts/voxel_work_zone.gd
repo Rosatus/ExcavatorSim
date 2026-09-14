@@ -1,6 +1,8 @@
 class_name VoxelWorkZone
 extends Node3D
 
+var layout := preload("res://scripts/voxel_zone_layout.gd").new()
+
 const WorkZoneConfig = preload("res://scripts/voxel_work_zone_config.gd")
 const CollisionReadiness = preload("res://scripts/voxel_collision_readiness.gd")
 
@@ -9,6 +11,7 @@ const CollisionReadiness = preload("res://scripts/voxel_collision_readiness.gd")
 ## coordinate configuration, derivative readiness and reset/teardown.
 @export_range(0.1, 0.25, 0.005) var voxel_scale_m := WorkZoneConfig.DEFAULT_VOXEL_SCALE_M
 @export var initialize_on_ready := true
+@export var starter_pit := false
 @export var collision_viewer_target_path := NodePath("../../ChassisMotionRoot")
 
 var terrain: VoxelTerrain
@@ -34,7 +37,8 @@ func _physics_process(_delta: float) -> void:
 		return
 	if terrain.is_area_meshed(initial_ticket["area_voxels"] as AABB):
 		readiness.mark_meshed(initial_ticket)
-		_try_acknowledge_surface(initial_ticket, WorkZoneConfig.ORIGIN_WORLD)
+		var probe := layout.ORIGIN_WORLD
+		_try_acknowledge_surface(initial_ticket, probe)
 
 
 func build_runtime() -> bool:
@@ -47,22 +51,28 @@ func build_runtime() -> bool:
 
 	var format := VoxelFormat.new()
 	format.set_channel_depth(VoxelBuffer.CHANNEL_SDF, VoxelBuffer.DEPTH_16_BIT)
-	var generator := VoxelGeneratorFlat.new()
-	generator.channel = VoxelBuffer.CHANNEL_SDF
-	generator.height = 0.0
+	var generator = preload("res://scripts/voxel_pit_generator.gd").new()
+	generator.scale_m = voxel_scale_m
+	generator.half_size = Vector2(layout.SIZE_WORLD_M.x, layout.SIZE_WORLD_M.z) * 0.5
+	generator.depth_m = 0.6 if starter_pit else 0.0
+	# Native block bounds round outward. Generate a finite apron under hard
+	# ground and clip its presentation to the exact semantic rectangle.
+	# Terrain3D heightmap holes also remove neighboring collision triangles.
+	# A hidden, immutable one-metre apron bridges that native grid seam.
+	generator.apron_m = 1.0
 	var mesher := VoxelMesherTransvoxel.new()
 	mesher.texturing_mode = VoxelMesherTransvoxel.TEXTURES_NONE
 	mesher.transitions_enabled = false
 
 	terrain = VoxelTerrain.new()
 	terrain.name = "VoxelTerrain"
-	terrain.transform = WorkZoneConfig.terrain_transform(voxel_scale_m)
+	terrain.transform = layout.terrain_transform(voxel_scale_m)
 	terrain.format = format
 	terrain.generator = generator
 	terrain.mesher = mesher
-	terrain.bounds = WorkZoneConfig.voxel_bounds(voxel_scale_m)
+	terrain.bounds = layout.voxel_bounds(voxel_scale_m).grow(ceilf(generator.apron_m / voxel_scale_m) + 1.0)
 	terrain.mesh_block_size = WorkZoneConfig.MESH_BLOCK_SIZE_VOXELS
-	terrain.max_view_distance = ceili(WorkZoneConfig.SIZE_WORLD_M.x / voxel_scale_m)
+	terrain.max_view_distance = ceili(maxf(layout.SIZE_WORLD_M.x, layout.SIZE_WORLD_M.z) / voxel_scale_m)
 	terrain.generate_collisions = true
 	terrain.collision_layer = WorkZoneConfig.TERRAIN_COLLISION_LAYER
 	terrain.collision_mask = WorkZoneConfig.TERRAIN_COLLISION_MASK
@@ -71,8 +81,8 @@ func build_runtime() -> bool:
 
 	zone_viewer = VoxelViewer.new()
 	zone_viewer.name = "ZoneViewer"
-	zone_viewer.position = WorkZoneConfig.ORIGIN_WORLD
-	zone_viewer.view_distance = ceili(WorkZoneConfig.SIZE_WORLD_M.x / voxel_scale_m)
+	zone_viewer.position = layout.ORIGIN_WORLD
+	zone_viewer.view_distance = terrain.max_view_distance
 	zone_viewer.view_distance_vertical_ratio = 0.4
 	zone_viewer.requires_visuals = true
 	zone_viewer.requires_collisions = true
@@ -80,14 +90,14 @@ func build_runtime() -> bool:
 
 	collision_viewer = VoxelViewer.new()
 	collision_viewer.name = "ChassisCollisionViewer"
-	collision_viewer.position = WorkZoneConfig.ORIGIN_WORLD
+	collision_viewer.position = layout.ORIGIN_WORLD
 	collision_viewer.view_distance = ceili(12.0 / voxel_scale_m)
 	collision_viewer.view_distance_vertical_ratio = 0.5
 	collision_viewer.requires_visuals = false
 	collision_viewer.requires_collisions = true
 	add_child(collision_viewer)
 
-	initial_ticket = readiness.issue(WorkZoneConfig.voxel_bounds(voxel_scale_m), &"initial_surface")
+	initial_ticket = readiness.issue(layout.voxel_bounds(voxel_scale_m), &"initial_surface")
 	latest_ticket = initial_ticket
 	return true
 
@@ -124,8 +134,8 @@ func get_ticket_status(ticket: Dictionary) -> Dictionary:
 
 
 func is_support_ready_at(world_position: Vector3) -> bool:
-	return WorkZoneConfig.owns_world_xz(Vector2(world_position.x, world_position.z)) \
-		and readiness.is_point_ready(WorkZoneConfig.world_to_voxel(world_position, voxel_scale_m))
+	return layout.owns_world_xz(Vector2(world_position.x, world_position.z)) \
+		and readiness.is_point_ready(layout.world_to_voxel(world_position, voxel_scale_m))
 
 
 func get_voxel_tool() -> VoxelTool:
@@ -137,8 +147,8 @@ func get_status_snapshot() -> Dictionary:
 		"generation": readiness.generation,
 		"revision": readiness.revision,
 		"voxel_scale_m": voxel_scale_m,
-		"world_bounds": WorkZoneConfig.world_bounds(),
-		"voxel_bounds": WorkZoneConfig.voxel_bounds(voxel_scale_m),
+		"world_bounds": layout.world_bounds(),
+		"voxel_bounds": layout.voxel_bounds(voxel_scale_m),
 		"initial_readiness": readiness.status(initial_ticket),
 		"readiness": readiness.get_status_snapshot(),
 		"statistics": terrain.get_statistics() if terrain != null else {},
@@ -160,7 +170,8 @@ func _try_acknowledge_surface(ticket: Dictionary, world_position: Vector3) -> bo
 	if hit.is_empty():
 		return false
 	var hit_position: Variant = hit.get("position")
-	if not hit_position is Vector3 or absf((hit_position as Vector3).y - WorkZoneConfig.INITIAL_SURFACE_Y) > 0.35:
+	var expected_y := layout.INITIAL_SURFACE_Y - (0.6 if starter_pit else 0.0)
+	if not hit_position is Vector3 or absf((hit_position as Vector3).y - expected_y) > 0.15:
 		return false
 	return readiness.acknowledge_query(ticket)
 
@@ -182,8 +193,14 @@ func _teardown_runtime() -> void:
 	latest_ticket = {}
 
 
-func _make_soil_material() -> StandardMaterial3D:
-	return preload("res://scripts/soil_visual_resources.gd").surface_material(true)
+func _make_soil_material() -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = preload("res://assets/terrain/shaders/voxel_soil_bounded.gdshader")
+	var visuals = preload("res://scripts/soil_visual_resources.gd")
+	material.set_shader_parameter("texture_albedo", visuals.ALBEDO)
+	material.set_shader_parameter("texture_normal", visuals.NORMAL_ROUGHNESS)
+	material.set_shader_parameter("soil_bounds", Vector4(layout.MIN_WORLD.x, layout.MIN_WORLD.z, layout.MAX_WORLD.x, layout.MAX_WORLD.z))
+	return material
 
 
 func _module_contract_available() -> bool:

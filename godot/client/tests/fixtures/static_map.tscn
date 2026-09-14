@@ -1,0 +1,18 @@
+[gd_scene load_steps=2 format=3]
+
+[sub_resource type="BoxShape3D" id="1"]
+size = Vector3(600, 1, 600)
+
+[node name="StaticMap" type="Node3D"]
+
+[node name="Ground" type="StaticBody3D" parent="."]
+position = Vector3(0, -0.5, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground"]
+shape = SubResource("1")
+
+[node name="WorkArea" type="Node3D" parent="."]
+
+[node name="SpawnPoint" type="Marker3D" parent="WorkArea"]
+position = Vector3(38.301582, 0, 31.119902)
+rotation = Vector3(0, 3.141592653589793, 0)

@@ -47,12 +47,15 @@ func _run() -> void:
 	if not tool.configure(source):
 		return _fail(tool.validation_error)
 	var interaction := source["interaction"] as Dictionary
+	var teeth_height := _contact_height(tool, source, "teeth_main_edge")
+	var side_height := _contact_height(tool, source, "left_side_cutter")
+	var floor_height := _contact_height(tool, source, "floor_wear_plate")
 
 	# Long downward motion crosses the surface between endpoints. The bounded
 	# swept samples must retain the first working-band tooth contact.
 	var long_sweep := tool.compose_snapshot(
-		Transform3D(Basis.IDENTITY, Vector3(0.0, 1.25, 0.0)),
-		Transform3D(Basis.IDENTITY, Vector3(0.0, 0.70, 0.0)),
+		Transform3D(Basis.IDENTITY, Vector3(0.0, teeth_height + 0.25, 0.0)),
+		Transform3D(Basis.IDENTITY, Vector3(0.0, teeth_height - 0.30, 0.0)),
 		true,
 		"sy205|generation-1|long-sweep",
 	)
@@ -70,8 +73,8 @@ func _run() -> void:
 		return _fail("shadow classifier mutated bucket inventory")
 
 	var resting := tool.compose_snapshot(
-		Transform3D(Basis.IDENTITY, Vector3(0.0, 1.01, 0.0)),
-		Transform3D(Basis.IDENTITY, Vector3(0.0, 1.01, 0.0)),
+		Transform3D(Basis.IDENTITY, Vector3(0.0, teeth_height - 0.02, 0.0)),
+		Transform3D(Basis.IDENTITY, Vector3(0.0, teeth_height - 0.02, 0.0)),
 		true,
 		"sy205|generation-1|rest",
 	)
@@ -79,8 +82,8 @@ func _run() -> void:
 		return _fail("resting tooth produced cut intent")
 
 	var lateral := tool.compose_snapshot(
-		Transform3D(Basis.IDENTITY, Vector3(-0.05, 1.0, 0.0)),
-		Transform3D(Basis.IDENTITY, Vector3(0.0, 1.0, 0.0)),
+		Transform3D(Basis.IDENTITY, Vector3(-0.05, side_height - 0.03, 0.0)),
+		Transform3D(Basis.IDENTITY, Vector3(0.0, side_height - 0.03, 0.0)),
 		true,
 		"sy205|generation-1|side",
 	)
@@ -88,16 +91,17 @@ func _run() -> void:
 		return _fail("side cutter did not classify lateral contact")
 
 	var scrape := tool.compose_snapshot(
-		Transform3D(Basis.IDENTITY, Vector3(0.0, 0.65, -0.05)),
-		Transform3D(Basis.IDENTITY, Vector3(0.0, 0.65, 0.0)),
+		Transform3D(Basis.IDENTITY, Vector3(0.0, floor_height - 0.03, -0.05)),
+		Transform3D(Basis.IDENTITY, Vector3(0.0, floor_height - 0.03, 0.0)),
 		true,
 		"sy205|generation-1|scrape",
 	)
 	if _classification(tool.classify(scrape, terrain, 0.0, interaction), "floor_wear_plate") != "scrape":
 		return _fail("floor did not classify scrape contact")
 
-	var back_outward := Vector3(0.0, -0.707107, 0.707107).normalized()
-	var push_start := Transform3D(Basis.IDENTITY, Vector3(0.0, 0.405, 0.0))
+	var back_raw: Array = source["proxies"]["shell"]["up_godot"]
+	var back_outward := Vector3(back_raw[0], back_raw[1], back_raw[2])
+	var push_start := Transform3D(Basis.IDENTITY, Vector3(0.0, _contact_height(tool, source, "outer_back") - 0.03, 0.0))
 	var push_finish := Transform3D(Basis.IDENTITY, push_start.origin - back_outward * 0.05)
 	var push := tool.compose_snapshot(push_start, push_finish, true, "sy205|generation-1|push")
 	if _classification(tool.classify(push, terrain, 0.0, interaction), "outer_back") != "push":
@@ -112,7 +116,8 @@ func _run() -> void:
 	if _classification(tool.classify(carry, terrain, 0.5, interaction), "inner_shell") != "contain":
 		return _fail("inner shell did not classify active-soil containment")
 
-	var opening_normal := Vector3(0.0, 0.707107, -0.707107).normalized()
+	var opening_raw: Array = source["proxies"]["opening"]["normal_godot"]
+	var opening_normal := Vector3(opening_raw[0], opening_raw[1], opening_raw[2])
 	var dump_basis := Basis(Quaternion(opening_normal, Vector3.DOWN))
 	var dump := tool.compose_snapshot(
 		Transform3D(dump_basis, Vector3(0.0, 2.0, 0.0)),
@@ -135,6 +140,18 @@ func _run() -> void:
 
 	print("bucket_soil_tool_test: PASS")
 	quit(0)
+
+
+func _contact_height(tool: BucketSoilTool, source: Dictionary, region_id: String) -> float:
+	# Place the tested surface at the terrain independently of the asset rest
+	# orientation. Imported mesh alignment is covered by the geometry test.
+	for region in source["bucket_tool"]["regions"]:
+		if region["region_id"] == region_id:
+			var lowest := INF
+			for point in tool._local_sample_points(region):
+				lowest = minf(lowest, point.y)
+			return -lowest
+	return 0.0
 
 
 func _classification(result: Dictionary, region_id: String) -> String:

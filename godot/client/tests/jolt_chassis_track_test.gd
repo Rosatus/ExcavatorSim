@@ -373,8 +373,9 @@ func _test_slope_and_obstacle() -> void:
 	var state := terrain_world.terrain_state
 	for row in state.rows:
 		var z := state.origin_xz.y + float(row) * state.spacing_m
-		var slope_height := -0.08 * z
-		var mound_distance := absf(z + 2.0)
+		# SY205 now spawns without a half-turn and drives toward world +Z.
+		var slope_height := 0.08 * z
+		var mound_distance := absf(z - 2.0)
 		var mound_height := (
 			0.1 * (0.5 + 0.5 * cos(PI * mound_distance / 2.0))
 			if mound_distance < 2.0
@@ -499,8 +500,8 @@ func _test_controller_authority_lifecycle() -> void:
 		host.queue_free()
 		return
 	var start := chassis.global_transform
-	if (-start.basis.z).dot(Vector3.BACK) < 0.99:
-		failures.append("SY205 authoritative spawn did not apply its 180-degree heading: %s" % start.basis)
+	if start.basis.z.dot(Vector3.BACK) < 0.99:
+		failures.append("SY205 authoritative spawn added an unwanted half-turn: %s" % start.basis)
 	chassis.set_commands_for_test(1.0, 1.0)
 	for _frame in 120:
 		await physics_frame

@@ -750,6 +750,9 @@ func _configure_material_for(target: Node3D) -> bool:
 		if target.get("material") == null:
 			_set_error("Terrain3D material could not be assigned: %s" % material_path)
 			return false
+		if material_path == WORKSITE_MATERIAL:
+			var bounds := VoxelWorkZoneConfig.world_bounds()
+			_configured_material.call("set_shader_param", "voxel_seam_rect", Vector4(bounds.position.x, bounds.position.z, bounds.end.x, bounds.end.z))
 	return true
 
 

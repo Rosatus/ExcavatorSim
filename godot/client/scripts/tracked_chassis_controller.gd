@@ -10,6 +10,9 @@ const INPUT_ACTIONS := {
 }
 
 @export var controller_enabled := false
+@export var static_map_driving := false
+@export var map_spawn_position := Vector3.ZERO
+@export var map_spawn_yaw_rad := 0.0
 @export_enum("python_kinematic", "jolt_shadow", "jolt_authoritative") var authority_profile := AuthorityProfile.JOLT_AUTHORITATIVE
 @export var use_project_authority_profile := true
 @export var ground_lift_enabled := true
@@ -293,7 +296,7 @@ func _empty_authoritative_status() -> Dictionary:
 	return {
 		"authority_mode": AuthorityProfile.JOLT_AUTHORITATIVE,
 		"configured": false,
-		"body_transform": global_transform,
+		"body_transform": global_transform if is_inside_tree() else Transform3D.IDENTITY,
 		"linear_velocity": Vector3.ZERO,
 		"angular_velocity": Vector3.ZERO,
 		"sleeping": false,
@@ -535,9 +538,10 @@ func _configure_jolt_runtime(catalog_entry: Dictionary) -> bool:
 		_jolt_runtime.post_step_snapshot_captured.connect(_on_jolt_post_step_snapshot)
 	if not _jolt_runtime.configure(
 		descriptor,
-		_terrain_world,
+		null if static_map_driving else _terrain_world,
 		_terrain_collider,
-		_authoritative_spawn_transform(descriptor)
+		_authoritative_spawn_transform(descriptor),
+		get_node_or_null("../ConstructionMap") as Node3D if static_map_driving else null
 	):
 		contract_error = _jolt_runtime.contract_error
 		_destroy_jolt_runtime()
@@ -568,6 +572,8 @@ func _destroy_jolt_runtime() -> void:
 
 
 func _ensure_authoritative_terrain_collider() -> bool:
+	if static_map_driving:
+		return get_node_or_null("../ConstructionMap") != null
 	if _terrain_world == null or _terrain_world.terrain_state == null or _terrain_collider == null:
 		return false
 	_terrain_collider.enabled = true
@@ -585,10 +591,12 @@ func _authoritative_spawn_transform(descriptor: PhysicsRigDescriptor) -> Transfo
 	var parent := get_parent_node_3d()
 	var spawn := parent.global_transform if parent != null else Transform3D.IDENTITY
 	spawn.basis = spawn.basis.orthonormalized()
+	if static_map_driving:
+		spawn.origin = map_spawn_position
 	var dynamics := descriptor.chassis_dynamics()
 	var spawn_yaw := float(dynamics.get("spawn_yaw_rad", 0.0))
-	spawn.basis = (spawn.basis * Basis(Vector3.UP, spawn_yaw)).orthonormalized()
-	var terrain_normal := _sample_authoritative_terrain_normal(spawn.origin)
+	spawn.basis = Basis(Vector3.UP, map_spawn_yaw_rad) if static_map_driving else (spawn.basis * Basis(Vector3.UP, spawn_yaw)).orthonormalized()
+	var terrain_normal := Vector3.UP if static_map_driving else _sample_authoritative_terrain_normal(spawn.origin)
 	if terrain_normal.length_squared() > 0.5:
 		var forward := (-spawn.basis.z).slide(terrain_normal)
 		if forward.length_squared() < 0.25:
@@ -597,9 +605,9 @@ func _authoritative_spawn_transform(descriptor: PhysicsRigDescriptor) -> Transfo
 			forward = forward.normalized()
 			var right := forward.cross(terrain_normal).normalized()
 			spawn.basis = Basis(right, terrain_normal, -forward).orthonormalized()
-	var surface_y := 0.0
+	var surface_y := map_spawn_position.y if static_map_driving else 0.0
 	var terrain_state: TerrainState = null
-	if _terrain_world != null and _terrain_world.terrain_state != null:
+	if not static_map_driving and _terrain_world != null and _terrain_world.terrain_state != null:
 		terrain_state = _terrain_world.terrain_state
 		var sampled := terrain_state.sample_surface_bilinear_at(Vector2(spawn.origin.x, spawn.origin.z))
 		if is_finite(sampled):

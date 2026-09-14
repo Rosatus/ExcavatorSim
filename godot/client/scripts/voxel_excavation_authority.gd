@@ -6,6 +6,8 @@ const CutTransaction = preload("res://scripts/voxel_cut_transaction.gd")
 const SoilOperationProposal = preload("res://scripts/voxel_soil_operation_proposal.gd")
 const BucketCutter = preload("res://scripts/voxel_bucket_cutter.gd")
 const MaterialField = preload("res://scripts/voxel_soil_material_field.gd")
+var layout := preload("res://scripts/voxel_zone_layout.gd").new()
+
 const WorkZoneConfig = preload("res://scripts/voxel_work_zone_config.gd")
 const TimingWindow = preload("res://scripts/voxel_timing_window.gd")
 const DepositSurface = preload("res://scripts/soil_deposit_surface.gd")
@@ -159,7 +161,8 @@ func configure(work_zone: VoxelWorkZone, contract: Dictionary, target_generation
 	if voxel_tool == null:
 		return _fail("voxel_tool_unavailable")
 	voxel_tool.channel = VoxelBuffer.CHANNEL_SDF
-	if not cutter.configure(contract, work_zone.voxel_scale_m):
+	layout = work_zone.layout
+	if not cutter.configure(contract, work_zone.voxel_scale_m, layout):
 		return _fail("cutter_configuration_failed:%s" % cutter.validation_error)
 	if not material_field.configure(contract, target_generation, capacity_override_m3):
 		return _fail("material_field_configuration_failed")
@@ -807,7 +810,7 @@ func _queued_deposit_mass_q() -> int:
 
 
 func _dump_landing_key(deposit_world: Vector3) -> String:
-	var deposit_voxels := WorkZoneConfig.world_to_voxel(deposit_world, _work_zone.voxel_scale_m)
+	var deposit_voxels := layout.world_to_voxel(deposit_world, _work_zone.voxel_scale_m)
 	return "%d,%d" % [
 		floori(deposit_voxels.x / DUMP_LANDING_NEIGHBORHOOD_VOXELS),
 		floori(deposit_voxels.z / DUMP_LANDING_NEIGHBORHOOD_VOXELS),
@@ -826,7 +829,7 @@ func _resized_dump_proposal(
 	var old_radius_voxels := float(base_shape.get("radius_voxels", DEPOSIT_MIN_RADIUS_VOXELS))
 	var support_voxels := (base_shape.get("a_voxels", Vector3.ZERO) as Vector3) \
 		- Vector3.UP * old_radius_voxels * 0.2
-	var support_world := WorkZoneConfig.voxel_to_world(support_voxels, _work_zone.voxel_scale_m)
+	var support_world := layout.voxel_to_world(support_voxels, _work_zone.voxel_scale_m)
 	var shape_data := _deposit_shape_for_mass(requested_mass_q, support_world)
 	if shape_data.is_empty():
 		return null
@@ -879,8 +882,8 @@ func _deposit_shape_for_mass(requested_mass_q: int, support_world: Vector3) -> D
 	var top_world := support_world + Vector3.UP * maxf(height_world, radius_world * 0.8)
 	var shape := {
 		"mode": "add",
-		"a_voxels": WorkZoneConfig.world_to_voxel(base_world, _work_zone.voxel_scale_m),
-		"b_voxels": WorkZoneConfig.world_to_voxel(top_world, _work_zone.voxel_scale_m),
+		"a_voxels": layout.world_to_voxel(base_world, _work_zone.voxel_scale_m),
+		"b_voxels": layout.world_to_voxel(top_world, _work_zone.voxel_scale_m),
 		"radius_voxels": radius_voxels,
 	}
 	var area := _merge_shape_area(AABB(), shape)
@@ -1157,13 +1160,13 @@ func _update_dump_gate_diagnostics(pose_snapshot: Dictionary, delta_s: float) ->
 	elif _dump_gate_raw_active:
 		var opening := current["opening"] as Transform3D
 		var outlet_world := opening.origin + opening_normal * 0.12
-		var editable := WorkZoneConfig.editable_world_bounds(_work_zone.voxel_scale_m)
+		var editable := layout.editable_world_bounds(_work_zone.voxel_scale_m)
 		# Air above the bounded voxel volume is a valid release source. Querying
 		# unloaded/out-of-volume SDF there can return zero and falsely close it.
 		if outlet_world.y < editable.position.y:
 			_dump_gate_raw_active = false
 		elif outlet_world.y < editable.end.y:
-			var outlet := WorkZoneConfig.world_to_voxel(outlet_world, _work_zone.voxel_scale_m)
+			var outlet := layout.world_to_voxel(outlet_world, _work_zone.voxel_scale_m)
 			if _tool.get_voxel_f(Vector3i(roundi(outlet.x), roundi(outlet.y), roundi(outlet.z))) <= 0.0:
 				_dump_gate_raw_active = false
 	if _dump_gate_raw_active:
@@ -1200,7 +1203,7 @@ func _build_dump_proposal(pose_snapshot: Dictionary, identity: Dictionary, delta
 	var opening := current.get("opening", Transform3D.IDENTITY) as Transform3D
 	var release_world := opening.origin
 	var release_direction := (opening_normal * 0.65 + Vector3.DOWN * 0.85).normalized()
-	var editable := WorkZoneConfig.editable_world_bounds(_work_zone.voxel_scale_m)
+	var editable := layout.editable_world_bounds(_work_zone.voxel_scale_m)
 	# The receiving terrain must be inside the work zone; the bucket may be
 	# higher than its upper Y bound. This used to strand soil until boom-lowering.
 	if release_world.x < editable.position.x or release_world.x >= editable.end.x \
@@ -1213,7 +1216,7 @@ func _build_dump_proposal(pose_snapshot: Dictionary, identity: Dictionary, delta
 	if not bool(support.get("valid", false)):
 		return {"attempted": true, "accepted": false, "reason": "dump_support_unavailable", "release_world": release_world}
 	var support_world := support.get("position", Vector3.ZERO) as Vector3
-	if not WorkZoneConfig.is_world_position_editable(support_world, _work_zone.voxel_scale_m):
+	if not layout.is_world_position_editable(support_world, _work_zone.voxel_scale_m):
 		return {"attempted": true, "accepted": false, "reason": "dump_out_of_zone", "release_world": release_world}
 	var contract_capacity := float(contract.get("heaped_capacity_m3", 0.0))
 	var exposure := clampf((opening_down_dot - dump_threshold) / maxf(0.01, 1.0 - dump_threshold), 0.0, 1.0)
@@ -1283,8 +1286,8 @@ func _publish_accepted_dump_event(transaction: VoxelCutTransaction) -> void:
 
 
 func _find_sdf_support_world(world_position: Vector3) -> Dictionary:
-	var voxel_xz := WorkZoneConfig.world_to_voxel(world_position, _work_zone.voxel_scale_m)
-	var bounds := WorkZoneConfig.voxel_bounds(_work_zone.voxel_scale_m)
+	var voxel_xz := layout.world_to_voxel(world_position, _work_zone.voxel_scale_m)
+	var bounds := layout.voxel_bounds(_work_zone.voxel_scale_m)
 	var x := roundi(voxel_xz.x)
 	var z := roundi(voxel_xz.z)
 	var top := mini(floori(voxel_xz.y), floori(bounds.end.y) - WorkZoneConfig.PROTECTED_SHELL_VOXELS - 1)
@@ -1298,7 +1301,7 @@ func _find_sdf_support_world(world_position: Vector3) -> Dictionary:
 			var gradient := maxf(0.0001, prior_sdf - sdf)
 			var surface_y := float(y) - sdf / gradient
 			return {"valid": true, "gradient": gradient,
-				"position": WorkZoneConfig.voxel_to_world(Vector3(x, surface_y, z), _work_zone.voxel_scale_m)}
+				"position": layout.voxel_to_world(Vector3(x, surface_y, z), _work_zone.voxel_scale_m)}
 		prior_sdf = sdf
 	return {"valid": false}
 
@@ -1437,24 +1440,24 @@ func _commit_surface_deposit_proposal(
 	var voxel_volume := pow(scale_m, 3.0)
 	var target_mass := mini(proposal.requested_mass_q, material_field.bucket_mass_q)
 	var radius := DepositSurface.GRID_RADIUS * DepositSurface.GRID_STEP
-	var landing := WorkZoneConfig.world_to_voxel(proposal.release_world, scale_m)
-	var scan_top := WorkZoneConfig.world_to_voxel(WorkZoneConfig.MAX_WORLD, scale_m).y \
+	var landing := layout.world_to_voxel(proposal.release_world, scale_m)
+	var scan_top := layout.world_to_voxel(layout.MAX_WORLD, scale_m).y \
 		- WorkZoneConfig.PROTECTED_SHELL_VOXELS - 1.0
 	var patch_origin := Vector3i(roundi(landing.x) - radius, 0, roundi(landing.z) - radius)
 	var heights := PackedFloat32Array()
 	# One coarse 2D support scan per committed batch, not per input tick.
 	for z in DepositSurface.GRID_SIZE:
 		for x in DepositSurface.GRID_SIZE:
-			var sample_world := WorkZoneConfig.voxel_to_world(Vector3(
+			var sample_world := layout.voxel_to_world(Vector3(
 				patch_origin.x + x * DepositSurface.GRID_STEP, scan_top,
 				patch_origin.z + z * DepositSurface.GRID_STEP), scale_m)
-			if not WorkZoneConfig.is_world_position_editable(sample_world, scale_m):
-				heights.append(WorkZoneConfig.world_to_voxel(WorkZoneConfig.MAX_WORLD, scale_m).y)
+			if not layout.is_world_position_editable(sample_world, scale_m):
+				heights.append(layout.world_to_voxel(layout.MAX_WORLD, scale_m).y)
 				continue
 			var support := _find_sdf_support_world(sample_world)
 			if not bool(support.get("valid", false)):
 				return _reject_transaction(transaction, "dump_surface_support_unavailable", started_usec)
-			heights.append(WorkZoneConfig.world_to_voxel(support["position"], scale_m).y)
+			heights.append(layout.world_to_voxel(support["position"], scale_m).y)
 	var planned := DepositSurface.plan(heights,
 		material_field.volume_for_mass_q(target_mass) / voxel_volume,
 		tan(deg_to_rad(REPOSE_ANGLE_DEG)))
@@ -1472,11 +1475,11 @@ func _commit_surface_deposit_proposal(
 			if added <= 0.0001:
 				continue
 			var coordinate := Vector3i(patch_origin.x + x, 0, patch_origin.z + z)
-			var sample_world := WorkZoneConfig.voxel_to_world(Vector3(coordinate.x, scan_top, coordinate.z), scale_m)
+			var sample_world := layout.voxel_to_world(Vector3(coordinate.x, scan_top, coordinate.z), scale_m)
 			var support := _find_sdf_support_world(sample_world)
 			if not bool(support.get("valid", false)):
 				return _reject_transaction(transaction, "dump_surface_support_unavailable", started_usec)
-			var base := WorkZoneConfig.world_to_voxel(support["position"], scale_m).y
+			var base := layout.world_to_voxel(support["position"], scale_m).y
 			var top := base + added
 			var column_area := AABB(Vector3(coordinate.x - 1, floorf(base) - 2, coordinate.z - 1),
 				Vector3(3, ceilf(top) - floorf(base) + 5, 3))
@@ -1486,16 +1489,16 @@ func _commit_surface_deposit_proposal(
 			represented_volume += added * voxel_volume
 			if added > highest_addition:
 				highest_addition = added
-				probe_world = WorkZoneConfig.voxel_to_world(Vector3(coordinate.x, top + 2.0, coordinate.z), scale_m)
+				probe_world = layout.voxel_to_world(Vector3(coordinate.x, top + 2.0, coordinate.z), scale_m)
 	if columns.is_empty():
 		return _reject_transaction(transaction, "dump_surface_patch_full", started_usec)
 	var window := _integer_window_without_halo(area)
 	var origin := window["origin"] as Vector3i
 	var size := window["size"] as Vector3i
-	var world_area := AABB(WorkZoneConfig.voxel_to_world(Vector3(origin), scale_m), Vector3(size) * scale_m)
+	var world_area := AABB(layout.voxel_to_world(Vector3(origin), scale_m), Vector3(size) * scale_m)
 	if size.x * size.y * size.z > MAX_DEPOSIT_SURFACE_SAMPLES:
 		return _reject_transaction(transaction, "dump_surface_sample_budget", started_usec)
-	if not WorkZoneConfig.editable_world_bounds(scale_m).encloses(world_area) or not _tool.is_area_editable(area):
+	if not layout.editable_world_bounds(scale_m).encloses(world_area) or not _tool.is_area_editable(area):
 		return _reject_transaction(transaction, "dump_surface_out_of_zone", started_usec)
 	var accepted_mass := mini(target_mass, material_field.mass_q_for_volume(represented_volume))
 	if accepted_mass <= 0:
@@ -1817,8 +1820,8 @@ func _readiness_work_is_compatible(
 	var existing_probe := existing.get("probe_world", Vector3(INF, INF, INF)) as Vector3
 	if not existing_probe.is_finite() or not probe_world.is_finite() or _work_zone == null:
 		return false
-	return WorkZoneConfig.mesh_block_key(WorkZoneConfig.world_to_voxel(existing_probe, _work_zone.voxel_scale_m)) \
-		== WorkZoneConfig.mesh_block_key(WorkZoneConfig.world_to_voxel(probe_world, _work_zone.voxel_scale_m))
+	return WorkZoneConfig.mesh_block_key(layout.world_to_voxel(existing_probe, _work_zone.voxel_scale_m)) \
+		== WorkZoneConfig.mesh_block_key(layout.world_to_voxel(probe_world, _work_zone.voxel_scale_m))
 
 
 func _apply_soil_shapes(values: PackedFloat32Array, size: Vector3i, origin: Vector3i, shapes: Array[Dictionary]) -> int:
@@ -1935,9 +1938,9 @@ func _merge_shape_area(current: AABB, shape: Dictionary) -> AABB:
 
 
 func _area_is_editable_world_voxel(area: AABB) -> bool:
-	var editable := WorkZoneConfig.editable_world_bounds(_work_zone.voxel_scale_m)
-	var world_min := WorkZoneConfig.voxel_to_world(area.position, _work_zone.voxel_scale_m)
-	var world_max := WorkZoneConfig.voxel_to_world(area.end, _work_zone.voxel_scale_m)
+	var editable := layout.editable_world_bounds(_work_zone.voxel_scale_m)
+	var world_min := layout.voxel_to_world(area.position, _work_zone.voxel_scale_m)
+	var world_max := layout.voxel_to_world(area.end, _work_zone.voxel_scale_m)
 	return editable.has_point(world_min) and editable.has_point(world_max - Vector3.ONE * 0.000001)
 
 
@@ -1955,7 +1958,7 @@ func _record_rejected_dump(reason: String, release_world: Vector3, identity: Dic
 
 
 func _integer_window(area: AABB) -> Dictionary:
-	var bounds := WorkZoneConfig.voxel_bounds(_work_zone.voxel_scale_m)
+	var bounds := layout.voxel_bounds(_work_zone.voxel_scale_m)
 	var minimum := Vector3i(floor(area.position.x), floor(area.position.y), floor(area.position.z)) - Vector3i.ONE * SDF_HALO_VOXELS
 	var maximum := Vector3i(ceil(area.end.x), ceil(area.end.y), ceil(area.end.z)) + Vector3i.ONE * SDF_HALO_VOXELS
 	var bounds_min := Vector3i(ceil(bounds.position.x), ceil(bounds.position.y), ceil(bounds.position.z))
@@ -1966,7 +1969,7 @@ func _integer_window(area: AABB) -> Dictionary:
 
 
 func _integer_window_without_halo(area: AABB) -> Dictionary:
-	var bounds := WorkZoneConfig.voxel_bounds(_work_zone.voxel_scale_m)
+	var bounds := layout.voxel_bounds(_work_zone.voxel_scale_m)
 	var minimum := Vector3i(floor(area.position.x), floor(area.position.y), floor(area.position.z))
 	var maximum := Vector3i(ceil(area.end.x), ceil(area.end.y), ceil(area.end.z))
 	var bounds_min := Vector3i(ceil(bounds.position.x), ceil(bounds.position.y), ceil(bounds.position.z))
@@ -1977,7 +1980,7 @@ func _integer_window_without_halo(area: AABB) -> Dictionary:
 
 
 func _configure_coverage_index() -> void:
-	var bounds := WorkZoneConfig.voxel_bounds(_work_zone.voxel_scale_m)
+	var bounds := layout.voxel_bounds(_work_zone.voxel_scale_m)
 	_coverage_min = Vector3i(ceil(bounds.position.x), ceil(bounds.position.y), ceil(bounds.position.z))
 	var maximum := Vector3i(floor(bounds.end.x), floor(bounds.end.y), floor(bounds.end.z))
 	_coverage_size = maximum - _coverage_min
@@ -2295,7 +2298,7 @@ func _has_solid_contact_voxels(samples: Dictionary) -> bool:
 func _sample_contact_sdf_world(world_position: Vector3, samples: Dictionary) -> Dictionary:
 	if not configured or _tool == null or not world_position.is_finite():
 		return {"valid": false}
-	var voxel_position := WorkZoneConfig.world_to_voxel(world_position, _work_zone.voxel_scale_m)
+	var voxel_position := layout.world_to_voxel(world_position, _work_zone.voxel_scale_m)
 	var point := Vector3i(round(voxel_position.x), round(voxel_position.y), round(voxel_position.z))
 	if samples.has(point):
 		return samples[point]
@@ -2312,7 +2315,7 @@ func _sample_contact_sdf_world(world_position: Vector3, samples: Dictionary) -> 
 func _sample_sdf_world(world_position: Vector3) -> Dictionary:
 	if not configured or _tool == null or not world_position.is_finite():
 		return {"valid": false}
-	var voxel_position := WorkZoneConfig.world_to_voxel(world_position, _work_zone.voxel_scale_m)
+	var voxel_position := layout.world_to_voxel(world_position, _work_zone.voxel_scale_m)
 	var point := Vector3i(round(voxel_position.x), round(voxel_position.y), round(voxel_position.z))
 	var point_area := AABB(Vector3(point - Vector3i.ONE), Vector3.ONE * 3.0)
 	if not _tool.is_area_editable(point_area):
@@ -2380,8 +2383,8 @@ func _ray_surface_y(world_position: Vector3) -> float:
 	if _work_zone == null or not _work_zone.is_inside_tree() or _work_zone.get_world_3d() == null:
 		return INF
 	var query := PhysicsRayQueryParameters3D.create(
-		Vector3(world_position.x, WorkZoneConfig.MAX_WORLD.y - 0.1, world_position.z),
-		Vector3(world_position.x, WorkZoneConfig.MIN_WORLD.y + 0.1, world_position.z),
+		Vector3(world_position.x, layout.MAX_WORLD.y - 0.1, world_position.z),
+		Vector3(world_position.x, layout.MIN_WORLD.y + 0.1, world_position.z),
 		WorkZoneConfig.TERRAIN_COLLISION_LAYER,
 	)
 	query.collide_with_areas = false

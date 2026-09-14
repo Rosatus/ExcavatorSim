@@ -156,44 +156,52 @@
     },
     {
       "destination_path": "godot/client/resources/protocol/equipment-command-profile-v1.json",
-      "destination_sha256": "5057dcba49feb5c31ccbaa0e99bc3b50d03655f643203b5a5177ed0358535034",
+      "destination_sha256": "21fb25f57397b992111f52501086efaab0e865951856d8537431c87015ef4f4a",
       "generator": {
-        "path": "backend/scripts/sync_equipment_command_profile.py",
-        "sha256": "0b67068352f7810d62236b440c0cf6e27817be615f62f0baa09d9ed3a9598fff"
+        "path": "backend/scripts/sync_sy205_joint_contract.py",
+        "sha256": "465809e94b966a72a91dd890bc9c9e60c7ef7f819c556135b0b583efca28f3b4"
       },
       "inputs": [
         {
           "path": "protocol/equipment-command-profile-v1.json",
-          "sha256": "84ecd8f883ddffbd9e17101bd9e900959be997d5e6b156bdedc2cbb2f00c7e22"
+          "sha256": "21fb25f57397b992111f52501086efaab0e865951856d8537431c87015ef4f4a"
         },
         {
           "path": "protocol/equipment-command-profile-v1.schema.json",
           "sha256": "cd180b04ff64bef727b9f13c50bd54859d015683e20972542390fba322edb6a5"
+        },
+        {
+          "path": "backend/scripts/sync_equipment_command_profile.py",
+          "sha256": "0b67068352f7810d62236b440c0cf6e27817be615f62f0baa09d9ed3a9598fff"
         }
       ],
       "license": "AGPL-3.0-only",
-      "generated_at": "2026-08-27",
+      "generated_at": "2026-09-09",
       "relationship": "generated-godot-operator-command-profile"
     },
     {
       "destination_path": "godot/client/scripts/equipment_command_profile_hash.gd",
-      "destination_sha256": "2aa1719937a42e19d43ace007d4276a2cd908e6b03ff847ea5a9afc666afa694",
+      "destination_sha256": "39299d87ae4da4226b862ead1cdd61262fc104bcd69f185a453e6a74d1e6afc5",
       "generator": {
-        "path": "backend/scripts/sync_equipment_command_profile.py",
-        "sha256": "0b67068352f7810d62236b440c0cf6e27817be615f62f0baa09d9ed3a9598fff"
+        "path": "backend/scripts/sync_sy205_joint_contract.py",
+        "sha256": "465809e94b966a72a91dd890bc9c9e60c7ef7f819c556135b0b583efca28f3b4"
       },
       "inputs": [
         {
           "path": "protocol/equipment-command-profile-v1.json",
-          "sha256": "84ecd8f883ddffbd9e17101bd9e900959be997d5e6b156bdedc2cbb2f00c7e22"
+          "sha256": "21fb25f57397b992111f52501086efaab0e865951856d8537431c87015ef4f4a"
         },
         {
           "path": "protocol/equipment-command-profile-v1.schema.json",
           "sha256": "cd180b04ff64bef727b9f13c50bd54859d015683e20972542390fba322edb6a5"
+        },
+        {
+          "path": "backend/scripts/sync_equipment_command_profile.py",
+          "sha256": "0b67068352f7810d62236b440c0cf6e27817be615f62f0baa09d9ed3a9598fff"
         }
       ],
       "license": "AGPL-3.0-only",
-      "generated_at": "2026-08-27",
+      "generated_at": "2026-09-09",
       "relationship": "generated-godot-operator-command-profile-hash"
     }
   ],

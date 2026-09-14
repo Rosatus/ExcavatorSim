@@ -10,6 +10,8 @@ func _init() -> void:
 func _run() -> void:
 	var failure := await _check_scene_and_derived_seam()
 	if failure.is_empty():
+		failure = await _check_runtime_perimeters()
+	if failure.is_empty():
 		print("Voxel work-zone hard/soil seam contracts passed.")
 		quit(0)
 		return
@@ -73,3 +75,38 @@ func _ray(world_xz: Vector2) -> Dictionary:
 	)
 	query.collide_with_areas = false
 	return root.get_world_3d().direct_space_state.intersect_ray(query)
+
+
+func _check_runtime_perimeters() -> String:
+	var catalog = root.get_node("MapCatalog")
+	for map_id in ["training", "construction"]:
+		catalog.active_map_id = map_id
+		var scene = load("res://scenes/main.tscn").instantiate()
+		root.add_child(scene)
+		current_scene = scene
+		var zone = scene.get_node("TerrainRoot/VoxelWorkZone")
+		for frame in 600:
+			await physics_frame
+			if zone.terrain != null and zone.readiness.is_ready(zone.initial_ticket):
+				break
+		if zone.terrain == null or not zone.readiness.is_ready(zone.initial_ticket):
+			return "%s soil collision readiness" % map_id
+		var lo: Vector3 = zone.layout.MIN_WORLD
+		var hi: Vector3 = zone.layout.MAX_WORLD
+		var expected := Vector4(lo.x, lo.z, hi.x, hi.z)
+		if zone.terrain.material_override.get_shader_parameter("soil_bounds") != expected:
+			return "%s presentation uses semantic boundary" % map_id
+		# Dummy rendering has no native Terrain3D shader uniforms to read back.
+		if map_id == "construction" and DisplayServer.get_name() != "headless" and not scene.get_node("ConstructionMap/Ground").material.get_shader_param("voxel_seam_rect").is_equal_approx(expected):
+			return "construction native presentation and voxel boundary agree"
+		for step in range(1, 16):
+			var x := lerpf(lo.x, hi.x, float(step) / 16.0)
+			var z := lerpf(lo.z, hi.z, float(step) / 16.0)
+			for offset in [-0.3, -0.05, 0.0, 0.05, 0.3]:
+				for point in [Vector2(lo.x + offset, z), Vector2(hi.x + offset, z), Vector2(x, lo.z + offset), Vector2(x, hi.z + offset)]:
+					if _ray(point).is_empty():
+						return "%s collision gap at %s" % [map_id, point]
+		scene.queue_free()
+		await process_frame
+		await process_frame
+	return ""

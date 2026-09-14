@@ -4,6 +4,7 @@ extends CanvasLayer
 const MenuLayout := preload("res://scripts/game_menu_layout.gd")
 const GameSkin := preload("res://scripts/game_ui_theme.gd")
 const Capture := preload("res://scripts/performance_capture.gd")
+const MenuControls := preload("res://scenes/operator_menu_controls.tscn")
 
 const UIStrings := preload("res://scripts/operator_ui_strings.gd")
 const CONFIG_PATH := "user://operator_ui.cfg"
@@ -100,6 +101,16 @@ const GATEWAY_CONFIG_PATH := "user://ict_config.cfg"
 @onready var _confirmation: ConfirmationDialog = $DestructiveConfirmation
 
 
+func _init() -> void:
+	# Instantiate bindings only at runtime, so the main scene never displays
+	# the pre-composition control layout in the editor.
+	var controls := MenuControls.instantiate()
+	for child in controls.get_children():
+		controls.remove_child(child)
+		add_child(child)
+	controls.free()
+
+
 func _ready() -> void:
 	_motion_client = get_node_or_null(motion_client_path) as MotionClient
 	_product_session = get_node_or_null(product_session_path) as ProductSession
@@ -150,6 +161,7 @@ func _ready() -> void:
 	if can_bridge != null and can_bridge.has_signal("ict_link_status_changed"):
 		can_bridge.connect("ict_link_status_changed", _on_pc001_link_status_changed)
 	_menu = MenuLayout.build(self)
+	_configure_map_selector()
 	_build_capture_controls()
 	_hud = $ControlInputHUD as ControlInputHUD
 	_advanced_panel.visible = true
@@ -175,7 +187,7 @@ func _apply_static_copy() -> void:
 	_mute_audio_button.text = UIStrings.BUTTON_MUTE_AUDIO
 	_test_graphics_button.text = UIStrings.BUTTON_TEST_GRAPHICS
 	_test_graphics_button.tooltip_text = "Use an untextured black/white terrain grid and hide site dressing."
-	_bucket_passthrough_button.tooltip_text = "Let the bucket pass through terrain. Entering or leaving clears bucket soil and pending soil work."
+	_bucket_passthrough_button.tooltip_text = "开启后铲斗可穿透地面，不进行挖土或卸土。切换开关会清空斗内土量和待处理的土方作业。进入训练场时默认开启，进入施工大地图时默认关闭。"
 	_unlimited_bucket_button.tooltip_text = "Testing only: raise collection capacity while keeping the visible full-bucket level at the model contract capacity."
 	_cutting_diagnostics_button.tooltip_text = "按需采集切削耗时与地形统计；关闭可减少开销。重新开启将清空旧计时样本，不影响地形和斗内土量。"
 	_guide_title_label.text = UIStrings.GUIDE_TITLE
@@ -206,6 +218,7 @@ func _process(delta: float) -> void:
 func get_control_for_test(id: String) -> Control:
 	# Stable semantic seam; the visual hierarchy may evolve independently.
 	return {
+		"map_selector": _menu.get("map_selector"),
 		"bucket_passthrough": _bucket_passthrough_button,
 		"camera_selector": _camera_selector,
 		"gateway_restart": _gateway_button,
@@ -575,6 +588,13 @@ func _on_model_selected(index: int) -> void:
 
 
 func _on_destructive_confirmed() -> void:
+	if _pending_action == "map_switch":
+		var catalog := get_node("/root/MapCatalog")
+		if not catalog.select_map(_pending_model_id, _active_model_id()):
+			_completion_label.text = catalog.last_error
+		_pending_action = ""
+		_pending_model_id = ""
+		return
 	var status := _authority_status()
 	_awaiting_action = _pending_action
 	_awaiting_model_id = _pending_model_id
@@ -617,7 +637,42 @@ func _on_destructive_canceled() -> void:
 	_pending_action = ""
 	_pending_model_id = ""
 	_refresh_model_selector()
+	_refresh_map_selector()
 	(_menu["resume"] as Button).grab_focus()
+
+
+func _configure_map_selector() -> void:
+	var selector := _menu["map_selector"] as OptionButton
+	var catalog := get_node_or_null("/root/MapCatalog")
+	selector.add_item("地图：训练场")
+	selector.set_item_metadata(0, "training")
+	var available: bool = catalog != null and catalog.construction_available()
+	selector.add_item("地图：施工大地图" if available else "地图：施工大地图（未安装）")
+	selector.set_item_metadata(1, "construction")
+	selector.set_item_disabled(1, not available or not _is_local_authority())
+	selector.tooltip_text = "切换地图将重新开始作业。施工大地图的警戒线内为挖掘土区。"
+	selector.item_selected.connect(_on_map_selected)
+	_refresh_map_selector()
+
+
+func _refresh_map_selector() -> void:
+	var catalog := get_node_or_null("/root/MapCatalog")
+	if catalog != null and _menu.has("map_selector"):
+		(_menu["map_selector"] as OptionButton).select(1 if catalog.active_map_id == "construction" else 0)
+
+
+func _on_map_selected(index: int) -> void:
+	var catalog := get_node("/root/MapCatalog")
+	var map_id := String((_menu["map_selector"] as OptionButton).get_item_metadata(index))
+	_refresh_map_selector()
+	if _confirmation.visible or map_id == catalog.active_map_id:
+		return
+	_pending_action = "map_switch"
+	_pending_model_id = map_id
+	_confirmation.title = "切换地图"
+	_confirmation.dialog_text = "切换地图将清空当前作业与土量，保留所选机型。是否继续？"
+	_confirmation.popup_centered()
+	_confirmation.get_cancel_button().grab_focus()
 
 
 func _on_advanced_toggled(pressed: bool) -> void:

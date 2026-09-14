@@ -366,6 +366,8 @@ func _connect_excavation() -> void:
 	if excavation_world_path.is_empty():
 		return
 	_excavation = get_node_or_null(excavation_world_path) as ExcavationWorld
+	if _excavation != null and not _excavation.simulation_enabled:
+		return
 	if _excavation == null or not _excavation.is_soil_runtime_ready():
 		call_deferred("_connect_excavation")
 		return

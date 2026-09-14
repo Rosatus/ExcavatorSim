@@ -6,6 +6,9 @@ const FIXED_LATITUDE_RADIANS := deg_to_rad(16.0)
 const FIXED_LONGITUDE_RADIANS := deg_to_rad(108.0)
 const FIXED_UTC_OFFSET_HOURS := 7.0
 const HORIZON_GROUND_COLOR := Color("#46513d")
+# Sky3D offsets the vertical view direction: -0.15 lowers the ground-color
+# transition about 8.6 degrees, below the distant terrain in normal camera views.
+const SKY_HORIZON_OFFSET := -0.15
 const SKY_PROFILES := {
 	"low": {
 		"ambient_energy": 0.58,
@@ -90,7 +93,7 @@ func apply_profile(profile_name: String) -> bool:
 	if world.sky != null:
 		world.sky.fog_density = float(settings["fog_density"])
 		world.sky.ground_color = HORIZON_GROUND_COLOR
-		world.sky.horizon_offset = -0.005
+		world.sky.horizon_offset = SKY_HORIZON_OFFSET
 		world.sky.wind_speed = 0.0
 		world.sky.cirrus_intensity = float(settings["cirrus_intensity"])
 		world.sky.cirrus_coverage = 0.34 if profile_name == "high" else 0.26

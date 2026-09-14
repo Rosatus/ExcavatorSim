@@ -1806,8 +1806,10 @@ backend/scripts/jolt_product_soak.py
 
 ### 3. Contracts
 
-- The only values are `normal` and `bucket_passthrough`; launch default is
-  `normal`, the selection is not persisted, and ProductSession commits a valid
+- The only values are `normal` and `bucket_passthrough`; entering training defaults
+  to `bucket_passthrough`, while entering construction defaults to `normal`.
+  The settings page exposes “铲斗穿透地面”; manual selection is not persisted
+  across map reloads. ProductSession commits a valid
   requested mode at the next physics tick after all participants preflight.
 - The selected mode survives process-local start/pause/reset/reconnect, model
   switch, Jolt rebuild, Test Grid, and Terrain3D fallback/recovery.

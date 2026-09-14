@@ -71,6 +71,7 @@ var _external_digging_response_enabled := false
 var _physics_tick := 0
 var _terrain_identity := Vector2i(-1, -1)
 var _terrain_identity_valid := false
+var _static_map_root: Node3D
 var _left_contact_count := 0
 var _right_contact_count := 0
 var _left_speed_m_s := 0.0
@@ -170,7 +171,8 @@ func configure(
 	descriptor: PhysicsRigDescriptor,
 	terrain_world: TerrainWorld,
 	terrain_collider: TerrainCollider,
-	spawn_global_transform: Transform3D
+	spawn_global_transform: Transform3D,
+	static_map_root: Node3D = null
 ) -> bool:
 	teardown()
 	if descriptor == null:
@@ -183,6 +185,7 @@ func configure(
 	_tracks = (_descriptor.get("tracks", {}) as Dictionary).duplicate(true)
 	_terrain_world = terrain_world
 	_terrain_collider = terrain_collider
+	_static_map_root = static_map_root
 	_spawn_global_transform = spawn_global_transform
 	_index_descriptors()
 	if _body_descriptors.size() != BODY_NAMES.size() or _joint_descriptors.size() != JOINT_NAMES.size():
@@ -201,6 +204,7 @@ func configure(
 
 
 func teardown() -> void:
+	_static_map_root = null
 	configured = false
 	enabled = false
 	set_commands(0.0, 0.0)
@@ -469,6 +473,7 @@ func _build_rig() -> bool:
 		_soil_contract,
 		_terrain_collider,
 		_layer_mask(int(_descriptor["collision_layers"]["terrain"])),
+		_static_map_root,
 	)
 
 
@@ -1177,6 +1182,30 @@ func _track_raycast(local_point: Vector3) -> Dictionary:
 	query.exclude = [_body.get_rid()]
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
 	var collider: Variant = hit.get("collider")
+	# Mutable soil remains its own readiness-gated collision owner even when
+	# the surrounding ground belongs to an optional static map.
+	if not hit.is_empty() and collider is Node:
+		var voxel_owner := _find_voxel_support_owner(collider as Node)
+		if voxel_owner != null:
+			if bool(voxel_owner.call("is_support_ready_at", hit.get("position", center))):
+				hit["ray_start"] = ray_start
+				hit["support_source"] = "voxel_terrain"
+				return hit
+			return {}
+	if is_instance_valid(_static_map_root):
+		var map_ground := _static_map_root.get_node_or_null("Ground") as Terrain3D
+		if map_ground != null and map_ground.collision != null \
+			and hit.get("rid", RID()) == map_ground.collision.get_rid():
+			# Terrain3D uses a PhysicsServer body without a scene-node collider.
+			hit["collider"] = map_ground
+			hit["ray_start"] = ray_start
+			hit["support_source"] = "static_map"
+			return hit
+		if collider is Node and (_static_map_root == collider or _static_map_root.is_ancestor_of(collider)):
+			hit["ray_start"] = ray_start
+			hit["support_source"] = "static_map"
+			return hit
+		return {}
 	if not hit.is_empty() and collider is Node and _terrain_collider != null and _terrain_collider.is_ancestor_of(collider as Node):
 		hit["ray_start"] = ray_start
 		hit["support_source"] = "terrain_collider"
@@ -1245,6 +1274,10 @@ func _sample_heightfield_clamped(state: TerrainState, world_xz: Vector2) -> floa
 
 func _update_terrain_identity() -> void:
 	_terrain_identity_valid = false
+	if is_instance_valid(_static_map_root):
+		_terrain_identity = Vector2i(0, 0)
+		_terrain_identity_valid = _static_map_root.is_inside_tree()
+		return
 	if _terrain_world == null or _terrain_world.terrain_state == null or _terrain_collider == null:
 		_terrain_identity = Vector2i(-1, -1)
 		return

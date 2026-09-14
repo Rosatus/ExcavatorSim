@@ -37,15 +37,15 @@ func _check_contact(scale: float, failures: Array[String]) -> void:
 	var probe := Vector3(0, -0.5, 24)
 	var before := authority._sample_contact_sdf_world(probe, {})
 	_expect(bool(before.get("valid", false)) and float(before.get("sdf", INF)) < 0, "probe initially solid", failures)
-	var probe_voxel := WorkZoneConfig.world_to_voxel(probe, scale)
+	var probe_voxel := authority.layout.world_to_voxel(probe, scale)
 	var probe_coordinate := Vector3i(round(probe_voxel.x), round(probe_voxel.y), round(probe_voxel.z))
 	_expect(authority._has_solid_contact_voxels({probe_coordinate: true}), "batch initially sees solid", failures)
 	# Clear the entire trailing footprint. This is the costly no-contact case:
 	# every column must be checked before retaining the episode without a cut.
 	var tool := zone.get_voxel_tool()
 	tool.mode = VoxelTool.MODE_REMOVE
-	tool.do_box(WorkZoneConfig.world_to_voxel(Vector3(-3, -3, 20), scale),
-		WorkZoneConfig.world_to_voxel(Vector3(3, 2, 28), scale))
+	tool.do_box(authority.layout.world_to_voxel(Vector3(-3, -3, 20), scale),
+		authority.layout.world_to_voxel(Vector3(3, 2, 28), scale))
 	var after := authority._sample_contact_sdf_world(probe, {})
 	_expect(bool(after.get("valid", false)) and float(after.get("sdf", -INF)) > 0, "new proposal observes edited SDF", failures)
 	_expect(not authority._has_solid_contact_voxels({probe_coordinate: true}), "same-sized batch refreshes after a cut", failures)
@@ -92,7 +92,7 @@ func _check_contact(scale: float, failures: Array[String]) -> void:
 		"before_native_sdf_reads": full_reads * 7, "after_native_sdf_reads": unique_cells}))
 	# A later edit must restore contact, with unchanged accepted proposal geometry.
 	tool.mode = VoxelTool.MODE_ADD
-	tool.do_sphere(WorkZoneConfig.world_to_voxel(probe, scale), 0.3 / scale)
+	tool.do_sphere(authority.layout.world_to_voxel(probe, scale), 0.3 / scale)
 	_expect(authority._has_solid_contact_voxels({probe_coordinate: true}), "same-sized batch refreshes after a deposit", failures)
 	_expect(authority.cutter._has_lift_exit_contact(pose.soil_tool, authority._sample_contact_sdf_world.bind({})), "later solid residual is detected", failures)
 	_compare_proposal(authority, pose, true, failures)
@@ -102,7 +102,7 @@ func _check_contact(scale: float, failures: Array[String]) -> void:
 
 
 func _collect_air_probe(world: Vector3, authority: VoxelExcavationAuthority, collected: Dictionary) -> Dictionary:
-	var voxel := WorkZoneConfig.world_to_voxel(world, authority._work_zone.voxel_scale_m)
+	var voxel := authority.layout.world_to_voxel(world, authority._work_zone.voxel_scale_m)
 	collected[Vector3i(round(voxel.x), round(voxel.y), round(voxel.z))] = true
 	return {"valid": true, "sdf": 1.0, "gradient_world": Vector3.UP}
 

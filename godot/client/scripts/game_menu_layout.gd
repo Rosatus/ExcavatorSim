@@ -50,6 +50,11 @@ static func build(ui: CanvasLayer) -> Dictionary:
 	heading.add_theme_color_override("font_color", GameSkin.MUTED)
 	settings.add_child(heading)
 	move(old.get_node("Header"), settings)
+	var map_selector := OptionButton.new()
+	map_selector.name = "MapSelector"
+	map_selector.custom_minimum_size.y = 42
+	settings.add_child(map_selector)
+	move(old.get_node("Tools/BucketPassthrough"), settings)
 	move(old.get_node("CameraRow"), settings)
 	move(old.get_node("Tools/MuteAudio"), settings)
 	var reset_note := Label.new()
@@ -94,7 +99,7 @@ static func build(ui: CanvasLayer) -> Dictionary:
 		move(old.get_node(key), advanced)
 	move(old.get_node("Completion"), body)
 	old.get_parent().queue_free()
-	return {"root": root, "panel": panel, "resume": resume, "tabs": tabs, "hardware": hardware, "atmosphere": atmosphere}
+	return {"root": root, "panel": panel, "resume": resume, "tabs": tabs, "hardware": hardware, "atmosphere": atmosphere, "map_selector": map_selector}
 
 static func page(tabs: TabContainer, title: String) -> VBoxContainer:
 	var scroll := ScrollContainer.new()

@@ -4,7 +4,10 @@ param(
     [string]$GodotExe = "",
 
     [Parameter()]
-    [string]$ToolchainRoot = ""
+    [string]$ToolchainRoot = "",
+
+    [Parameter()]
+    [switch]$IncludeConstructionMap
 )
 
 $ErrorActionPreference = "Stop"
@@ -255,6 +258,9 @@ try {
     $toolchain = New-GodotVoxelExportProject -Source $godotProject `
         -Destination $isolatedProject -GodotExe $GodotExe -ToolchainRoot $ToolchainRoot
     $GodotExe = [string]$toolchain.components.windows_editor.path
+    if ($IncludeConstructionMap) {
+        & (Join-Path $PSScriptRoot 'build_construction_pack.ps1') -GodotExe $GodotExe
+    }
     $toolchainEvidence = Join-Path $stagingRoot "build-toolchain.json"
     [IO.File]::WriteAllText(
         $toolchainEvidence,
@@ -381,6 +387,15 @@ cd '$wslRepoRoot/tools/can_gateway' && ./dist_linux.sh
     Copy-Item -LiteralPath $gatewayLinux -Destination (Join-Path $stagedLinux "can_gateway") -Recurse -Force
     Copy-ReleaseNotices -Destination $stagedWindows
     Copy-ReleaseNotices -Destination $stagedLinux
+    if ($IncludeConstructionMap) {
+        $constructionPack = Join-Path $godotDist 'maps/construction.pck'
+        Assert-ReleaseFile -Path $constructionPack
+        foreach ($targetRelease in @($stagedWindows, $stagedLinux)) {
+            $mapDirectory = Join-Path $targetRelease 'maps'
+            New-Item -ItemType Directory -Path $mapDirectory -Force | Out-Null
+            Copy-Item -LiteralPath $constructionPack -Destination (Join-Path $mapDirectory 'construction.pck')
+        }
+    }
 
     Assert-ReleaseFile -Path (Join-Path $stagedWindows "ExcavatorSim.exe")
     Assert-ReleaseFile -Path (Join-Path $stagedWindows "can_gateway\gateway.exe")

@@ -674,10 +674,16 @@ static func _read_u16(data: PackedByteArray, offset: int) -> int:
 ## --- telemetry streaming ---
 
 func _resolve_once() -> void:
-	if _resolved:
-		return
 	var scene := get_tree().current_scene if get_tree() != null else null
-	if scene == null:
+	if _resolved and is_instance_valid(_presentation) and is_instance_valid(_chassis) \
+		and _presentation.is_inside_tree() and _chassis.is_inside_tree() \
+		and scene != null and scene.is_ancestor_of(_presentation):
+		return
+	# Autoload supervision outlives a map reload; retired frames cannot emit CAN.
+	_resolved = false
+	_presentation = null
+	_chassis = null
+	if scene == null or not scene.is_inside_tree():
 		return
 	_presentation = scene.get_node_or_null("MotionPresentation")
 	_chassis = scene.get_node_or_null("ChassisMotionRoot")

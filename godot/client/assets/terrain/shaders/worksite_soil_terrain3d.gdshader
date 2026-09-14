@@ -32,6 +32,14 @@ uniform highp sampler2DArray _control_maps : repeat_disable;
 
 uniform bool flat_terrain_normals = false;
 
+
+// Exact soil seam. Native control holes remain collision data; discarding
+// whole clipmap vertices would expand the visible opening by a grid cell.
+uniform vec4 voxel_seam_rect = vec4(-16.0, 8.0, 16.0, 40.0);
+bool inside_voxel_seam(vec2 p, float margin) {
+ return all(greaterThanEqual(p, voxel_seam_rect.xy - vec2(margin))) && all(lessThan(p, voxel_seam_rect.zw + vec2(margin)));
+}
+
 varying float v_vertex_xz_dist;
 varying vec3 v_vertex;
 
@@ -86,7 +94,7 @@ void vertex() {
 	uint control = floatBitsToUint(texelFetch(_control_maps, v_region, 0)).r;
 	bool hole = bool(control >> 2u & 0x1u);
 	if (!(CAMERA_VISIBLE_LAYERS == _mouse_layer)
-			&& (hole || (_background_mode == 0u && v_region.z < 0))) {
+			&& ((hole && !inside_voxel_seam(start_pos * _vertex_spacing, _vertex_spacing)) || (_background_mode == 0u && v_region.z < 0))) {
 		v_vertex.x = 0. / 0.;
 	} else {
 		ivec3 uv_a = get_index_coord(start_pos, VERTEX_PASS);
@@ -106,6 +114,7 @@ void vertex() {
 }
 
 void fragment() {
+	if (inside_voxel_seam(v_vertex.xz, 0.0)) { discard; }
 	vec2 uv = UV;
 	const vec3 offsets = vec3(0, 1, 2);
 	vec2 index_id = floor(uv);
