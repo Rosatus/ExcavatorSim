@@ -1,0 +1,19 @@
+[gd_resource type="StandardMaterial3D" load_steps=4 format=3]
+
+[ext_resource type="Texture2D" path="res://maps/construction/Construction_Site/Textures/Tileable/MT00999-Concrete_Rough/02/T_Concrete_02_basecolor.png" id="1_bc"]
+[ext_resource type="Texture2D" path="res://maps/construction/Construction_Site/Textures/Tileable/MT00999-Concrete_Rough/02/T_Concrete_02_normal.png" id="2_nm"]
+[ext_resource type="Texture2D" path="res://maps/construction/Construction_Site/Textures/Tileable/MT00999-Concrete_Rough/02/T_Concrete_02_roughness.png" id="3_rg"]
+
+[resource]
+resource_name = "MI_MT00999-2-Concrete_Rough"
+albedo_color = Color(0.588, 0.591, 0.7, 1)
+albedo_texture = ExtResource("1_bc")
+metallic = 0.0
+roughness = 1.0
+roughness_texture = ExtResource("3_rg")
+normal_enabled = true
+normal_scale = 3.0
+normal_texture = ExtResource("2_nm")
+uv1_triplanar = true
+uv1_world_triplanar = true
+uv1_scale = Vector3(0.478887, 0.478887, 0.478887)

@@ -1,0 +1,11 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" path="res://maps/construction/Construction_Site/Assets/MM00934_Large_Modular_Crane/SM_MM00934-LargeModularCrane_Wires_CounterJib.glb" id="1_bj7mo"]
+[ext_resource type="Material" path="res://maps/construction/Construction_Site/Textures/Tileable/MT00065-Galvanized_Metal/4096x4096/MI_MT00065_Galvanized_Metal.tres" id="2_cpeyr"]
+[ext_resource type="Material" path="res://maps/construction/Construction_Site/Textures/Tileable/MT00513_Worn_Bare_Metal/4096x4096/MI_MT00513_Worn_Bare_Metal_Red_Painted.tres" id="3_bnbo8"]
+
+[node name = "SM_MM00934-LargeModularCrane_Wires_CounterJib" instance = ExtResource("1_bj7mo")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_cpeyr")
+surface_material_override/1 = ExtResource("3_bnbo8")

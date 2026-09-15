@@ -17,5 +17,27 @@ gateway.spec
 # godot debug build artifact (stray, git-tracked import never existed)
 godot/client/addons/terrain_3d/bin/~libterrain.windows.debug.x86_64.dll
 
-# Large map authoring workspaces are local-only; never upload map resources.
-/godot/worldbuilding/
+# Map authoring workspaces: version the authoring layer (scene layout, lighting,
+# materials, shaders, terrain data, import settings) so layout edits are tracked
+# and pushed. Static art assets (textures / meshes) stay local -- the Unreal
+# project at E:\projects\unreal\ConstructionEnvironment is their cold backup.
+# NOTE: .exr / .hdr are deliberately NOT ignored: sky HDRI is lighting content.
+/godot/worldbuilding/**/*.png
+/godot/worldbuilding/**/*.glb
+/godot/worldbuilding/**/*.fbx
+/godot/worldbuilding/**/*.obj
+/godot/worldbuilding/**/*.blend
+/godot/worldbuilding/**/*.jpg
+/godot/worldbuilding/**/*.jpeg
+/godot/worldbuilding/**/*.tga
+/godot/worldbuilding/**/*.psd
+/godot/worldbuilding/**/*.wav
+/godot/worldbuilding/**/*.ogg
+/godot/worldbuilding/**/*.mp3
+/godot/worldbuilding/**/*.mp4
+
+# Godot import cache and the addons bootstrap copies (both regenerated locally)
+/godot/worldbuilding/**/.godot/
+/godot/worldbuilding/**/addons/
+/godot/worldbuilding/**/*.tmp
+/godot/worldbuilding/**/*.TMP

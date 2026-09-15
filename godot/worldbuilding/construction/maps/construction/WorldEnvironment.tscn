@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://addons/sky_3d/src/Sky3D.gd" id="1"]
+[ext_resource type="Script" path="res://addons/sky_3d/src/TimeOfDay.gd" id="2"]
+
+[node name="WorldEnvironment" type="WorldEnvironment"]
+script = ExtResource("1")
+current_time = 10.5
+
+[node name="TimeOfDay" type="Node" parent="."]
+script = ExtResource("2")
+dome_path = NodePath("../SkyDome")
+current_time = 10.5

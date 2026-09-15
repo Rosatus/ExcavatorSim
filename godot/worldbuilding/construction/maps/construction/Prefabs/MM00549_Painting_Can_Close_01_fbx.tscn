@@ -1,0 +1,11 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://maps/construction/Construction_Site/Assets/MM00549_Painting_Cans/MM00549_Painting_Can_Close_01_fbx.glb" id="1_5bwba"]
+[ext_resource type="Material" path="res://maps/construction/Construction_Site/Assets/MM00549_Painting_Cans/MI_Painting_Can_01.tres" id="2_cki3s"]
+
+[node name = "MM00549_Painting_Can_Close_01_fbx" instance = ExtResource("1_5bwba")]
+
+[node name="Skeleton3D" parent="Mesh" index="0"]
+
+[node name="Mesh" parent="Mesh/Skeleton3D" index="0"]
+surface_material_override/0 = ExtResource("2_cki3s")

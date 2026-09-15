@@ -1,0 +1,68 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="ArrayMesh" path="res://maps/construction/MM_Packs/Meshes/SM_MM00924_Window_02_mesh.res" id="1_m"]
+[ext_resource type="Shape3D" path="res://maps/construction/MM_Packs/Shapes/SM_MM00924_Window_02_shape.tres" id="2_s"]
+[ext_resource type="Script" path="res://maps/construction/MM_Packs/mm_init.gd" id="3_sc"]
+
+[node name="SM_MM00924_Window_02_MM" type="Node3D"]
+
+[node name="MM" type="MultiMeshInstance3D" parent="."]
+script = ExtResource("3_sc")
+mm_mesh = ExtResource("1_m")
+xforms = PackedFloat32Array(0.0, 0.0, 0.909950017929077, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, -66.5, 15.9000015258789, 103.0, 0.0, 0.0, 0.909950017929077, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, -68.3199005126953, 7.90000104904175, 103.0, 0.0, 0.0, 0.909950017929077, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, -68.3199005126953, 3.90000104904175, 103.0, 0.0, 0.0, 0.909950017929077, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, -66.5, 11.9000015258789, 103.0, 0.0, 0.0, 0.909950017929077, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, -68.3199005126953, 11.9000015258789, 103.0, 0.0, 0.0, 0.909950017929077, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, -66.5, 7.90000104904175, 103.0, 0.0, 0.0, 0.909950017929077, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, -66.5, 3.90000104904175, 103.0, 0.0, 0.0, 0.909950017929077, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, -68.3199005126953, 15.9000015258789, 103.0)
+
+[node name="SB0" type="StaticBody3D" parent="."]
+transform = Transform3D(0.0, 0.0, 0.909950017929077, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, -66.5, 15.9000015258789, 103.0)
+
+[node name="CS0" type="CollisionShape3D" parent="SB0"]
+transform = Transform3D(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)
+shape = ExtResource("2_s")
+
+[node name="SB1" type="StaticBody3D" parent="."]
+transform = Transform3D(0.0, 0.0, 0.909950017929077, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, -68.3199005126953, 7.90000104904175, 103.0)
+
+[node name="CS1" type="CollisionShape3D" parent="SB1"]
+transform = Transform3D(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)
+shape = ExtResource("2_s")
+
+[node name="SB2" type="StaticBody3D" parent="."]
+transform = Transform3D(0.0, 0.0, 0.909950017929077, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, -68.3199005126953, 3.90000104904175, 103.0)
+
+[node name="CS2" type="CollisionShape3D" parent="SB2"]
+transform = Transform3D(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)
+shape = ExtResource("2_s")
+
+[node name="SB3" type="StaticBody3D" parent="."]
+transform = Transform3D(0.0, 0.0, 0.909950017929077, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, -66.5, 11.9000015258789, 103.0)
+
+[node name="CS3" type="CollisionShape3D" parent="SB3"]
+transform = Transform3D(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)
+shape = ExtResource("2_s")
+
+[node name="SB4" type="StaticBody3D" parent="."]
+transform = Transform3D(0.0, 0.0, 0.909950017929077, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, -68.3199005126953, 11.9000015258789, 103.0)
+
+[node name="CS4" type="CollisionShape3D" parent="SB4"]
+transform = Transform3D(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)
+shape = ExtResource("2_s")
+
+[node name="SB5" type="StaticBody3D" parent="."]
+transform = Transform3D(0.0, 0.0, 0.909950017929077, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, -66.5, 7.90000104904175, 103.0)
+
+[node name="CS5" type="CollisionShape3D" parent="SB5"]
+transform = Transform3D(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)
+shape = ExtResource("2_s")
+
+[node name="SB6" type="StaticBody3D" parent="."]
+transform = Transform3D(0.0, 0.0, 0.909950017929077, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, -66.5, 3.90000104904175, 103.0)
+
+[node name="CS6" type="CollisionShape3D" parent="SB6"]
+transform = Transform3D(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)
+shape = ExtResource("2_s")
+
+[node name="SB7" type="StaticBody3D" parent="."]
+transform = Transform3D(0.0, 0.0, 0.909950017929077, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, -68.3199005126953, 15.9000015258789, 103.0)
+
+[node name="CS7" type="CollisionShape3D" parent="SB7"]
+transform = Transform3D(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)
+shape = ExtResource("2_s")

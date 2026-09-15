@@ -1,0 +1,48 @@
+[gd_scene load_steps=4 format=3]
+
+[sub_resource type="StandardMaterial3D" id="BoundaryMaterial"]
+albedo_color = Color(1, 0.68, 0.08, 1)
+roughness = 1.0
+
+[sub_resource type="BoxMesh" id="WidthEdge"]
+material = SubResource("BoundaryMaterial")
+size = Vector3(18, 0.025, 0.12)
+
+[sub_resource type="BoxMesh" id="LengthEdge"]
+material = SubResource("BoundaryMaterial")
+size = Vector3(0.12, 0.025, 28)
+
+[node name="WorkArea" type="Node3D"]
+
+[node name="SpawnPoint" type="Marker3D" parent="."]
+position = Vector3(38.301582, -0.02, 31.119902)
+rotation = Vector3(0, 3.141592653589793, 0)
+metadata/captured_position = Vector3(38.301582, 0.046694, 31.119902)
+metadata/captured_yaw_degrees = 179.847266
+metadata/axis_snap_tolerance_degrees = 10.0
+
+[node name="ExcavationArea" type="Node3D" parent="."]
+position = Vector3(38.301582, -0.02, 53.5)
+metadata/size_m = Vector2(18, 28)
+metadata/status = "voxel"
+
+[node name="NearEdge" type="MeshInstance3D" parent="ExcavationArea"]
+position = Vector3(0, 0.025, -14)
+cast_shadow = 0
+mesh = SubResource("WidthEdge")
+
+[node name="FarEdge" type="MeshInstance3D" parent="ExcavationArea"]
+position = Vector3(0, 0.025, 14)
+cast_shadow = 0
+mesh = SubResource("WidthEdge")
+
+[node name="LeftEdge" type="MeshInstance3D" parent="ExcavationArea"]
+position = Vector3(-9, 0.025, 0)
+cast_shadow = 0
+mesh = SubResource("LengthEdge")
+
+[node name="RightEdge" type="MeshInstance3D" parent="ExcavationArea"]
+position = Vector3(9, 0.025, 0)
+cast_shadow = 0
+mesh = SubResource("LengthEdge")
+

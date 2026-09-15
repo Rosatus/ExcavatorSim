@@ -1,0 +1,85 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://maps/construction/ground_runtime.gd" id="3_runtime"]
+
+[ext_resource type="Texture2D" path="res://maps/construction/Construction_Site/Textures/Tileable/MT00086-Concrete/4096x4096/T_MT00086-Concrete_Floor_basecolor.png" id="1_0bylm"]
+[ext_resource type="Texture2D" path="res://maps/construction/Construction_Site/Textures/Tileable/MT00086-Concrete/4096x4096/T_MT00086-Concrete_Floor_normal.png" id="2_n1e7p"]
+
+[sub_resource type="Gradient" id="Gradient_x1all"]
+offsets = PackedFloat32Array(0.2, 1)
+colors = PackedColorArray(1, 1, 1, 1, 0, 0, 0, 1)
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_b30pp"]
+noise_type = 2
+frequency = 0.03
+cellular_jitter = 3.0
+cellular_return_type = 0
+domain_warp_enabled = true
+domain_warp_type = 1
+domain_warp_amplitude = 50.0
+domain_warp_fractal_type = 2
+domain_warp_fractal_lacunarity = 1.5
+domain_warp_fractal_gain = 1.0
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_6bj67"]
+noise = SubResource("FastNoiseLite_b30pp")
+color_ramp = SubResource("Gradient_x1all")
+seamless = true
+
+[sub_resource type="Terrain3DMaterial" id="Terrain3DMaterial_aru3s"]
+_shader_parameters = {
+&"bias_distance": null,
+&"blend_sharpness": null,
+&"depth_blur": null,
+&"enable_macro_variation": null,
+&"enable_projection": null,
+&"flat_terrain_normals": null,
+&"macro_variation1": null,
+&"macro_variation2": null,
+&"macro_variation_slope": null,
+&"mipmap_bias": null,
+&"noise1_angle": null,
+&"noise1_offset": null,
+&"noise1_scale": null,
+&"noise2_scale": null,
+&"noise_texture": SubResource("NoiseTexture2D_6bj67"),
+&"projection_threshold": null
+}
+world_background = 0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_7us7o"]
+transparency = 4
+cull_mode = 2
+vertex_color_use_as_albedo = true
+backlight_enabled = true
+backlight = Color(0.5, 0.5, 0.5, 1)
+distance_fade_mode = 1
+distance_fade_min_distance = 128.0
+distance_fade_max_distance = 96.0
+
+[sub_resource type="Terrain3DMeshAsset" id="Terrain3DMeshAsset_n8xu1"]
+generated_type = 1
+height_offset = 0.5
+material_override = SubResource("StandardMaterial3D_7us7o")
+last_lod = 0
+last_shadow_lod = 0
+lod0_range = 128.0
+
+[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_38qkt"]
+name = "Construction concrete"
+albedo_texture = ExtResource("1_0bylm")
+normal_texture = ExtResource("2_n1e7p")
+uv_scale = 0.125
+
+[sub_resource type="Terrain3DAssets" id="Terrain3DAssets_a5bb5"]
+mesh_list = Array[Terrain3DMeshAsset]([SubResource("Terrain3DMeshAsset_n8xu1")])
+texture_list = Array[Terrain3DTextureAsset]([SubResource("Terrain3DTextureAsset_38qkt")])
+
+[node name="Ground" type="Terrain3D" unique_id=790403585]
+script = ExtResource("3_runtime")
+data_directory = "res://maps/construction/terrain_data"
+material = SubResource("Terrain3DMaterial_aru3s")
+assets = SubResource("Terrain3DAssets_a5bb5")
+free_editor_textures = false
+top_level = true
+metadata/_edit_lock_ = true

@@ -1,0 +1,32 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://maps/construction/Construction_Site/Assets/MM00924_Modular_Semi_Completed_Building/SM_MM00924_DoorWall_01.glb" id="1_dqp6c"]
+[ext_resource type="Material" path="res://maps/construction/Construction_Site/Textures/Tileable/MT00086-Concrete/4096x4096/MI_MT00086_Concrete.tres" id="2_gthrg"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(0.250000, 1.042167, 2.142534)
+[sub_resource type="BoxShape3D" id="1_c31wp"]
+size = Vector3(0.250000, 4.000001, 1.807611)
+[sub_resource type="BoxShape3D" id="2_c31wn"]
+size = Vector3(0.250000, 1.042167, 2.142534)
+
+[node name = "SM_MM00924_DoorWall_01" instance = ExtResource("1_dqp6c")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_gthrg")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+shape = SubResource("0_c31wo")
+debug_fill = false
+
+[node name="Box1" type="CollisionShape3D" parent="StaticBody" ]
+shape = SubResource("1_c31wp")
+debug_fill = false
+
+[node name="Box2" type="CollisionShape3D" parent="StaticBody" ]
+shape = SubResource("2_c31wn")
+debug_fill = false
+

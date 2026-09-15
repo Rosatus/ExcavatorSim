@@ -1,0 +1,40 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="ArrayMesh" path="res://maps/construction/MM_Packs/Meshes/SM_MM00934-LargeModularCrane_JibMiddle_mesh.res" id="1_m"]
+[ext_resource type="Shape3D" path="res://maps/construction/MM_Packs/Shapes/SM_MM00934-LargeModularCrane_JibMiddle_shape.tres" id="2_s"]
+[ext_resource type="Script" path="res://maps/construction/MM_Packs/mm_init.gd" id="3_sc"]
+
+[node name="SM_MM00934-LargeModularCrane_JibMiddle_MM" type="Node3D"]
+
+[node name="MM" type="MultiMeshInstance3D" parent="."]
+script = ExtResource("3_sc")
+mm_mesh = ExtResource("1_m")
+xforms = PackedFloat32Array(-0.642787992954254, 0.0, 0.766044020652771, 0.0, 1.0, 0.0, -0.766044020652771, 0.0, -0.642787992954254, 22.971248626709, 27.1000003814697, 23.9917144775391, -0.642787992954254, 0.0, 0.766044020652771, 0.0, 1.0, 0.0, -0.766044020652771, 0.0, -0.642787992954254, 10.3315143585205, 27.1000003814697, 34.5977096557617, -0.939692974090576, 0.0, 0.342020004987717, 0.0, 1.0, 0.0, -0.342020004987717, 0.0, -0.939692974090576, 81.8843612670898, 23.6249485015869, 56.1364555358887, -0.939692974090576, 0.0, 0.342020004987717, 0.0, 1.0, 0.0, -0.342020004987717, 0.0, -0.939692974090576, 76.2410278320312, 23.6249485015869, 71.6413803100586)
+
+[node name="SB0" type="StaticBody3D" parent="."]
+transform = Transform3D(-0.642787992954254, 0.0, 0.766044020652771, 0.0, 1.0, 0.0, -0.766044020652771, 0.0, -0.642787992954254, 22.971248626709, 27.1000003814697, 23.9917144775391)
+
+[node name="CS0" type="CollisionShape3D" parent="SB0"]
+transform = Transform3D(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)
+shape = ExtResource("2_s")
+
+[node name="SB1" type="StaticBody3D" parent="."]
+transform = Transform3D(-0.642787992954254, 0.0, 0.766044020652771, 0.0, 1.0, 0.0, -0.766044020652771, 0.0, -0.642787992954254, 10.3315143585205, 27.1000003814697, 34.5977096557617)
+
+[node name="CS1" type="CollisionShape3D" parent="SB1"]
+transform = Transform3D(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)
+shape = ExtResource("2_s")
+
+[node name="SB2" type="StaticBody3D" parent="."]
+transform = Transform3D(-0.939692974090576, 0.0, 0.342020004987717, 0.0, 1.0, 0.0, -0.342020004987717, 0.0, -0.939692974090576, 81.8843612670898, 23.6249485015869, 56.1364555358887)
+
+[node name="CS2" type="CollisionShape3D" parent="SB2"]
+transform = Transform3D(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)
+shape = ExtResource("2_s")
+
+[node name="SB3" type="StaticBody3D" parent="."]
+transform = Transform3D(-0.939692974090576, 0.0, 0.342020004987717, 0.0, 1.0, 0.0, -0.342020004987717, 0.0, -0.939692974090576, 76.2410278320312, 23.6249485015869, 71.6413803100586)
+
+[node name="CS3" type="CollisionShape3D" parent="SB3"]
+transform = Transform3D(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)
+shape = ExtResource("2_s")

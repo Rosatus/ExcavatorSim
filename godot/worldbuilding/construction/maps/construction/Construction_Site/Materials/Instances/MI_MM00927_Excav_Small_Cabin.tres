@@ -1,0 +1,50 @@
+[gd_resource type = "ShaderMaterial" load_steps=4 format=3]
+
+[ext_resource type="Shader" path="res://maps/construction/Shaders/MI_MM00927_Excav_Small_Cabin.tres" id="4_bchwm"]
+[ext_resource type="Texture2D" path="res://maps/construction/Construction_Site/Textures/Assets/MM00927-Excavator_Small/Cabin/T_Cabin_Normal.png" id="1_dpq0l"]
+[ext_resource type="Texture2D" path="res://maps/construction/Construction_Site/Textures/Assets/MM00927-Excavator_Small/Cabin/T_Cabin_BaseColor.png" id="2_y0snj"]
+[ext_resource type="Texture2D" path="res://maps/construction/Construction_Site/Textures/Assets/MM00927-Excavator_Small/Cabin/T_Cabin_ORME.png" id="3_bhy7u"]
+
+[resource]
+resource_name = "MI_MM00927_Excav_Small_Cabin"
+render_priority = 0
+shader = ExtResource("4_bchwm")
+shader_parameter/WS_Dust = false
+shader_parameter/Base_Color_Texture_Input = true
+shader_parameter/Use_Color_Mask = false
+shader_parameter/Base_Color_Texture = ExtResource("2_y0snj")
+shader_parameter/Texture_Tiling = 1.000
+shader_parameter/Base_Color_Multiplier = Vector4(1.000, 1.000, 1.000, 1.000)
+shader_parameter/Base_Color_Constant = Vector4(0.500, 0.500, 0.500, 1.000)
+shader_parameter/Dust_Color = Vector4(0.356, 0.301, 0.250, 1.000)
+shader_parameter/Dust_Falloff = 2.000
+shader_parameter/Dust_Texture_Tiling = 3.000
+shader_parameter/Dust_Texture_Contrast = 0.700
+shader_parameter/Dust_Opacity = 0.500
+shader_parameter/Base_Color_Alpha_Texture_Input = false
+shader_parameter/Alpha_Constant = 1.000
+shader_parameter/Mask_Strength = 1.000
+shader_parameter/Use_Detail_Normal = false
+shader_parameter/Use_Normal = true
+shader_parameter/Normal_Texture = ExtResource("1_dpq0l")
+shader_parameter/Normal_Strength = 1.000
+shader_parameter/Detail_Texture_Tiling = 2.000
+shader_parameter/Detail_Normal_Strength = 1.000
+shader_parameter/Metallic_Amount = 0.800
+shader_parameter/Metallic_Texture_Input = true
+shader_parameter/ORMA_AO_Rough_Mat_Emis_ = ExtResource("3_bhy7u")
+shader_parameter/Metallic_Constant = 0.000
+shader_parameter/Roughness_Grunge_Breakup = false
+shader_parameter/Multiply_Breakup = true
+shader_parameter/Roughness_Texture_Input = true
+shader_parameter/Roughness_Multiplier = 1.000
+shader_parameter/Roughness_Constant = 1.000
+shader_parameter/R_Overall_Grunge_Power = 0.000
+shader_parameter/Roughness_Grunge_02_Amount = 0.800
+shader_parameter/Roughness_Grunge_01_Amount = 0.800
+shader_parameter/Roughness_Grunge_Tilling = 400.000
+shader_parameter/R_01_Grunge_Power = 0.000
+shader_parameter/R_02_Grunge_Power = 0.000
+shader_parameter/Dust_Roughness = 0.900
+shader_parameter/Use_AO = false
+shader_parameter/AO_Strength_Offset = 0.000

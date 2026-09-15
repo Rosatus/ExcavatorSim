@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayOccluder3D" path="res://maps/construction/Occluders/site_occ.res" id="1_sdlga"]
+
+[node name="SceneOccluder" type="OccluderInstance3D" unique_id=80789381]
+occluder = ExtResource("1_sdlga")

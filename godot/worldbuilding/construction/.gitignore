@@ -1,0 +1,9 @@
+.godot/
+addons/
+*.tmp
+# Godot extracts these from GLBs on import. Source textures are named T_*.
+# The PCK builder includes the generated imports, but Git stores the GLB once.
+maps/construction/**/SM_*.png
+maps/construction/**/SM_*.png.import
+maps/construction/**/MM00549_Painting_Can_Close_01_fbx_MI_*.png
+maps/construction/**/MM00549_Painting_Can_Close_01_fbx_MI_*.png.import

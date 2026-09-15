@@ -1,0 +1,40 @@
+[gd_resource type="Terrain3DAssets" format=3]
+
+[ext_resource type="Texture2D" path="res://materials/ground_0_albedo.png" id="1_mp251"]
+[ext_resource type="Texture2D" path="res://materials/ground_0_normal.png" id="2_hcfc3"]
+[ext_resource type="Texture2D" path="res://materials/ground_1_albedo.png" id="3_v2iih"]
+[ext_resource type="Texture2D" path="res://materials/ground_1_normal.png" id="4_rg25f"]
+[ext_resource type="Texture2D" path="res://materials/ground_2_albedo.png" id="5_tgnjt"]
+[ext_resource type="Texture2D" path="res://materials/ground_2_normal.png" id="6_2g24y"]
+[ext_resource type="Texture2D" path="res://materials/ground_3_albedo.png" id="7_ji8nq"]
+[ext_resource type="Texture2D" path="res://materials/ground_3_normal.png" id="8_nsjch"]
+
+[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_4sio6"]
+name = "Compacted haul road"
+albedo_texture = ExtResource("1_mp251")
+normal_texture = ExtResource("2_hcfc3")
+uv_scale = 0.5
+
+[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_3x5cb"]
+name = "Exposed earth"
+id = 1
+albedo_texture = ExtResource("3_v2iih")
+normal_texture = ExtResource("4_rg25f")
+uv_scale = 0.5
+
+[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_df86w"]
+name = "Gravel service pad"
+id = 2
+albedo_texture = ExtResource("5_tgnjt")
+normal_texture = ExtResource("6_2g24y")
+uv_scale = 0.5
+
+[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_qidfi"]
+name = "Perimeter soil"
+id = 3
+albedo_texture = ExtResource("7_ji8nq")
+normal_texture = ExtResource("8_nsjch")
+uv_scale = 0.5
+
+[resource]
+texture_list = Array[Terrain3DTextureAsset]([SubResource("Terrain3DTextureAsset_4sio6"), SubResource("Terrain3DTextureAsset_3x5cb"), SubResource("Terrain3DTextureAsset_df86w"), SubResource("Terrain3DTextureAsset_qidfi")])
