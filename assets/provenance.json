@@ -71,6 +71,15 @@
       "hash_mode": "raw",
       "relationship": "user-supplied-articulated-visual-model",
       "imported_at": "2026-08-14"
+    },
+    {
+      "source_path": "E:/projects/blender/Excavator/SY135-Neo/export/godot/SY135_excavator_godot.glb",
+      "destination_path": "godot/client/assets/visual/SY135-NEO_excavator_godot.glb",
+      "byte_size": 5916196,
+      "sha256": "e287cd2e02e709a53cb06ad5014272f93ba11ce11e68baf063620c7a1725c85e",
+      "hash_mode": "raw",
+      "relationship": "user-supplied-articulated-visual-model",
+      "imported_at": "2026-09-15"
     }
   ],
   "generated_assets": [

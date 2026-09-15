@@ -30,7 +30,12 @@ func _init(profile_path: String = PROFILE_PATH) -> void:
 
 
 func configure_model(model_id: String) -> bool:
-	if not _models.has(model_id):
+	# SY135-NEO shares the SY135 kinematic semantics; alias it to the same
+	# command profile instead of duplicating the hash-pinned protocol entry.
+	var profile_id := model_id
+	if profile_id == "sy135neo":
+		profile_id = "sy135"
+	if not _models.has(profile_id):
 		if _models.is_empty() and not _last_error.is_empty():
 			_model_id = ""
 			_signs = Vector4.ZERO
@@ -39,7 +44,7 @@ func configure_model(model_id: String) -> bool:
 		_model_id = ""
 		_signs = Vector4.ZERO
 		return false
-	var entry := _models[model_id] as Dictionary
+	var entry := _models[profile_id] as Dictionary
 	var values := entry["semantic_to_joint_signs"] as Array
 	_signs = Vector4(float(values[0]), float(values[1]), float(values[2]), float(values[3]))
 	_model_id = model_id

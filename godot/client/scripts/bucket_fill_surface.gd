@@ -4,6 +4,7 @@ extends RefCounted
 
 const PROFILE_PATHS := {
 	"sy135": "res://resources/visual/sy135_bucket_fill_profile.json",
+	"sy135neo": "res://resources/visual/sy135neo_bucket_fill_profile.json",
 	"sy205": "res://resources/visual/sy205_bucket_fill_profile.json",
 }
 const SURFACE_RELIEF_M := 0.065

@@ -507,6 +507,8 @@ func _configure_model_selector() -> void:
 	_model_selector.set_item_metadata(0, "sy205")
 	_model_selector.add_item(UIStrings.model_name("sy135"))
 	_model_selector.set_item_metadata(1, "sy135")
+	_model_selector.add_item(UIStrings.model_name("sy135neo"))
+	_model_selector.set_item_metadata(2, "sy135neo")
 	_model_selector.tooltip_text = "Choose an excavator model. Switching starts a fresh work session."
 	_model_selector.item_selected.connect(_on_model_selected)
 

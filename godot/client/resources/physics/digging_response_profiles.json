@@ -24,6 +24,18 @@
       "blocked_delay_s": 0.28,
       "flow_reference_m3_per_tick": 0.004,
       "axis_weights": [0.0, 0.76, 0.88, 1.0]
+    },
+    "sy135neo": {
+      "minimum_speed_scale": 0.38,
+      "attack_hz": 6.2,
+      "release_hz": 12.0,
+      "escape_release_hz": 20.0,
+      "maximum_scale_slew_per_s": 5.1,
+      "engage_threshold": 0.11,
+      "disengage_threshold": 0.055,
+      "blocked_delay_s": 0.28,
+      "flow_reference_m3_per_tick": 0.004,
+      "axis_weights": [0.0, 0.76, 0.88, 1.0]
     }
   },
   "materials": {

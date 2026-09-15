@@ -3,7 +3,7 @@ extends RefCounted
 
 
 static func apply(asset_root: Node3D, manifest: Dictionary, model_id: String) -> void:
-	if model_id != "sy135":
+	if model_id != "sy135" and model_id != "sy135neo":
 		return
 	var mapping: Dictionary = manifest.get("frame_map", {})
 	var bucket: Dictionary = mapping.get("bucket_link", {})
@@ -18,6 +18,10 @@ static func apply(asset_root: Node3D, manifest: Dictionary, model_id: String) ->
 			# SY135 exports untextured near-black paint (linear RGB 0.007143).
 			# Use worn dark steel while retaining lit shading and all shadows.
 			# Always duplicate the source, so reactivation cannot accumulate gain.
+			# SY135-NEO detail steel ships readable (luminance >= 0.1) and passes
+			# through untouched; brightening it would only darken the surface.
+			if original.albedo_color.get_luminance() >= 0.1:
+				continue
 			var corrected := original.duplicate() as StandardMaterial3D
 			corrected.albedo_color = Color(0.29, 0.28, 0.26, 1.0)
 			corrected.roughness = 0.82

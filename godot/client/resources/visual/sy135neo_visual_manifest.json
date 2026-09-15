@@ -1,0 +1,439 @@
+{
+  "schema_version": "sy135-visual-v1",
+  "asset_id": "sy135neo-excavator",
+  "asset_path": "res://assets/visual/SY135-NEO_excavator_godot.glb",
+  "source": {
+    "path": "E:/projects/blender/Excavator/SY135-Neo/export/godot/SY135_excavator_godot.glb",
+    "filename": "SY135_excavator_godot.glb",
+    "copied_on": "2026-09-15",
+    "byte_size": 5916196,
+    "sha256": "e287cd2e02e709a53cb06ad5014272f93ba11ce11e68baf063620c7a1725c85e",
+    "format": "glTF 2.0 binary",
+    "generator": "Khronos glTF Blender I/O v5.2.39"
+  },
+  "inspection": {
+    "scene_count": 1,
+    "gltf_node_count": 14,
+    "godot_node_count": 15,
+    "mesh_count": 8,
+    "surface_count": 14,
+    "material_count": 9,
+    "embedded_images": [
+      {
+        "name": "135_Boom_left",
+        "mime_type": "image/png"
+      },
+      {
+        "name": "135_Boom_right",
+        "mime_type": "image/png"
+      },
+      {
+        "name": "135_Carbin_logo",
+        "mime_type": "image/png"
+      }
+    ],
+    "godot_embedded_image_handling": "embed_as_basisu",
+    "imported_bounds_godot": {
+      "min": [
+        -1.262922,
+        0.0,
+        -6.091319
+      ],
+      "max": [
+        1.242801,
+        4.984285,
+        1.82085
+      ],
+      "size": [
+        2.505723,
+        4.984285,
+        7.912169
+      ]
+    },
+    "skin_count": 0,
+    "animation_count": 0,
+    "collision_resource_count": 0,
+    "script_resource_count": 0
+  },
+  "coordinate_system": {
+    "source_authoring": "right_handed_blender_z_up",
+    "godot_runtime": "right_handed_gltf_y_up",
+    "python_to_godot_position": "(x, y, z) -> (x, z, -y)",
+    "python_to_godot_transform": "C * T_python * inverse(C)",
+    "runtime_axes": {
+      "base_link": "none",
+      "upper_structure_link": "Y",
+      "boom_link": "X",
+      "arm_link": "X",
+      "bucket_link": "X"
+    }
+  },
+  "local_kinematics": {
+    "mode": "adjacent_frame_local_rotation_delta",
+    "base_frame": "base_link",
+    "origin_policy": "preserve_imported_parent_local_position",
+    "rotation_policy": "clean_single_runtime_axis",
+    "invalid_policy": "retain_last_valid_local_pose",
+    "frame_contracts": {
+      "base_link": {
+        "parent_frame": "",
+        "runtime_axis": "none",
+        "parent_local_position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "upper_structure_link": {
+        "parent_frame": "base_link",
+        "runtime_axis": "Y",
+        "parent_local_position": [
+          0.0,
+          0.4165,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "boom_link": {
+        "parent_frame": "upper_structure_link",
+        "runtime_axis": "X",
+        "parent_local_position": [
+          0.0,
+          0.8835,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "arm_link": {
+        "parent_frame": "boom_link",
+        "runtime_axis": "X",
+        "parent_local_position": [
+          0.0,
+          0.0,
+          -4.6082
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "bucket_link": {
+        "parent_frame": "arm_link",
+        "runtime_axis": "X",
+        "parent_local_position": [
+          0.0,
+          0.0,
+          -2.4986
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      }
+    }
+  },
+  "pivot_contract": {
+    "tolerance_m": 0.002,
+    "nodes": {
+      "root": {
+        "node_path": "CTRL_EXCAVATOR_ROOT",
+        "parent_path": "",
+        "local_position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "runtime_axis": "none"
+      },
+      "slew": {
+        "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW",
+        "parent_path": "CTRL_EXCAVATOR_ROOT",
+        "local_position": [
+          0.0,
+          0.4165,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "runtime_axis": "Y"
+      },
+      "boom": {
+        "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE",
+        "parent_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW",
+        "local_position": [
+          0.0,
+          0.8835,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "runtime_axis": "X"
+      },
+      "arm": {
+        "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT",
+        "parent_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE",
+        "local_position": [
+          0.0,
+          0.0,
+          -4.6082
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "runtime_axis": "X"
+      },
+      "bucket": {
+        "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT",
+        "parent_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT",
+        "local_position": [
+          0.0,
+          0.0,
+          -2.4986
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "runtime_axis": "X"
+      },
+      "bucket_tip": {
+        "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT/REF_BUCKET_TIP",
+        "parent_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT",
+        "local_position": [
+          0.0,
+          0.0,
+          -1.212636
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "runtime_axis": "inherited_X"
+      }
+    }
+  },
+  "frame_map": {
+    "base_link": {
+      "node_path": "CTRL_EXCAVATOR_ROOT",
+      "pivot_axis": "none",
+      "visual_nodes": [
+        "CTRL_EXCAVATOR_ROOT/undercarriage"
+      ]
+    },
+    "upper_structure_link": {
+      "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW",
+      "pivot_axis": "Z",
+      "visual_nodes": [
+        "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/upper_structure"
+      ]
+    },
+    "boom_link": {
+      "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE",
+      "pivot_axis": "X",
+      "visual_nodes": [
+        "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/boom"
+      ]
+    },
+    "arm_link": {
+      "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT",
+      "pivot_axis": "X",
+      "visual_nodes": [
+        "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/arm"
+      ]
+    },
+    "bucket_link": {
+      "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT",
+      "pivot_axis": "X",
+      "visual_nodes": [
+        "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT/bucket"
+      ]
+    }
+  },
+  "passive_linkage": {
+    "mode": "none"
+  },
+  "excavation_contact": {
+    "mode": "node",
+    "frame": "bucket_link",
+    "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT/REF_BUCKET_TIP"
+  },
+  "calibration": {
+    "status": "godot_import_and_controlled_poses_validated",
+    "authority_fixture": "godot/client/tests/fixtures/sy135_frame_parity_cases.json",
+    "authority_fixture_sha256": "bb034a1540a68e892cd016f3b60e13729de1c66c0373cecf2a22f49915d20005",
+    "matrix_semantics": "Python row arrays encode right-handed T_world_frame; Godot conversion is adapter-owned",
+    "asset_root_scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "rest_transforms_godot": {
+      "base_link": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "upper_structure_link": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.4165
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "boom_link": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.819152,
+          -0.573577,
+          1.3
+        ],
+        [
+          0.0,
+          0.573577,
+          0.819152,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "arm_link": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.573577,
+          0.819152,
+          3.943156
+        ],
+        [
+          0.0,
+          -0.819152,
+          0.573577,
+          -3.774816
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "bucket_link": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          -0.258819,
+          0.965926,
+          1.896423
+        ],
+        [
+          0.0,
+          -0.965926,
+          -0.258819,
+          -5.207954
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    }
+  },
+  "runtime_policy": {
+    "motion_authority": "python_motion_service",
+    "linkage_mode": "none",
+    "local_colliders": "disabled_until_separate_contract",
+    "fallback": "none_on_selected_model_contract_failure"
+  }
+}

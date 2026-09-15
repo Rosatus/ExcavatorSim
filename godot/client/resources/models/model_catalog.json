@@ -72,6 +72,41 @@
         "minimum_traction": 0.2,
         "support_response_hz": 8.5
       }
+    },
+    {
+      "model_id": "sy135neo",
+      "display_name": "SANY SY135 NEO",
+      "model_version": "sy135-reference-urdf-v1",
+      "visual_model_version": "sy135neo-combined-glb-v1",
+      "glb_path": "res://assets/visual/SY135-NEO_excavator_godot.glb",
+      "glb_sha256": "e287cd2e02e709a53cb06ad5014272f93ba11ce11e68baf063620c7a1725c85e",
+      "manifest_path": "res://resources/visual/sy135neo_visual_manifest.json",
+      "manifest_sha256": "eb6b0cf1cdef6b313482a9ded23c096646b201d736c3fbc766e33761710fbbcc",
+      "parity_fixture_path": "res://tests/fixtures/sy135neo_frame_parity_cases.json",
+      "parity_fixture_sha256": "eabf22a0452afa846e8f4ce656a72dd1dae770de4b0b3267d14b42665f40ad7b",
+      "soil_contract_path": "res://resources/models/sy135neo_soil_contract.json",
+      "soil_contract_sha256": "3b0fcef5d91d531bee76f1353d96f00bbd24f33796c57a9290a869765b09b816",
+      "physics_rig_path": "res://resources/physics/sy135neo_physics_rig.json",
+      "physics_rig_sha256": "c8c63df75451e185a59547709cdee06334edea91cd414f732fcbd17cc7ca7cce",
+      "tracked_locomotion": {
+        "track_gauge_m": 1.96,
+        "contact_length_m": 2.9,
+        "contact_width_m": 2.5,
+        "support_front_offset_m": 1.32,
+        "support_rear_offset_m": 1.22,
+        "support_left_offset_m": 0.98,
+        "support_right_offset_m": 0.98,
+        "max_speed_mps": 1.55,
+        "acceleration_mps2": 0.95,
+        "service_brake_mps2": 2.0,
+        "coast_drag_mps2": 0.7,
+        "pivot_scale": 0.82,
+        "max_slope_degrees": 30.0,
+        "slope_slip": 0.5,
+        "turn_slip": 0.16,
+        "minimum_traction": 0.2,
+        "support_response_hz": 8.5
+      }
     }
   ]
 }

@@ -31,7 +31,7 @@ const WARNING_NONE := "Ready"
 
 
 static func model_name(model_id: String) -> String:
-	return {"sy205": "SANY SY205", "sy135": "SANY SY135"}.get(model_id, model_id.to_upper())
+	return {"sy205": "SANY SY205", "sy135": "SANY SY135", "sy135neo": "SANY SY135 NEO"}.get(model_id, model_id.to_upper())
 
 
 static func lifecycle_text(value: String) -> String:

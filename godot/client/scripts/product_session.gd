@@ -14,7 +14,7 @@ const LOCAL_SESSION_ID := "godot-local-authority"
 const LIFECYCLE_STOPPED := "stopped"
 const LIFECYCLE_RUNNING := "running"
 const LIFECYCLE_PAUSED := "paused"
-const MODEL_IDS := ["sy205", "sy135"]
+const MODEL_IDS := ["sy205", "sy135", "sy135neo"]
 
 @export var motion_presentation_path := NodePath("../MotionPresentation")
 @export var motion_client_path := NodePath("../MotionClient")

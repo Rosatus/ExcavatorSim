@@ -517,7 +517,7 @@ func get_status_snapshot(refresh_diagnostics: bool = false) -> Dictionary:
 		"native_overburden_path_total": _native_overburden_path_total,
 		"native_deposit_committed": _native_deposit_committed_count,
 		"readiness_coalesced": _readiness_coalesced_count,
-		"cut_accounting_mode": "sparse_coverage_approximate" if model_id == "sy135" else "exact_sdf_volume",
+		"cut_accounting_mode": "sparse_coverage_approximate" if model_id == "sy135" or model_id == "sy135neo" else "exact_sdf_volume",
 		"deposit_accounting_mode": "native_sparse_deposit_approximate",
 		"engaged": _engaged,
 		"last_error": last_error,
@@ -1027,7 +1027,7 @@ func _commit_native_proposal(
 	transaction: VoxelCutTransaction,
 	started_usec: int
 ) -> VoxelCutTransaction:
-	if proposal.model_id != "sy135" or proposal.native_paths.size() > MAX_NATIVE_PATHS:
+	if (proposal.model_id != "sy135" and proposal.model_id != "sy135neo") or proposal.native_paths.size() > MAX_NATIVE_PATHS:
 		return _reject_transaction(transaction, "native_path_work_budget", started_usec)
 	var window := _integer_window_without_halo(proposal.area_voxels)
 	var origin := window.get("origin", Vector3i.ZERO) as Vector3i

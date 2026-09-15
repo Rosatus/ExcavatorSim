@@ -113,7 +113,7 @@ func build_proposal(
 		rejected["reason"] = "stationary"
 		# A committed brush clears its own contact probes. Keep the established
 		# episode through a pause in that cavity, without submitting an air cut.
-		rejected["engaged"] = was_engaged and model_id == "sy135" \
+		rejected["engaged"] = was_engaged and (model_id == "sy135" or model_id == "sy135neo") \
 			and valid_samples == current_points.size() and _within_lift_exit_envelope(tool_snapshot)
 		return rejected
 	if maximum_motion > MAX_TELEPORT_M:
@@ -128,13 +128,13 @@ func build_proposal(
 	# teeth lift out. Teeth-only entry tests cannot decide that the whole bucket
 	# has left the soil. Never use this continuation to start an unengaged cut.
 	var finishing_lift := false
-	if was_engaged and model_id == "sy135":
+	if was_engaged and (model_id == "sy135" or model_id == "sy135neo"):
 		# Exit contact needs occupancy only; the leading edge still needs normals.
 		finishing_lift = _has_lift_exit_contact(tool_snapshot,
 			contact_sampler if contact_sampler.is_valid() else sdf_sampler, true, batch_contact_sampler)
 	# Contact decides whether this frame cuts; the geometric exit decides
 	# when the episode ends. Clearing one frame must not disable later contact.
-	var retain_lift := was_engaged and model_id == "sy135" \
+	var retain_lift := was_engaged and (model_id == "sy135" or model_id == "sy135neo") \
 		and _has_upward_motion(tool_snapshot) and _within_lift_exit_envelope(tool_snapshot)
 	if minimum_sdf > air_limit and not finishing_lift:
 		rejected["reason"] = "above_ground"
@@ -161,7 +161,7 @@ func build_proposal(
 		if not region.is_empty():
 			clearance.append_array(_clearance_capsules(region, leading_center, leading_normal))
 	var native_paths: Array[Dictionary] = []
-	if model_id == "sy135":
+	if model_id == "sy135" or model_id == "sy135neo":
 		native_paths = _build_sy135_native_paths(tool_snapshot, finishing_lift)
 		if native_paths.is_empty():
 			rejected["reason"] = "empty_native_sweep"

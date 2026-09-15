@@ -39,6 +39,13 @@ const PRESETS := {
 		MODE_INSPECTION: {"anchor": "base_link", "reference": "base_link", "yaw": 0.68, "pitch": 0.35, "distance": 11.5, "focus_height": 1.85, "minimum": 3.8},
 		MODE_CAB: {"anchor": "upper_structure_link", "reference": "upper_structure_link", "cab_position": Vector3(-0.64, 1.58, -0.28), "cab_rotation": Vector3(-0.04, 0.0, 0.0)},
 	},
+	"sy135neo": {
+		MODE_OPERATOR: {"anchor": "upper_structure_link", "reference": "upper_structure_link", "yaw": 2.18, "pitch": 0.30, "distance": 5.2, "focus_height": 0.95, "minimum": 3.0},
+		MODE_CHASE: {"anchor": "base_link", "reference": "base_link", "yaw": 0.0, "pitch": 0.31, "distance": 11.2, "focus_height": 1.55, "minimum": 5.0},
+		MODE_WORK_TOOL: {"anchor": "bucket_link", "reference": "base_link", "yaw": 0.76, "pitch": 0.36, "distance": 6.8, "focus_height": 0.12, "minimum": 3.5},
+		MODE_INSPECTION: {"anchor": "base_link", "reference": "base_link", "yaw": 0.68, "pitch": 0.35, "distance": 11.5, "focus_height": 1.85, "minimum": 3.8},
+		MODE_CAB: {"anchor": "upper_structure_link", "reference": "upper_structure_link", "cab_position": Vector3(-0.64, 1.58, -0.28), "cab_rotation": Vector3(-0.04, 0.0, 0.0)},
+	},
 }
 
 @export var target_path := NodePath("../PresentationRoot/SY205Excavator/CTRL_EXCAVATOR_ROOT")
