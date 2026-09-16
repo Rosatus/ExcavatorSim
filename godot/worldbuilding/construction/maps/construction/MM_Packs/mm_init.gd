@@ -20,9 +20,9 @@ func _ready() -> void:
 	mm.instance_count = n
 	for i in n:
 		var o := i * 12
-		var basis := Basis(
+		var xform_basis := Basis(
 			Vector3(xforms[o], xforms[o + 3], xforms[o + 6]),
 			Vector3(xforms[o + 1], xforms[o + 4], xforms[o + 7]),
 			Vector3(xforms[o + 2], xforms[o + 5], xforms[o + 8]))
-		mm.set_instance_transform(i, Transform3D(basis, Vector3(xforms[o + 9], xforms[o + 10], xforms[o + 11])))
+		mm.set_instance_transform(i, Transform3D(xform_basis, Vector3(xforms[o + 9], xforms[o + 10], xforms[o + 11])))
 	multimesh = mm
