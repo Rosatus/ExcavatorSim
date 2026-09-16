@@ -2,8 +2,8 @@
 
 [ext_resource type="Script" path="res://maps/construction/ground_runtime.gd" id="3_runtime"]
 
-[ext_resource type="Texture2D" path="res://maps/construction/Construction_Site/Textures/Tileable/MT00086-Concrete/4096x4096/T_MT00086-Concrete_Floor_basecolor.png" id="1_0bylm"]
-[ext_resource type="Texture2D" path="res://maps/construction/Construction_Site/Textures/Tileable/MT00086-Concrete/4096x4096/T_MT00086-Concrete_Floor_normal.png" id="2_n1e7p"]
+[ext_resource type="Texture2D" path="res://maps/construction/Construction_Site/Textures/Tileable/Site_Dirt_Tracks/T_Site_Dirt_Tracks_BaseColor.png" id="1_0bylm"]
+[ext_resource type="Texture2D" path="res://maps/construction/Construction_Site/Textures/Tileable/Site_Dirt_Tracks/T_Site_Dirt_Tracks_Normal.png" id="2_n1e7p"]
 
 [sub_resource type="Gradient" id="Gradient_x1all"]
 offsets = PackedFloat32Array(0.2, 1)
@@ -31,17 +31,17 @@ _shader_parameters = {
 &"bias_distance": null,
 &"blend_sharpness": null,
 &"depth_blur": null,
-&"enable_macro_variation": null,
+&"enable_macro_variation": true,
 &"enable_projection": null,
 &"flat_terrain_normals": null,
-&"macro_variation1": null,
-&"macro_variation2": null,
+&"macro_variation1": Color(0.72, 0.66, 0.58, 1),
+&"macro_variation2": Color(0.9, 0.9, 0.85, 1),
 &"macro_variation_slope": null,
 &"mipmap_bias": null,
 &"noise1_angle": null,
 &"noise1_offset": null,
-&"noise1_scale": null,
-&"noise2_scale": null,
+&"noise1_scale": 0.06,
+&"noise2_scale": 0.1,
 &"noise_texture": SubResource("NoiseTexture2D_6bj67"),
 &"projection_threshold": null
 }
@@ -66,10 +66,10 @@ last_shadow_lod = 0
 lod0_range = 128.0
 
 [sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_38qkt"]
-name = "Construction concrete"
+name = "Site dirt tracks"
 albedo_texture = ExtResource("1_0bylm")
 normal_texture = ExtResource("2_n1e7p")
-uv_scale = 0.125
+uv_scale = 0.13
 
 [sub_resource type="Terrain3DAssets" id="Terrain3DAssets_a5bb5"]
 mesh_list = Array[Terrain3DMeshAsset]([SubResource("Terrain3DMeshAsset_n8xu1")])

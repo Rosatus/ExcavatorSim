@@ -1,6 +1,4 @@
-[gd_scene format=3]
-
-[ext_resource type="PackedScene" path="res://maps/construction/WorkArea.tscn" id="work_area"]
+[gd_scene format=3 uid="uid://cia1yoiqxrvkp"]
 
 [ext_resource type="PackedScene" path="res://maps/construction/Prefabs/SM_MM00927_Loader.tscn" id="2_bykbr"]
 [ext_resource type="PackedScene" path="res://maps/construction/Prefabs/SM_MM00924_TriangleColumn_01.tscn" id="3_paut2"]
@@ -95,13 +93,21 @@
 [ext_resource type="PackedScene" path="res://maps/construction/Prefabs/SM_Scaffolding_Ladder.tscn" id="114_dgfu7"]
 [ext_resource type="PackedScene" path="res://maps/construction/Prefabs/SM_MM00926-VariousWoodPlanks_MediumThick.tscn" id="115_1sd7l"]
 [ext_resource type="PackedScene" path="res://maps/construction/Prefabs/SM_MM00950_Random_Pipes_02.tscn" id="116_bxqqo"]
+[ext_resource type="Shader" uid="uid://cvd0x7lon1ur6" path="res://addons/sky_3d/shaders/SkyMaterial.gdshader" id="117_4bq8e"]
 [ext_resource type="PackedScene" path="res://maps/construction/Prefabs/SM_MM00950_Random_Pipes_01.tscn" id="117_c6440"]
+[ext_resource type="Texture2D" uid="uid://cfqk60lpl5ljv" path="res://addons/sky_3d/assets/resources/SNoise.tres" id="118_7bkx4"]
 [ext_resource type="PackedScene" path="res://maps/construction/Prefabs/SM_MM00926-VariousWoodPlanks_MediumThin.tscn" id="118_dv746"]
+[ext_resource type="Texture2D" uid="uid://cecwdqjol0ckd" path="res://addons/sky_3d/assets/textures/noiseClouds.png" id="119_a0lr6"]
 [ext_resource type="PackedScene" path="res://maps/construction/Prefabs/SM_MM00934-LargeModularCrane_TowerPeak_01.tscn" id="120_cyo3r"]
+[ext_resource type="Texture2D" uid="uid://2r8ylu6rg5dp" path="res://addons/sky_3d/assets/thirdparty/textures/moon/MoonMap.png" id="120_sm7xw"]
+[ext_resource type="Texture2D" uid="uid://djpfuyxkryegn" path="res://addons/sky_3d/assets/textures/noise.jpg" id="121_aalmn"]
 [ext_resource type="PackedScene" path="res://maps/construction/Prefabs/SM_MM00934-LargeModularCrane_Cabin_v2.tscn" id="121_br8pd"]
 [ext_resource type="PackedScene" path="res://maps/construction/Prefabs/SM_MM00934-LargeModularCrane_Wires_LongJib.tscn" id="122_iv8dv"]
+[ext_resource type="Texture2D" uid="uid://bm7dot7t7u1q4" path="res://addons/sky_3d/assets/thirdparty/textures/milkyway/StarField.jpg" id="122_ph5sb"]
 [ext_resource type="PackedScene" path="res://maps/construction/Prefabs/SM_MM00934-LargeModularCrane_CounterJib.tscn" id="123_b1di0"]
+[ext_resource type="Texture2D" uid="uid://c1vwcdcdvb74a" path="res://addons/sky_3d/assets/thirdparty/textures/milkyway/Milkyway.jpg" id="123_diqsr"]
 [ext_resource type="PackedScene" path="res://maps/construction/Prefabs/SM_MM00934-LargeModularCrane_Base.tscn" id="124_dfcje"]
+[ext_resource type="Script" uid="uid://b4tkplvh7fq40" path="res://addons/sky_3d/src/SkyDome.gd" id="124_qw56o"]
 [ext_resource type="PackedScene" path="res://maps/construction/Prefabs/SM_MM00934-LargeModularCrane_Platform.tscn" id="125_ck0uo"]
 [ext_resource type="PackedScene" path="res://maps/construction/Prefabs/SM_MM00934-LargeModularCrane_Wires_CounterJib.tscn" id="126_k32qw"]
 [ext_resource type="PackedScene" path="res://maps/construction/Prefabs/SM_MM00934-LargeModularCrane_CraneHookMedium.tscn" id="127_c0617"]
@@ -109,16 +115,17 @@
 [ext_resource type="PackedScene" path="res://maps/construction/Prefabs/SM_MM00934-LargeModularCrane_Wires_ShortJib.tscn" id="129_iv8dv"]
 [ext_resource type="PackedScene" path="res://maps/construction/Prefabs/SM_Cons_Scaffolding_Support_Frame_Double.tscn" id="133_c8upi"]
 [ext_resource type="PackedScene" path="res://maps/construction/Prefabs/SM_Cons_Scaffolding_Ladder_Floor_2_Story.tscn" id="134_btmcy"]
-[ext_resource type="Texture2D" path="res://maps/construction/Construction_Site/Textures/Decals/Road_Tracks_01/Crossing/T_Road_Decal_Crossing_01_normal.png" id="147_d1kwm"]
-[ext_resource type="Texture2D" path="res://maps/construction/Construction_Site/Textures/Decals/Road_Tracks_01/Bend/T_Road_Decal_Bend_01_normal.png" id="261_cpcri"]
-[ext_resource type="Texture2D" path="res://maps/construction/Construction_Site/Textures/Decals/Road_Tracks_01/Straight/T_Road_Decal_Straight_01_normal.png" id="327_1yb1x"]
-[ext_resource type="Texture2D" path="res://maps/construction/Construction_Site/Textures/Decals/Road_Tracks_01/Messy_POM/T_Road_Messy_POM_normal.png" id="349_bcp1f"]
+[ext_resource type="Texture2D" uid="uid://dky3yj2iwkx2x" path="res://maps/construction/Construction_Site/Textures/Decals/Road_Tracks_01/Crossing/T_Road_Decal_Crossing_01_normal.png" id="147_d1kwm"]
+[ext_resource type="Texture2D" uid="uid://mixlnoqfu1l2" path="res://maps/construction/Construction_Site/Textures/Decals/Road_Tracks_01/Bend/T_Road_Decal_Bend_01_normal.png" id="261_cpcri"]
+[ext_resource type="Texture2D" uid="uid://c7jc6g72saxvl" path="res://maps/construction/Construction_Site/Textures/Decals/Road_Tracks_01/Straight/T_Road_Decal_Straight_01_normal.png" id="327_1yb1x"]
+[ext_resource type="Texture2D" uid="uid://yq6n4mb4lnpj" path="res://maps/construction/Construction_Site/Textures/Decals/Road_Tracks_01/Messy_POM/T_Road_Messy_POM_normal.png" id="349_bcp1f"]
 [ext_resource type="PackedScene" path="res://maps/construction/WorldEnvironment.tscn" id="351_dx7tv"]
-[ext_resource type="Texture2D" path="res://maps/construction/Construction_Site/Textures/Decals/Road_Tracks_01/Straight/T_Road_Decal_Straight_01_Decal.png" id="352_decal"]
-[ext_resource type="Texture2D" path="res://maps/construction/Construction_Site/Textures/Decals/Road_Tracks_01/Bend/T_Road_Decal_Bend_01_Decal.png" id="353_decal"]
-[ext_resource type="Texture2D" path="res://maps/construction/Construction_Site/Textures/Decals/Road_Tracks_01/Crossing/T_Road_Decal_Crossing_01_Decal.png" id="354_decal"]
-[ext_resource type="Texture2D" path="res://maps/construction/Construction_Site/Textures/Decals/Road_Tracks_01/Messy_POM/T_Road_Messy_POM_Decal.png" id="355_decal"]
+[ext_resource type="Texture2D" uid="uid://be0okt81s827" path="res://maps/construction/Construction_Site/Textures/Decals/Road_Tracks_01/Straight/T_Road_Decal_Straight_01_Decal.png" id="352_decal"]
+[ext_resource type="Texture2D" uid="uid://gvmdmnv7q66n" path="res://maps/construction/Construction_Site/Textures/Decals/Road_Tracks_01/Bend/T_Road_Decal_Bend_01_Decal.png" id="353_decal"]
+[ext_resource type="Texture2D" uid="uid://du032pccxxqew" path="res://maps/construction/Construction_Site/Textures/Decals/Road_Tracks_01/Crossing/T_Road_Decal_Crossing_01_Decal.png" id="354_decal"]
+[ext_resource type="Texture2D" uid="uid://bdi50bk8w2464" path="res://maps/construction/Construction_Site/Textures/Decals/Road_Tracks_01/Messy_POM/T_Road_Messy_POM_Decal.png" id="355_decal"]
 [ext_resource type="PackedScene" path="res://maps/construction/Ground.tscn" id="900_ground"]
+[ext_resource type="PackedScene" path="res://maps/construction/SceneOccluder.tscn" id="oc1"]
 [ext_resource type="PackedScene" path="res://maps/construction/MM_Packs/SM_Cons_Scaffolding_Continue_Stair_Double__c-1_0_-1.tscn" id="pk0000"]
 [ext_resource type="PackedScene" path="res://maps/construction/MM_Packs/SM_Cons_Scaffolding_Continue_Stair_Double__c-1_0_0.tscn" id="pk0001"]
 [ext_resource type="PackedScene" path="res://maps/construction/MM_Packs/SM_Cons_Scaffolding_Continue_Stair_Double__c-1_0_1.tscn" id="pk0002"]
@@ -475,7 +482,97 @@
 [ext_resource type="PackedScene" path="res://maps/construction/MM_Packs/SM_WM00217_Pallet_Small_fbx__c1_0_1.tscn" id="pk0353"]
 [ext_resource type="PackedScene" path="res://maps/construction/MM_Packs/SM_WM00217_Pallet_Thin_fbx__c0_0_-1.tscn" id="pk0354"]
 [ext_resource type="PackedScene" path="res://maps/construction/MM_Packs/SM_WM00217_Pallet_Thin_fbx__c1_0_-1.tscn" id="pk0355"]
-[ext_resource type="PackedScene" path="res://maps/construction/SceneOccluder.tscn" id="oc1"]
+[ext_resource type="PackedScene" path="res://maps/construction/WorkArea.tscn" id="work_area"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_lf7ju"]
+shader = ExtResource("117_4bq8e")
+shader_parameter/sky_visible = true
+shader_parameter/color_correction = Vector2(0, 1)
+shader_parameter/ground_color = Color(0.3, 0.3, 0.3, 1)
+shader_parameter/horizon_offset = 0.0
+shader_parameter/atm_darkness = 0.5
+shader_parameter/atm_sun_intensity = 18.0
+shader_parameter/atm_day_tint = Color(0.807843, 0.909804, 1, 1)
+shader_parameter/atm_horizon_light_tint = Color(0.980392, 0.635294, 0.462745, 1)
+shader_parameter/atm_night_tint = Color(0, 0, 0, 0)
+shader_parameter/atm_level_params = Vector3(1, 0, 0)
+shader_parameter/atm_thickness = 0.7
+shader_parameter/atm_beta_ray = Vector3(5.804544e-06, 1.3562913e-05, 3.311258e-05)
+shader_parameter/atm_beta_mie = Vector3(3.038e-08, 3.038e-08, 3.038e-08)
+shader_parameter/sun_light_color = Color(1, 1, 1, 1)
+shader_parameter/sun_disk_color = Color(0.996094, 0.541334, 0.140076, 1)
+shader_parameter/sun_disk_intensity = 30.0
+shader_parameter/sun_disk_size = 0.02
+shader_parameter/atm_sun_mie_tint = Color(1, 1, 1, 1)
+shader_parameter/atm_sun_mie_intensity = 1.0
+shader_parameter/atm_sun_partial_mie_phase = Vector3(0.36, 1.64, 1.6)
+shader_parameter/moon_color = Color(1, 1, 1, 1)
+shader_parameter/moon_texture = ExtResource("120_sm7xw")
+shader_parameter/moon_texture_alignment = Vector3(7, 1.4, 4.8)
+shader_parameter/moon_texture_flip_u = false
+shader_parameter/moon_texture_flip_v = false
+shader_parameter/moon_size = 0.07
+shader_parameter/atm_moon_mie_tint = Color(0.137255, 0.184314, 0.292196, 1)
+shader_parameter/atm_moon_mie_intensity = 0.0
+shader_parameter/atm_moon_partial_mie_phase = Vector3(0.36, 1.64, 1.6)
+shader_parameter/starmap_color = Color(0.709804, 0.709804, 0.709804, 0.854902)
+shader_parameter/starmap_texture = ExtResource("123_diqsr")
+shader_parameter/starmap_flip_u = false
+shader_parameter/starmap_flip_v = false
+shader_parameter/starmap_alignment = Vector3(2.68288, -0.25891, 0.40101)
+shader_parameter/star_rotation_offset = 9.38899
+shader_parameter/star_rotation = 0.0
+shader_parameter/star_tilt = 0.0
+shader_parameter/star_field_color = Color(1, 1, 1, 1)
+shader_parameter/star_field_texture = ExtResource("122_ph5sb")
+shader_parameter/star_scintillation = 0.75
+shader_parameter/star_scintillation_speed = 0.01
+shader_parameter/noise_tex = ExtResource("121_aalmn")
+shader_parameter/clouds_night_color = Color(0.090196, 0.094118, 0.129412, 1)
+shader_parameter/cirrus_visible = true
+shader_parameter/cirrus_intensity = 2.0
+shader_parameter/cirrus_coverage = 0.5
+shader_parameter/cirrus_thickness = 1.7
+shader_parameter/cirrus_absorption = 2.0
+shader_parameter/cirrus_sky_tint_fade = 0.5
+shader_parameter/cirrus_size = 1.0
+shader_parameter/cirrus_uv = Vector2(0.16, 0.11)
+shader_parameter/cirrus_position1 = Vector2(0.17896129, 0.17896129)
+shader_parameter/cirrus_position2 = Vector2(0.17896129, 0.17896129)
+shader_parameter/cirrus_texture = ExtResource("118_7bkx4")
+shader_parameter/cumulus_visible = true
+shader_parameter/cumulus_intensity = 0.6
+shader_parameter/cumulus_coverage = 0.55
+shader_parameter/cumulus_thickness = 0.0243
+shader_parameter/cumulus_absorption = 2.0
+shader_parameter/cumulus_noise_freq = 2.7
+shader_parameter/cumulus_sky_tint_fade = 0.0
+shader_parameter/cumulus_size = 0.5
+shader_parameter/cumulus_position = Vector2(0.8946591, 0.8946591)
+shader_parameter/cumulus_texture = ExtResource("119_a0lr6")
+shader_parameter/cumulus_partial_mie_phase = Vector3(0.957564, 1.042436, 0.412)
+shader_parameter/cumulus_mie_intensity = 1.0
+shader_parameter/show_azimuthal_grid = false
+shader_parameter/azimuthal_grid_color = Color(0.87058824, 0.72156864, 0.5294118, 1)
+shader_parameter/azimuthal_grid_rotation_offset = 0.03
+shader_parameter/show_equatorial_grid = false
+shader_parameter/equatorial_grid_color = Color(0, 0.75, 1, 1)
+shader_parameter/equatorial_grid_rotation_offset = 0.03
+shader_parameter/moon_matrix = Basis(0.77142143, -0.6116744, -0.1753948, 0.26904768, 0.5633204, -0.78120637, 0.57664746, 0.5554497, 0.59912705)
+
+[sub_resource type="Sky" id="Sky_c8cti"]
+sky_material = SubResource("ShaderMaterial_lf7ju")
+
+[sub_resource type="Environment" id="Environment_j1v54"]
+background_mode = 2
+sky = SubResource("Sky_c8cti")
+ambient_light_source = 3
+ambient_light_color = Color(1, 1, 1, 1)
+reflected_light_source = 2
+tonemap_mode = 3
+tonemap_white = 6.0
+
+[sub_resource type="CameraAttributesPractical" id="CameraAttributesPractical_7aikg"]
 
 [node name="Root" type="Node3D" unique_id=8429413]
 
@@ -1495,19 +1592,7 @@ texture_normal = ExtResource("261_cpcri")
 
 [node name="Tracks_01_Straight22" type="Node3D" parent="." unique_id=2036339856]
 
-[node name="Decal" type="Decal" parent="Tracks_01_Straight22" unique_id=691947958]
-transform = Transform3D(-0.939693, 0, -0.34202, 0, 1, 0, 0.34202, 0, -0.939693, 50.157463, -7.3e-05, 54.87346)
-size = Vector3(15.36, 0.256, 15.36)
-texture_albedo = ExtResource("352_decal")
-texture_normal = ExtResource("327_1yb1x")
-
 [node name="Tracks_01_Straight23" type="Node3D" parent="." unique_id=1486636826]
-
-[node name="Decal" type="Decal" parent="Tracks_01_Straight23" unique_id=1090470763]
-transform = Transform3D(-0.34202, 0, 0.939693, 0, 1, 0, -0.939693, 0, -0.34202, 45.05746, -7.4e-05, 40.87346)
-size = Vector3(15.36, 0.256, 15.36)
-texture_albedo = ExtResource("353_decal")
-texture_normal = ExtResource("261_cpcri")
 
 [node name="Tracks_01_Straight24" type="Node3D" parent="." unique_id=982380435]
 
@@ -1821,12 +1906,6 @@ texture_albedo = ExtResource("352_decal")
 texture_normal = ExtResource("327_1yb1x")
 
 [node name="Tracks_01_Straight52" type="Node3D" parent="." unique_id=1955290945]
-
-[node name="Decal" type="Decal" parent="Tracks_01_Straight52" unique_id=1650213856]
-transform = Transform3D(-0.939693, 0, -0.34202, 0, 1, 0, 0.34202, 0, -0.939693, 45.633488, 0.039397, 57.686714)
-size = Vector3(15.36, 0.406, 15.36)
-texture_albedo = ExtResource("352_decal")
-texture_normal = ExtResource("327_1yb1x")
 
 [node name="Tracks_01_Straight53" type="Node3D" parent="." unique_id=1639789522]
 
@@ -3771,366 +3850,744 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -71.3, 0, 8.849566)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -71.6, 0, 6.349566)
 
 [node name="WorldEnvironment" parent="." unique_id=729529488 instance=ExtResource("351_dx7tv")]
+environment = SubResource("Environment_j1v54")
+camera_attributes = SubResource("CameraAttributesPractical_7aikg")
+editor_time_enabled = false
+game_time_enabled = false
+wind_direction = 2.35619451204804
 
-[node name="Ground" parent="." instance=ExtResource("900_ground")]
+[node name="SunLight" type="DirectionalLight3D" parent="WorldEnvironment" unique_id=1988944053]
+transform = Transform3D(0.8857257, -0.33516553, 0.32117596, 0, 0.691878, 0.7220144, -0.4642089, -0.6395067, 0.6128142, 0.32117596, 0.7220144, 0.6128142)
+shadow_enabled = true
 
-[node name="MMpack_SM_Cons_Scaffolding_Continue_Stair_Double_c-1_0_-1" parent="." instance=ExtResource("pk0000")]
-[node name="MMpack_SM_Cons_Scaffolding_Continue_Stair_Double_c-1_0_0" parent="." instance=ExtResource("pk0001")]
-[node name="MMpack_SM_Cons_Scaffolding_Continue_Stair_Double_c-1_0_1" parent="." instance=ExtResource("pk0002")]
-[node name="MMpack_SM_Cons_Scaffolding_Continue_Stair_Double_c-2_0_0" parent="." instance=ExtResource("pk0003")]
-[node name="MMpack_SM_Cons_Scaffolding_Continue_Stair_Double_c-2_0_1" parent="." instance=ExtResource("pk0004")]
-[node name="MMpack_SM_Cons_Scaffolding_Continue_Stair_Double_c0_0_-1" parent="." instance=ExtResource("pk0005")]
-[node name="MMpack_SM_Cons_Scaffolding_Continue_Stair_Double_c0_0_0" parent="." instance=ExtResource("pk0006")]
-[node name="MMpack_SM_Cons_Scaffolding_Continue_Stair_Double_c0_0_1" parent="." instance=ExtResource("pk0007")]
-[node name="MMpack_SM_Cons_Scaffolding_Continue_Stair_Double_c1_0_-1" parent="." instance=ExtResource("pk0008")]
-[node name="MMpack_SM_Cons_Scaffolding_Continue_Stair_Double_c1_0_0" parent="." instance=ExtResource("pk0009")]
-[node name="MMpack_SM_Cons_Scaffolding_Continue_Stair_Double_c1_0_1" parent="." instance=ExtResource("pk0010")]
-[node name="MMpack_SM_Cons_Scaffolding_Ladder_Floor_2_Story_c-1_0_0" parent="." instance=ExtResource("pk0011")]
-[node name="MMpack_SM_Cons_Scaffolding_Support_Frame_Double_c-1_0_-1" parent="." instance=ExtResource("pk0012")]
-[node name="MMpack_SM_Cons_Scaffolding_Support_Frame_Double_c-1_0_0" parent="." instance=ExtResource("pk0013")]
-[node name="MMpack_SM_Cons_Scaffolding_Support_Frame_Double_c-1_0_1" parent="." instance=ExtResource("pk0014")]
-[node name="MMpack_SM_Cons_Scaffolding_Support_Frame_Double_c-2_0_0" parent="." instance=ExtResource("pk0015")]
-[node name="MMpack_SM_Cons_Scaffolding_Support_Frame_Double_c0_0_-1" parent="." instance=ExtResource("pk0016")]
-[node name="MMpack_SM_Cons_Scaffolding_Support_Frame_Double_c0_0_0" parent="." instance=ExtResource("pk0017")]
-[node name="MMpack_SM_Cons_Scaffolding_Support_Frame_Double_c0_0_1" parent="." instance=ExtResource("pk0018")]
-[node name="MMpack_SM_Cons_Scaffolding_Support_Frame_Double_c1_0_-1" parent="." instance=ExtResource("pk0019")]
-[node name="MMpack_SM_MM00275_Concrete_Barrier_fbx_c-1_0_0" parent="." instance=ExtResource("pk0020")]
-[node name="MMpack_SM_MM00275_Concrete_Barrier_fbx_c-1_0_1" parent="." instance=ExtResource("pk0021")]
-[node name="MMpack_SM_MM00275_Concrete_Barrier_fbx_c-2_0_0" parent="." instance=ExtResource("pk0022")]
-[node name="MMpack_SM_MM00275_Concrete_Barrier_fbx_c0_-1_-1" parent="." instance=ExtResource("pk0023")]
-[node name="MMpack_SM_MM00275_Concrete_Barrier_fbx_c0_-1_0" parent="." instance=ExtResource("pk0024")]
-[node name="MMpack_SM_MM00275_Concrete_Barrier_fbx_c0_0_-1" parent="." instance=ExtResource("pk0025")]
-[node name="MMpack_SM_MM00275_Concrete_Barrier_fbx_c0_0_0" parent="." instance=ExtResource("pk0026")]
-[node name="MMpack_SM_MM00275_Concrete_Barrier_fbx_c0_0_1" parent="." instance=ExtResource("pk0027")]
-[node name="MMpack_SM_MM00275_Concrete_Barrier_fbx_c1_-1_-1" parent="." instance=ExtResource("pk0028")]
-[node name="MMpack_SM_MM00275_Concrete_Barrier_fbx_c1_0_-1" parent="." instance=ExtResource("pk0029")]
-[node name="MMpack_SM_MM00275_Concrete_Barrier_fbx_c1_0_0" parent="." instance=ExtResource("pk0030")]
-[node name="MMpack_SM_MM00283_Traffic_Cone_01_fbx_c-1_-1_0" parent="." instance=ExtResource("pk0031")]
-[node name="MMpack_SM_MM00283_Traffic_Cone_01_fbx_c-1_0_0" parent="." instance=ExtResource("pk0032")]
-[node name="MMpack_SM_MM00283_Traffic_Cone_01_fbx_c-1_0_1" parent="." instance=ExtResource("pk0033")]
-[node name="MMpack_SM_MM00283_Traffic_Cone_01_fbx_c0_-1_0" parent="." instance=ExtResource("pk0034")]
-[node name="MMpack_SM_MM00283_Traffic_Cone_01_fbx_c0_0_-1" parent="." instance=ExtResource("pk0035")]
-[node name="MMpack_SM_MM00283_Traffic_Cone_01_fbx_c0_0_1" parent="." instance=ExtResource("pk0036")]
-[node name="MMpack_SM_MM00283_Traffic_Cone_01_fbx_c1_-1_-1" parent="." instance=ExtResource("pk0037")]
-[node name="MMpack_SM_MM00303_Small_Waste_bin_open_fbx_c0_0_0" parent="." instance=ExtResource("pk0038")]
-[node name="MMpack_SM_MM00518_Nitrogen_Tanks_fbx_c-1_0_0" parent="." instance=ExtResource("pk0039")]
-[node name="MMpack_SM_MM00518_Nitrogen_Tanks_fbx_c0_0_0" parent="." instance=ExtResource("pk0040")]
-[node name="MMpack_SM_MM00518_Nitrogen_Tanks_fbx_c0_0_1" parent="." instance=ExtResource("pk0041")]
-[node name="MMpack_SM_MM00522_Portable_Toilet_fbx_c-1_0_0" parent="." instance=ExtResource("pk0042")]
-[node name="MMpack_SM_MM00522_Portable_Toilet_fbx_c0_0_-1" parent="." instance=ExtResource("pk0043")]
-[node name="MMpack_SM_MM00530_Wire_Cable_Roll_fbx_c-1_-1_-1" parent="." instance=ExtResource("pk0044")]
-[node name="MMpack_SM_MM00530_Wire_Cable_Roll_fbx_c-1_-1_0" parent="." instance=ExtResource("pk0045")]
-[node name="MMpack_SM_MM00530_Wire_Cable_Roll_fbx_c-1_0_0" parent="." instance=ExtResource("pk0046")]
-[node name="MMpack_SM_MM00530_Wire_Cable_Roll_fbx_c0_-1_0" parent="." instance=ExtResource("pk0047")]
-[node name="MMpack_SM_MM00530_Wire_Cable_Roll_fbx_c1_0_0" parent="." instance=ExtResource("pk0048")]
-[node name="MMpack_SM_MM00532_Containers_c-1_0_-1" parent="." instance=ExtResource("pk0049")]
-[node name="MMpack_SM_MM00532_Containers_c-1_0_0" parent="." instance=ExtResource("pk0050")]
-[node name="MMpack_SM_MM00532_Containers_c-1_0_1" parent="." instance=ExtResource("pk0051")]
-[node name="MMpack_SM_MM00532_Containers_c-2_0_0" parent="." instance=ExtResource("pk0052")]
-[node name="MMpack_SM_MM00532_Containers_c0_0_0" parent="." instance=ExtResource("pk0053")]
-[node name="MMpack_SM_MM00532_Containers_c0_0_1" parent="." instance=ExtResource("pk0054")]
-[node name="MMpack_SM_MM00537_Liquid_Container_fbx_c-1_-1_0" parent="." instance=ExtResource("pk0055")]
-[node name="MMpack_SM_MM00537_Liquid_Container_fbx_c-1_-1_1" parent="." instance=ExtResource("pk0056")]
-[node name="MMpack_SM_MM00540_Wheelbarrow_fbx_c-1_-1_0" parent="." instance=ExtResource("pk0057")]
-[node name="MMpack_SM_MM00541-Cement_Bags_02_c-1_0_0" parent="." instance=ExtResource("pk0058")]
-[node name="MMpack_SM_MM00541-Cement_Bags_02_c-1_0_1" parent="." instance=ExtResource("pk0059")]
-[node name="MMpack_SM_MM00541-Cement_Bags_02_c0_-1_0" parent="." instance=ExtResource("pk0060")]
-[node name="MMpack_SM_MM00541-Cement_Bags_02_c0_-1_1" parent="." instance=ExtResource("pk0061")]
-[node name="MMpack_SM_MM00541-Cement_Bags_02_c0_0_-1" parent="." instance=ExtResource("pk0062")]
-[node name="MMpack_SM_MM00541-Cement_Bags_02_c0_0_1" parent="." instance=ExtResource("pk0063")]
-[node name="MMpack_SM_MM00541-Cement_Bags_04_c-1_0_0" parent="." instance=ExtResource("pk0064")]
-[node name="MMpack_SM_MM00541-Cement_Bags_04_c-1_0_1" parent="." instance=ExtResource("pk0065")]
-[node name="MMpack_SM_MM00541-Cement_Bags_04_c0_-1_0" parent="." instance=ExtResource("pk0066")]
-[node name="MMpack_SM_MM00541-Cement_Bags_04_c0_-1_1" parent="." instance=ExtResource("pk0067")]
-[node name="MMpack_SM_MM00541-Cement_Bags_04_c0_0_-1" parent="." instance=ExtResource("pk0068")]
-[node name="MMpack_SM_MM00541-Cement_Bags_04_c0_0_1" parent="." instance=ExtResource("pk0069")]
-[node name="MMpack_SM_MM00541-Cement_Bags_06_c-1_0_0" parent="." instance=ExtResource("pk0070")]
-[node name="MMpack_SM_MM00541-Cement_Bags_06_c-1_0_1" parent="." instance=ExtResource("pk0071")]
-[node name="MMpack_SM_MM00541-Cement_Bags_06_c0_-1_0" parent="." instance=ExtResource("pk0072")]
-[node name="MMpack_SM_MM00541-Cement_Bags_06_c0_-1_1" parent="." instance=ExtResource("pk0073")]
-[node name="MMpack_SM_MM00541-Cement_Bags_06_c0_0_-1" parent="." instance=ExtResource("pk0074")]
-[node name="MMpack_SM_MM00541-Cement_Bags_06_c0_0_1" parent="." instance=ExtResource("pk0075")]
-[node name="MMpack_SM_MM00541-Cement_Bags_07_c-1_-1_-1" parent="." instance=ExtResource("pk0076")]
-[node name="MMpack_SM_MM00541-Cement_Bags_07_c-1_-1_0" parent="." instance=ExtResource("pk0077")]
-[node name="MMpack_SM_MM00541-Cement_Bags_07_c-1_-1_1" parent="." instance=ExtResource("pk0078")]
-[node name="MMpack_SM_MM00541-Cement_Bags_07_c-1_0_-1" parent="." instance=ExtResource("pk0079")]
-[node name="MMpack_SM_MM00541-Cement_Bags_07_c-1_0_0" parent="." instance=ExtResource("pk0080")]
-[node name="MMpack_SM_MM00541-Cement_Bags_07_c-1_0_1" parent="." instance=ExtResource("pk0081")]
-[node name="MMpack_SM_MM00541-Cement_Bags_07_c-2_-1_0" parent="." instance=ExtResource("pk0082")]
-[node name="MMpack_SM_MM00541-Cement_Bags_07_c-2_0_0" parent="." instance=ExtResource("pk0083")]
-[node name="MMpack_SM_MM00541-Cement_Bags_07_c0_-1_-1" parent="." instance=ExtResource("pk0084")]
-[node name="MMpack_SM_MM00541-Cement_Bags_07_c0_-1_0" parent="." instance=ExtResource("pk0085")]
-[node name="MMpack_SM_MM00541-Cement_Bags_07_c0_-1_1" parent="." instance=ExtResource("pk0086")]
-[node name="MMpack_SM_MM00541-Cement_Bags_07_c0_0_-1" parent="." instance=ExtResource("pk0087")]
-[node name="MMpack_SM_MM00541-Cement_Bags_07_c0_0_0" parent="." instance=ExtResource("pk0088")]
-[node name="MMpack_SM_MM00541-Cement_Bags_07_c0_0_1" parent="." instance=ExtResource("pk0089")]
-[node name="MMpack_SM_MM00541-Cement_Bags_07_c1_-1_0" parent="." instance=ExtResource("pk0090")]
-[node name="MMpack_SM_MM00541-Cement_Bags_07_c1_0_0" parent="." instance=ExtResource("pk0091")]
-[node name="MMpack_SM_MM00543_Concrete_Bricks_Pile_fbx_c-1_-1_-1" parent="." instance=ExtResource("pk0092")]
-[node name="MMpack_SM_MM00543_Concrete_Bricks_Pile_fbx_c-1_-1_0" parent="." instance=ExtResource("pk0093")]
-[node name="MMpack_SM_MM00543_Concrete_Bricks_Pile_fbx_c-1_0_0" parent="." instance=ExtResource("pk0094")]
-[node name="MMpack_SM_MM00543_Concrete_Bricks_Pile_fbx_c0_0_1" parent="." instance=ExtResource("pk0095")]
-[node name="MMpack_SM_MM00543_Concrete_Bricks_Pile_fbx_c1_-1_0" parent="." instance=ExtResource("pk0096")]
-[node name="MMpack_SM_MM00543_Concrete_Bricks_Pile_fbx_c1_0_0" parent="." instance=ExtResource("pk0097")]
-[node name="MMpack_SM_MM00543_Concrete_Bricks_Single_fbx_c-1_-1_0" parent="." instance=ExtResource("pk0098")]
-[node name="MMpack_SM_MM00551_Mallet_fbx_c-1_0_0" parent="." instance=ExtResource("pk0099")]
-[node name="MMpack_SM_MM00551_Mallet_fbx_c0_0_1" parent="." instance=ExtResource("pk0100")]
-[node name="MMpack_SM_MM00553_Hammer_fbx_c-1_0_0" parent="." instance=ExtResource("pk0101")]
-[node name="MMpack_SM_MM00553_Hammer_fbx_c0_0_1" parent="." instance=ExtResource("pk0102")]
-[node name="MMpack_SM_MM00554_Pliers_01_fbx_c-1_0_0" parent="." instance=ExtResource("pk0103")]
-[node name="MMpack_SM_MM00554_Pliers_01_fbx_c0_0_1" parent="." instance=ExtResource("pk0104")]
-[node name="MMpack_SM_MM00559_Shipping_Crate_fbx_c-1_-1_0" parent="." instance=ExtResource("pk0105")]
-[node name="MMpack_SM_MM00559_Shipping_Crate_fbx_c-1_0_0" parent="." instance=ExtResource("pk0106")]
-[node name="MMpack_SM_MM00559_Shipping_Crate_fbx_c0_-1_-1" parent="." instance=ExtResource("pk0107")]
-[node name="MMpack_SM_MM00559_Shipping_Crate_fbx_c0_0_-1" parent="." instance=ExtResource("pk0108")]
-[node name="MMpack_SM_MM00564_Plastic_Barrel_fbx_c-1_-1_-1" parent="." instance=ExtResource("pk0109")]
-[node name="MMpack_SM_MM00564_Plastic_Barrel_fbx_c0_0_-1" parent="." instance=ExtResource("pk0110")]
-[node name="MMpack_SM_MM00564_Plastic_Barrel_fbx_c1_-1_0" parent="." instance=ExtResource("pk0111")]
-[node name="MMpack_SM_MM00564_Plastic_Barrel_fbx_c1_0_0" parent="." instance=ExtResource("pk0112")]
-[node name="MMpack_SM_MM00924_Beam_02_c-1_0_-1" parent="." instance=ExtResource("pk0113")]
-[node name="MMpack_SM_MM00924_Beam_02_c-1_0_0" parent="." instance=ExtResource("pk0114")]
-[node name="MMpack_SM_MM00924_Beam_02_c-1_0_1" parent="." instance=ExtResource("pk0115")]
-[node name="MMpack_SM_MM00924_Beam_02_c-2_0_0" parent="." instance=ExtResource("pk0116")]
-[node name="MMpack_SM_MM00924_Beam_02_c-2_0_1" parent="." instance=ExtResource("pk0117")]
-[node name="MMpack_SM_MM00924_Beam_02_c0_0_-1" parent="." instance=ExtResource("pk0118")]
-[node name="MMpack_SM_MM00924_Beam_02_c0_0_0" parent="." instance=ExtResource("pk0119")]
-[node name="MMpack_SM_MM00924_Beam_02_c0_0_1" parent="." instance=ExtResource("pk0120")]
-[node name="MMpack_SM_MM00924_Beam_02_c1_0_-1" parent="." instance=ExtResource("pk0121")]
-[node name="MMpack_SM_MM00924_Beam_02_c1_0_0" parent="." instance=ExtResource("pk0122")]
-[node name="MMpack_SM_MM00924_BrickWall_01_c1_0_-1" parent="." instance=ExtResource("pk0123")]
-[node name="MMpack_SM_MM00924_Column_01_c-1_-1_-1" parent="." instance=ExtResource("pk0124")]
-[node name="MMpack_SM_MM00924_Column_01_c-1_-1_0" parent="." instance=ExtResource("pk0125")]
-[node name="MMpack_SM_MM00924_Column_01_c-1_0_-1" parent="." instance=ExtResource("pk0126")]
-[node name="MMpack_SM_MM00924_Column_01_c-1_0_0" parent="." instance=ExtResource("pk0127")]
-[node name="MMpack_SM_MM00924_Column_01_c0_-1_-1" parent="." instance=ExtResource("pk0128")]
-[node name="MMpack_SM_MM00924_Column_01_c0_0_-1" parent="." instance=ExtResource("pk0129")]
-[node name="MMpack_SM_MM00924_Column_01_c1_0_-1" parent="." instance=ExtResource("pk0130")]
-[node name="MMpack_SM_MM00924_Column_03_c-1_0_-1" parent="." instance=ExtResource("pk0131")]
-[node name="MMpack_SM_MM00924_Column_03_c-1_0_0" parent="." instance=ExtResource("pk0132")]
-[node name="MMpack_SM_MM00924_Column_03_c-1_0_1" parent="." instance=ExtResource("pk0133")]
-[node name="MMpack_SM_MM00924_Column_03_c-2_0_0" parent="." instance=ExtResource("pk0134")]
-[node name="MMpack_SM_MM00924_Column_03_c-2_0_1" parent="." instance=ExtResource("pk0135")]
-[node name="MMpack_SM_MM00924_Column_03_c0_0_-1" parent="." instance=ExtResource("pk0136")]
-[node name="MMpack_SM_MM00924_Column_03_c0_0_0" parent="." instance=ExtResource("pk0137")]
-[node name="MMpack_SM_MM00924_Column_03_c0_0_1" parent="." instance=ExtResource("pk0138")]
-[node name="MMpack_SM_MM00924_Column_03_c1_0_-1" parent="." instance=ExtResource("pk0139")]
-[node name="MMpack_SM_MM00924_Column_03_c1_0_0" parent="." instance=ExtResource("pk0140")]
-[node name="MMpack_SM_MM00924_Column_04_c-1_-1_0" parent="." instance=ExtResource("pk0141")]
-[node name="MMpack_SM_MM00924_Column_04_c-1_0_-1" parent="." instance=ExtResource("pk0142")]
-[node name="MMpack_SM_MM00924_Column_04_c-1_0_0" parent="." instance=ExtResource("pk0143")]
-[node name="MMpack_SM_MM00924_Column_04_c-1_0_1" parent="." instance=ExtResource("pk0144")]
-[node name="MMpack_SM_MM00924_Column_04_c-2_0_0" parent="." instance=ExtResource("pk0145")]
-[node name="MMpack_SM_MM00924_Column_04_c-2_0_1" parent="." instance=ExtResource("pk0146")]
-[node name="MMpack_SM_MM00924_Column_04_c0_-1_0" parent="." instance=ExtResource("pk0147")]
-[node name="MMpack_SM_MM00924_Column_04_c0_0_-1" parent="." instance=ExtResource("pk0148")]
-[node name="MMpack_SM_MM00924_Column_04_c0_0_0" parent="." instance=ExtResource("pk0149")]
-[node name="MMpack_SM_MM00924_Column_04_c0_0_1" parent="." instance=ExtResource("pk0150")]
-[node name="MMpack_SM_MM00924_Column_04_c1_0_-1" parent="." instance=ExtResource("pk0151")]
-[node name="MMpack_SM_MM00924_Column_04_c1_0_0" parent="." instance=ExtResource("pk0152")]
-[node name="MMpack_SM_MM00924_Column_SteelBar_01_c-1_0_-1" parent="." instance=ExtResource("pk0153")]
-[node name="MMpack_SM_MM00924_Column_SteelBar_01_c-1_0_0" parent="." instance=ExtResource("pk0154")]
-[node name="MMpack_SM_MM00924_Column_SteelBar_01_c0_0_-1" parent="." instance=ExtResource("pk0155")]
-[node name="MMpack_SM_MM00924_Column_SteelBar_02_c-1_0_-1" parent="." instance=ExtResource("pk0156")]
-[node name="MMpack_SM_MM00924_Column_SteelBar_02_c-1_0_0" parent="." instance=ExtResource("pk0157")]
-[node name="MMpack_SM_MM00924_CornerWindow_Concave_01_c-1_0_0" parent="." instance=ExtResource("pk0158")]
-[node name="MMpack_SM_MM00924_DoorWall_01_c0_0_-1" parent="." instance=ExtResource("pk0159")]
-[node name="MMpack_SM_MM00924_DoorWall_01_c1_0_0" parent="." instance=ExtResource("pk0160")]
-[node name="MMpack_SM_MM00924_Floor_01_c-1_0_-1" parent="." instance=ExtResource("pk0161")]
-[node name="MMpack_SM_MM00924_Floor_01_c-1_0_0" parent="." instance=ExtResource("pk0162")]
-[node name="MMpack_SM_MM00924_Floor_01_c0_0_-1" parent="." instance=ExtResource("pk0163")]
-[node name="MMpack_SM_MM00924_Floor_01_c0_0_0" parent="." instance=ExtResource("pk0164")]
-[node name="MMpack_SM_MM00924_Floor_02_c-1_0_-1" parent="." instance=ExtResource("pk0165")]
-[node name="MMpack_SM_MM00924_Floor_02_c-1_0_0" parent="." instance=ExtResource("pk0166")]
-[node name="MMpack_SM_MM00924_Floor_02_c0_0_-1" parent="." instance=ExtResource("pk0167")]
-[node name="MMpack_SM_MM00924_Floor_02_c0_0_0" parent="." instance=ExtResource("pk0168")]
-[node name="MMpack_SM_MM00924_Floor_02_c1_-1_-1" parent="." instance=ExtResource("pk0169")]
-[node name="MMpack_SM_MM00924_Floor_Stairs_01_c-1_0_0" parent="." instance=ExtResource("pk0170")]
-[node name="MMpack_SM_MM00924_Floor_Stairs_01_c-1_0_1" parent="." instance=ExtResource("pk0171")]
-[node name="MMpack_SM_MM00924_Floor_Stairs_01_c0_0_-1" parent="." instance=ExtResource("pk0172")]
-[node name="MMpack_SM_MM00924_Floor_Stairs_02_c-1_0_0" parent="." instance=ExtResource("pk0173")]
-[node name="MMpack_SM_MM00924_Floor_Stairs_02_c0_0_-1" parent="." instance=ExtResource("pk0174")]
-[node name="MMpack_SM_MM00924_Floor_Stairs_02_c1_0_0" parent="." instance=ExtResource("pk0175")]
-[node name="MMpack_SM_MM00924_Floor_SteelStructure_01_c-1_0_-1" parent="." instance=ExtResource("pk0176")]
-[node name="MMpack_SM_MM00924_Floor_SteelStructure_01_c-1_0_0" parent="." instance=ExtResource("pk0177")]
-[node name="MMpack_SM_MM00924_Floor_SteelStructure_01_c-1_0_1" parent="." instance=ExtResource("pk0178")]
-[node name="MMpack_SM_MM00924_Floor_SteelStructure_01_c-2_0_0" parent="." instance=ExtResource("pk0179")]
-[node name="MMpack_SM_MM00924_Floor_SteelStructure_01_c-2_0_1" parent="." instance=ExtResource("pk0180")]
-[node name="MMpack_SM_MM00924_Floor_SteelStructure_01_c0_0_-1" parent="." instance=ExtResource("pk0181")]
-[node name="MMpack_SM_MM00924_Floor_SteelStructure_01_c0_0_0" parent="." instance=ExtResource("pk0182")]
-[node name="MMpack_SM_MM00924_Floor_SteelStructure_01_c0_0_1" parent="." instance=ExtResource("pk0183")]
-[node name="MMpack_SM_MM00924_Floor_SteelStructure_01_c1_0_-1" parent="." instance=ExtResource("pk0184")]
-[node name="MMpack_SM_MM00924_Floor_SteelStructure_01_c1_0_0" parent="." instance=ExtResource("pk0185")]
-[node name="MMpack_SM_MM00924_TriangleColumn_01_c-1_0_-1" parent="." instance=ExtResource("pk0186")]
-[node name="MMpack_SM_MM00924_TriangleColumn_01_c-1_0_0" parent="." instance=ExtResource("pk0187")]
-[node name="MMpack_SM_MM00924_TriangleColumn_01_c0_-1_0" parent="." instance=ExtResource("pk0188")]
-[node name="MMpack_SM_MM00924_TriangleColumn_01_c0_0_-1" parent="." instance=ExtResource("pk0189")]
-[node name="MMpack_SM_MM00924_TriangleColumn_End_01_c-1_0_0" parent="." instance=ExtResource("pk0190")]
-[node name="MMpack_SM_MM00924_TriangleColumn_End_01_c0_0_0" parent="." instance=ExtResource("pk0191")]
-[node name="MMpack_SM_MM00924_Wall_01_c-1_0_-1" parent="." instance=ExtResource("pk0192")]
-[node name="MMpack_SM_MM00924_Wall_01_c-1_0_0" parent="." instance=ExtResource("pk0193")]
-[node name="MMpack_SM_MM00924_Wall_01_c-1_0_1" parent="." instance=ExtResource("pk0194")]
-[node name="MMpack_SM_MM00924_Wall_01_c-2_0_0" parent="." instance=ExtResource("pk0195")]
-[node name="MMpack_SM_MM00924_Wall_01_c-2_0_1" parent="." instance=ExtResource("pk0196")]
-[node name="MMpack_SM_MM00924_Wall_01_c0_0_-1" parent="." instance=ExtResource("pk0197")]
-[node name="MMpack_SM_MM00924_Wall_01_c0_0_0" parent="." instance=ExtResource("pk0198")]
-[node name="MMpack_SM_MM00924_Wall_01_c0_0_1" parent="." instance=ExtResource("pk0199")]
-[node name="MMpack_SM_MM00924_Wall_01_c1_0_-1" parent="." instance=ExtResource("pk0200")]
-[node name="MMpack_SM_MM00924_Wall_01_c1_0_0" parent="." instance=ExtResource("pk0201")]
-[node name="MMpack_SM_MM00924_WindowWall_01_c-1_0_-1" parent="." instance=ExtResource("pk0202")]
-[node name="MMpack_SM_MM00924_WindowWall_01_c-1_0_0" parent="." instance=ExtResource("pk0203")]
-[node name="MMpack_SM_MM00924_WindowWall_01_c1_0_-1" parent="." instance=ExtResource("pk0204")]
-[node name="MMpack_SM_MM00924_Window_01_c-1_0_0" parent="." instance=ExtResource("pk0205")]
-[node name="MMpack_SM_MM00924_Window_01_c-1_0_1" parent="." instance=ExtResource("pk0206")]
-[node name="MMpack_SM_MM00924_Window_01_c-2_0_1" parent="." instance=ExtResource("pk0207")]
-[node name="MMpack_SM_MM00924_Window_01_c0_0_-1" parent="." instance=ExtResource("pk0208")]
-[node name="MMpack_SM_MM00924_Window_01_c0_0_0" parent="." instance=ExtResource("pk0209")]
-[node name="MMpack_SM_MM00924_Window_01_c0_0_1" parent="." instance=ExtResource("pk0210")]
-[node name="MMpack_SM_MM00924_Window_01_c1_0_-1" parent="." instance=ExtResource("pk0211")]
-[node name="MMpack_SM_MM00924_Window_01_c1_0_0" parent="." instance=ExtResource("pk0212")]
-[node name="MMpack_SM_MM00924_Window_02_c-1_0_1" parent="." instance=ExtResource("pk0213")]
-[node name="MMpack_SM_MM00926-VariousWoodPlanksPoles_Packed_v01_c-1_-1_0" parent="." instance=ExtResource("pk0214")]
-[node name="MMpack_SM_MM00926-VariousWoodPlanksPoles_Packed_v03_c-1_-1_0" parent="." instance=ExtResource("pk0215")]
-[node name="MMpack_SM_MM00926-VariousWoodPlanksPoles_Packed_v03_c0_-1_0" parent="." instance=ExtResource("pk0216")]
-[node name="MMpack_SM_MM00927-Cement_Truck_c0_-1_0" parent="." instance=ExtResource("pk0217")]
-[node name="MMpack_SM_MM00927_Front_Loader_c-1_0_0" parent="." instance=ExtResource("pk0218")]
-[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_MainBeam_c-1_0_-1" parent="." instance=ExtResource("pk0219")]
-[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_MainBeam_c-1_0_0" parent="." instance=ExtResource("pk0220")]
-[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_MainBeam_c-1_0_1" parent="." instance=ExtResource("pk0221")]
-[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_MainBeam_c-2_0_0" parent="." instance=ExtResource("pk0222")]
-[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_MainBeam_c-2_0_1" parent="." instance=ExtResource("pk0223")]
-[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_MainBeam_c0_0_-1" parent="." instance=ExtResource("pk0224")]
-[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_MainBeam_c0_0_0" parent="." instance=ExtResource("pk0225")]
-[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_MainBeam_c0_0_1" parent="." instance=ExtResource("pk0226")]
-[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_MainBeam_c1_0_-1" parent="." instance=ExtResource("pk0227")]
-[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_MainBeam_c1_0_0" parent="." instance=ExtResource("pk0228")]
-[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_Packed_01_c0_0_-1" parent="." instance=ExtResource("pk0229")]
-[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_Packed_01_c1_0_-1" parent="." instance=ExtResource("pk0230")]
-[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_Packed_02_c-1_0_-1" parent="." instance=ExtResource("pk0231")]
-[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_Packed_02_c-1_0_0" parent="." instance=ExtResource("pk0232")]
-[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_Packed_02_c-1_0_1" parent="." instance=ExtResource("pk0233")]
-[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_Packed_02_c-2_0_0" parent="." instance=ExtResource("pk0234")]
-[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_Packed_02_c-2_0_1" parent="." instance=ExtResource("pk0235")]
-[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_Packed_02_c0_0_-1" parent="." instance=ExtResource("pk0236")]
-[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_Packed_02_c0_0_0" parent="." instance=ExtResource("pk0237")]
-[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_Packed_02_c0_0_1" parent="." instance=ExtResource("pk0238")]
-[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_Packed_02_c1_0_-1" parent="." instance=ExtResource("pk0239")]
-[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_Packed_02_c1_0_0" parent="." instance=ExtResource("pk0240")]
-[node name="MMpack_SM_MM00929-MetalStorageBin_01_c-1_-1_0" parent="." instance=ExtResource("pk0241")]
-[node name="MMpack_SM_MM00929-MetalStorageBin_01_c-1_0_0" parent="." instance=ExtResource("pk0242")]
-[node name="MMpack_SM_MM00929-MetalStorageBin_01_c0_-1_0" parent="." instance=ExtResource("pk0243")]
-[node name="MMpack_SM_MM00929-MetalStorageBin_01_c0_-1_1" parent="." instance=ExtResource("pk0244")]
-[node name="MMpack_SM_MM00929-MetalStorageBin_01_c0_0_-1" parent="." instance=ExtResource("pk0245")]
-[node name="MMpack_SM_MM00929-MetalStorageBin_01_c1_-1_0" parent="." instance=ExtResource("pk0246")]
-[node name="MMpack_SM_MM00929-MetalStorageBin_01_c1_0_-1" parent="." instance=ExtResource("pk0247")]
-[node name="MMpack_SM_MM00929-MetalStorageBin_01_c1_0_0" parent="." instance=ExtResource("pk0248")]
-[node name="MMpack_SM_MM00930-Big_Sand_Bag_01_c-1_0_0" parent="." instance=ExtResource("pk0249")]
-[node name="MMpack_SM_MM00930-Big_Sand_Bag_01_c0_0_-1" parent="." instance=ExtResource("pk0250")]
-[node name="MMpack_SM_MM00930-Big_Sand_Bag_02_c-1_0_0" parent="." instance=ExtResource("pk0251")]
-[node name="MMpack_SM_MM00930-Big_Sand_Bag_02_c0_0_-1" parent="." instance=ExtResource("pk0252")]
-[node name="MMpack_SM_MM00931-GenericMetalBeam_PackedClean_01_c-1_0_0" parent="." instance=ExtResource("pk0253")]
-[node name="MMpack_SM_MM00931-GenericMetalBeam_PackedClean_01_c-1_0_1" parent="." instance=ExtResource("pk0254")]
-[node name="MMpack_SM_MM00931-GenericMetalBeam_PackedClean_01_c0_-1_-1" parent="." instance=ExtResource("pk0255")]
-[node name="MMpack_SM_MM00931-GenericMetalBeam_PackedClean_01_c0_0_1" parent="." instance=ExtResource("pk0256")]
-[node name="MMpack_SM_MM00931-GenericMetalBeam_PackedClean_01_c1_-1_1" parent="." instance=ExtResource("pk0257")]
-[node name="MMpack_SM_MM00933_Metal_Fencing_0_5m_Straight_c0_0_0" parent="." instance=ExtResource("pk0258")]
-[node name="MMpack_SM_MM00933_Metal_Fencing_2m_Straight_c0_0_0" parent="." instance=ExtResource("pk0259")]
-[node name="MMpack_SM_MM00933_Metal_Fencing_Support_Pillar_c0_0_0" parent="." instance=ExtResource("pk0260")]
-[node name="MMpack_SM_MM00934-LargeModularCrane_JibMiddle_c0_0_-1" parent="." instance=ExtResource("pk0261")]
-[node name="MMpack_SM_MM00934-LargeModularCrane_JibMiddle_c0_0_0" parent="." instance=ExtResource("pk0262")]
-[node name="MMpack_SM_MM00934-LargeModularCrane_JibStart_c0_-1_-1" parent="." instance=ExtResource("pk0263")]
-[node name="MMpack_SM_MM00934-LargeModularCrane_JibStart_c0_0_-1" parent="." instance=ExtResource("pk0264")]
-[node name="MMpack_SM_MM00934-LargeModularCrane_Mast_c-1_0_-1" parent="." instance=ExtResource("pk0265")]
-[node name="MMpack_SM_MM00934-LargeModularCrane_Mast_c-1_0_0" parent="." instance=ExtResource("pk0266")]
-[node name="MMpack_SM_MM00934-LargeModularCrane_Mast_c-1_0_1" parent="." instance=ExtResource("pk0267")]
-[node name="MMpack_SM_MM00934-LargeModularCrane_Mast_c-2_0_0" parent="." instance=ExtResource("pk0268")]
-[node name="MMpack_SM_MM00934-LargeModularCrane_Mast_c0_0_-1" parent="." instance=ExtResource("pk0269")]
-[node name="MMpack_SM_MM00934-LargeModularCrane_Mast_c0_0_0" parent="." instance=ExtResource("pk0270")]
-[node name="MMpack_SM_MM00934-LargeModularCrane_Mast_c1_0_1" parent="." instance=ExtResource("pk0271")]
-[node name="MMpack_SM_MM00940_Transport_Cubes_c-1_-1_0" parent="." instance=ExtResource("pk0272")]
-[node name="MMpack_SM_MM00940_Transport_Cubes_c0_-1_0" parent="." instance=ExtResource("pk0273")]
-[node name="MMpack_SM_MM00942_Shovel_01_c-1_-1_0" parent="." instance=ExtResource("pk0274")]
-[node name="MMpack_SM_MM00943_Metal_Storage_c-1_0_-1" parent="." instance=ExtResource("pk0275")]
-[node name="MMpack_SM_MM00943_Metal_Storage_c-1_0_0" parent="." instance=ExtResource("pk0276")]
-[node name="MMpack_SM_MM00943_Metal_Storage_c-1_0_1" parent="." instance=ExtResource("pk0277")]
-[node name="MMpack_SM_MM00943_Metal_Storage_c-2_0_0" parent="." instance=ExtResource("pk0278")]
-[node name="MMpack_SM_MM00943_Metal_Storage_c0_-1_-1" parent="." instance=ExtResource("pk0279")]
-[node name="MMpack_SM_MM00943_Metal_Storage_c0_0_-1" parent="." instance=ExtResource("pk0280")]
-[node name="MMpack_SM_MM00943_Metal_Storage_c0_0_0" parent="." instance=ExtResource("pk0281")]
-[node name="MMpack_SM_MM00943_Metal_Storage_c0_0_1" parent="." instance=ExtResource("pk0282")]
-[node name="MMpack_SM_MM00951_Wrapped_Cylinders_c-1_0_0" parent="." instance=ExtResource("pk0283")]
-[node name="MMpack_SM_MM00951_Wrapped_Cylinders_c1_0_0" parent="." instance=ExtResource("pk0284")]
-[node name="MMpack_SM_MM00951_Wrapped_Cylinders_Palet_c-1_-1_0" parent="." instance=ExtResource("pk0285")]
-[node name="MMpack_SM_MM00951_Wrapped_Cylinders_Palet_c0_0_-1" parent="." instance=ExtResource("pk0286")]
-[node name="MMpack_SM_MM00951_Wrapped_Planks_c-1_-1_0" parent="." instance=ExtResource("pk0287")]
-[node name="MMpack_SM_MM00951_Wrapped_Square_c-1_0_0" parent="." instance=ExtResource("pk0288")]
-[node name="MMpack_SM_MM00951_Wrapped_Square_c0_0_0" parent="." instance=ExtResource("pk0289")]
-[node name="MMpack_SM_MM00951_Wrapped_Square_c0_0_1" parent="." instance=ExtResource("pk0290")]
-[node name="MMpack_SM_MM00952_Metal_Corrigated_A_c0_0_0" parent="." instance=ExtResource("pk0291")]
-[node name="MMpack_SM_MM00953_Rebar_Stack_Thin_c-1_0_0" parent="." instance=ExtResource("pk0292")]
-[node name="MMpack_SM_Scaffolding_Floor_Panel_c-1_0_-1" parent="." instance=ExtResource("pk0293")]
-[node name="MMpack_SM_Scaffolding_Floor_Panel_c-1_0_0" parent="." instance=ExtResource("pk0294")]
-[node name="MMpack_SM_Scaffolding_Floor_Panel_c-1_0_1" parent="." instance=ExtResource("pk0295")]
-[node name="MMpack_SM_Scaffolding_Floor_Panel_c0_0_-1" parent="." instance=ExtResource("pk0296")]
-[node name="MMpack_SM_Scaffolding_Floor_Panel_c0_0_0" parent="." instance=ExtResource("pk0297")]
-[node name="MMpack_SM_Scaffolding_Floor_Panel_c0_0_1" parent="." instance=ExtResource("pk0298")]
-[node name="MMpack_SM_Scaffolding_Floor_Panel_c1_0_-1" parent="." instance=ExtResource("pk0299")]
-[node name="MMpack_SM_Scaffolding_Floor_Panel_c1_0_0" parent="." instance=ExtResource("pk0300")]
-[node name="MMpack_SM_Scaffolding_Floor_Panel_c1_0_1" parent="." instance=ExtResource("pk0301")]
-[node name="MMpack_SM_Scaffolding_Floor_Plank_c-1_0_-1" parent="." instance=ExtResource("pk0302")]
-[node name="MMpack_SM_Scaffolding_Floor_Plank_c-1_0_0" parent="." instance=ExtResource("pk0303")]
-[node name="MMpack_SM_Scaffolding_Floor_Plank_c-1_0_1" parent="." instance=ExtResource("pk0304")]
-[node name="MMpack_SM_Scaffolding_Floor_Plank_c-2_0_0" parent="." instance=ExtResource("pk0305")]
-[node name="MMpack_SM_Scaffolding_Floor_Plank_c-2_0_1" parent="." instance=ExtResource("pk0306")]
-[node name="MMpack_SM_Scaffolding_Floor_Plank_c0_0_-1" parent="." instance=ExtResource("pk0307")]
-[node name="MMpack_SM_Scaffolding_Floor_Plank_c0_0_0" parent="." instance=ExtResource("pk0308")]
-[node name="MMpack_SM_Scaffolding_Floor_Plank_c0_0_1" parent="." instance=ExtResource("pk0309")]
-[node name="MMpack_SM_Scaffolding_Floor_Plank_c1_0_-1" parent="." instance=ExtResource("pk0310")]
-[node name="MMpack_SM_Scaffolding_Floor_Plank_c1_0_0" parent="." instance=ExtResource("pk0311")]
-[node name="MMpack_SM_Scaffolding_Floor_Plank_c1_0_1" parent="." instance=ExtResource("pk0312")]
-[node name="MMpack_SM_Scaffolding_Ground_Leg_c-1_0_-1" parent="." instance=ExtResource("pk0313")]
-[node name="MMpack_SM_Scaffolding_Ground_Leg_c-1_0_0" parent="." instance=ExtResource("pk0314")]
-[node name="MMpack_SM_Scaffolding_Ground_Leg_c-1_0_1" parent="." instance=ExtResource("pk0315")]
-[node name="MMpack_SM_Scaffolding_Ground_Leg_c-2_0_0" parent="." instance=ExtResource("pk0316")]
-[node name="MMpack_SM_Scaffolding_Ground_Leg_c-2_0_1" parent="." instance=ExtResource("pk0317")]
-[node name="MMpack_SM_Scaffolding_Ground_Leg_c0_0_-1" parent="." instance=ExtResource("pk0318")]
-[node name="MMpack_SM_Scaffolding_Ground_Leg_c0_0_0" parent="." instance=ExtResource("pk0319")]
-[node name="MMpack_SM_Scaffolding_Ground_Leg_c0_0_1" parent="." instance=ExtResource("pk0320")]
-[node name="MMpack_SM_Scaffolding_Ground_Leg_c1_0_-1" parent="." instance=ExtResource("pk0321")]
-[node name="MMpack_SM_Scaffolding_Ground_Leg_c1_0_0" parent="." instance=ExtResource("pk0322")]
-[node name="MMpack_SM_Scaffolding_Ground_Leg_c1_0_1" parent="." instance=ExtResource("pk0323")]
-[node name="MMpack_SM_Scaffolding_Wall_Full_01_c-1_0_-1" parent="." instance=ExtResource("pk0324")]
-[node name="MMpack_SM_Scaffolding_Wall_Full_01_c-1_0_0" parent="." instance=ExtResource("pk0325")]
-[node name="MMpack_SM_Scaffolding_Wall_Full_01_c-1_0_1" parent="." instance=ExtResource("pk0326")]
-[node name="MMpack_SM_Scaffolding_Wall_Full_01_c-2_0_0" parent="." instance=ExtResource("pk0327")]
-[node name="MMpack_SM_Scaffolding_Wall_Full_01_c0_0_-1" parent="." instance=ExtResource("pk0328")]
-[node name="MMpack_SM_Scaffolding_Wall_Full_01_c0_0_0" parent="." instance=ExtResource("pk0329")]
-[node name="MMpack_SM_Scaffolding_Wall_Full_01_c0_0_1" parent="." instance=ExtResource("pk0330")]
-[node name="MMpack_SM_Scaffolding_Wall_Full_01_c1_0_-1" parent="." instance=ExtResource("pk0331")]
-[node name="MMpack_SM_Scaffolding_Wall_Full_01_c1_0_0" parent="." instance=ExtResource("pk0332")]
-[node name="MMpack_SM_Scaffolding_Wall_Half_01_c-1_0_-1" parent="." instance=ExtResource("pk0333")]
-[node name="MMpack_SM_Scaffolding_Wall_Half_01_c-1_0_0" parent="." instance=ExtResource("pk0334")]
-[node name="MMpack_SM_Scaffolding_Wall_Half_01_c-1_0_1" parent="." instance=ExtResource("pk0335")]
-[node name="MMpack_SM_Scaffolding_Wall_Half_01_c-2_0_0" parent="." instance=ExtResource("pk0336")]
-[node name="MMpack_SM_Scaffolding_Wall_Half_01_c0_0_-1" parent="." instance=ExtResource("pk0337")]
-[node name="MMpack_SM_Scaffolding_Wall_Half_01_c0_0_0" parent="." instance=ExtResource("pk0338")]
-[node name="MMpack_SM_Scaffolding_Wall_Half_01_c0_0_1" parent="." instance=ExtResource("pk0339")]
-[node name="MMpack_SM_Scaffolding_Wall_Half_01_c1_0_-1" parent="." instance=ExtResource("pk0340")]
-[node name="MMpack_SM_Scaffolding_Wall_Half_01_c1_0_0" parent="." instance=ExtResource("pk0341")]
-[node name="MMpack_SM_WM00217_Pallet_Small_fbx_c-1_-1_0" parent="." instance=ExtResource("pk0342")]
-[node name="MMpack_SM_WM00217_Pallet_Small_fbx_c-1_0_-1" parent="." instance=ExtResource("pk0343")]
-[node name="MMpack_SM_WM00217_Pallet_Small_fbx_c-1_0_0" parent="." instance=ExtResource("pk0344")]
-[node name="MMpack_SM_WM00217_Pallet_Small_fbx_c0_-1_-1" parent="." instance=ExtResource("pk0345")]
-[node name="MMpack_SM_WM00217_Pallet_Small_fbx_c0_-1_0" parent="." instance=ExtResource("pk0346")]
-[node name="MMpack_SM_WM00217_Pallet_Small_fbx_c0_0_-1" parent="." instance=ExtResource("pk0347")]
-[node name="MMpack_SM_WM00217_Pallet_Small_fbx_c0_0_0" parent="." instance=ExtResource("pk0348")]
-[node name="MMpack_SM_WM00217_Pallet_Small_fbx_c0_0_1" parent="." instance=ExtResource("pk0349")]
-[node name="MMpack_SM_WM00217_Pallet_Small_fbx_c1_-1_-1" parent="." instance=ExtResource("pk0350")]
-[node name="MMpack_SM_WM00217_Pallet_Small_fbx_c1_0_-1" parent="." instance=ExtResource("pk0351")]
-[node name="MMpack_SM_WM00217_Pallet_Small_fbx_c1_0_0" parent="." instance=ExtResource("pk0352")]
-[node name="MMpack_SM_WM00217_Pallet_Small_fbx_c1_0_1" parent="." instance=ExtResource("pk0353")]
-[node name="MMpack_SM_WM00217_Pallet_Thin_fbx_c0_0_-1" parent="." instance=ExtResource("pk0354")]
-[node name="MMpack_SM_WM00217_Pallet_Thin_fbx_c1_0_-1" parent="." instance=ExtResource("pk0355")]
+[node name="MoonLight" type="DirectionalLight3D" parent="WorldEnvironment" unique_id=1892712776]
+transform = Transform3D(0, -0.816993, 0.57664746, 0.7333318, 0.3920458, 0.5554498, -0.67987084, 0.4228739, 0.59912705, 0.57664746, 0.5554498, 0.59912705)
+light_color = Color(0.572549, 0.776471, 0.956863, 1)
+light_energy = 0.0
 
-[node name="SceneOccluder" parent="." instance=ExtResource("oc1")]
+[node name="SkyDome" type="Node" parent="WorldEnvironment" unique_id=1477486405]
+script = ExtResource("124_qw56o")
+sun_azimuth = -2.6588514
+sun_altitude = -0.7640869
+moon_azimuth = -2.3753111
+moon_altitude = -0.9818925
+wind_direction = 2.35619451204804
 
-[node name="WorkArea" parent="." instance=ExtResource("work_area")]
+[node name="Ground" parent="." unique_id=1715565127 instance=ExtResource("900_ground")]
+collision_mode = 3
+
+[node name="MMpack_SM_Cons_Scaffolding_Continue_Stair_Double_c-1_0_-1" parent="." unique_id=393221175 instance=ExtResource("pk0000")]
+
+[node name="MMpack_SM_Cons_Scaffolding_Continue_Stair_Double_c-1_0_0" parent="." unique_id=1404596329 instance=ExtResource("pk0001")]
+
+[node name="MMpack_SM_Cons_Scaffolding_Continue_Stair_Double_c-1_0_1" parent="." unique_id=1551588164 instance=ExtResource("pk0002")]
+
+[node name="MMpack_SM_Cons_Scaffolding_Continue_Stair_Double_c-2_0_0" parent="." unique_id=1485887528 instance=ExtResource("pk0003")]
+
+[node name="MMpack_SM_Cons_Scaffolding_Continue_Stair_Double_c-2_0_1" parent="." unique_id=1839279024 instance=ExtResource("pk0004")]
+
+[node name="MMpack_SM_Cons_Scaffolding_Continue_Stair_Double_c0_0_-1" parent="." unique_id=1060517638 instance=ExtResource("pk0005")]
+
+[node name="MMpack_SM_Cons_Scaffolding_Continue_Stair_Double_c0_0_0" parent="." unique_id=562232409 instance=ExtResource("pk0006")]
+
+[node name="MMpack_SM_Cons_Scaffolding_Continue_Stair_Double_c0_0_1" parent="." unique_id=856835773 instance=ExtResource("pk0007")]
+
+[node name="MMpack_SM_Cons_Scaffolding_Continue_Stair_Double_c1_0_-1" parent="." unique_id=2126763711 instance=ExtResource("pk0008")]
+
+[node name="MMpack_SM_Cons_Scaffolding_Continue_Stair_Double_c1_0_0" parent="." unique_id=1158888780 instance=ExtResource("pk0009")]
+
+[node name="MMpack_SM_Cons_Scaffolding_Continue_Stair_Double_c1_0_1" parent="." unique_id=34622668 instance=ExtResource("pk0010")]
+
+[node name="MMpack_SM_Cons_Scaffolding_Ladder_Floor_2_Story_c-1_0_0" parent="." unique_id=1690706426 instance=ExtResource("pk0011")]
+
+[node name="MMpack_SM_Cons_Scaffolding_Support_Frame_Double_c-1_0_-1" parent="." unique_id=2056828062 instance=ExtResource("pk0012")]
+
+[node name="MMpack_SM_Cons_Scaffolding_Support_Frame_Double_c-1_0_0" parent="." unique_id=311169519 instance=ExtResource("pk0013")]
+
+[node name="MMpack_SM_Cons_Scaffolding_Support_Frame_Double_c-1_0_1" parent="." unique_id=648612282 instance=ExtResource("pk0014")]
+
+[node name="MMpack_SM_Cons_Scaffolding_Support_Frame_Double_c-2_0_0" parent="." unique_id=1964781652 instance=ExtResource("pk0015")]
+
+[node name="MMpack_SM_Cons_Scaffolding_Support_Frame_Double_c0_0_-1" parent="." unique_id=1101621885 instance=ExtResource("pk0016")]
+
+[node name="MMpack_SM_Cons_Scaffolding_Support_Frame_Double_c0_0_0" parent="." unique_id=1990121577 instance=ExtResource("pk0017")]
+
+[node name="MMpack_SM_Cons_Scaffolding_Support_Frame_Double_c0_0_1" parent="." unique_id=1197052626 instance=ExtResource("pk0018")]
+
+[node name="MMpack_SM_Cons_Scaffolding_Support_Frame_Double_c1_0_-1" parent="." unique_id=1282992701 instance=ExtResource("pk0019")]
+
+[node name="MMpack_SM_MM00275_Concrete_Barrier_fbx_c-1_0_0" parent="." unique_id=1415203342 instance=ExtResource("pk0020")]
+
+[node name="MMpack_SM_MM00275_Concrete_Barrier_fbx_c-1_0_1" parent="." unique_id=1756339163 instance=ExtResource("pk0021")]
+
+[node name="MMpack_SM_MM00275_Concrete_Barrier_fbx_c-2_0_0" parent="." unique_id=1248911482 instance=ExtResource("pk0022")]
+
+[node name="MMpack_SM_MM00275_Concrete_Barrier_fbx_c0_-1_-1" parent="." unique_id=937410971 instance=ExtResource("pk0023")]
+
+[node name="MMpack_SM_MM00275_Concrete_Barrier_fbx_c0_-1_0" parent="." unique_id=2035281336 instance=ExtResource("pk0024")]
+
+[node name="MMpack_SM_MM00275_Concrete_Barrier_fbx_c0_0_-1" parent="." unique_id=1343674078 instance=ExtResource("pk0025")]
+
+[node name="MMpack_SM_MM00275_Concrete_Barrier_fbx_c0_0_0" parent="." unique_id=1675676163 instance=ExtResource("pk0026")]
+
+[node name="MMpack_SM_MM00275_Concrete_Barrier_fbx_c0_0_1" parent="." unique_id=422905193 instance=ExtResource("pk0027")]
+
+[node name="MMpack_SM_MM00275_Concrete_Barrier_fbx_c1_-1_-1" parent="." unique_id=125111722 instance=ExtResource("pk0028")]
+
+[node name="MMpack_SM_MM00275_Concrete_Barrier_fbx_c1_0_-1" parent="." unique_id=1006102611 instance=ExtResource("pk0029")]
+
+[node name="MMpack_SM_MM00275_Concrete_Barrier_fbx_c1_0_0" parent="." unique_id=1089733636 instance=ExtResource("pk0030")]
+
+[node name="MMpack_SM_MM00283_Traffic_Cone_01_fbx_c-1_-1_0" parent="." unique_id=1265273860 instance=ExtResource("pk0031")]
+
+[node name="MMpack_SM_MM00283_Traffic_Cone_01_fbx_c-1_0_0" parent="." unique_id=1629628134 instance=ExtResource("pk0032")]
+
+[node name="MMpack_SM_MM00283_Traffic_Cone_01_fbx_c-1_0_1" parent="." unique_id=694841499 instance=ExtResource("pk0033")]
+
+[node name="MMpack_SM_MM00283_Traffic_Cone_01_fbx_c0_-1_0" parent="." unique_id=1303971686 instance=ExtResource("pk0034")]
+
+[node name="MMpack_SM_MM00283_Traffic_Cone_01_fbx_c0_0_-1" parent="." unique_id=356168181 instance=ExtResource("pk0035")]
+
+[node name="MMpack_SM_MM00283_Traffic_Cone_01_fbx_c0_0_1" parent="." unique_id=1125860639 instance=ExtResource("pk0036")]
+
+[node name="MMpack_SM_MM00283_Traffic_Cone_01_fbx_c1_-1_-1" parent="." unique_id=967823129 instance=ExtResource("pk0037")]
+
+[node name="MMpack_SM_MM00303_Small_Waste_bin_open_fbx_c0_0_0" parent="." unique_id=875348967 instance=ExtResource("pk0038")]
+
+[node name="MMpack_SM_MM00518_Nitrogen_Tanks_fbx_c-1_0_0" parent="." unique_id=2003601065 instance=ExtResource("pk0039")]
+
+[node name="MMpack_SM_MM00518_Nitrogen_Tanks_fbx_c0_0_0" parent="." unique_id=442015119 instance=ExtResource("pk0040")]
+
+[node name="MMpack_SM_MM00518_Nitrogen_Tanks_fbx_c0_0_1" parent="." unique_id=355593261 instance=ExtResource("pk0041")]
+
+[node name="MMpack_SM_MM00522_Portable_Toilet_fbx_c-1_0_0" parent="." unique_id=283660701 instance=ExtResource("pk0042")]
+
+[node name="MMpack_SM_MM00522_Portable_Toilet_fbx_c0_0_-1" parent="." unique_id=1382962546 instance=ExtResource("pk0043")]
+
+[node name="MMpack_SM_MM00530_Wire_Cable_Roll_fbx_c-1_-1_-1" parent="." unique_id=1768201415 instance=ExtResource("pk0044")]
+
+[node name="MMpack_SM_MM00530_Wire_Cable_Roll_fbx_c-1_-1_0" parent="." unique_id=1850151828 instance=ExtResource("pk0045")]
+
+[node name="MMpack_SM_MM00530_Wire_Cable_Roll_fbx_c-1_0_0" parent="." unique_id=1991978764 instance=ExtResource("pk0046")]
+
+[node name="MMpack_SM_MM00530_Wire_Cable_Roll_fbx_c0_-1_0" parent="." unique_id=1703242632 instance=ExtResource("pk0047")]
+
+[node name="MMpack_SM_MM00530_Wire_Cable_Roll_fbx_c1_0_0" parent="." unique_id=398690640 instance=ExtResource("pk0048")]
+
+[node name="MMpack_SM_MM00532_Containers_c-1_0_-1" parent="." unique_id=2134095474 instance=ExtResource("pk0049")]
+
+[node name="MMpack_SM_MM00532_Containers_c-1_0_0" parent="." unique_id=2119797680 instance=ExtResource("pk0050")]
+
+[node name="MMpack_SM_MM00532_Containers_c-1_0_1" parent="." unique_id=2049112149 instance=ExtResource("pk0051")]
+
+[node name="MMpack_SM_MM00532_Containers_c-2_0_0" parent="." unique_id=1536030708 instance=ExtResource("pk0052")]
+
+[node name="MMpack_SM_MM00532_Containers_c0_0_0" parent="." unique_id=2055361744 instance=ExtResource("pk0053")]
+
+[node name="MMpack_SM_MM00532_Containers_c0_0_1" parent="." unique_id=1839440477 instance=ExtResource("pk0054")]
+
+[node name="MMpack_SM_MM00537_Liquid_Container_fbx_c-1_-1_0" parent="." unique_id=850392242 instance=ExtResource("pk0055")]
+
+[node name="MMpack_SM_MM00537_Liquid_Container_fbx_c-1_-1_1" parent="." unique_id=1785093860 instance=ExtResource("pk0056")]
+
+[node name="MMpack_SM_MM00540_Wheelbarrow_fbx_c-1_-1_0" parent="." unique_id=1391168877 instance=ExtResource("pk0057")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_02_c-1_0_0" parent="." unique_id=756233527 instance=ExtResource("pk0058")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_02_c-1_0_1" parent="." unique_id=517285344 instance=ExtResource("pk0059")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_02_c0_-1_0" parent="." unique_id=1834941767 instance=ExtResource("pk0060")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_02_c0_-1_1" parent="." unique_id=1650975561 instance=ExtResource("pk0061")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_02_c0_0_-1" parent="." unique_id=1617971433 instance=ExtResource("pk0062")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_02_c0_0_1" parent="." unique_id=855358911 instance=ExtResource("pk0063")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_04_c-1_0_0" parent="." unique_id=384838414 instance=ExtResource("pk0064")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_04_c-1_0_1" parent="." unique_id=394504447 instance=ExtResource("pk0065")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_04_c0_-1_0" parent="." unique_id=1610807043 instance=ExtResource("pk0066")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_04_c0_-1_1" parent="." unique_id=1580363035 instance=ExtResource("pk0067")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_04_c0_0_-1" parent="." unique_id=1550247459 instance=ExtResource("pk0068")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_04_c0_0_1" parent="." unique_id=254737071 instance=ExtResource("pk0069")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_06_c-1_0_0" parent="." unique_id=1320141301 instance=ExtResource("pk0070")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_06_c-1_0_1" parent="." unique_id=1033573724 instance=ExtResource("pk0071")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_06_c0_-1_0" parent="." unique_id=556138835 instance=ExtResource("pk0072")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_06_c0_-1_1" parent="." unique_id=768788608 instance=ExtResource("pk0073")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_06_c0_0_-1" parent="." unique_id=851697584 instance=ExtResource("pk0074")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_06_c0_0_1" parent="." unique_id=2036202752 instance=ExtResource("pk0075")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_07_c-1_-1_-1" parent="." unique_id=945518744 instance=ExtResource("pk0076")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_07_c-1_-1_0" parent="." unique_id=334348720 instance=ExtResource("pk0077")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_07_c-1_-1_1" parent="." unique_id=800216840 instance=ExtResource("pk0078")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_07_c-1_0_-1" parent="." unique_id=1018623671 instance=ExtResource("pk0079")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_07_c-1_0_0" parent="." unique_id=1273249179 instance=ExtResource("pk0080")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_07_c-1_0_1" parent="." unique_id=1410399554 instance=ExtResource("pk0081")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_07_c-2_-1_0" parent="." unique_id=96257518 instance=ExtResource("pk0082")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_07_c-2_0_0" parent="." unique_id=415616764 instance=ExtResource("pk0083")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_07_c0_-1_-1" parent="." unique_id=1337987015 instance=ExtResource("pk0084")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_07_c0_-1_0" parent="." unique_id=244597447 instance=ExtResource("pk0085")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_07_c0_-1_1" parent="." unique_id=957331527 instance=ExtResource("pk0086")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_07_c0_0_-1" parent="." unique_id=619233726 instance=ExtResource("pk0087")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_07_c0_0_0" parent="." unique_id=1492377173 instance=ExtResource("pk0088")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_07_c0_0_1" parent="." unique_id=724324502 instance=ExtResource("pk0089")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_07_c1_-1_0" parent="." unique_id=1927436052 instance=ExtResource("pk0090")]
+
+[node name="MMpack_SM_MM00541-Cement_Bags_07_c1_0_0" parent="." unique_id=609056147 instance=ExtResource("pk0091")]
+
+[node name="MMpack_SM_MM00543_Concrete_Bricks_Pile_fbx_c-1_-1_-1" parent="." unique_id=367766769 instance=ExtResource("pk0092")]
+
+[node name="MMpack_SM_MM00543_Concrete_Bricks_Pile_fbx_c-1_-1_0" parent="." unique_id=684777702 instance=ExtResource("pk0093")]
+
+[node name="MMpack_SM_MM00543_Concrete_Bricks_Pile_fbx_c-1_0_0" parent="." unique_id=2068416218 instance=ExtResource("pk0094")]
+
+[node name="MMpack_SM_MM00543_Concrete_Bricks_Pile_fbx_c0_0_1" parent="." unique_id=1701657582 instance=ExtResource("pk0095")]
+
+[node name="MMpack_SM_MM00543_Concrete_Bricks_Pile_fbx_c1_-1_0" parent="." unique_id=1930838123 instance=ExtResource("pk0096")]
+
+[node name="MMpack_SM_MM00543_Concrete_Bricks_Pile_fbx_c1_0_0" parent="." unique_id=2029846443 instance=ExtResource("pk0097")]
+
+[node name="MMpack_SM_MM00543_Concrete_Bricks_Single_fbx_c-1_-1_0" parent="." unique_id=1890230281 instance=ExtResource("pk0098")]
+
+[node name="MMpack_SM_MM00551_Mallet_fbx_c-1_0_0" parent="." unique_id=469468707 instance=ExtResource("pk0099")]
+
+[node name="MMpack_SM_MM00551_Mallet_fbx_c0_0_1" parent="." unique_id=643282537 instance=ExtResource("pk0100")]
+
+[node name="MMpack_SM_MM00553_Hammer_fbx_c-1_0_0" parent="." unique_id=1879258863 instance=ExtResource("pk0101")]
+
+[node name="MMpack_SM_MM00553_Hammer_fbx_c0_0_1" parent="." unique_id=1088408496 instance=ExtResource("pk0102")]
+
+[node name="MMpack_SM_MM00554_Pliers_01_fbx_c-1_0_0" parent="." unique_id=592358488 instance=ExtResource("pk0103")]
+
+[node name="MMpack_SM_MM00554_Pliers_01_fbx_c0_0_1" parent="." unique_id=419245644 instance=ExtResource("pk0104")]
+
+[node name="MMpack_SM_MM00559_Shipping_Crate_fbx_c-1_-1_0" parent="." unique_id=1944842250 instance=ExtResource("pk0105")]
+
+[node name="MMpack_SM_MM00559_Shipping_Crate_fbx_c-1_0_0" parent="." unique_id=959419361 instance=ExtResource("pk0106")]
+
+[node name="MMpack_SM_MM00559_Shipping_Crate_fbx_c0_-1_-1" parent="." unique_id=1089269387 instance=ExtResource("pk0107")]
+
+[node name="MMpack_SM_MM00559_Shipping_Crate_fbx_c0_0_-1" parent="." unique_id=1028694033 instance=ExtResource("pk0108")]
+
+[node name="MMpack_SM_MM00564_Plastic_Barrel_fbx_c-1_-1_-1" parent="." unique_id=1595105882 instance=ExtResource("pk0109")]
+
+[node name="MMpack_SM_MM00564_Plastic_Barrel_fbx_c0_0_-1" parent="." unique_id=246771052 instance=ExtResource("pk0110")]
+
+[node name="MMpack_SM_MM00564_Plastic_Barrel_fbx_c1_-1_0" parent="." unique_id=1544829369 instance=ExtResource("pk0111")]
+
+[node name="MMpack_SM_MM00564_Plastic_Barrel_fbx_c1_0_0" parent="." unique_id=32905173 instance=ExtResource("pk0112")]
+
+[node name="MMpack_SM_MM00924_Beam_02_c-1_0_-1" parent="." unique_id=1973905560 instance=ExtResource("pk0113")]
+
+[node name="MMpack_SM_MM00924_Beam_02_c-1_0_0" parent="." unique_id=1154269577 instance=ExtResource("pk0114")]
+
+[node name="MMpack_SM_MM00924_Beam_02_c-1_0_1" parent="." unique_id=71847838 instance=ExtResource("pk0115")]
+
+[node name="MMpack_SM_MM00924_Beam_02_c-2_0_0" parent="." unique_id=1923910796 instance=ExtResource("pk0116")]
+
+[node name="MMpack_SM_MM00924_Beam_02_c-2_0_1" parent="." unique_id=1766454174 instance=ExtResource("pk0117")]
+
+[node name="MMpack_SM_MM00924_Beam_02_c0_0_-1" parent="." unique_id=705509435 instance=ExtResource("pk0118")]
+
+[node name="MMpack_SM_MM00924_Beam_02_c0_0_0" parent="." unique_id=487695012 instance=ExtResource("pk0119")]
+
+[node name="MMpack_SM_MM00924_Beam_02_c0_0_1" parent="." unique_id=532581352 instance=ExtResource("pk0120")]
+
+[node name="MMpack_SM_MM00924_Beam_02_c1_0_-1" parent="." unique_id=1168995632 instance=ExtResource("pk0121")]
+
+[node name="MMpack_SM_MM00924_Beam_02_c1_0_0" parent="." unique_id=1304316833 instance=ExtResource("pk0122")]
+
+[node name="MMpack_SM_MM00924_BrickWall_01_c1_0_-1" parent="." unique_id=1191677712 instance=ExtResource("pk0123")]
+
+[node name="MMpack_SM_MM00924_Column_01_c-1_-1_-1" parent="." unique_id=1734434750 instance=ExtResource("pk0124")]
+
+[node name="MMpack_SM_MM00924_Column_01_c-1_-1_0" parent="." unique_id=929426221 instance=ExtResource("pk0125")]
+
+[node name="MMpack_SM_MM00924_Column_01_c-1_0_-1" parent="." unique_id=1940718881 instance=ExtResource("pk0126")]
+
+[node name="MMpack_SM_MM00924_Column_01_c-1_0_0" parent="." unique_id=956762647 instance=ExtResource("pk0127")]
+
+[node name="MMpack_SM_MM00924_Column_01_c0_-1_-1" parent="." unique_id=1406765060 instance=ExtResource("pk0128")]
+
+[node name="MMpack_SM_MM00924_Column_01_c0_0_-1" parent="." unique_id=455086125 instance=ExtResource("pk0129")]
+
+[node name="MMpack_SM_MM00924_Column_01_c1_0_-1" parent="." unique_id=234634015 instance=ExtResource("pk0130")]
+
+[node name="MMpack_SM_MM00924_Column_03_c-1_0_-1" parent="." unique_id=2062525609 instance=ExtResource("pk0131")]
+
+[node name="MMpack_SM_MM00924_Column_03_c-1_0_0" parent="." unique_id=1171916810 instance=ExtResource("pk0132")]
+
+[node name="MMpack_SM_MM00924_Column_03_c-1_0_1" parent="." unique_id=665066845 instance=ExtResource("pk0133")]
+
+[node name="MMpack_SM_MM00924_Column_03_c-2_0_0" parent="." unique_id=1206097821 instance=ExtResource("pk0134")]
+
+[node name="MMpack_SM_MM00924_Column_03_c-2_0_1" parent="." unique_id=1595759194 instance=ExtResource("pk0135")]
+
+[node name="MMpack_SM_MM00924_Column_03_c0_0_-1" parent="." unique_id=930804850 instance=ExtResource("pk0136")]
+
+[node name="MMpack_SM_MM00924_Column_03_c0_0_0" parent="." unique_id=1629894556 instance=ExtResource("pk0137")]
+
+[node name="MMpack_SM_MM00924_Column_03_c0_0_1" parent="." unique_id=367232838 instance=ExtResource("pk0138")]
+
+[node name="MMpack_SM_MM00924_Column_03_c1_0_-1" parent="." unique_id=1090096791 instance=ExtResource("pk0139")]
+
+[node name="MMpack_SM_MM00924_Column_03_c1_0_0" parent="." unique_id=1258003077 instance=ExtResource("pk0140")]
+
+[node name="MMpack_SM_MM00924_Column_04_c-1_-1_0" parent="." unique_id=298628771 instance=ExtResource("pk0141")]
+
+[node name="MMpack_SM_MM00924_Column_04_c-1_0_-1" parent="." unique_id=1393261395 instance=ExtResource("pk0142")]
+
+[node name="MMpack_SM_MM00924_Column_04_c-1_0_0" parent="." unique_id=432117978 instance=ExtResource("pk0143")]
+
+[node name="MMpack_SM_MM00924_Column_04_c-1_0_1" parent="." unique_id=379007915 instance=ExtResource("pk0144")]
+
+[node name="MMpack_SM_MM00924_Column_04_c-2_0_0" parent="." unique_id=1863120844 instance=ExtResource("pk0145")]
+
+[node name="MMpack_SM_MM00924_Column_04_c-2_0_1" parent="." unique_id=2065768299 instance=ExtResource("pk0146")]
+
+[node name="MMpack_SM_MM00924_Column_04_c0_-1_0" parent="." unique_id=1637716918 instance=ExtResource("pk0147")]
+
+[node name="MMpack_SM_MM00924_Column_04_c0_0_-1" parent="." unique_id=1852028314 instance=ExtResource("pk0148")]
+
+[node name="MMpack_SM_MM00924_Column_04_c0_0_0" parent="." unique_id=1982035637 instance=ExtResource("pk0149")]
+
+[node name="MMpack_SM_MM00924_Column_04_c0_0_1" parent="." unique_id=537194693 instance=ExtResource("pk0150")]
+
+[node name="MMpack_SM_MM00924_Column_04_c1_0_-1" parent="." unique_id=116570102 instance=ExtResource("pk0151")]
+
+[node name="MMpack_SM_MM00924_Column_04_c1_0_0" parent="." unique_id=1076046996 instance=ExtResource("pk0152")]
+
+[node name="MMpack_SM_MM00924_Column_SteelBar_01_c-1_0_-1" parent="." unique_id=118295669 instance=ExtResource("pk0153")]
+
+[node name="MMpack_SM_MM00924_Column_SteelBar_01_c-1_0_0" parent="." unique_id=123445331 instance=ExtResource("pk0154")]
+
+[node name="MMpack_SM_MM00924_Column_SteelBar_01_c0_0_-1" parent="." unique_id=625747650 instance=ExtResource("pk0155")]
+
+[node name="MMpack_SM_MM00924_Column_SteelBar_02_c-1_0_-1" parent="." unique_id=404762829 instance=ExtResource("pk0156")]
+
+[node name="MMpack_SM_MM00924_Column_SteelBar_02_c-1_0_0" parent="." unique_id=1725890467 instance=ExtResource("pk0157")]
+
+[node name="MMpack_SM_MM00924_CornerWindow_Concave_01_c-1_0_0" parent="." unique_id=1404484884 instance=ExtResource("pk0158")]
+
+[node name="MMpack_SM_MM00924_DoorWall_01_c0_0_-1" parent="." unique_id=1740746824 instance=ExtResource("pk0159")]
+
+[node name="MMpack_SM_MM00924_DoorWall_01_c1_0_0" parent="." unique_id=379513835 instance=ExtResource("pk0160")]
+
+[node name="MMpack_SM_MM00924_Floor_01_c-1_0_-1" parent="." unique_id=1506551609 instance=ExtResource("pk0161")]
+
+[node name="MMpack_SM_MM00924_Floor_01_c-1_0_0" parent="." unique_id=275014124 instance=ExtResource("pk0162")]
+
+[node name="MMpack_SM_MM00924_Floor_01_c0_0_-1" parent="." unique_id=951900406 instance=ExtResource("pk0163")]
+
+[node name="MMpack_SM_MM00924_Floor_01_c0_0_0" parent="." unique_id=898087617 instance=ExtResource("pk0164")]
+
+[node name="MMpack_SM_MM00924_Floor_02_c-1_0_-1" parent="." unique_id=127018932 instance=ExtResource("pk0165")]
+
+[node name="MMpack_SM_MM00924_Floor_02_c-1_0_0" parent="." unique_id=832254287 instance=ExtResource("pk0166")]
+
+[node name="MMpack_SM_MM00924_Floor_02_c0_0_-1" parent="." unique_id=309893252 instance=ExtResource("pk0167")]
+
+[node name="MMpack_SM_MM00924_Floor_02_c0_0_0" parent="." unique_id=740626767 instance=ExtResource("pk0168")]
+
+[node name="MMpack_SM_MM00924_Floor_02_c1_-1_-1" parent="." unique_id=104691755 instance=ExtResource("pk0169")]
+
+[node name="MMpack_SM_MM00924_Floor_Stairs_01_c-1_0_0" parent="." unique_id=778553878 instance=ExtResource("pk0170")]
+
+[node name="MMpack_SM_MM00924_Floor_Stairs_01_c-1_0_1" parent="." unique_id=835275069 instance=ExtResource("pk0171")]
+
+[node name="MMpack_SM_MM00924_Floor_Stairs_01_c0_0_-1" parent="." unique_id=148237790 instance=ExtResource("pk0172")]
+
+[node name="MMpack_SM_MM00924_Floor_Stairs_02_c-1_0_0" parent="." unique_id=1106167801 instance=ExtResource("pk0173")]
+
+[node name="MMpack_SM_MM00924_Floor_Stairs_02_c0_0_-1" parent="." unique_id=1199485090 instance=ExtResource("pk0174")]
+
+[node name="MMpack_SM_MM00924_Floor_Stairs_02_c1_0_0" parent="." unique_id=1640821422 instance=ExtResource("pk0175")]
+
+[node name="MMpack_SM_MM00924_Floor_SteelStructure_01_c-1_0_-1" parent="." unique_id=1720174849 instance=ExtResource("pk0176")]
+
+[node name="MMpack_SM_MM00924_Floor_SteelStructure_01_c-1_0_0" parent="." unique_id=471821346 instance=ExtResource("pk0177")]
+
+[node name="MMpack_SM_MM00924_Floor_SteelStructure_01_c-1_0_1" parent="." unique_id=56106954 instance=ExtResource("pk0178")]
+
+[node name="MMpack_SM_MM00924_Floor_SteelStructure_01_c-2_0_0" parent="." unique_id=164411661 instance=ExtResource("pk0179")]
+
+[node name="MMpack_SM_MM00924_Floor_SteelStructure_01_c-2_0_1" parent="." unique_id=2021892497 instance=ExtResource("pk0180")]
+
+[node name="MMpack_SM_MM00924_Floor_SteelStructure_01_c0_0_-1" parent="." unique_id=48004028 instance=ExtResource("pk0181")]
+
+[node name="MMpack_SM_MM00924_Floor_SteelStructure_01_c0_0_0" parent="." unique_id=1627349260 instance=ExtResource("pk0182")]
+
+[node name="MMpack_SM_MM00924_Floor_SteelStructure_01_c0_0_1" parent="." unique_id=1818942624 instance=ExtResource("pk0183")]
+
+[node name="MMpack_SM_MM00924_Floor_SteelStructure_01_c1_0_-1" parent="." unique_id=993571908 instance=ExtResource("pk0184")]
+
+[node name="MMpack_SM_MM00924_Floor_SteelStructure_01_c1_0_0" parent="." unique_id=57273108 instance=ExtResource("pk0185")]
+
+[node name="MMpack_SM_MM00924_TriangleColumn_01_c-1_0_-1" parent="." unique_id=1293620186 instance=ExtResource("pk0186")]
+
+[node name="MMpack_SM_MM00924_TriangleColumn_01_c-1_0_0" parent="." unique_id=991152908 instance=ExtResource("pk0187")]
+
+[node name="MMpack_SM_MM00924_TriangleColumn_01_c0_-1_0" parent="." unique_id=1238599335 instance=ExtResource("pk0188")]
+
+[node name="MMpack_SM_MM00924_TriangleColumn_01_c0_0_-1" parent="." unique_id=777148915 instance=ExtResource("pk0189")]
+
+[node name="MMpack_SM_MM00924_TriangleColumn_End_01_c-1_0_0" parent="." unique_id=1330015474 instance=ExtResource("pk0190")]
+
+[node name="MMpack_SM_MM00924_TriangleColumn_End_01_c0_0_0" parent="." unique_id=2019743765 instance=ExtResource("pk0191")]
+
+[node name="MMpack_SM_MM00924_Wall_01_c-1_0_-1" parent="." unique_id=671066359 instance=ExtResource("pk0192")]
+
+[node name="MMpack_SM_MM00924_Wall_01_c-1_0_0" parent="." unique_id=567291801 instance=ExtResource("pk0193")]
+
+[node name="MMpack_SM_MM00924_Wall_01_c-1_0_1" parent="." unique_id=1126059007 instance=ExtResource("pk0194")]
+
+[node name="MMpack_SM_MM00924_Wall_01_c-2_0_0" parent="." unique_id=1342220014 instance=ExtResource("pk0195")]
+
+[node name="MMpack_SM_MM00924_Wall_01_c-2_0_1" parent="." unique_id=273839143 instance=ExtResource("pk0196")]
+
+[node name="MMpack_SM_MM00924_Wall_01_c0_0_-1" parent="." unique_id=1380146082 instance=ExtResource("pk0197")]
+
+[node name="MMpack_SM_MM00924_Wall_01_c0_0_0" parent="." unique_id=145530402 instance=ExtResource("pk0198")]
+
+[node name="MMpack_SM_MM00924_Wall_01_c0_0_1" parent="." unique_id=797161449 instance=ExtResource("pk0199")]
+
+[node name="MMpack_SM_MM00924_Wall_01_c1_0_-1" parent="." unique_id=46157591 instance=ExtResource("pk0200")]
+
+[node name="MMpack_SM_MM00924_Wall_01_c1_0_0" parent="." unique_id=229829639 instance=ExtResource("pk0201")]
+
+[node name="MMpack_SM_MM00924_WindowWall_01_c-1_0_-1" parent="." unique_id=216035680 instance=ExtResource("pk0202")]
+
+[node name="MMpack_SM_MM00924_WindowWall_01_c-1_0_0" parent="." unique_id=1447756343 instance=ExtResource("pk0203")]
+
+[node name="MMpack_SM_MM00924_WindowWall_01_c1_0_-1" parent="." unique_id=1377804506 instance=ExtResource("pk0204")]
+
+[node name="MMpack_SM_MM00924_Window_01_c-1_0_0" parent="." unique_id=1678329559 instance=ExtResource("pk0205")]
+
+[node name="MMpack_SM_MM00924_Window_01_c-1_0_1" parent="." unique_id=1037415303 instance=ExtResource("pk0206")]
+
+[node name="MMpack_SM_MM00924_Window_01_c-2_0_1" parent="." unique_id=1830215275 instance=ExtResource("pk0207")]
+
+[node name="MMpack_SM_MM00924_Window_01_c0_0_-1" parent="." unique_id=1764623261 instance=ExtResource("pk0208")]
+
+[node name="MMpack_SM_MM00924_Window_01_c0_0_0" parent="." unique_id=1054835120 instance=ExtResource("pk0209")]
+
+[node name="MMpack_SM_MM00924_Window_01_c0_0_1" parent="." unique_id=362540592 instance=ExtResource("pk0210")]
+
+[node name="MMpack_SM_MM00924_Window_01_c1_0_-1" parent="." unique_id=1356253421 instance=ExtResource("pk0211")]
+
+[node name="MMpack_SM_MM00924_Window_01_c1_0_0" parent="." unique_id=60536076 instance=ExtResource("pk0212")]
+
+[node name="MMpack_SM_MM00924_Window_02_c-1_0_1" parent="." unique_id=337826552 instance=ExtResource("pk0213")]
+
+[node name="MMpack_SM_MM00926-VariousWoodPlanksPoles_Packed_v01_c-1_-1_0" parent="." unique_id=1076568942 instance=ExtResource("pk0214")]
+
+[node name="MMpack_SM_MM00926-VariousWoodPlanksPoles_Packed_v03_c-1_-1_0" parent="." unique_id=1519556293 instance=ExtResource("pk0215")]
+
+[node name="MMpack_SM_MM00926-VariousWoodPlanksPoles_Packed_v03_c0_-1_0" parent="." unique_id=1896663144 instance=ExtResource("pk0216")]
+
+[node name="MMpack_SM_MM00927-Cement_Truck_c0_-1_0" parent="." unique_id=1618234356 instance=ExtResource("pk0217")]
+
+[node name="MMpack_SM_MM00927_Front_Loader_c-1_0_0" parent="." unique_id=2112753073 instance=ExtResource("pk0218")]
+
+[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_MainBeam_c-1_0_-1" parent="." unique_id=420268288 instance=ExtResource("pk0219")]
+
+[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_MainBeam_c-1_0_0" parent="." unique_id=1006879344 instance=ExtResource("pk0220")]
+
+[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_MainBeam_c-1_0_1" parent="." unique_id=1375019653 instance=ExtResource("pk0221")]
+
+[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_MainBeam_c-2_0_0" parent="." unique_id=634292488 instance=ExtResource("pk0222")]
+
+[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_MainBeam_c-2_0_1" parent="." unique_id=1713477715 instance=ExtResource("pk0223")]
+
+[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_MainBeam_c0_0_-1" parent="." unique_id=45551782 instance=ExtResource("pk0224")]
+
+[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_MainBeam_c0_0_0" parent="." unique_id=514316231 instance=ExtResource("pk0225")]
+
+[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_MainBeam_c0_0_1" parent="." unique_id=1670143382 instance=ExtResource("pk0226")]
+
+[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_MainBeam_c1_0_-1" parent="." unique_id=1982203284 instance=ExtResource("pk0227")]
+
+[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_MainBeam_c1_0_0" parent="." unique_id=615165430 instance=ExtResource("pk0228")]
+
+[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_Packed_01_c0_0_-1" parent="." unique_id=931403664 instance=ExtResource("pk0229")]
+
+[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_Packed_01_c1_0_-1" parent="." unique_id=1321503492 instance=ExtResource("pk0230")]
+
+[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_Packed_02_c-1_0_-1" parent="." unique_id=1692467932 instance=ExtResource("pk0231")]
+
+[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_Packed_02_c-1_0_0" parent="." unique_id=9985007 instance=ExtResource("pk0232")]
+
+[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_Packed_02_c-1_0_1" parent="." unique_id=2043884930 instance=ExtResource("pk0233")]
+
+[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_Packed_02_c-2_0_0" parent="." unique_id=473932547 instance=ExtResource("pk0234")]
+
+[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_Packed_02_c-2_0_1" parent="." unique_id=1498009326 instance=ExtResource("pk0235")]
+
+[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_Packed_02_c0_0_-1" parent="." unique_id=1601846526 instance=ExtResource("pk0236")]
+
+[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_Packed_02_c0_0_0" parent="." unique_id=1876889851 instance=ExtResource("pk0237")]
+
+[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_Packed_02_c0_0_1" parent="." unique_id=2069157845 instance=ExtResource("pk0238")]
+
+[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_Packed_02_c1_0_-1" parent="." unique_id=2029481542 instance=ExtResource("pk0239")]
+
+[node name="MMpack_SM_MM00928-MessyScaffoldingFencing_Packed_02_c1_0_0" parent="." unique_id=1469697731 instance=ExtResource("pk0240")]
+
+[node name="MMpack_SM_MM00929-MetalStorageBin_01_c-1_-1_0" parent="." unique_id=650706666 instance=ExtResource("pk0241")]
+
+[node name="MMpack_SM_MM00929-MetalStorageBin_01_c-1_0_0" parent="." unique_id=240748173 instance=ExtResource("pk0242")]
+
+[node name="MMpack_SM_MM00929-MetalStorageBin_01_c0_-1_0" parent="." unique_id=1778329464 instance=ExtResource("pk0243")]
+
+[node name="MMpack_SM_MM00929-MetalStorageBin_01_c0_-1_1" parent="." unique_id=406598518 instance=ExtResource("pk0244")]
+
+[node name="MMpack_SM_MM00929-MetalStorageBin_01_c0_0_-1" parent="." unique_id=1819475727 instance=ExtResource("pk0245")]
+
+[node name="MMpack_SM_MM00929-MetalStorageBin_01_c1_-1_0" parent="." unique_id=64446292 instance=ExtResource("pk0246")]
+
+[node name="MMpack_SM_MM00929-MetalStorageBin_01_c1_0_-1" parent="." unique_id=1548235939 instance=ExtResource("pk0247")]
+
+[node name="MMpack_SM_MM00929-MetalStorageBin_01_c1_0_0" parent="." unique_id=865134226 instance=ExtResource("pk0248")]
+
+[node name="MMpack_SM_MM00930-Big_Sand_Bag_01_c-1_0_0" parent="." unique_id=2082177627 instance=ExtResource("pk0249")]
+
+[node name="MMpack_SM_MM00930-Big_Sand_Bag_01_c0_0_-1" parent="." unique_id=540444242 instance=ExtResource("pk0250")]
+
+[node name="MMpack_SM_MM00930-Big_Sand_Bag_02_c-1_0_0" parent="." unique_id=1817240356 instance=ExtResource("pk0251")]
+
+[node name="MMpack_SM_MM00930-Big_Sand_Bag_02_c0_0_-1" parent="." unique_id=718844772 instance=ExtResource("pk0252")]
+
+[node name="MMpack_SM_MM00931-GenericMetalBeam_PackedClean_01_c-1_0_0" parent="." unique_id=213937497 instance=ExtResource("pk0253")]
+
+[node name="MMpack_SM_MM00931-GenericMetalBeam_PackedClean_01_c-1_0_1" parent="." unique_id=1538214157 instance=ExtResource("pk0254")]
+
+[node name="MMpack_SM_MM00931-GenericMetalBeam_PackedClean_01_c0_-1_-1" parent="." unique_id=292385219 instance=ExtResource("pk0255")]
+
+[node name="MMpack_SM_MM00931-GenericMetalBeam_PackedClean_01_c0_0_1" parent="." unique_id=850556987 instance=ExtResource("pk0256")]
+
+[node name="MMpack_SM_MM00931-GenericMetalBeam_PackedClean_01_c1_-1_1" parent="." unique_id=1754055265 instance=ExtResource("pk0257")]
+
+[node name="MMpack_SM_MM00933_Metal_Fencing_0_5m_Straight_c0_0_0" parent="." unique_id=2128912946 instance=ExtResource("pk0258")]
+
+[node name="MMpack_SM_MM00933_Metal_Fencing_2m_Straight_c0_0_0" parent="." unique_id=1003013265 instance=ExtResource("pk0259")]
+
+[node name="MMpack_SM_MM00933_Metal_Fencing_Support_Pillar_c0_0_0" parent="." unique_id=965218971 instance=ExtResource("pk0260")]
+
+[node name="MMpack_SM_MM00934-LargeModularCrane_JibMiddle_c0_0_-1" parent="." unique_id=931687614 instance=ExtResource("pk0261")]
+
+[node name="MMpack_SM_MM00934-LargeModularCrane_JibMiddle_c0_0_0" parent="." unique_id=243499458 instance=ExtResource("pk0262")]
+
+[node name="MMpack_SM_MM00934-LargeModularCrane_JibStart_c0_-1_-1" parent="." unique_id=1746672001 instance=ExtResource("pk0263")]
+
+[node name="MMpack_SM_MM00934-LargeModularCrane_JibStart_c0_0_-1" parent="." unique_id=329051564 instance=ExtResource("pk0264")]
+
+[node name="MMpack_SM_MM00934-LargeModularCrane_Mast_c-1_0_-1" parent="." unique_id=1101115022 instance=ExtResource("pk0265")]
+
+[node name="MMpack_SM_MM00934-LargeModularCrane_Mast_c-1_0_0" parent="." unique_id=1620327053 instance=ExtResource("pk0266")]
+
+[node name="MMpack_SM_MM00934-LargeModularCrane_Mast_c-1_0_1" parent="." unique_id=1016686478 instance=ExtResource("pk0267")]
+
+[node name="MMpack_SM_MM00934-LargeModularCrane_Mast_c-2_0_0" parent="." unique_id=69362192 instance=ExtResource("pk0268")]
+
+[node name="MMpack_SM_MM00934-LargeModularCrane_Mast_c0_0_-1" parent="." unique_id=589395064 instance=ExtResource("pk0269")]
+
+[node name="MMpack_SM_MM00934-LargeModularCrane_Mast_c0_0_0" parent="." unique_id=1446209543 instance=ExtResource("pk0270")]
+
+[node name="MMpack_SM_MM00934-LargeModularCrane_Mast_c1_0_1" parent="." unique_id=883539944 instance=ExtResource("pk0271")]
+
+[node name="MMpack_SM_MM00940_Transport_Cubes_c-1_-1_0" parent="." unique_id=1515523606 instance=ExtResource("pk0272")]
+
+[node name="MMpack_SM_MM00940_Transport_Cubes_c0_-1_0" parent="." unique_id=1138808636 instance=ExtResource("pk0273")]
+
+[node name="MMpack_SM_MM00942_Shovel_01_c-1_-1_0" parent="." unique_id=223486465 instance=ExtResource("pk0274")]
+
+[node name="MMpack_SM_MM00943_Metal_Storage_c-1_0_-1" parent="." unique_id=1615706748 instance=ExtResource("pk0275")]
+
+[node name="MMpack_SM_MM00943_Metal_Storage_c-1_0_0" parent="." unique_id=548800715 instance=ExtResource("pk0276")]
+
+[node name="MMpack_SM_MM00943_Metal_Storage_c-1_0_1" parent="." unique_id=897540332 instance=ExtResource("pk0277")]
+
+[node name="MMpack_SM_MM00943_Metal_Storage_c-2_0_0" parent="." unique_id=279179443 instance=ExtResource("pk0278")]
+
+[node name="MMpack_SM_MM00943_Metal_Storage_c0_-1_-1" parent="." unique_id=789616362 instance=ExtResource("pk0279")]
+
+[node name="MMpack_SM_MM00943_Metal_Storage_c0_0_-1" parent="." unique_id=1698045880 instance=ExtResource("pk0280")]
+
+[node name="MMpack_SM_MM00943_Metal_Storage_c0_0_0" parent="." unique_id=1986820877 instance=ExtResource("pk0281")]
+
+[node name="MMpack_SM_MM00943_Metal_Storage_c0_0_1" parent="." unique_id=172515012 instance=ExtResource("pk0282")]
+
+[node name="MMpack_SM_MM00951_Wrapped_Cylinders_c-1_0_0" parent="." unique_id=584142280 instance=ExtResource("pk0283")]
+
+[node name="MMpack_SM_MM00951_Wrapped_Cylinders_c1_0_0" parent="." unique_id=1524480053 instance=ExtResource("pk0284")]
+
+[node name="MMpack_SM_MM00951_Wrapped_Cylinders_Palet_c-1_-1_0" parent="." unique_id=766484298 instance=ExtResource("pk0285")]
+
+[node name="MMpack_SM_MM00951_Wrapped_Cylinders_Palet_c0_0_-1" parent="." unique_id=1125372337 instance=ExtResource("pk0286")]
+
+[node name="MMpack_SM_MM00951_Wrapped_Planks_c-1_-1_0" parent="." unique_id=149301985 instance=ExtResource("pk0287")]
+
+[node name="MMpack_SM_MM00951_Wrapped_Square_c-1_0_0" parent="." unique_id=453435264 instance=ExtResource("pk0288")]
+
+[node name="MMpack_SM_MM00951_Wrapped_Square_c0_0_0" parent="." unique_id=1013702181 instance=ExtResource("pk0289")]
+
+[node name="MMpack_SM_MM00951_Wrapped_Square_c0_0_1" parent="." unique_id=1530914354 instance=ExtResource("pk0290")]
+
+[node name="MMpack_SM_MM00952_Metal_Corrigated_A_c0_0_0" parent="." unique_id=1272253944 instance=ExtResource("pk0291")]
+
+[node name="MMpack_SM_MM00953_Rebar_Stack_Thin_c-1_0_0" parent="." unique_id=917669825 instance=ExtResource("pk0292")]
+
+[node name="MMpack_SM_Scaffolding_Floor_Panel_c-1_0_-1" parent="." unique_id=1444172130 instance=ExtResource("pk0293")]
+
+[node name="MMpack_SM_Scaffolding_Floor_Panel_c-1_0_0" parent="." unique_id=1490466292 instance=ExtResource("pk0294")]
+
+[node name="MMpack_SM_Scaffolding_Floor_Panel_c-1_0_1" parent="." unique_id=1775625342 instance=ExtResource("pk0295")]
+
+[node name="MMpack_SM_Scaffolding_Floor_Panel_c0_0_-1" parent="." unique_id=1579628205 instance=ExtResource("pk0296")]
+
+[node name="MMpack_SM_Scaffolding_Floor_Panel_c0_0_0" parent="." unique_id=686809060 instance=ExtResource("pk0297")]
+
+[node name="MMpack_SM_Scaffolding_Floor_Panel_c0_0_1" parent="." unique_id=102524255 instance=ExtResource("pk0298")]
+
+[node name="MMpack_SM_Scaffolding_Floor_Panel_c1_0_-1" parent="." unique_id=1737920024 instance=ExtResource("pk0299")]
+
+[node name="MMpack_SM_Scaffolding_Floor_Panel_c1_0_0" parent="." unique_id=1980850890 instance=ExtResource("pk0300")]
+
+[node name="MMpack_SM_Scaffolding_Floor_Panel_c1_0_1" parent="." unique_id=1759618338 instance=ExtResource("pk0301")]
+
+[node name="MMpack_SM_Scaffolding_Floor_Plank_c-1_0_-1" parent="." unique_id=1103321682 instance=ExtResource("pk0302")]
+
+[node name="MMpack_SM_Scaffolding_Floor_Plank_c-1_0_0" parent="." unique_id=1233845427 instance=ExtResource("pk0303")]
+
+[node name="MMpack_SM_Scaffolding_Floor_Plank_c-1_0_1" parent="." unique_id=612404898 instance=ExtResource("pk0304")]
+
+[node name="MMpack_SM_Scaffolding_Floor_Plank_c-2_0_0" parent="." unique_id=1677712142 instance=ExtResource("pk0305")]
+
+[node name="MMpack_SM_Scaffolding_Floor_Plank_c-2_0_1" parent="." unique_id=1809618835 instance=ExtResource("pk0306")]
+
+[node name="MMpack_SM_Scaffolding_Floor_Plank_c0_0_-1" parent="." unique_id=1828742746 instance=ExtResource("pk0307")]
+
+[node name="MMpack_SM_Scaffolding_Floor_Plank_c0_0_0" parent="." unique_id=725918707 instance=ExtResource("pk0308")]
+
+[node name="MMpack_SM_Scaffolding_Floor_Plank_c0_0_1" parent="." unique_id=350894248 instance=ExtResource("pk0309")]
+
+[node name="MMpack_SM_Scaffolding_Floor_Plank_c1_0_-1" parent="." unique_id=1772561287 instance=ExtResource("pk0310")]
+
+[node name="MMpack_SM_Scaffolding_Floor_Plank_c1_0_0" parent="." unique_id=651172317 instance=ExtResource("pk0311")]
+
+[node name="MMpack_SM_Scaffolding_Floor_Plank_c1_0_1" parent="." unique_id=520703745 instance=ExtResource("pk0312")]
+
+[node name="MMpack_SM_Scaffolding_Ground_Leg_c-1_0_-1" parent="." unique_id=643436062 instance=ExtResource("pk0313")]
+
+[node name="MMpack_SM_Scaffolding_Ground_Leg_c-1_0_0" parent="." unique_id=1908545669 instance=ExtResource("pk0314")]
+
+[node name="MMpack_SM_Scaffolding_Ground_Leg_c-1_0_1" parent="." unique_id=502513542 instance=ExtResource("pk0315")]
+
+[node name="MMpack_SM_Scaffolding_Ground_Leg_c-2_0_0" parent="." unique_id=1568314085 instance=ExtResource("pk0316")]
+
+[node name="MMpack_SM_Scaffolding_Ground_Leg_c-2_0_1" parent="." unique_id=1544572398 instance=ExtResource("pk0317")]
+
+[node name="MMpack_SM_Scaffolding_Ground_Leg_c0_0_-1" parent="." unique_id=1697072017 instance=ExtResource("pk0318")]
+
+[node name="MMpack_SM_Scaffolding_Ground_Leg_c0_0_0" parent="." unique_id=1691873829 instance=ExtResource("pk0319")]
+
+[node name="MMpack_SM_Scaffolding_Ground_Leg_c0_0_1" parent="." unique_id=864263416 instance=ExtResource("pk0320")]
+
+[node name="MMpack_SM_Scaffolding_Ground_Leg_c1_0_-1" parent="." unique_id=1602325381 instance=ExtResource("pk0321")]
+
+[node name="MMpack_SM_Scaffolding_Ground_Leg_c1_0_0" parent="." unique_id=1004801871 instance=ExtResource("pk0322")]
+
+[node name="MMpack_SM_Scaffolding_Ground_Leg_c1_0_1" parent="." unique_id=1471612733 instance=ExtResource("pk0323")]
+
+[node name="MMpack_SM_Scaffolding_Wall_Full_01_c-1_0_-1" parent="." unique_id=1161774795 instance=ExtResource("pk0324")]
+
+[node name="MMpack_SM_Scaffolding_Wall_Full_01_c-1_0_0" parent="." unique_id=652828807 instance=ExtResource("pk0325")]
+
+[node name="MMpack_SM_Scaffolding_Wall_Full_01_c-1_0_1" parent="." unique_id=1638705942 instance=ExtResource("pk0326")]
+
+[node name="MMpack_SM_Scaffolding_Wall_Full_01_c-2_0_0" parent="." unique_id=442040750 instance=ExtResource("pk0327")]
+
+[node name="MMpack_SM_Scaffolding_Wall_Full_01_c0_0_-1" parent="." unique_id=703355904 instance=ExtResource("pk0328")]
+
+[node name="MMpack_SM_Scaffolding_Wall_Full_01_c0_0_0" parent="." unique_id=21695161 instance=ExtResource("pk0329")]
+
+[node name="MMpack_SM_Scaffolding_Wall_Full_01_c0_0_1" parent="." unique_id=654434849 instance=ExtResource("pk0330")]
+
+[node name="MMpack_SM_Scaffolding_Wall_Full_01_c1_0_-1" parent="." unique_id=1989508206 instance=ExtResource("pk0331")]
+
+[node name="MMpack_SM_Scaffolding_Wall_Full_01_c1_0_0" parent="." unique_id=366169018 instance=ExtResource("pk0332")]
+
+[node name="MMpack_SM_Scaffolding_Wall_Half_01_c-1_0_-1" parent="." unique_id=303520138 instance=ExtResource("pk0333")]
+
+[node name="MMpack_SM_Scaffolding_Wall_Half_01_c-1_0_0" parent="." unique_id=1760468513 instance=ExtResource("pk0334")]
+
+[node name="MMpack_SM_Scaffolding_Wall_Half_01_c-1_0_1" parent="." unique_id=1920608154 instance=ExtResource("pk0335")]
+
+[node name="MMpack_SM_Scaffolding_Wall_Half_01_c-2_0_0" parent="." unique_id=1747966877 instance=ExtResource("pk0336")]
+
+[node name="MMpack_SM_Scaffolding_Wall_Half_01_c0_0_-1" parent="." unique_id=1810008708 instance=ExtResource("pk0337")]
+
+[node name="MMpack_SM_Scaffolding_Wall_Half_01_c0_0_0" parent="." unique_id=1308773753 instance=ExtResource("pk0338")]
+
+[node name="MMpack_SM_Scaffolding_Wall_Half_01_c0_0_1" parent="." unique_id=8112055 instance=ExtResource("pk0339")]
+
+[node name="MMpack_SM_Scaffolding_Wall_Half_01_c1_0_-1" parent="." unique_id=856288875 instance=ExtResource("pk0340")]
+
+[node name="MMpack_SM_Scaffolding_Wall_Half_01_c1_0_0" parent="." unique_id=120787094 instance=ExtResource("pk0341")]
+
+[node name="MMpack_SM_WM00217_Pallet_Small_fbx_c-1_-1_0" parent="." unique_id=802007052 instance=ExtResource("pk0342")]
+
+[node name="MMpack_SM_WM00217_Pallet_Small_fbx_c-1_0_-1" parent="." unique_id=2144034441 instance=ExtResource("pk0343")]
+
+[node name="MMpack_SM_WM00217_Pallet_Small_fbx_c-1_0_0" parent="." unique_id=283697506 instance=ExtResource("pk0344")]
+
+[node name="MMpack_SM_WM00217_Pallet_Small_fbx_c0_-1_-1" parent="." unique_id=2078127072 instance=ExtResource("pk0345")]
+
+[node name="MMpack_SM_WM00217_Pallet_Small_fbx_c0_-1_0" parent="." unique_id=1557590738 instance=ExtResource("pk0346")]
+
+[node name="MMpack_SM_WM00217_Pallet_Small_fbx_c0_0_-1" parent="." unique_id=695800310 instance=ExtResource("pk0347")]
+
+[node name="MMpack_SM_WM00217_Pallet_Small_fbx_c0_0_0" parent="." unique_id=73602509 instance=ExtResource("pk0348")]
+
+[node name="MMpack_SM_WM00217_Pallet_Small_fbx_c0_0_1" parent="." unique_id=1381056449 instance=ExtResource("pk0349")]
+
+[node name="MMpack_SM_WM00217_Pallet_Small_fbx_c1_-1_-1" parent="." unique_id=852209389 instance=ExtResource("pk0350")]
+
+[node name="MMpack_SM_WM00217_Pallet_Small_fbx_c1_0_-1" parent="." unique_id=1106818726 instance=ExtResource("pk0351")]
+
+[node name="MMpack_SM_WM00217_Pallet_Small_fbx_c1_0_0" parent="." unique_id=784534471 instance=ExtResource("pk0352")]
+
+[node name="MMpack_SM_WM00217_Pallet_Small_fbx_c1_0_1" parent="." unique_id=615094442 instance=ExtResource("pk0353")]
+
+[node name="MMpack_SM_WM00217_Pallet_Thin_fbx_c0_0_-1" parent="." unique_id=518295612 instance=ExtResource("pk0354")]
+
+[node name="MMpack_SM_WM00217_Pallet_Thin_fbx_c1_0_-1" parent="." unique_id=1978483988 instance=ExtResource("pk0355")]
+
+[node name="SceneOccluder" parent="." unique_id=2044909331 instance=ExtResource("oc1")]
+
+[node name="WorkArea" parent="." unique_id=1127789413 instance=ExtResource("work_area")]
