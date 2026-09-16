@@ -9,6 +9,7 @@ data = PackedVector3Array(-0.595123, 0.000707, 0.506127, -0.594897, 0.045000, 0.
 [node name = "SM_WM00217_Pallet_Thin_fbx" instance = ExtResource("1_dipid")]
 
 [node name="Mesh" parent="." index="0"]
+visibility_range_end = 160.0
 surface_material_override/0 = ExtResource("2_bjee5")
 
 [node name="StaticBody" type="StaticBody3D" parent="." ]

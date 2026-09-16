@@ -9,6 +9,7 @@ data = PackedVector3Array(0.128470, 0.478125, 0.195625, -0.012269, 0.660858, 0.0
 [node name = "SM_MM00283_Traffic_Cone_01_fbx" instance = ExtResource("1_dqmbt")]
 
 [node name="Mesh" parent="." index="0"]
+visibility_range_end = 110.0
 surface_material_override/0 = ExtResource("2_4ag0o")
 
 [node name="StaticBody" type="StaticBody3D" parent="." ]

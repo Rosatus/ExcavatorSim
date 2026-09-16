@@ -9,6 +9,7 @@ data = PackedVector3Array(0.257611, 1.601139, -0.661529, -0.255923, 1.599841, -0
 [node name = "SM_MM00303_Small_Waste_bin_open_fbx" instance = ExtResource("1_1abgt")]
 
 [node name="Mesh" parent="." index="0"]
+visibility_range_end = 160.0
 surface_material_override/0 = ExtResource("2_bkr47")
 
 [node name="StaticBody" type="StaticBody3D" parent="." ]

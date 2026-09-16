@@ -9,6 +9,7 @@ data = PackedVector3Array(0.308437, -0.001000, 0.524271, 0.308359, 2.102500, -0.
 [node name = "SM_MM00944_Gas_Canisters_and_Storage_01" instance = ExtResource("1_b0ubw")]
 
 [node name="Mesh" parent="." index="0"]
+visibility_range_end = 160.0
 surface_material_override/0 = ExtResource("2_bbwdq")
 
 [node name="StaticBody" type="StaticBody3D" parent="." ]

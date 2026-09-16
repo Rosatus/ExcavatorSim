@@ -8,4 +8,5 @@
 [node name="Skeleton3D" parent="Mesh" index="0"]
 
 [node name="Mesh" parent="Mesh/Skeleton3D" index="0"]
+visibility_range_end = 110.0
 surface_material_override/0 = ExtResource("2_cki3s")

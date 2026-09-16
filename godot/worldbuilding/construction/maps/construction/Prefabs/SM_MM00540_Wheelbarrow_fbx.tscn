@@ -9,6 +9,7 @@ data = PackedVector3Array(0.333817, 0.666145, 1.009933, 0.398346, 0.601407, 0.94
 [node name = "SM_MM00540_Wheelbarrow_fbx" instance = ExtResource("1_yn6n1")]
 
 [node name="Mesh" parent="." index="0"]
+visibility_range_end = 160.0
 surface_material_override/0 = ExtResource("2_hrfbc")
 
 [node name="StaticBody" type="StaticBody3D" parent="." ]

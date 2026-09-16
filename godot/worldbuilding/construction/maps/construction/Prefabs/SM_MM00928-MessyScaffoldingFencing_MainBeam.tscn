@@ -9,6 +9,7 @@ data = PackedVector3Array(-0.144857, 1.122643, -0.023723, -0.079912, 0.056264, 0
 [node name = "SM_MM00928-MessyScaffoldingFencing_MainBeam" instance = ExtResource("1_doxcr")]
 
 [node name="Mesh" parent="." index="0"]
+visibility_range_end = 160.0
 surface_material_override/0 = ExtResource("2_btkm6")
 
 [node name="StaticBody" type="StaticBody3D" parent="." ]

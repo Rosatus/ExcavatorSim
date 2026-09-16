@@ -9,6 +9,7 @@ data = PackedVector3Array(0.620417, 0.042594, 0.823333, -0.674407, 0.041875, 0.8
 [node name = "SM_MM00541-Cement_Bags_06" instance = ExtResource("1_blr45")]
 
 [node name="Mesh" parent="." index="0"]
+visibility_range_end = 160.0
 surface_material_override/0 = ExtResource("2_bih0u")
 
 [node name="StaticBody" type="StaticBody3D" parent="." ]

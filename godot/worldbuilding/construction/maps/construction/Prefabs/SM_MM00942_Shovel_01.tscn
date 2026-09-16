@@ -9,6 +9,7 @@ data = PackedVector3Array(0.473384, -0.001012, 0.091488, -0.505474, -0.001012, 0
 [node name = "SM_MM00942_Shovel_01" instance = ExtResource("1_dpq4m")]
 
 [node name="Mesh" parent="." index="0"]
+visibility_range_end = 110.0
 surface_material_override/0 = ExtResource("2_b1wr8")
 
 [node name="StaticBody" type="StaticBody3D" parent="." ]

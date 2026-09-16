@@ -9,6 +9,7 @@ data = PackedVector3Array(-0.738443, -0.003762, 0.444057, -0.406539, -0.003860, 
 [node name = "SM_MM00936_Messy_Wire_Coils_03" instance = ExtResource("1_dkd4l")]
 
 [node name="Mesh" parent="." index="0"]
+visibility_range_end = 160.0
 surface_material_override/0 = ExtResource("2_7tm4n")
 
 [node name="StaticBody" type="StaticBody3D" parent="." ]

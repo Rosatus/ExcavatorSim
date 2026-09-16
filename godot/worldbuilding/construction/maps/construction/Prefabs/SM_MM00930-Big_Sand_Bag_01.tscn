@@ -9,6 +9,7 @@ data = PackedVector3Array(0.568008, 1.464534, 0.686992, 0.634687, 0.072039, 0.62
 [node name = "SM_MM00930-Big_Sand_Bag_01" instance = ExtResource("1_dtygx")]
 
 [node name="Mesh" parent="." index="0"]
+visibility_range_end = 160.0
 surface_material_override/0 = ExtResource("2_7a072")
 
 [node name="StaticBody" type="StaticBody3D" parent="." ]
