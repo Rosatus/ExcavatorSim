@@ -41,3 +41,7 @@ godot/client/addons/terrain_3d/bin/~libterrain.windows.debug.x86_64.dll
 /godot/worldbuilding/**/addons/
 /godot/worldbuilding/**/*.tmp
 /godot/worldbuilding/**/*.TMP
+
+# large local asset archives and editor tool state (regenerated/local-only)
+godot/worldbuilding/**/*.zip
+.workbuddy/
