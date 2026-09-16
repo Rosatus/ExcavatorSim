@@ -21,3 +21,13 @@ the project-owned `VisualEnvironment`/`VisualQualityController` seam. The
 simulation viewport does not carry a permanent credit overlay; the complete
 ESO/S. Brunier title, source, modification note, and CC BY 4.0 license remain in
 the adjacent `LICENSE.md`, `ThirdParty.md`, and root `NOTICE.md` for packaging.
+
+## Local patches
+
+Reapply after any upstream Sky3D update:
+
+- `src/Sky3D.gd` `_set("environment")`: guard `sky.environment = value` with
+  `if sky:`. `_initialize()` assigns `environment` (line 468) before `sky` is
+  assigned (line 514), so the assignment routes through `_set` while the sky
+  dome is still nil and errors on every scene open. The value is re-applied
+  afterwards at line 516, so the guard is behavior-preserving.
