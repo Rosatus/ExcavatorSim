@@ -1,7 +1,7 @@
 {
   "schema_version": "bucket-fill-profile-v1",
   "model_id": "sy135neo",
-  "source_sha256": "e287cd2e02e709a53cb06ad5014272f93ba11ce11e68baf063620c7a1725c85e",
+  "source_sha256": "cc263ef489c6851ceb2fa26cabfa5b7cd38d911e25f1ff4f3417e11066a4c81c",
   "coordinate_space": "cavity_local",
   "growth_direction_y": -1.0,
   "cavity_center_godot": [

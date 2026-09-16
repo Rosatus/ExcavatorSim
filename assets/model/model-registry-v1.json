@@ -25,7 +25,11 @@
       "excavation_contact": {
         "mode": "frame_offset",
         "frame": "bucket_link",
-        "offset_godot": [0.0, -0.55, 0.0]
+        "offset_godot": [
+          0.0,
+          -0.55,
+          0.0
+        ]
       }
     },
     {
@@ -66,10 +70,10 @@
       "calibration_version": "machine-calibration-v2",
       "godot_glb_path": "godot/client/assets/visual/SY135-NEO_excavator_godot.glb",
       "godot_glb_resource": "res://assets/visual/SY135-NEO_excavator_godot.glb",
-      "godot_glb_sha256": "e287cd2e02e709a53cb06ad5014272f93ba11ce11e68baf063620c7a1725c85e",
+      "godot_glb_sha256": "cc263ef489c6851ceb2fa26cabfa5b7cd38d911e25f1ff4f3417e11066a4c81c",
       "visual_manifest_path": "godot/client/resources/visual/sy135neo_visual_manifest.json",
       "visual_manifest_resource": "res://resources/visual/sy135neo_visual_manifest.json",
-      "visual_manifest_sha256": "eb6b0cf1cdef6b313482a9ded23c096646b201d736c3fbc766e33761710fbbcc",
+      "visual_manifest_sha256": "2bb4fd752c90cafc14352baafb27e093e7bee1f8843ce7c6f3f7bbbb4f2975cf",
       "parity_fixture_path": "godot/client/tests/fixtures/sy135neo_frame_parity_cases.json",
       "parity_fixture_resource": "res://tests/fixtures/sy135neo_frame_parity_cases.json",
       "parity_fixture_sha256": "eabf22a0452afa846e8f4ce656a72dd1dae770de4b0b3267d14b42665f40ad7b",

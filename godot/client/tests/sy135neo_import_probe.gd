@@ -4,7 +4,7 @@ const MotionProtocolScript = preload("res://scripts/motion_protocol.gd")
 
 const ASSET_PATH := "res://assets/visual/SY135-NEO_excavator_godot.glb"
 const FIXTURE_PATH := "res://tests/fixtures/sy135neo_frame_parity_cases.json"
-const EXPECTED_SHA256 := "e287cd2e02e709a53cb06ad5014272f93ba11ce11e68baf063620c7a1725c85e"
+const EXPECTED_SHA256 := "cc263ef489c6851ceb2fa26cabfa5b7cd38d911e25f1ff4f3417e11066a4c81c"
 const FRAME_NAMES := [
 	"base_link",
 	"upper_structure_link",

@@ -6,8 +6,8 @@
     "path": "E:/projects/blender/Excavator/SY135-Neo/export/godot/SY135_excavator_godot.glb",
     "filename": "SY135_excavator_godot.glb",
     "copied_on": "2026-09-15",
-    "byte_size": 5916196,
-    "sha256": "e287cd2e02e709a53cb06ad5014272f93ba11ce11e68baf063620c7a1725c85e",
+    "byte_size": 5894208,
+    "sha256": "cc263ef489c6851ceb2fa26cabfa5b7cd38d911e25f1ff4f3417e11066a4c81c",
     "format": "glTF 2.0 binary",
     "generator": "Khronos glTF Blender I/O v5.2.39"
   },
