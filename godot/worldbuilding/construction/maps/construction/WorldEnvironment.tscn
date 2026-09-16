@@ -10,4 +10,6 @@ current_time = 10.5
 [node name="TimeOfDay" type="Node" parent="."]
 script = ExtResource("2")
 dome_path = NodePath("../SkyDome")
+editor_time_enabled = false
+game_time_enabled = false
 current_time = 10.5
