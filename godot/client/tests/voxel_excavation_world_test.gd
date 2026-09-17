@@ -23,6 +23,16 @@ func _run() -> void:
 		if String(status.get("soil_material_lifecycle_mode", "")) == "voxel" and bool(voxel.get("configured", false)):
 			break
 		await physics_frame
+	# The training map defers a bucket_passthrough default; this integration
+	# scenario needs the normal excavating path, so request it afterwards.
+	await process_frame
+	var session := scene.get_node("ProductSession")
+	session.request_bucket_ground_mode(BucketGroundInteractionMode.NORMAL)
+	for _frame in MAX_READY_FRAMES:
+		if session.bucket_ground_mode == BucketGroundInteractionMode.NORMAL:
+			break
+		await physics_frame
+	_expect(session.bucket_ground_mode == BucketGroundInteractionMode.NORMAL, "session applies normal bucket-ground interaction", failures)
 	var selected := excavation.get_status_snapshot()
 	_expect(String(selected.get("soil_material_lifecycle_mode", "")) == "voxel", "voxel mode owns the generation", failures)
 	_expect(String(selected.get("soil_surface_solver_mode", "")) == "voxel_bucket_v1", "voxel solver identity is selected", failures)

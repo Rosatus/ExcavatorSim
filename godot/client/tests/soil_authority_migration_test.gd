@@ -2,6 +2,10 @@ extends SceneTree
 
 
 func _init() -> void:
+	call_deferred("_run")
+
+
+func _run() -> void:
 	var modes := SoilAuthorityModeController.new()
 	for retired in ["legacy", "shadow", "active_patch"]:
 		if modes.set_requested_mode(retired):

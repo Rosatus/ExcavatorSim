@@ -5,24 +5,6 @@ const SY205_SOIL_CONTRACT := "res://resources/models/sy205_soil_contract.json"
 const SY135_SOIL_CONTRACT := "res://resources/models/sy135_soil_contract.json"
 
 
-class HybridStatusController:
-	extends TrackedChassisController
-
-	var test_status: Dictionary = {}
-
-	func get_status_snapshot() -> Dictionary:
-		return test_status.duplicate(true)
-
-	func raw_world_transform(world_transform: Transform3D) -> Transform3D:
-		return world_transform
-
-	func submit_bucket_support_contact(_contact: Dictionary) -> void:
-		pass
-
-	func clear_bucket_support_contact() -> void:
-		pass
-
-
 func _init() -> void:
 	call_deferred("_run")
 
@@ -37,10 +19,6 @@ func _run() -> void:
 		result = _test_scheduler_cadence_and_generation()
 	if result == 0:
 		result = await _test_scene_nodes_and_production_controls()
-	if result == 0:
-		result = await _test_automatic_motion_for_both_models()
-	if result == 0:
-		result = await _test_hybrid_query_batch_identity()
 	if result == 0:
 		print("Automatic excavation gameplay contracts passed.")
 	quit(result)
@@ -160,14 +138,20 @@ func _test_scene_nodes_and_production_controls() -> int:
 	if packed == null:
 		return _fail("main scene loads")
 	var scene := packed.instantiate()
-	(scene.get_node("TerrainRoot/ExcavationWorld") as ExcavationWorld).soil_material_lifecycle_mode = "legacy"
+	(scene.get_node("TerrainRoot/ExcavationWorld") as ExcavationWorld).soil_material_lifecycle_mode = "voxel"
 	root.add_child(scene)
-	await process_frame
-	await process_frame
 	var excavation := scene.get_node_or_null("TerrainRoot/ExcavationWorld") as ExcavationWorld
-	if excavation == null or excavation.terrain_scheduler == null or excavation.soil_state == null:
+	if excavation == null:
 		scene.queue_free()
-		return _fail("terrain, automatic excavation and scheduler initialize")
+		return _fail("excavation world node exists")
+	for _frame in 600:
+		var voxel := excavation.get_status_snapshot().get("voxel_excavation", {}) as Dictionary
+		if bool(voxel.get("configured", false)):
+			break
+		await physics_frame
+	if excavation._voxel_authority == null or not excavation._voxel_authority.configured:
+		scene.queue_free()
+		return _fail("voxel authority configures as the product soil owner")
 	if not excavation.automatic_soil_enabled or excavation.debug_manual_controls:
 		scene.queue_free()
 		return _fail("automatic soil is production default and manual controls are debug-only")
@@ -188,256 +172,6 @@ func _test_scene_nodes_and_production_controls() -> int:
 	scene.queue_free()
 	await process_frame
 	return 0
-
-
-func _test_automatic_motion_for_both_models() -> int:
-	var packed := load(MAIN_SCENE) as PackedScene
-	if packed == null:
-		return _fail("main scene loads for automatic soil scenarios")
-	var scene := packed.instantiate()
-	(scene.get_node("TerrainRoot/ExcavationWorld") as ExcavationWorld).soil_material_lifecycle_mode = "legacy"
-	root.add_child(scene)
-	await process_frame
-	await process_frame
-	var excavation := scene.get_node("TerrainRoot/ExcavationWorld") as ExcavationWorld
-	# This scenario injects bucket snapshots directly to exercise the soil
-	# reducer; leave Jolt chassis query identity to the dedicated hybrid test.
-	excavation._tracked_chassis_controller = null
-	for contract_path in [SY205_SOIL_CONTRACT, SY135_SOIL_CONTRACT]:
-		var contract := _read_json(contract_path)
-		excavation.terrain_scheduler.reset_world()
-		if not excavation.soil_state.configure_contract(contract):
-			scene.queue_free()
-			return _fail("model soil contract configures: %s" % contract_path)
-		var direction := _vector3((contract["proxies"] as Dictionary)["cutting_edge"].get("direction_godot", []))
-		var current_cut := Vector3(0.0, -0.02, 0.0)
-		var previous_cut := current_cut - direction * 0.12
-		var cut := excavation.step_automatic_snapshot_for_test(_soil_snapshot(contract, previous_cut, current_cut, Vector3.UP))
-		if (
-			cut.get("interaction_state", "") != "cut"
-			or float(cut.get("bucket_volume_m3", 0.0)) != 0.0
-			or float(cut.get("flow_volume_m3", 0.0)) <= 0.0
-		):
-			scene.queue_free()
-			return _fail("bucket motion alone cuts; soil leaves as particles for %s" % contract.get("model_id", ""))
-		var batch := cut.get("soil_interaction_batch", {}) as Dictionary
-		if (
-			String(batch.get("key", "")).is_empty()
-			or String(batch.get("operation", "")) != "cutting"
-			or not bool(batch.get("transaction_queued", false))
-		):
-			scene.queue_free()
-			return _fail("cut did not publish one accepted soil interaction batch")
-		if excavation._queue_batch_cut(batch, previous_cut, current_cut):
-			scene.queue_free()
-			return _fail("duplicate soil interaction batch queued a second transaction")
-		# Carry/idle must stay quiet; clear flying cut parcels first so the
-		# occupancy read reflects only capture, never in-flight spray.
-		excavation._parcel_pool.clear_all()
-		var carry := excavation.step_automatic_snapshot_for_test(_soil_snapshot(contract, current_cut, current_cut, Vector3.UP))
-		if (
-			carry.get("interaction_state", "") != "idle"
-			or int(carry.get("occupied_cells", 0)) != 0
-			or float(carry.get("flow_volume_m3", -1.0)) != 0.0
-		):
-			scene.queue_free()
-			return _fail("empty bucket idles without occupancy for %s" % contract.get("model_id", ""))
-		var volume_before_invalid := float(carry.get("bucket_volume_m3", 0.0))
-		var revision_before_invalid := int(carry.get("terrain_revision", -1))
-		var transfers_before_invalid := int(carry.get("active_transfers", 0))
-		var invalid := excavation.step_automatic_snapshot_for_test({"valid": false, "reason": "stale_identity"})
-		if (
-			invalid.get("interaction_state", "") != "no_pose"
-			or not is_equal_approx(float(invalid.get("bucket_volume_m3", 0.0)), volume_before_invalid)
-			or int(invalid.get("terrain_revision", -1)) != revision_before_invalid
-			or int(invalid.get("active_transfers", 0)) != transfers_before_invalid
-		):
-			scene.queue_free()
-			return _fail("invalid fixed-step snapshots cannot create or remove material")
-		# Digging stays decoupled from the ledger: repeated cuts spawn
-		# transport parcels but never accrue payload or unbounded transfers.
-		for attempt in 60:
-			var x := float(attempt % 20) * 0.7 - 6.65
-			var z := float(attempt / 20) * 0.7 - 3.45
-			var surface_at_fill := excavation.terrain_world.terrain_state.sample_surface_at(Vector2(x, z))
-			if is_nan(surface_at_fill):
-				continue
-			var fill_point := Vector3(x, surface_at_fill - 0.02, z)
-			excavation.step_automatic_snapshot_for_test(
-				_soil_snapshot(contract, fill_point - direction * 0.12, fill_point, Vector3.UP)
-			)
-		if excavation.soil_state.bucket_volume_m3 > BucketSoilState.EPSILON_M3:
-			scene.queue_free()
-			return _fail("cutting never accrues bucket payload for %s" % contract.get("model_id", ""))
-		var transport := excavation._parcel_pool.get_pool_snapshot()
-		if int(transport.get("active", 0)) <= 0 or float(transport.get("volume_m3", 0.0)) <= 0.0:
-			scene.queue_free()
-			return _fail("repeated cuts feed the parcel transport pool for %s" % contract.get("model_id", ""))
-		# An empty ledger still cannot pour: spill and dump stay silent until
-		# parcels have actually been captured into the cavity.
-		excavation._parcel_pool.clear_all()
-		var spill_normal := Vector3.RIGHT if contract.get("model_id", "") == "sy205" else Vector3(0.0, 0.3, 0.953939)
-		var spill := excavation.step_automatic_snapshot_for_test(_soil_snapshot(contract, current_cut, current_cut, spill_normal))
-		if spill.get("interaction_state", "") == "spill" or float(spill.get("flow_volume_m3", 0.0)) > 0.0:
-			scene.queue_free()
-			return _fail("empty bucket cannot spill for %s" % contract.get("model_id", ""))
-		var dump_pose := Vector3(current_cut.x, 1.0, current_cut.z)
-		var dump := excavation.step_automatic_snapshot_for_test(_soil_snapshot(contract, dump_pose, dump_pose, Vector3.DOWN), 0.15)
-		if dump.get("interaction_state", "") == "dump" or float(dump.get("flow_volume_m3", 0.0)) > 0.0:
-			scene.queue_free()
-			return _fail("empty bucket cannot dump for %s" % contract.get("model_id", ""))
-		# A 30-second fixed-step idle/carry window must not accumulate transfers.
-		for _frame in 1800:
-			var sustained := excavation.step_automatic_snapshot_for_test(_soil_snapshot(contract, current_cut, current_cut, Vector3.UP))
-			if int(sustained.get("active_transfers", 0)) > BucketSoilState.MAX_ACTIVE_TRANSFERS:
-				scene.queue_free()
-				return _fail("sustained automatic interaction remains bounded for %s" % contract.get("model_id", ""))
-	scene.queue_free()
-	await process_frame
-	return 0
-
-
-func _test_hybrid_query_batch_identity() -> int:
-	var packed := load(MAIN_SCENE) as PackedScene
-	var scene := packed.instantiate()
-	(scene.get_node("TerrainRoot/ExcavationWorld") as ExcavationWorld).soil_material_lifecycle_mode = "legacy"
-	root.add_child(scene)
-	await process_frame
-	await process_frame
-	var excavation := scene.get_node("TerrainRoot/ExcavationWorld") as ExcavationWorld
-	var contract := _read_json(SY205_SOIL_CONTRACT)
-	excavation.terrain_scheduler.reset_world()
-	excavation.soil_state.configure_contract(contract)
-	var fake := HybridStatusController.new()
-	excavation._tracked_chassis_controller = fake
-	var direction := _vector3((contract["proxies"] as Dictionary)["cutting_edge"].get("direction_godot", []))
-	# A wide bucket can touch a cross-slope at one edge while its frame center is
-	# still above the center sample. Hybrid cutting follows the validated contact.
-	var current_cut := Vector3(0.0, 0.4, 0.0)
-	var previous_cut := current_cut - direction * 0.12
-	var contact_point := Vector3(0.0, excavation.terrain_world.terrain_state.sample_surface_at(Vector2.ZERO), 0.0)
-	var generation := excavation.terrain_world.terrain_state.world_generation
-	var revision := excavation.terrain_world.terrain_state.terrain_revision
-	var query := {
-		"valid": true,
-		"authority_epoch": "hybrid-test",
-		"physics_tick": 40,
-		"motion_sequence": 7,
-		"terrain_generation": generation,
-		"terrain_revision": revision,
-		"contacts": [{
-			"contact_id": "40:7:cutting_edge:0",
-			"proxy_role": "cutting_edge",
-			"travel_fraction": 0.5,
-			"point_world": contact_point,
-			"point_valid": true,
-			"normal_world": Vector3.UP,
-			"initial_overlap": false,
-		}],
-	}
-	fake.test_status = {
-		"authority_profile": AuthorityProfile.JOLT_AUTHORITATIVE,
-		"authority_epoch": "hybrid-test",
-		"physics_tick": 40,
-		"bucket_motion_sequence": 7,
-		"bucket_query": query,
-	}
-	var cut := excavation.step_automatic_snapshot_for_test(_soil_snapshot(contract, previous_cut, current_cut, Vector3.UP))
-	var batch := cut.get("soil_interaction_batch", {}) as Dictionary
-	if (
-		cut.get("interaction_state", "") != "cut"
-		or not bool(batch.get("query_identity_valid", false))
-		or batch.get("operation", "") != "cutting"
-		or not bool(batch.get("transaction_queued", false))
-		or not String(batch.get("key", "")).begins_with("hybrid-test|40|")
-	):
-		scene.queue_free()
-		return _fail("hybrid query identity did not reduce to one cutting transaction")
-	var volume_after_cut := excavation.soil_state.bucket_volume_m3
-	var duplicate := excavation.step_automatic_snapshot_for_test(_soil_snapshot(contract, previous_cut, current_cut, Vector3.UP))
-	var duplicate_batch := duplicate.get("soil_interaction_batch", {}) as Dictionary
-	if not bool(duplicate_batch.get("duplicate", false)) or not is_equal_approx(excavation.soil_state.bucket_volume_m3, volume_after_cut):
-		scene.queue_free()
-		return _fail("hybrid duplicate query key changed soil a second time")
-
-	excavation.terrain_scheduler.reset_world()
-	excavation.soil_state.configure_contract(contract)
-	generation = excavation.terrain_world.terrain_state.world_generation
-	revision = excavation.terrain_world.terrain_state.terrain_revision
-	query = {
-		"valid": true,
-		"authority_epoch": "hybrid-test-2",
-		"physics_tick": 41,
-		"motion_sequence": 8,
-		"terrain_generation": generation,
-		"terrain_revision": revision,
-		"contacts": [{
-			"contact_id": "41:8:shell:0",
-			"proxy_role": "shell",
-			"travel_fraction": 0.4,
-			"point_world": current_cut,
-			"normal_world": Vector3.RIGHT,
-			"initial_overlap": false,
-		}],
-	}
-	fake.test_status = {
-		"authority_profile": AuthorityProfile.JOLT_AUTHORITATIVE,
-		"authority_epoch": "hybrid-test-2",
-		"physics_tick": 41,
-		"bucket_motion_sequence": 8,
-		"bucket_query": query,
-	}
-	var shell_only := excavation.step_automatic_snapshot_for_test(_soil_snapshot(contract, previous_cut, current_cut, Vector3.UP))
-	var shell_batch := shell_only.get("soil_interaction_batch", {}) as Dictionary
-	if bool(shell_batch.get("transaction_queued", false)) or float(shell_only.get("bucket_volume_m3", 0.0)) > BucketSoilState.EPSILON_M3:
-		scene.queue_free()
-		return _fail("shell-only query evidence was misclassified as a soil transaction")
-
-	query["physics_tick"] = 42
-	query["motion_sequence"] = 9
-	query["terrain_revision"] = revision + 1
-	fake.test_status["physics_tick"] = 42
-	fake.test_status["bucket_motion_sequence"] = 9
-	fake.test_status["bucket_query"] = query
-	var stale := excavation.step_automatic_snapshot_for_test(_soil_snapshot(contract, previous_cut, current_cut, Vector3.UP))
-	if bool((stale.get("soil_interaction_batch", {}) as Dictionary).get("eligible", true)):
-		scene.queue_free()
-		return _fail("stale hybrid query terrain identity remained eligible")
-	scene.queue_free()
-	fake.free()
-	await process_frame
-	return 0
-
-
-func _soil_snapshot(contract: Dictionary, previous_cut: Vector3, current_cut: Vector3, opening_normal: Vector3) -> Dictionary:
-	var previous := {}
-	var current := {}
-	for proxy_name in ["cutting_edge", "top_edge", "opening", "cavity", "rear_support"]:
-		var previous_origin := previous_cut
-		var current_origin := current_cut
-		if proxy_name == "opening" or proxy_name == "cavity":
-			previous_origin.y += 0.42
-			current_origin.y += 0.42
-		elif proxy_name == "rear_support":
-			previous_origin.y = 1.0
-			current_origin.y = 1.0
-		previous[proxy_name] = Transform3D(Basis.IDENTITY, previous_origin)
-		current[proxy_name] = Transform3D(Basis.IDENTITY, current_origin)
-	return {
-		"valid": true,
-		"reason": "test",
-		"previous": previous,
-		"current": current,
-		"cutting_direction_world": _vector3((contract["proxies"] as Dictionary)["cutting_edge"].get("direction_godot", [])),
-		"opening_normal_world": opening_normal,
-		"contract": contract,
-	}
-
-
-func _vector3(value: Variant) -> Vector3:
-	if not value is Array or (value as Array).size() != 3:
-		return Vector3.ZERO
-	return Vector3(float(value[0]), float(value[1]), float(value[2])).normalized()
 
 
 func _read_json(path: String) -> Dictionary:

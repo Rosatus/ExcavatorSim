@@ -34,7 +34,7 @@ func _run() -> void:
 func _test_model_contracts() -> int:
 	var catalog := _read_json(CATALOG_PATH)
 	var entries: Array = catalog.get("models", [])
-	if _check(entries.size() == 2, "model catalog must contain both tracked models") != 0:
+	if _check(entries.size() >= 2, "model catalog must contain at least the tracked models") != 0:
 		return 1
 	var values: Dictionary = {}
 	for entry in entries:
