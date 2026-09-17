@@ -215,6 +215,14 @@ func accepted_frames() -> Dictionary:
 	return _accepted_frames.duplicate(true)
 
 
+## Forward kinematics for an arbitrary position set: the slope preview
+## sweeps joint-limit grids through this to probe the reachable tooth
+## envelope without touching the live accepted state. positions must carry
+## every joint name.
+func frames_for_positions(chassis_transform: Transform3D, positions: Dictionary) -> Dictionary:
+	return _compute_frames(chassis_transform, positions)
+
+
 func joint_states() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for joint_name in JOINT_NAMES:
