@@ -11,9 +11,10 @@ from babylon_sim.session_manager import ModelSelectionError, RuntimeSessionManag
 def test_registry_resolves_two_reviewed_models_with_sy205_default() -> None:
     registry = load_model_registry()
     assert registry.default_model_id == "sy205"
-    assert registry.model_ids == ("sy205", "sy135")
+    assert registry.model_ids == ("sy205", "sy135", "sy135neo")
     assert registry.resolve().model_version == "sy205-glb-urdf-v4"
     assert registry.resolve("sy135").model_version == "sy135-reference-urdf-v1"
+    assert registry.resolve("sy135neo").model_version == "sy135-reference-urdf-v1"
     with pytest.raises(ModelRegistryError) as error:
         registry.resolve("unknown")
     assert error.value.code == "unknown_model"
