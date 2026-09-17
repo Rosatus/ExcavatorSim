@@ -255,6 +255,12 @@ and Jolt space queries for bucket/terrain evidence.
 JoltChassisTrackRuntime.configure(descriptor, terrain_world, terrain_collider, spawn_global_transform) -> bool
 JoltChassisTrackRuntime.set_commands(left: float, right: float) -> void
 JoltChassisTrackRuntime.set_equipment_commands(commands: Vector4, identity: int = -1) -> void
+JoltChassisTrackRuntime.set_equipment_assist_enabled(stage_name: String, value: bool) -> bool
+JoltChassisTrackRuntime.is_equipment_assist_enabled(stage_name: String) -> bool
+JoltChassisTrackRuntime.set_assist_context(context: Dictionary) -> void
+EquipmentAssistPipeline.configure(descriptor: Dictionary, soil_contract: Dictionary, model_id: String) -> bool
+EquipmentAssistPipeline.step(commands: Vector4, articulation, chassis_transform, delta: float, external: Dictionary) -> Dictionary
+EquipmentAssistStage.step(ctx: EquipmentKinematicsContext, commands: Vector4) -> Dictionary
 JoltChassisTrackRuntime.set_bucket_payload(mass_kg: float, center_of_mass_local: Vector3, identity: int) -> bool
 JoltChassisTrackRuntime.stop_motion() -> void
 JoltChassisTrackRuntime.reset(spawn_global_transform: Transform3D) -> void

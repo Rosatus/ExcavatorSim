@@ -20,6 +20,37 @@ pixi run python backend/scripts/sync_sy205_joint_contract.py [--check]
 - Operator order: swing, boom, arm, bucket; positive means right rotation,
   boom raise, arm extend, bucket curl. W/S extend/retract, I/K lower/raise,
   J/L curl/dump. Both models use `[-1,+1,+1,-1]` operator-to-logical signs.
+- The `bucket_level` assist stage (`jolt_authoritative` only) works downstream
+  of the mapper in joint command space and never changes logical signs: while
+  enabled it owns boom/arm/bucket outright — operator boom (I/K) and bucket
+  (J/L) input is ignored — and the arm channel becomes bucket-edge horizontal
+  translation (W pushes out, S pulls in) with latched height/pitch setpoints.
+  Swing is never written by the stage. If any required joint cannot move in
+  the solved direction the whole tick outputs zero — but the response depends
+  on *why* it is blocked. A kinematic bound (position limit, faded ceiling,
+  braking-distance law) is `level_assist_infeasible`: the setpoints relatch
+  so reversing the stick is always reachable. Pure residual momentum — the
+  joint still carries velocity opposite the solve and cannot cross zero in
+  one tick — is `level_assist_reversing`: the same zero output brakes it, but
+  setpoints are held so feedback pulls the coast excursion back instead of
+  ratifying it. Neither state latches; every tick is re-judged.
+- The assist tracks constraints by *integrator inversion*, not blind rate
+  commands: `EquipmentKinematicsContext` mirrors `propose_step`'s cut/limit
+  multipliers and the accel/jerk `move_toward` chain, and the stage scales
+  the solved joint triplet uniformly into each joint's reachable velocity
+  interval. Any change to `KinematicArticulationState.propose_step`
+  execution semantics must be mirrored there or tracking silently degrades.
+  Chassis linear/angular velocity feeds forward as a transport term so the
+  held pose is ground-relative, not chassis-relative.
+- Two additional shapings keep limit/singular transitions smooth. A
+  braking-law bound (`v <= k*sqrt(2*a_max*d)`) makes approach velocity decay
+  to ~0 at any joint limit, so the infeasible tick arrives with no residual
+  coast. When the DLS solve inflates joint rates far past task need (deep
+  retract is ill-conditioned for horizontal translation), per-joint ceilings
+  shrink proportionally — the machine creeps through the degenerate zone
+  instead of charging a kinematic toggle point at speed. Held channels also
+  subtract the joints' current task velocity (rate damping), otherwise the
+  P correction rings through the forced reversals as a ~1 Hz limit cycle.
 - SY135 hinge axes remain +X. SY205's three work-equipment axes are -X because
   its segment geometry is baked in different asset coordinates. Its swing
   remains +Y. Keep SY205 rest transforms and anchors unchanged.
@@ -76,7 +107,11 @@ neutral. Bad: copying SY135 signs alone and changing only expected sign tuples.
 
 `equipment_command_mapper_test.gd` must exercise mapper → integrator → FK in
 both directions and reach both finite work-joint endpoints. Verify actual W
-extension/K raise, not just scalar signs. `test_sy205_joint_contract.py` compares
+extension/K raise, not just scalar signs. `bucket_level_assist_test.gd` covers
+the task-space reinterpretation on both models: held height/pitch during arm
+drive, boom/bucket input fully ignored while enabled, neutral gating,
+passthrough when disabled, bounded behavior at limits with no single-tick
+pose step above 4 mm / 4 mrad, and motion resuming on input reversal. `test_sy205_joint_contract.py` compares
 logical SY205 FK with the original asset motion, checks replay/calibration,
 and proves SY135 identity and frames unchanged. Existing gateway attitude,
 bucket parity and QML tests guard the physical-output chain. Human review owns
