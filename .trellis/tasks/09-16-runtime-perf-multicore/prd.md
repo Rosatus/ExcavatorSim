@@ -292,7 +292,30 @@ JSON,soak 用 `--replay` 注入同一测试通道回放，形成可重复的"真
   内容需含真实挖掘+卸土，建议含一次支车）。
 - 回放命令：同上但 `--replay <录制.json>`，可叠加 `--headless` 快速量帧。
 
-- Current milestone: M1 完成 + 录回放基准就绪，待用户录制真实挖掘轨迹。
-- Blockers: 需用户跑一次 `--record` 窗口录制（ scripted 不可代劳）。
-- Next: 录制挖掘轨迹 → `--replay` soak 对比 M1 前后 → 达标收尾，未达标
-  进 M2（引擎线程开关）/M3(worker 下沉 coverage/do_path 外围）。
+### 真实挖掘回放落地（2026-09-18）
+
+- 真实驾驶录制 `manual-dig-sy135-balanced-normal-90s-turn180.json`（首录
+  修正版，开头原地转向由 ~3.5s/~257° 截到 ~2.45s/~180° 与用户实际操作一致）
+  `--replay` 完整复现挖掘：**267 cut / 227 dump / 14 support / 1056kg /
+  397 事务**。履带转向速率随会话接触状态漂移 ~30%（同输入回放 257° vs
+  实录真实 ~180°），故录制器现已按 tick 记 `chassis_yaw_deg/chassis_pos_m`
+  作为地面真值，报告输出 `replay.yaw_divergence_{max,final}_deg`（受控
+  轨迹实测偏差 ~2e-6°，注入本身精确）。
+- **修复静默 telemetry 断流**（`43e7f9a`）：preflight
+  `/api/capabilities` 请求在启动大帧下被 1.5s `HTTPRequest.timeout` 杀掉
+  （实测 `RESULT_TIMEOUT`），客户端带空能力表连接 → 协商 `[]` → 三条可选
+  通道整会话静默失效。preflight 失败时改为兜底报全量可选能力（后端本来就
+  取交集协商）。
+- 90s 窗口回放 soak **PASS**：render p95 7.7ms / p99 23.6ms、fixed p95
+  0.64ms、engine_fps 449、telemetry 2133 批零丢弃。
+- **真实挖掘暴露持续卡顿窗口**（`metrics.spike_frames` 新增 >33ms 帧记
+  录）：136 尖峰帧聚成 5 簇——31–32.4s 持续 ~45-55ms、42.7–44.9s 持续
+  ~95-150ms（~7fps 达 2.2s）、54–56.4s 持续 ~48-95ms，疑似挖掘期地形
+  流式/commit 集中爆发。这是 scripted soak 看不到、acceptance 最相关的
+  残余问题，供 M2/M3 归因。
+
+- Current milestone: M1 完成 + 真实挖掘回放基线成立（soak 门全过）。
+- Blockers: 无（用户 WIP `equipment_assist_pipeline.gd`/`slope_cut_preview.gd`
+  编译错误会连带阻断 soak，属并行开发噪音）。
+- Next: 把 spike 窗口归因到具体系统（terrain 流式/commit/GC）→ 决定
+  M2 引擎线程开关还是直接 M3 worker 下沉。
