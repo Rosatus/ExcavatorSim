@@ -8,6 +8,9 @@ const INPUT_ACTIONS := {
 	"track_right_forward": {"key": KEY_Y, "joy_axis": JOY_AXIS_TRIGGER_RIGHT, "joy_sign": 1.0},
 	"track_right_reverse": {"key": KEY_H, "joy_button": JOY_BUTTON_RIGHT_SHOULDER},
 }
+const TOGGLE_ACTIONS := {
+	"operator_level_assist": KEY_G,
+}
 
 @export var controller_enabled := false
 @export var static_map_driving := false
@@ -18,6 +21,7 @@ const INPUT_ACTIONS := {
 @export var ground_lift_enabled := true
 @export var use_jolt_support_hints := true
 @export var digging_response_enabled := true
+@export var level_assist_enabled := false
 @export var jolt_probe_height_m := 4.0
 @export var jolt_hint_max_error_m := 0.2
 @export_flags_3d_physics var terrain_collision_mask := 1
@@ -256,6 +260,7 @@ func get_status_snapshot() -> Dictionary:
 	status["authority_profile"] = authority_profile
 	status["digging_response"] = _digging_response.get_status_snapshot()
 	status["bucket_ground_mode"] = _bucket_ground_mode
+	status["level_assist_enabled"] = level_assist_enabled
 	return status
 
 
@@ -283,6 +288,13 @@ func set_digging_response_enabled(value: bool) -> void:
 		_jolt_runtime.set_external_digging_response_enabled(
 			value and _digging_response.configured and not _bucket_ground_bypassed()
 		)
+
+
+func set_level_assist_enabled(value: bool) -> bool:
+	level_assist_enabled = value
+	if _jolt_runtime == null:
+		return false
+	return _jolt_runtime.set_equipment_assist_enabled("bucket_level", value)
 
 
 func can_set_bucket_ground_mode(value: String) -> bool:
@@ -483,6 +495,8 @@ func _on_world_reset(_generation: int) -> void:
 func _step_authoritative_chassis(delta: float) -> void:
 	if _jolt_runtime == null or not _jolt_runtime.configured:
 		return
+	if controller_enabled and _input_focused and Input.is_action_just_pressed("operator_level_assist"):
+		set_level_assist_enabled(not level_assist_enabled)
 	var left := 0.0
 	var right := 0.0
 	if controller_enabled and (
@@ -572,6 +586,7 @@ func _configure_jolt_runtime(catalog_entry: Dictionary) -> bool:
 	_jolt_runtime.set_external_digging_response_enabled(
 		digging_response_enabled and _digging_response.configured and not _bucket_ground_bypassed()
 	)
+	_jolt_runtime.set_equipment_assist_enabled("bucket_level", level_assist_enabled)
 	_on_jolt_post_step_snapshot(_jolt_runtime.get_post_step_snapshot())
 	return true
 
@@ -759,6 +774,13 @@ func _ensure_input_actions() -> void:
 			_add_joy_axis_event(action, int(definition["joy_axis"]), float(definition["joy_sign"]))
 		else:
 			_add_joy_button_event(action, int(definition["joy_button"]))
+	for action in TOGGLE_ACTIONS:
+		if not InputMap.has_action(action):
+			InputMap.add_action(action, 0.08)
+		for existing in InputMap.action_get_events(action):
+			if existing is InputEventKey:
+				InputMap.action_erase_event(action, existing)
+		_add_key_event(action, int(TOGGLE_ACTIONS[action]))
 
 
 func _add_key_event(action: String, keycode: int) -> void:

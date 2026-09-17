@@ -32,6 +32,7 @@ var last_error: Dictionary = {}
 var bucket_ground_mode := BucketGroundInteractionMode.NORMAL
 var requested_bucket_ground_mode := BucketGroundInteractionMode.NORMAL
 var bucket_ground_transition_sequence := 0
+var level_assist_enabled := false
 
 var _presentation: MotionPresentation
 var _motion_client: MotionClient
@@ -165,6 +166,16 @@ func request_bucket_ground_mode(mode: String) -> bool:
 	return true
 
 
+func request_level_assist(enabled: bool) -> bool:
+	level_assist_enabled = enabled
+	if _chassis != null:
+		_chassis.set_level_assist_enabled(enabled)
+		level_assist_enabled = _chassis.level_assist_enabled
+	last_error.clear()
+	status_changed.emit(get_status_snapshot())
+	return true
+
+
 func get_status_snapshot() -> Dictionary:
 	return {
 		"authority_profile": String(ProjectSettings.get_setting("simulation/authority_profile", "jolt_authoritative")),
@@ -181,6 +192,7 @@ func get_status_snapshot() -> Dictionary:
 		"requested_bucket_ground_mode": requested_bucket_ground_mode,
 		"bucket_ground_mode_pending": _bucket_ground_mode_pending,
 		"bucket_ground_transition_sequence": bucket_ground_transition_sequence,
+		"level_assist_enabled": _chassis.level_assist_enabled if _chassis != null else level_assist_enabled,
 		"last_error": last_error,
 	}
 

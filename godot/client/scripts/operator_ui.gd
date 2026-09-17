@@ -91,6 +91,7 @@ const GATEWAY_CONFIG_PATH := "user://ict_config.cfg"
 @onready var _mute_audio_button: CheckButton = $StatusPanel/Margin/VBox/Tools/MuteAudio
 @onready var _test_graphics_button: CheckButton = $StatusPanel/Margin/VBox/Tools/TestGraphics
 @onready var _bucket_passthrough_button: CheckButton = $StatusPanel/Margin/VBox/Tools/BucketPassthrough
+@onready var _level_assist_button: CheckButton = $StatusPanel/Margin/VBox/Tools/LevelAssist
 @onready var _guide_panel: PanelContainer = $GuidePanel
 @onready var _guide_title_label: Label = $GuidePanel/Margin/VBox/Title
 @onready var _guide_intro_label: Label = $GuidePanel/Margin/VBox/Intro
@@ -132,6 +133,7 @@ func _ready() -> void:
 	_mute_audio_button.toggled.connect(_on_audio_muted)
 	_test_graphics_button.toggled.connect(_on_test_graphics_toggled)
 	_bucket_passthrough_button.toggled.connect(_on_bucket_passthrough_toggled)
+	_level_assist_button.toggled.connect(_on_level_assist_toggled)
 	_unlimited_bucket_button.toggled.connect(_on_unlimited_bucket_toggled)
 	_cutting_diagnostics_button.toggled.connect(_on_cutting_diagnostics_toggled)
 	_can_output_button.pressed.connect(_on_can_output_pressed)
@@ -188,6 +190,7 @@ func _apply_static_copy() -> void:
 	_test_graphics_button.text = UIStrings.BUTTON_TEST_GRAPHICS
 	_test_graphics_button.tooltip_text = "Use an untextured black/white terrain grid and hide site dressing."
 	_bucket_passthrough_button.tooltip_text = "开启后铲斗可穿透地面，不进行挖土或卸土。切换开关会清空斗内土量和待处理的土方作业。进入训练场时默认开启，进入施工大地图时默认关闭。"
+	_level_assist_button.tooltip_text = "G：末端辅助。开启后大臂与铲斗交由系统保持对地高度与角度，W 推远、S 拉近铲斗，回转不受影响；I/K/J/L 在此期间不生效。"
 	_unlimited_bucket_button.tooltip_text = "Testing only: raise collection capacity while keeping the visible full-bucket level at the model contract capacity."
 	_cutting_diagnostics_button.tooltip_text = "按需采集切削耗时与地形统计；关闭可减少开销。重新开启将清空旧计时样本，不影响地形和斗内土量。"
 	_guide_title_label.text = UIStrings.GUIDE_TITLE
@@ -220,6 +223,7 @@ func get_control_for_test(id: String) -> Control:
 	return {
 		"map_selector": _menu.get("map_selector"),
 		"bucket_passthrough": _bucket_passthrough_button,
+		"level_assist": _level_assist_button,
 		"camera_selector": _camera_selector,
 		"gateway_restart": _gateway_button,
 		"gateway_port": _gateway_port_edit,
@@ -370,6 +374,14 @@ func _on_bucket_passthrough_toggled(enabled: bool) -> void:
 	)
 	if not _product_session.request_bucket_ground_mode(requested):
 		_sync_bucket_passthrough_toggle()
+
+
+func _on_level_assist_toggled(enabled: bool) -> void:
+	if _product_session == null:
+		_sync_level_assist_toggle()
+		return
+	_product_session.request_level_assist(enabled)
+	_sync_level_assist_toggle()
 
 
 func _on_unlimited_bucket_toggled(enabled: bool) -> void:
@@ -1035,6 +1047,7 @@ func _refresh() -> void:
 	_maybe_complete_action(status)
 	_refresh_model_selector()
 	_sync_bucket_passthrough_toggle()
+	_sync_level_assist_toggle()
 	_sync_unlimited_bucket_toggle()
 	_sync_cutting_diagnostics_toggle()
 
@@ -1095,6 +1108,13 @@ func _sync_bucket_passthrough_toggle() -> void:
 	_bucket_passthrough_button.set_pressed_no_signal(
 		BucketGroundInteractionMode.is_passthrough(requested)
 	)
+
+
+func _sync_level_assist_toggle() -> void:
+	if _level_assist_button == null:
+		return
+	var status := _product_session.get_status_snapshot() if _product_session != null else {}
+	_level_assist_button.set_pressed_no_signal(bool(status.get("level_assist_enabled", false)))
 
 
 func _sync_unlimited_bucket_toggle(status: Dictionary = {}) -> void:

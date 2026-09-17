@@ -2,6 +2,7 @@ class_name JoltChassisTrackRuntime
 extends Node3D
 
 const VoxelZone = preload("res://scripts/voxel_work_zone_config.gd")
+const AssistPipeline = preload("res://scripts/equipment_assist_pipeline.gd")
 
 signal post_step_snapshot_captured(snapshot: Dictionary)
 
@@ -60,6 +61,10 @@ var _right_effort_n := 0.0
 var _equipment_commands := Vector4.ZERO
 var _articulation := KinematicArticulationState.new()
 var _bucket_sweeper := BucketProxySweeper.new()
+var _assist_pipeline := AssistPipeline.new()
+var _assist_context: Dictionary = {}
+var _assist_enable: Dictionary = {}
+var _assist_configured := false
 
 func collision_layers_snapshot() -> Dictionary:
 	if _descriptor.is_empty():
@@ -219,6 +224,9 @@ func teardown() -> void:
 	_quality_flags.clear()
 	_articulation.reset()
 	_bucket_sweeper.reset()
+	_assist_pipeline.reset("teardown")
+	_assist_context.clear()
+	_assist_configured = false
 	_soil_contract.clear()
 	_cut_engagement = 0.0
 	_post_step_snapshot.clear()
@@ -303,6 +311,24 @@ func set_equipment_commands(commands: Vector4, identity: int = -1) -> void:
 	_articulation.set_commands(_equipment_commands, identity)
 
 
+func set_equipment_assist_enabled(stage_name: String, value: bool) -> bool:
+	_assist_enable[stage_name] = value
+	if not _assist_configured:
+		return not value
+	return _assist_pipeline.set_stage_enabled(stage_name, value)
+
+
+func is_equipment_assist_enabled(stage_name: String) -> bool:
+	return _assist_configured and _assist_pipeline.is_stage_enabled(stage_name)
+
+
+## Latest controller-pushed semantics for assist stages (soil status, external
+## targets). Stages read it through EquipmentKinematicsContext.external; the
+## pipeline never interprets it.
+func set_assist_context(context: Dictionary) -> void:
+	_assist_context = context.duplicate(true)
+
+
 func set_bucket_payload(mass_kg: float, center_of_mass_local: Vector3, identity: int) -> bool:
 	var latest_identity := maxi(int(_pending_payload["identity"]), int(_applied_payload["identity"]))
 	if (
@@ -344,6 +370,7 @@ func _payload_center_in_bucket(center: Vector3) -> bool:
 func stop_motion() -> void:
 	set_commands(0.0, 0.0)
 	set_equipment_commands(Vector4.ZERO)
+	_assist_pipeline.reset("stop_motion")
 
 
 func set_bucket_ground_mode(value: String) -> bool:
@@ -475,6 +502,9 @@ func _build_rig() -> bool:
 	_soil_contract = _load_soil_contract()
 	if _soil_contract.is_empty():
 		return false
+	_assist_configured = _assist_pipeline.configure(_descriptor, _soil_contract, model_id)
+	for stage_name in _assist_enable.keys():
+		_assist_pipeline.set_stage_enabled(String(stage_name), bool(_assist_enable[stage_name]))
 	return _bucket_sweeper.configure(
 		model_id,
 		_soil_contract,
@@ -526,6 +556,21 @@ func _update_joint_actuators(delta: float) -> void:
 		if _external_digging_response_enabled or _bucket_ground_bypassed()
 		else _cut_engagement
 	)
+	if _assist_configured and _assist_pipeline.any_enabled():
+		var assist := _assist_pipeline.step(
+			_equipment_commands,
+			_articulation,
+			_body.global_transform,
+			delta,
+			_assist_context,
+			_body.linear_velocity,
+			_body.angular_velocity,
+		)
+		var effective := assist.get("commands", _equipment_commands) as Vector4
+		for flag in assist.get("flags", []):
+			_quality_flags.append(String(flag))
+		if effective != _equipment_commands:
+			_articulation.set_commands(effective, _command_identity)
 	var proposal := _articulation.propose_step(delta, _body.global_transform, enabled)
 	if proposal.is_empty():
 		_quality_flags.append("kinematic_articulation_unavailable")
@@ -675,6 +720,7 @@ func _capture_post_step_snapshot() -> void:
 		"bucket_motion_sequence": _bucket_motion_sequence,
 		"bucket_query": _bucket_query.duplicate(true),
 		"cut_engagement": _cut_engagement,
+		"assist_pipeline": _assist_pipeline.get_status_snapshot() if _assist_configured else {"configured": false},
 		"queued_chassis_wrench": _queued_support_wrench.duplicate(true),
 		"applied_chassis_wrench": _applied_support_wrench.duplicate(true),
 		"support_wrench_apply_count": _support_wrench_apply_count,
