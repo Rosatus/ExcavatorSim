@@ -1,0 +1,57 @@
+{
+  "schema_version": "assist-profiles-v1",
+  "models": {
+    "default": {
+      "bucket_level": {
+        "horizontal_speed_m_s": 1.0,
+        "input_deadband": 0.05,
+        "height_gain_hz": 10.0,
+        "attitude_gain_hz": 12.0,
+        "max_height_error_m": 0.25,
+        "max_attitude_error_rad": 0.35,
+        "max_height_correction_m_s": 0.5,
+        "max_attitude_correction_rad_s": 0.6,
+        "dls_lambda": 0.02
+      }
+    },
+    "sy135": {
+      "bucket_level": {
+        "horizontal_speed_m_s": 1.0,
+        "input_deadband": 0.05,
+        "height_gain_hz": 10.0,
+        "attitude_gain_hz": 12.0,
+        "max_height_error_m": 0.25,
+        "max_attitude_error_rad": 0.35,
+        "max_height_correction_m_s": 0.5,
+        "max_attitude_correction_rad_s": 0.6,
+        "dls_lambda": 0.02
+      }
+    },
+    "sy205": {
+      "bucket_level": {
+        "horizontal_speed_m_s": 1.0,
+        "input_deadband": 0.05,
+        "height_gain_hz": 10.0,
+        "attitude_gain_hz": 12.0,
+        "max_height_error_m": 0.25,
+        "max_attitude_error_rad": 0.35,
+        "max_height_correction_m_s": 0.5,
+        "max_attitude_correction_rad_s": 0.6,
+        "dls_lambda": 0.02
+      }
+    },
+    "sy135neo": {
+      "bucket_level": {
+        "horizontal_speed_m_s": 1.0,
+        "input_deadband": 0.05,
+        "height_gain_hz": 10.0,
+        "attitude_gain_hz": 12.0,
+        "max_height_error_m": 0.25,
+        "max_attitude_error_rad": 0.35,
+        "max_height_correction_m_s": 0.5,
+        "max_attitude_correction_rad_s": 0.6,
+        "dls_lambda": 0.02
+      }
+    }
+  }
+}
