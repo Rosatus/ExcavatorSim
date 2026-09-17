@@ -257,10 +257,25 @@ JoltChassisTrackRuntime.set_commands(left: float, right: float) -> void
 JoltChassisTrackRuntime.set_equipment_commands(commands: Vector4, identity: int = -1) -> void
 JoltChassisTrackRuntime.set_equipment_assist_enabled(stage_name: String, value: bool) -> bool
 JoltChassisTrackRuntime.is_equipment_assist_enabled(stage_name: String) -> bool
+JoltChassisTrackRuntime.set_equipment_assist_params(stage_name: String, params: Dictionary) -> bool
+JoltChassisTrackRuntime.get_equipment_assist_params(stage_name: String) -> Dictionary
+JoltChassisTrackRuntime.build_slope_profile(distance_m: float, angle_deg: float) -> RefCounted
+JoltChassisTrackRuntime.update_slope_preview(profile: RefCounted) -> Dictionary
+JoltChassisTrackRuntime.confirm_slope_assist(profile: RefCounted) -> bool
 JoltChassisTrackRuntime.set_assist_context(context: Dictionary) -> void
 EquipmentAssistPipeline.configure(descriptor: Dictionary, soil_contract: Dictionary, model_id: String) -> bool
 EquipmentAssistPipeline.step(commands: Vector4, articulation, chassis_transform, delta: float, external: Dictionary) -> Dictionary
+EquipmentAssistPipeline.set_stage_enabled(stage_name: String, value: bool) -> bool
+EquipmentAssistPipeline.set_stage_params(stage_name: String, params: Dictionary) -> bool
+EquipmentAssistPipeline.get_stage(stage_name: String) -> EquipmentAssistStage
 EquipmentAssistStage.step(ctx: EquipmentKinematicsContext, commands: Vector4) -> Dictionary
+EquipmentAssistStage.apply_params(params: Dictionary) -> bool
+KinematicArticulationState.frames_for_positions(chassis_transform: Transform3D, positions: Dictionary) -> Dictionary
+TrackedChassisController.advance_slope_mode() -> String
+TrackedChassisController.cancel_slope_mode() -> void
+TrackedChassisController.slope_status_snapshot() -> Dictionary
+ProductSession.advance_slope_assist() -> String
+ProductSession.cancel_slope_assist() -> void
 JoltChassisTrackRuntime.set_bucket_payload(mass_kg: float, center_of_mass_local: Vector3, identity: int) -> bool
 JoltChassisTrackRuntime.stop_motion() -> void
 JoltChassisTrackRuntime.reset(spawn_global_transform: Transform3D) -> void

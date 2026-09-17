@@ -51,6 +51,29 @@ pixi run python backend/scripts/sync_sy205_joint_contract.py [--check]
   instead of charging a kinematic toggle point at speed. Held channels also
   subtract the joints' current task velocity (rate damping), otherwise the
   P correction rings through the forced reversals as a ~1 Hz limit cycle.
+- The `slope_grade` assist stage is the second terminal-surface guide and
+  shares `bucket_level`'s whole control law — the solve/integrator mechanics
+  live in `AssistRateSolver`, the per-tick law in `GuidedProfileStage`, and
+  each stage only declares its target surface. Its differences are declared,
+  not reimplemented: `writes_mask` adds the swing channel (held at zero so
+  the profile plane cannot rotate), the tracked surface is a confirmed
+  `SlopeProfile` (piecewise: flat bench at toe height for `s < toe_s`,
+  `tan(angle)` grade beyond — positive angles rise away from the machine),
+  and the horizontal task axis is the profile's frozen anchor axis rather
+  than the live outward direction. Its flags are namespaced
+  `slope_assist_infeasible` / `slope_assist_reversing` with identical block
+  semantics. Both stages sit in exclusive group `terminal_surface` —
+  enabling one disables the other — and `slope_grade` refuses to enable
+  without an injected profile (`apply_params`), which is consumed only on a
+  real enabled->disabled transition.
+- Slope setup is a controller-side state machine (`SLOPE_MODE_*`): preview
+  freezes tracks and equipment and reroutes W/S to toe distance and A/D to
+  slope angle, `update_slope_preview` sweeps the reachable band via
+  `KinematicArticulationState.frames_for_positions` and samples terrain
+  through the same `TerrainState` the dig system reads (physics raycast
+  outside the grid), and confirm freezes exactly the previewed profile into
+  the stage. The toe height is sampled terrain at the junction point, so
+  the bench always starts at real ground level.
 - SY135 hinge axes remain +X. SY205's three work-equipment axes are -X because
   its segment geometry is baked in different asset coordinates. Its swing
   remains +Y. Keep SY205 rest transforms and anchors unchanged.

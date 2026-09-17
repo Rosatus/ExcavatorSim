@@ -1,0 +1,21 @@
+{"file": "godot/client/scripts/assist_rate_solver.gd", "reason": "Shared DLS + integrator-inversion mechanics extracted from bucket_level_assist; structured blocked classification replaces flag strings."}
+{"file": "godot/client/scripts/guided_profile_stage.gd", "reason": "Abstract mid-layer owning the full per-tick control law; concrete stages declare surface/axis/latch hooks only."}
+{"file": "godot/client/scripts/bucket_level_assist.gd", "reason": "Slimmed to a thin concrete stage over GuidedProfileStage; flat regression output is bit-identical."}
+{"file": "godot/client/scripts/slope_profile.gd", "reason": "Piecewise target surface value type: flat bench inside the toe, signed grade beyond; frozen anchor axis."}
+{"file": "godot/client/scripts/slope_grade_assist.gd", "reason": "Slope terminal-surface stage: swing added to writes_mask (held zero), profile injected via apply_params, enable refused without it."}
+{"file": "godot/client/scripts/slope_cut_preview.gd", "reason": "Reachable-band FK sweep + terrain-above-target cut region and volume; sampler injected for tests."}
+{"file": "godot/client/scripts/slope_cut_preview_visual.gd", "reason": "Pulsing translucent soil-wedge mesh plus Label3D world-space parameter readout."}
+{"file": "godot/client/scripts/equipment_assist_stage.gd", "reason": "exclusive_group + apply_params + profile_params added to the base contract."}
+{"file": "godot/client/scripts/equipment_assist_pipeline.gd", "reason": "Slope stage registered; terminal_surface exclusive group; set_stage_params/get_stage plumbing."}
+{"file": "godot/client/scripts/kinematic_articulation_state.gd", "reason": "frames_for_positions public FK wrapper for preview reach sweeping without touching accepted state."}
+{"file": "godot/client/scripts/jolt_chassis_track_runtime.gd", "reason": "Slope APIs: build_slope_profile / update_slope_preview / confirm_slope_assist / params get-set; soil height sampler (bilinear + raycast fallback)."}
+{"file": "godot/client/scripts/tracked_chassis_controller.gd", "reason": "SLOPE_MODE state machine: T key advance, preview input rerouting (W/S distance, A/D angle), machine freeze, ui_accept/ui_cancel, preview node ownership."}
+{"file": "godot/client/scripts/product_session.gd", "reason": "advance_slope_assist / cancel_slope_assist session APIs and slope_assist status mirror."}
+{"file": "godot/client/scripts/operator_ui.gd", "reason": "SlopeAssist tools button wired to advance_slope_assist with tri-state label; hunk-level separation from menu-theme work required."}
+{"file": "godot/client/scripts/operator_ui_strings.gd", "reason": "Guide keyboard text documents G/T and preview controls."}
+{"file": "godot/client/scenes/operator_menu_controls.tscn", "reason": "SlopeAssist toggle button node added to the Tools row."}
+{"file": "godot/client/resources/physics/assist_profiles.json", "reason": "slope_grade parameter section added for all models (adjust rates, preview grid)."}
+{"file": "godot/client/tests/slope_grade_assist_test.gd", "reason": "Profile math, pipeline exclusion/refusal/swing lock, synthetic-terrain preview compute, live tracking drives on both rigs."}
+{"file": "godot/client/tests/run_standalone_matrix.ps1", "reason": "slope_grade_assist_test registered after bucket_level_assist_test."}
+{"file": ".trellis/spec/frontend/client-boundary.md", "reason": "Runtime/pipeline/controller/session signature list extended with slope assist APIs."}
+{"file": ".trellis/spec/frontend/model-joint-semantics.md", "reason": "slope_grade stage semantics, exclusive group, preview state machine, and frozen-axis profile contract documented."}
