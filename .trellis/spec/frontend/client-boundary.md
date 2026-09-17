@@ -274,8 +274,15 @@ KinematicArticulationState.frames_for_positions(chassis_transform: Transform3D, 
 TrackedChassisController.advance_slope_mode() -> String
 TrackedChassisController.cancel_slope_mode() -> void
 TrackedChassisController.slope_status_snapshot() -> Dictionary
+TrackedChassisController.set_assist_menu_open(open: bool) -> void
+TrackedChassisController.is_assist_menu_open() -> bool
+TrackedChassisController.activate_assist_entry(index: int) -> String
+TrackedChassisController.assist_menu_snapshot() -> Dictionary
 ProductSession.advance_slope_assist() -> String
 ProductSession.cancel_slope_assist() -> void
+ProductSession.open_assist_menu() -> void
+ProductSession.close_assist_menu() -> void
+ProductSession.activate_assist_entry(index: int) -> String
 JoltChassisTrackRuntime.set_bucket_payload(mass_kg: float, center_of_mass_local: Vector3, identity: int) -> bool
 JoltChassisTrackRuntime.stop_motion() -> void
 JoltChassisTrackRuntime.reset(spawn_global_transform: Transform3D) -> void

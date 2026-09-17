@@ -20,6 +20,14 @@ pixi run python backend/scripts/sync_sy205_joint_contract.py [--check]
 - Operator order: swing, boom, arm, bucket; positive means right rotation,
   boom raise, arm extend, bucket curl. W/S extend/retract, I/K lower/raise,
   J/L curl/dump. Both models use `[-1,+1,+1,-1]` operator-to-logical signs.
+- All assists share one hotkey: T opens the assist menu (machine frozen
+  while open), W/S rides the arm axis to navigate, Enter activates the
+  highlighted entry, T/Esc closes. Each entry maps to that assist's own
+  advance/toggle semantics — slope's row runs the same
+  off->preview->active->off state machine, and inside preview T/Enter is
+  still the confirm shortcut and Esc the cancel. Mutual exclusion stays
+  the pipeline's terminal_surface group, so picking a different assist
+  while one is active switches cleanly.
 - The `bucket_level` assist stage (`jolt_authoritative` only) works downstream
   of the mapper in joint command space and never changes logical signs: while
   enabled it owns boom/arm/bucket outright — operator boom (I/K) and bucket
