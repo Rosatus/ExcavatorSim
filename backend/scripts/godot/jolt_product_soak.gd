@@ -14,6 +14,13 @@ var _report_path := "user://jolt-product-soak.json"
 var _duration_seconds := 90.0
 var _warmup_seconds := 15.0
 var _allow_incomplete_scenario := false
+var _replay_path := ""
+var _replay_tracks: Array = []
+var _replay_equipment: Array = []
+var _replay_base_tick := -1
+var _replay_applied_ticks := 0
+var _replay_loops := 0
+var _replay_model_mismatch := false
 var _failures: Array[String] = []
 
 
@@ -84,6 +91,10 @@ func _run() -> void:
 	var bucket_ground_work_before := _bucket_ground_work_snapshot(chassis, excavation, effects)
 	session.request_start()
 	await _wait_for_lifecycle(session, ProductSession.LIFECYCLE_RUNNING)
+	if not _replay_path.is_empty() and not _load_replay():
+		_finish({}, "replay recording failed to load: %s" % _replay_path)
+		return
+	_replay_base_tick = Engine.get_physics_frames()
 	var started_usec := Time.get_ticks_usec()
 	var previous_frame_usec := started_usec
 	var last_physics_tick := -1
@@ -134,8 +145,11 @@ func _run() -> void:
 			}
 		var phase_diag := phase_diagnostics[phase_name] as Dictionary
 		phase_diag["frames"] = int(phase_diag["frames"]) + 1
-		_apply_scenario(chassis, excavation, elapsed)
-		if not reset_started and elapsed >= _duration_seconds * 0.55:
+		if _replay_equipment.is_empty():
+			_apply_scenario(chassis, excavation, elapsed)
+		else:
+			_apply_replay(chassis)
+		if _replay_equipment.is_empty() and not reset_started and elapsed >= _duration_seconds * 0.55:
 			reset_started = true
 			session.request_reset()
 			await physics_frame
@@ -144,7 +158,7 @@ func _run() -> void:
 			session.request_start()
 			reset_completed = await _wait_for_lifecycle(session, ProductSession.LIFECYCLE_RUNNING)
 			previous_frame_usec = Time.get_ticks_usec()
-		if not reconnect_started and elapsed >= _duration_seconds * 0.72:
+		if _replay_equipment.is_empty() and not reconnect_started and elapsed >= _duration_seconds * 0.72:
 			reconnect_started = true
 			client.disconnect_from_service()
 			await create_timer(0.5).timeout
@@ -380,6 +394,13 @@ func _run() -> void:
 			"maximum_joint_motion_rad": maximum_joint_motion,
 			"reset_completed": reset_completed,
 			"reconnect_completed": reconnect_completed,
+			"replay": {
+				"path": _replay_path,
+				"tick_count": _replay_equipment.size(),
+				"applied_ticks": _replay_applied_ticks,
+				"loops": _replay_loops,
+				"model_mismatch": _replay_model_mismatch,
+			},
 		},
 	}
 	if not _allow_incomplete_scenario and _bucket_ground_mode == "normal":
@@ -443,6 +464,43 @@ func _wait_for_lifecycle(session: ProductSession, expected: String) -> bool:
 		if session.lifecycle == expected:
 			return true
 	return false
+
+
+func _apply_replay(chassis: TrackedChassisController) -> void:
+	var count := _replay_equipment.size()
+	if count == 0 or _replay_base_tick < 0:
+		return
+	var tick := Engine.get_physics_frames() - _replay_base_tick
+	if tick < 0:
+		return
+	_replay_applied_ticks = maxi(_replay_applied_ticks, tick + 1)
+	_replay_loops = maxi(_replay_loops, int(tick / count))
+	var index := tick % count
+	var tr: Array = _replay_tracks[index]
+	var eq: Array = _replay_equipment[index]
+	chassis.set_commands_for_test(float(tr[0]), float(tr[1]))
+	chassis.set_equipment_commands_for_test(
+		Vector4(float(eq[0]), float(eq[1]), float(eq[2]), float(eq[3]))
+	)
+
+
+func _load_replay() -> bool:
+	var file := FileAccess.open(_replay_path, FileAccess.READ)
+	if file == null:
+		return false
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	file.close()
+	if not parsed is Dictionary:
+		return false
+	var recording := parsed as Dictionary
+	if String(recording.get("schema", "")) != "excavator-sim-input-recording-v1":
+		return false
+	_replay_tracks = recording.get("tracks", []) as Array
+	_replay_equipment = recording.get("equipment", []) as Array
+	if _replay_tracks.size() != _replay_equipment.size() or _replay_equipment.is_empty():
+		return false
+	_replay_model_mismatch = String(recording.get("model_id", "")) != _model_id
+	return true
 
 
 func _apply_scenario(
@@ -710,6 +768,7 @@ func _parse_arguments() -> bool:
 			"--report": _report_path = value
 			"--duration-seconds": _duration_seconds = value.to_float()
 			"--warmup-seconds": _warmup_seconds = value.to_float()
+			"--replay": _replay_path = value
 			_:
 				push_error("unknown soak argument: %s" % argument)
 				return false

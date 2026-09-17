@@ -268,7 +268,31 @@ commit 路径的帧时间收益需 F12 真实挖掘录制对比（publish 尖峰
 `visual_environment.gd` 生产路径（balanced=55/high=80),GPU 11.5ms 是
 治理后残余。
 
-- Current milestone: M1 完成，待用户 F12 挖掘录制做最终前后对比。
-- Blockers: 真实挖掘测量需人工录制（scripted soak 不接触地面）。
-- Next: 用户重录 capture → analyzer 对比 → 达标则收尾，未达标进 M2
-  （引擎线程开关）/M3(worker 下沉 coverage/do_path 外围）。
+### 输入录回放 soak(2026-09-17 落地）
+
+修复 scripted soak `cut_frames=0` 盲区：真实驾驶输入按物理 tick 录制为
+JSON,soak 用 `--replay` 注入同一测试通道回放，形成可重复的"真实挖掘"
+基准。F12 PerformanceCapture 保留作人工验收工具，不受影响。
+
+- 新增 `backend/scripts/godot/jolt_input_recorder.gd`：窗口模式跑真场景，
+  逐物理 tick 采 `session.get_equipment_input_axes()` + 门控履带强度，
+  F9 提前停止，每 300 tick 落盘防丢。
+- `jolt_product_soak.gd --replay <path>`：按 `Engine.get_physics_frames()`
+  索引回放（循环补齐），回放时跳过中途 reset/断连；报告记
+  `scenario.replay.{tick_count,applied_ticks,loops,model_mismatch}`。
+- `jolt_product_soak.py --record/--replay` 透传；record 强制窗口化、
+  单 cell、校验录制文件（schema/长度/非零输入）；replay 运行自动放宽
+  reset_completed/reconnect_completed 两个 gate（回放不含生命周期段）。
+- 验证：synthetic-sweep 合成轨迹回放 applied_ticks=1802/loops=1，
+  车辆实动 4.5m、关节运动 0.76rad;recorder headless 机制验证 ticks=482。
+- 录制命令：`pixi run python backend/scripts/jolt_product_soak.py
+  --models sy135 --quality-profile balanced --bucket-ground-mode normal
+  --duration-seconds 90 --repetitions 1
+  --record backend/scripts/godot/recordings/<name>.json`(normal 模式，
+  内容需含真实挖掘+卸土，建议含一次支车）。
+- 回放命令：同上但 `--replay <录制.json>`，可叠加 `--headless` 快速量帧。
+
+- Current milestone: M1 完成 + 录回放基准就绪，待用户录制真实挖掘轨迹。
+- Blockers: 需用户跑一次 `--record` 窗口录制（ scripted 不可代劳）。
+- Next: 录制挖掘轨迹 → `--replay` soak 对比 M1 前后 → 达标收尾，未达标
+  进 M2（引擎线程开关）/M3(worker 下沉 coverage/do_path 外围）。

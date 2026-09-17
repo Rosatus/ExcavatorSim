@@ -33,6 +33,9 @@ ROOT = Path(__file__).resolve().parents[2]
 CLIENT_DIR = ROOT / "godot/client"
 DEFAULT_OUTPUT = ROOT / "artifacts/benchmark/jolt-product-soak.json"
 GODOT_TOOLCHAIN_CLI = ROOT / "tools/godot_voxel_toolchain.py"
+SOAK_SCRIPT = ROOT / "backend/scripts/godot/jolt_product_soak.gd"
+RECORDER_SCRIPT = ROOT / "backend/scripts/godot/jolt_input_recorder.gd"
+RECORDING_SCHEMA = "excavator-sim-input-recording-v1"
 STARTUP_TIMEOUT_SECONDS = 120.0
 GODOT_STARTUP_TIMEOUT_SECONDS = 240.0
 PROCESS_QUERY_INFORMATION = 0x0400
@@ -68,6 +71,23 @@ def main() -> int:
     output = args.output if args.output.is_absolute() else ROOT / args.output
     output.parent.mkdir(parents=True, exist_ok=True)
     budgets = SoakBudgets()
+    replay_path = (
+        args.replay if args.replay is None or args.replay.is_absolute() else ROOT / args.replay
+    )
+    record_path = (
+        args.record if args.record is None or args.record.is_absolute() else ROOT / args.record
+    )
+    if record_path is not None:
+        record_path.parent.mkdir(parents=True, exist_ok=True)
+        cells = (
+            len(args.models) * len(args.quality_profiles)
+            * len(args.bucket_ground_modes) * args.repetitions
+        )
+        if cells != 1:
+            raise SystemExit(
+                "--record writes one file per run: pass a single --models/--quality-profile/"
+                "--bucket-ground-mode and --repetitions 1"
+            )
     model_reports: list[dict[str, Any]] = []
     execution_order: list[dict[str, Any]] = []
     run_ordinal = 0
@@ -104,6 +124,8 @@ def main() -> int:
                             budgets=budgets,
                             allow_incomplete_scenario=args.allow_incomplete_scenario,
                             headless=args.headless,
+                            replay_path=replay_path,
+                            record_path=record_path,
                         )
                     )
     comparisons = summarize_paired_bucket_ground_reports(model_reports)
@@ -185,6 +207,16 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--repetitions", type=int, choices=range(1, 10), default=1)
     parser.add_argument("--headless", action="store_true")
+    parser.add_argument(
+        "--replay",
+        type=Path,
+        help="replay a recorded input trace (JSON) instead of the scripted scenario",
+    )
+    parser.add_argument(
+        "--record",
+        type=Path,
+        help="record a new input trace to this path (windowed, user drives)",
+    )
     return parser
 
 
@@ -267,6 +299,8 @@ def _run_model(
     budgets: SoakBudgets,
     allow_incomplete_scenario: bool,
     headless: bool,
+    replay_path: Path | None,
+    record_path: Path | None,
 ) -> dict[str, Any]:
     port = _reserve_port()
     health_url = f"http://127.0.0.1:{port}/health"
@@ -293,14 +327,14 @@ def _run_model(
         "--no-browser",
     ]
     godot_command = [str(godot_exe)]
-    if headless:
+    if headless and record_path is None:
         godot_command.append("--headless")
     godot_command.extend(
         [
             "--path",
             str(CLIENT_DIR),
             "--script",
-            str(ROOT / "backend/scripts/godot/jolt_product_soak.gd"),
+            str(RECORDER_SCRIPT if record_path is not None else SOAK_SCRIPT),
             "--",
             "--model",
             model_id,
@@ -310,16 +344,20 @@ def _run_model(
             bucket_ground_mode,
             "--duration-seconds",
             str(duration_seconds),
-            "--warmup-seconds",
-            str(warmup_seconds),
             "--endpoint",
             endpoint,
-            "--report",
-            str(godot_report_path),
         ]
     )
-    if allow_incomplete_scenario:
-        godot_command.append("--allow-incomplete-scenario")
+    if record_path is not None:
+        godot_command.extend(["--record", str(record_path)])
+    else:
+        godot_command.extend(
+            ["--warmup-seconds", str(warmup_seconds), "--report", str(godot_report_path)]
+        )
+        if replay_path is not None:
+            godot_command.extend(["--replay", str(replay_path)])
+        if allow_incomplete_scenario:
+            godot_command.append("--allow-incomplete-scenario")
     samples: list[tuple[float, int]] = []
     health_samples = 0
     telemetry = {"accepted_batches": 0, "dropped_batches": 0, "maximum_history_count": 0}
@@ -384,12 +422,27 @@ def _run_model(
         "telemetry": telemetry,
         "memory": memory,
     }
-    gates = evaluate_godot_report(
-        godot_report, budgets, model_id, quality_profile, bucket_ground_mode
-    )
-    gates.update(evaluate_gateway_report(gateway_report, budgets, model_id))
+    if record_path is not None:
+        recording_ok, recording_detail = _validate_recording(record_path)
+        gates = {
+            "godot_process_exit": godot_exit_code == 0,
+            "recording_written": recording_ok,
+        }
+        if not recording_ok:
+            print(f"recording validation failed: {recording_detail}", file=sys.stderr)
+    else:
+        gates = evaluate_godot_report(
+            godot_report, budgets, model_id, quality_profile, bucket_ground_mode
+        )
+        gates.update(evaluate_gateway_report(gateway_report, budgets, model_id))
+        if replay_path is not None:
+            # Replay keeps the input trace on one timeline; the scripted reset /
+            # reconnect interlude is intentionally skipped, so its gates relax.
+            for name in ("reset_completed", "reconnect_completed"):
+                if name in gates:
+                    gates[name] = True
     gates["godot_process_exit"] = godot_exit_code == 0
-    gates["rendered_product_path"] = not headless
+    gates["rendered_product_path"] = not headless or record_path is not None
     if allow_incomplete_scenario:
         for name in tuple(gates):
             if name.startswith("scenario_"):
@@ -470,6 +523,29 @@ def _memory_summary(
         "growth_ratio": float(growth) / float(baseline) if baseline > 0 else 0.0,
         "sample_count": len(measured),
     }
+
+
+def _validate_recording(path: Path) -> tuple[bool, str]:
+    if not path.is_file():
+        return False, f"recording file missing: {path}"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return False, f"recording file is not valid JSON: {exc}"
+    if not isinstance(payload, dict) or payload.get("schema") != RECORDING_SCHEMA:
+        return False, "recording schema mismatch"
+    tracks = payload.get("tracks")
+    equipment = payload.get("equipment")
+    if not isinstance(tracks, list) or not isinstance(equipment, list):
+        return False, "recording missing tracks/equipment arrays"
+    if len(tracks) == 0 or len(tracks) != len(equipment):
+        return False, f"recording length mismatch: tracks={len(tracks)} equipment={len(equipment)}"
+    active = any(
+        any(float(v) != 0.0 for v in tick) for tick in equipment[: len(equipment)]
+    ) or any(any(float(v) != 0.0 for v in tick) for tick in tracks[: len(tracks)])
+    if not active:
+        return False, "recording contains no nonzero input"
+    return True, f"ticks={len(tracks)}"
 
 
 def _load_report(path: Path) -> dict[str, Any]:
