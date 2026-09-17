@@ -259,6 +259,23 @@ func get_status_snapshot() -> Dictionary:
 	return status
 
 
+## Read-only borrow of the latest chassis snapshot for per-tick consumers
+## (truth build, voxel identity, feedback loops). Callers must read it inside
+## the current fixed step and must never retain or mutate it.
+func peek_runtime_snapshot() -> Dictionary:
+	if AuthorityProfile.writes_product_pose(authority_profile):
+		return _jolt_runtime.peek_post_step_snapshot() if _jolt_runtime != null else _empty_authoritative_status()
+	return locomotion_state.get_status_snapshot()
+
+
+func get_digging_response_snapshot() -> Dictionary:
+	return _digging_response.get_status_snapshot()
+
+
+func is_input_focused() -> bool:
+	return _input_focused
+
+
 func set_digging_response_enabled(value: bool) -> void:
 	digging_response_enabled = value
 	_digging_response.set_enabled(value)
@@ -496,7 +513,7 @@ func _step_authoritative_chassis(delta: float) -> void:
 	if _bucket_ground_bypassed():
 		_digging_response.reset_response("bucket_ground_interaction_bypassed")
 	else:
-		var soil_status := _excavation_world.get_status_snapshot() if _excavation_world != null else {}
+		var soil_status := _excavation_world.get_interaction_snapshot() if _excavation_world != null else {}
 		var response := _digging_response.step_fixed(delta, equipment_axes, soil_status)
 		scaled_axes = response.get("scaled_commands", equipment_axes) as Vector4
 	_jolt_runtime.set_external_digging_response_enabled(

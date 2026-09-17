@@ -233,6 +233,17 @@ func reset() -> void:
 	world_generation += 1
 
 
+## Scalar terrain identity only: no surface synthesis, byte encoding, layer
+## duplication or hashing. For consumers (truth publisher, telemetry gates)
+## that only need epoch/revision identity.
+func identity_snapshot() -> Dictionary:
+	return {
+		"terrain_epoch": terrain_epoch,
+		"terrain_revision": terrain_revision,
+		"world_generation": world_generation,
+	}
+
+
 func surface_snapshot() -> Dictionary:
 	var surface := get_surface()
 	var bytes := surface_to_bytes(surface)

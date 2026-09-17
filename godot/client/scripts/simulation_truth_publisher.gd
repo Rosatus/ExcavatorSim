@@ -99,9 +99,9 @@ func build_snapshot() -> SimulationTruthSnapshot:
 	if model_version.is_empty() or not _descriptor.is_valid_for(model_id, model_version):
 		contract_error = _descriptor.validation_error() if not model_version.is_empty() else "model version unavailable"
 		return null
-	var terrain := _terrain_world.terrain_state.surface_snapshot()
-	var excavation := _excavation_world.get_status_snapshot() if _excavation_world != null else {}
-	var chassis := _chassis.get_status_snapshot() if _chassis != null else {}
+	var terrain := _terrain_world.terrain_state.identity_snapshot()
+	var excavation := _excavation_world.get_interaction_snapshot() if _excavation_world != null else {}
+	var chassis := _chassis.peek_runtime_snapshot() if _chassis != null else {}
 	if authoritative and not bool(chassis.get("configured", false)):
 		contract_error = "authoritative chassis is not configured"
 		return null
@@ -223,7 +223,7 @@ func build_snapshot() -> SimulationTruthSnapshot:
 		quality_flags.append("conservative_soil_lifecycle_shadow")
 	if bool(soil_lifecycle_active.get("configured", false)):
 		quality_flags.append("conservative_soil_lifecycle_active")
-	var digging_response := chassis.get("digging_response", {}) as Dictionary
+	var digging_response := _chassis.get_digging_response_snapshot() if _chassis != null else {}
 	if bool(digging_response.get("configured", false)):
 		quality_flags.append("game_feel_digging_response")
 	var applied_payload := chassis.get("payload", {}) as Dictionary if authoritative else {}

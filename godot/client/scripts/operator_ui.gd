@@ -998,10 +998,10 @@ func _on_gateway_model_changed(_model_id: String) -> void:
 	_refresh()
 
 
-func _on_excavation_changed(_status: Dictionary) -> void:
-	_refresh_soil()
+func _on_excavation_changed(status: Dictionary) -> void:
+	_refresh_soil(status)
 	_refresh_camera_selector()
-	_sync_unlimited_bucket_toggle()
+	_sync_unlimited_bucket_toggle(status)
 	_sync_cutting_diagnostics_toggle()
 
 
@@ -1042,8 +1042,11 @@ func _refresh() -> void:
 func _terrain_diagnostics_text() -> String:
 	if _excavation_world == null:
 		return "Terrain: unavailable"
-	var excavation_status := _excavation_world.get_status_snapshot()
-	var terrain_status := excavation_status.get("terrain3d", {}) as Dictionary
+	var terrain_status := (
+		_excavation_world.terrain_world.get_status_snapshot()
+		if _excavation_world.terrain_world != null
+		else {}
+	) as Dictionary
 	var configured := String(terrain_status.get("configured_backend", "unknown"))
 	var active := String(terrain_status.get("active_backend", "unknown"))
 	var material := String(terrain_status.get("material_identity", "unknown"))
@@ -1059,10 +1062,10 @@ func _bucket_ground_diagnostics_text(session_status: Dictionary) -> String:
 	var requested := String(session_status.get("requested_bucket_ground_mode", active))
 	var pending := bool(session_status.get("bucket_ground_mode_pending", false))
 	var soil_status := (
-		_excavation_world.get_status_snapshot().get("bucket_ground_interaction", {}) as Dictionary
+		_excavation_world.get_bucket_ground_interaction_snapshot()
 		if _excavation_world != null
 		else {}
-	)
+	) as Dictionary
 	var last_transition := soil_status.get("last_transition", {}) as Dictionary
 	var cleared_text := (
 		"   cleared %.3f m³ / %.1f kg" % [
@@ -1094,10 +1097,11 @@ func _sync_bucket_passthrough_toggle() -> void:
 	)
 
 
-func _sync_unlimited_bucket_toggle() -> void:
+func _sync_unlimited_bucket_toggle(status: Dictionary = {}) -> void:
 	if _unlimited_bucket_button == null:
 		return
-	var status := _excavation_world.get_status_snapshot() if _excavation_world != null else {}
+	if status.is_empty():
+		status = _excavation_world.get_status_snapshot() if _excavation_world != null else {}
 	_unlimited_bucket_button.disabled = not bool(
 		status.get("voxel_unlimited_bucket_toggle_available", false)
 	)
@@ -1106,15 +1110,18 @@ func _sync_unlimited_bucket_toggle() -> void:
 	)
 
 
-func _refresh_soil() -> void:
+func _refresh_soil(status: Dictionary = {}) -> void:
 	if _excavation_world == null:
 		_operation_label.text = "SOIL STATUS UNAVAILABLE"
 		_bucket_status_label.text = "Bucket payload unavailable"
 		_bucket_fill.value = 0.0
 		_bucket_volume_label.text = "Bucket soil: unavailable"
 		return
-	var status := _excavation_world.get_status_snapshot()
-	var selected := _excavation_world.get_selected_soil_payload_snapshot()
+	if status.is_empty():
+		status = _excavation_world.get_status_snapshot()
+	var selected := status.get("selected_soil_payload", {}) as Dictionary
+	if selected.is_empty():
+		selected = _excavation_world.get_selected_soil_payload_snapshot()
 	var generation_key := "%d:%d:%s" % [int(selected.get("world_generation", -1)), int(status.get("material_generation", -1)), String(selected.get("source", "unknown"))]
 	if generation_key != _soil_generation_key:
 		_soil_generation_key = generation_key
@@ -1168,7 +1175,7 @@ func _refresh_warning(status: Dictionary, lifecycle: String, connection: String)
 	if not last_error.is_empty():
 		warnings.append("Recovery needed: %s" % String(last_error.get("message", last_error.get("code", "unknown error"))))
 	if _chassis != null:
-		var chassis_status := _chassis.get_status_snapshot()
+		var chassis_status := _chassis.peek_runtime_snapshot()
 		if not bool(chassis_status.get("neutral_armed", true)) or not bool(chassis_status.get("track_neutral_armed", true)):
 			warnings.append(UIStrings.WARNING_NEUTRAL)
 	_warning_label.text = UIStrings.WARNING_NONE if warnings.is_empty() else " • ".join(PackedStringArray(warnings))

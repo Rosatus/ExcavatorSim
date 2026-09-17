@@ -430,6 +430,13 @@ func get_post_step_snapshot() -> Dictionary:
 	return _post_step_snapshot.duplicate(true)
 
 
+## Read-only borrow of the last completed step's snapshot. The dictionary is
+## rebuilt each physics step; callers must read it inside the current fixed
+## step and must never retain or mutate it. Mirrors cell_patch_read_snapshot.
+func peek_post_step_snapshot() -> Dictionary:
+	return _post_step_snapshot if not _post_step_snapshot.is_empty() else _empty_snapshot()
+
+
 func get_status_snapshot() -> Dictionary:
 	var snapshot := get_post_step_snapshot()
 	if snapshot.is_empty():
@@ -652,6 +659,9 @@ func _capture_post_step_snapshot() -> void:
 	_post_step_snapshot = {
 		"physics_tick": _physics_tick,
 		"authority_epoch": _authority_epoch,
+		"configured": configured,
+		"enabled": enabled,
+		"model_id": model_id,
 		"body_transform": chassis.global_transform if chassis_available else Transform3D.IDENTITY,
 		"linear_velocity": chassis.linear_velocity if chassis_available else Vector3.ZERO,
 		"angular_velocity": chassis.angular_velocity if chassis_available else Vector3.ZERO,

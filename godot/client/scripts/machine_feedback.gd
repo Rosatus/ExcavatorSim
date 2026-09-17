@@ -71,7 +71,7 @@ func _physics_process(delta: float) -> void:
 		return
 	var session_status := _session.get_status_snapshot()
 	var soil_status := _excavation.get_soil_visual_snapshot() if _excavation != null else {}
-	var chassis_status := _chassis.get_status_snapshot() if _chassis != null else {}
+	var chassis_status := _chassis.peek_runtime_snapshot() if _chassis != null else {}
 	_apply_snapshots(session_status, soil_status, chassis_status)
 
 
