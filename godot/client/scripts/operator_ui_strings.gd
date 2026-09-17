@@ -4,7 +4,7 @@ extends RefCounted
 const TITLE := "作业菜单"
 const GUIDE_TITLE := "掌握你的挖掘机"
 const GUIDE_INTRO := "入场后即可操纵。让铲斗接触地面进行挖掘，收斗运土、翻斗卸土；无需额外的挖土按钮。"
-const GUIDE_KEYBOARD := "键盘与鼠标 · ISO 操纵布局\n\nW / S   小臂外伸 / 内收     A / D   左右回转\nI / K   大臂下降 / 抬升     J / L   收斗 / 卸土\nR / F   左履带前进 / 后退     Y / H   右履带前进 / 后退\n\nG   末端辅助（平地）     T   修坡辅助\n修坡预览：W/S 调坡脚距离 · A/D 调坡角 · T/Enter 确认 · Esc 取消\n\n1–5   切换视角     C   复位视角\n鼠标中键拖动环绕 · 滚轮缩放\nEsc   打开 / 关闭菜单     F8   重新开始作业"
+const GUIDE_KEYBOARD := "键盘与鼠标 · ISO 操纵布局\n\nW / S   小臂外伸 / 内收     A / D   左右回转\nI / K   大臂下降 / 抬升     J / L   收斗 / 卸土\nR / F   左履带前进 / 后退     Y / H   右履带前进 / 后退\n\nT   辅助菜单（W/S 选择 · Enter 确认 · Esc 关闭）\n修坡预览：W/S 调坡脚距离 · A/D 调坡角 · T/Enter 确认 · Esc 取消\n\n1–5   切换视角     C   复位视角\n鼠标中键拖动环绕 · 滚轮缩放\nEsc   打开 / 关闭菜单     F8   重新开始作业"
 const GUIDE_GAMEPAD := "手柄 · ISO 操纵布局\n\n左摇杆   左右回转 / 小臂外伸内收\n右摇杆   大臂升降 / 收斗卸土\nLT / LB   左履带前进 / 后退\nRT / RB   右履带前进 / 后退\n\n十字键   切换视角     R3   复位视角\n菜单键   打开 / 关闭菜单\n菜单内：十字键导航 · A 确认 · B 返回 · LB / RB 切换页面"
 const GUIDE_RECOVERY := "Reset 和切换机型会清空当前地形改动与斗内土量。确认后松开操纵输入，即可开始新作业。"
 const CONTROL_HINT_KEYBOARD := "WASD  回转 / 小臂   ·   IJKL  大臂 / 铲斗   ·   R/F、Y/H  履带"
