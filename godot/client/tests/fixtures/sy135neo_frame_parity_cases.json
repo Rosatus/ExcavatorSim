@@ -5,7 +5,7 @@
   "source_urdf_path": "assets/model/library/sy135_reference.urdf",
   "source_urdf_sha256": "2f32a9f635f6fb1b43da9fb624612ade5b7a7b7d2d84f5eed401ffb414afc485",
   "source_model_path": "godot/client/assets/visual/SY135-NEO_excavator_godot.glb",
-  "source_model_sha256": "a474978788ad14d04a3583ba41fd265e13540f94a3c5d0ce68c812563dfee38b",
+  "source_model_sha256": "f4d09bb731505342da2e07385b9b498f60808429ca28c0c934311295fe242d1a",
   "source_pixi_lock_sha256": "d4c4083ca6143dcd9acd40666bca117ed0790e8a8685ec2be0c7ebb32e6a7775",
   "generator_path": "backend/scripts/generate_frame_parity_fixture.py",
   "generator_sha256": "14558c303d3f1a0f4b73334fd1f8eb4c0ebb7fa93202fd9aaf6de75467ae1059",

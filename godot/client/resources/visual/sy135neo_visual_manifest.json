@@ -6,8 +6,8 @@
     "path": "E:/projects/blender/Excavator/SY135-Neo/excavator_assembled_pivots.blend",
     "filename": "SY135_excavator_godot.glb",
     "copied_on": "2026-09-17",
-    "byte_size": 5894500,
-    "sha256": "a474978788ad14d04a3583ba41fd265e13540f94a3c5d0ce68c812563dfee38b",
+    "byte_size": 5894520,
+    "sha256": "f4d09bb731505342da2e07385b9b498f60808429ca28c0c934311295fe242d1a",
     "format": "glTF 2.0 binary",
     "generator": "Khronos glTF Blender I/O v5.2.39 (assembled-pivots placement)"
   },
@@ -36,17 +36,17 @@
     "imported_bounds_godot": {
       "min": [
         -1.259715,
-        -1.752386,
+        0.038046,
         -5.959641
       ],
       "max": [
-        1.2428,
+        1.519992,
         4.283623,
         2.227508
       ],
       "size": [
-        2.502515,
-        6.036009,
+        2.779707,
+        4.245577,
         8.187149
       ]
     },
