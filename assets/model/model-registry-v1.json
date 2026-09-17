@@ -76,7 +76,7 @@
       "visual_manifest_sha256": "74c992e7123d7ef29135663f4c12de7d1c15d589c863cc6ef6618c375d1ddfff",
       "parity_fixture_path": "godot/client/tests/fixtures/sy135neo_frame_parity_cases.json",
       "parity_fixture_resource": "res://tests/fixtures/sy135neo_frame_parity_cases.json",
-      "parity_fixture_sha256": "7ebc45299036f2739256ea059b04c25e492b8516dd5ccd3b2350d1a43ffae31e",
+      "parity_fixture_sha256": "3253eeef0001fc36dfaa483ec9bf3610b732bf2cbba76d6e006213c5143e62c5",
       "passive_linkage_mode": "none",
       "excavation_contact": {
         "mode": "node",

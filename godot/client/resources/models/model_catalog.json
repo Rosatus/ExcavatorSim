@@ -83,9 +83,9 @@
       "manifest_path": "res://resources/visual/sy135neo_visual_manifest.json",
       "manifest_sha256": "74c992e7123d7ef29135663f4c12de7d1c15d589c863cc6ef6618c375d1ddfff",
       "parity_fixture_path": "res://tests/fixtures/sy135neo_frame_parity_cases.json",
-      "parity_fixture_sha256": "7ebc45299036f2739256ea059b04c25e492b8516dd5ccd3b2350d1a43ffae31e",
+      "parity_fixture_sha256": "3253eeef0001fc36dfaa483ec9bf3610b732bf2cbba76d6e006213c5143e62c5",
       "soil_contract_path": "res://resources/models/sy135neo_soil_contract.json",
-      "soil_contract_sha256": "3b0fcef5d91d531bee76f1353d96f00bbd24f33796c57a9290a869765b09b816",
+      "soil_contract_sha256": "d93739b218fe632b9fa0bd91a73525ac700a386328d1aaaff857c4ef81c7e226",
       "physics_rig_path": "res://resources/physics/sy135neo_physics_rig.json",
       "physics_rig_sha256": "f32d8539d9c85694670af5456da684c077eaf4452735e6091bb8557dbe41e2db",
       "tracked_locomotion": {
