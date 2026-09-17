@@ -176,6 +176,25 @@ func request_level_assist(enabled: bool) -> bool:
 	return true
 
 
+## Slope-assist state machine mirror of the chassis controller: advance moves
+## off -> preview -> active -> off (same as the T/Enter keys), cancel drops
+## back to off from any state (same as Esc during preview).
+func advance_slope_assist() -> String:
+	var state := "off"
+	if _chassis != null:
+		state = _chassis.advance_slope_mode()
+	last_error.clear()
+	status_changed.emit(get_status_snapshot())
+	return state
+
+
+func cancel_slope_assist() -> void:
+	if _chassis != null:
+		_chassis.cancel_slope_mode()
+	last_error.clear()
+	status_changed.emit(get_status_snapshot())
+
+
 func get_status_snapshot() -> Dictionary:
 	return {
 		"authority_profile": String(ProjectSettings.get_setting("simulation/authority_profile", "jolt_authoritative")),
@@ -193,6 +212,7 @@ func get_status_snapshot() -> Dictionary:
 		"bucket_ground_mode_pending": _bucket_ground_mode_pending,
 		"bucket_ground_transition_sequence": bucket_ground_transition_sequence,
 		"level_assist_enabled": _chassis.level_assist_enabled if _chassis != null else level_assist_enabled,
+		"slope_assist": _chassis.slope_status_snapshot() if _chassis != null else {"state": "off"},
 		"last_error": last_error,
 	}
 

@@ -3,6 +3,8 @@ extends Node3D
 
 const VoxelZone = preload("res://scripts/voxel_work_zone_config.gd")
 const AssistPipeline = preload("res://scripts/equipment_assist_pipeline.gd")
+const SlopeProfileScript := preload("res://scripts/slope_profile.gd")
+const SlopeCutPreviewScript := preload("res://scripts/slope_cut_preview.gd")
 
 signal post_step_snapshot_captured(snapshot: Dictionary)
 
@@ -322,11 +324,119 @@ func is_equipment_assist_enabled(stage_name: String) -> bool:
 	return _assist_configured and _assist_pipeline.is_stage_enabled(stage_name)
 
 
+## Runtime parameter injection for stages whose task is parameterized after
+## configure (the confirmed slope profile arrives here from the controller).
+func set_equipment_assist_params(stage_name: String, params: Dictionary) -> bool:
+	if not _assist_configured:
+		return false
+	return _assist_pipeline.set_stage_params(stage_name, params)
+
+
+## The configured profile parameters for a stage (adjustment rates, preview
+## cadence) — read-only view for non-control consumers like the preview
+## state machine.
+func get_equipment_assist_params(stage_name: String) -> Dictionary:
+	if not _assist_configured:
+		return {}
+	var stage := _assist_pipeline.get_stage(stage_name)
+	return stage.profile_params if stage != null else {}
+
+
 ## Latest controller-pushed semantics for assist stages (soil status, external
 ## targets). Stages read it through EquipmentKinematicsContext.external; the
 ## pipeline never interprets it.
 func set_assist_context(context: Dictionary) -> void:
 	_assist_context = context.duplicate(true)
+
+
+## Build the slope profile the current preview parameters imply: the anchor
+## is the live tooth position, the axis the live outward direction, and the
+## toe height the terrain under the toe point. Shared by the preview flash
+## and the confirm step so what was shown is exactly what gets tracked.
+func build_slope_profile(distance_m: float, angle_deg: float) -> RefCounted:
+	if not _assist_configured or _articulation == null or _body == null:
+		return null
+	var ctx := _assist_pipeline.build_context(
+		_articulation, _body.global_transform, 1.0 / 60.0, _assist_context,
+		_body.linear_velocity, _body.angular_velocity
+	)
+	var toe_xz := Vector2(ctx.bucket_ref_world.x, ctx.bucket_ref_world.z) \
+		+ Vector2(ctx.horizontal.x, ctx.horizontal.z) * distance_m
+	var toe_height := _sample_soil_height(toe_xz)
+	if not is_finite(toe_height):
+		return null
+	return SlopeProfileScript.create(ctx.bucket_ref_world, ctx.horizontal, distance_m, angle_deg, toe_height)
+
+
+## Preview the pending cut: the reachable band along the profile axis plus
+## the terrain cells rising above the target surface inside it. Returns
+## {"ok", "profile", "result"} — result carries the sampled grids for the
+## wedge visual and the volume estimate for the UI readout.
+func update_slope_preview(profile: RefCounted) -> Dictionary:
+	if profile == null or not _assist_configured or _articulation == null or _body == null:
+		return {"ok": false}
+	var ctx := _assist_pipeline.build_context(
+		_articulation, _body.global_transform, 1.0 / 60.0, _assist_context,
+		_body.linear_velocity, _body.angular_velocity
+	)
+	var stage := _assist_pipeline.get_stage("slope_grade")
+	var params: Dictionary = stage.profile_params if stage != null else {}
+	var sampler := func(world_xz: Vector2) -> float: return _sample_soil_height(world_xz)
+	var result := SlopeCutPreviewScript.compute(
+		profile,
+		_articulation,
+		_body.global_transform,
+		_cutting_edge_local(),
+		ctx.joint_limits,
+		sampler,
+		float(params.get("preview_cell_m", 0.25)),
+		_cutting_edge_half_width(),
+		int(params.get("preview_sweep_steps", 24))
+	)
+	return {"ok": true, "profile": profile, "result": result}
+
+
+## Confirm the previewed slope: inject the frozen profile and enable the
+## stage (mutual exclusion drops the level assist if it was on).
+func confirm_slope_assist(profile: RefCounted) -> bool:
+	if profile == null or not _assist_configured:
+		return false
+	if not _assist_pipeline.set_stage_params("slope_grade", {"profile": profile}):
+		return false
+	return set_equipment_assist_enabled("slope_grade", true)
+
+
+func _cutting_edge_local() -> Vector3:
+	var edge := (_soil_contract.get("proxies", {}) as Dictionary).get("cutting_edge", {}) as Dictionary
+	var rows := edge.get("center_godot", [0.0, 0.0, 0.0]) as Array
+	return Vector3(float(rows[0]), float(rows[1]), float(rows[2])) if rows.size() == 3 else Vector3.ZERO
+
+
+func _cutting_edge_half_width() -> float:
+	var edge := (_soil_contract.get("proxies", {}) as Dictionary).get("cutting_edge", {}) as Dictionary
+	return float(edge.get("half_width_m", 0.6))
+
+
+## Authoritative soil height: the same TerrainState the cut-penetration
+## probe reads, so the flash marks exactly the soil the dig system sees.
+## Outside the heightfield grid a downward terrain raycast fills in (the
+## voxel work zone owns its own collider inside the pit).
+func _sample_soil_height(world_xz: Vector2) -> float:
+	if _terrain_world != null and _terrain_world.terrain_state != null \
+			and _terrain_world.terrain_state.is_inside_grid(world_xz):
+		var height := _terrain_world.terrain_state.sample_surface_bilinear_at(world_xz)
+		if is_finite(height):
+			return height
+	if _body == null:
+		return NAN
+	var space := _body.get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(
+		Vector3(world_xz.x, 60.0, world_xz.y),
+		Vector3(world_xz.x, -40.0, world_xz.y)
+	)
+	query.collision_mask = 1
+	var hit := space.intersect_ray(query)
+	return float((hit.get("position", Vector3.ZERO) as Vector3).y) if not hit.is_empty() else NAN
 
 
 func set_bucket_payload(mass_kg: float, center_of_mass_local: Vector3, identity: int) -> bool:

@@ -9,8 +9,21 @@ const INPUT_ACTIONS := {
 	"track_right_reverse": {"key": KEY_H, "joy_button": JOY_BUTTON_RIGHT_SHOULDER},
 }
 const TOGGLE_ACTIONS := {
-	"operator_level_assist": KEY_G,
+	"operator_level_assist": [KEY_G],
+	"operator_slope_assist": [KEY_T],
 }
+const SlopePreviewVisual := preload("res://scripts/slope_cut_preview_visual.gd")
+
+enum {
+	SLOPE_MODE_OFF,
+	SLOPE_MODE_PREVIEW,
+	SLOPE_MODE_ACTIVE,
+}
+const SLOPE_DISTANCE_MIN_M := 0.5
+const SLOPE_DISTANCE_MAX_M := 20.0
+const SLOPE_ANGLE_MIN_DEG := -60.0
+const SLOPE_ANGLE_MAX_DEG := 60.0
+const SLOPE_PREVIEW_REFRESH_S := 0.15
 
 @export var controller_enabled := false
 @export var static_map_driving := false
@@ -55,6 +68,14 @@ var _payload_identity := -1
 var _last_payload_sample: Dictionary = {}
 var _digging_response := DiggingResponseShaper.new()
 var _bucket_ground_mode := BucketGroundInteractionMode.NORMAL
+var _slope_mode := SLOPE_MODE_OFF
+var _slope_distance_m := 3.0
+var _slope_angle_deg := 30.0
+var _slope_profile: RefCounted = null
+var _slope_preview_result: Dictionary = {}
+var _slope_preview_dirty := true
+var _slope_preview_accum := 0.0
+var _slope_preview_node: SlopePreviewVisual = null
 
 
 func _ready() -> void:
@@ -261,6 +282,7 @@ func get_status_snapshot() -> Dictionary:
 	status["digging_response"] = _digging_response.get_status_snapshot()
 	status["bucket_ground_mode"] = _bucket_ground_mode
 	status["level_assist_enabled"] = level_assist_enabled
+	status["slope_assist"] = slope_status_snapshot()
 	return status
 
 
@@ -295,6 +317,144 @@ func set_level_assist_enabled(value: bool) -> bool:
 	if _jolt_runtime == null:
 		return false
 	return _jolt_runtime.set_equipment_assist_enabled("bucket_level", value)
+
+
+## Advance the slope-assist state machine (bound to T/Enter and the UI control):
+## off -> preview -> active -> off. Preview freezes the machine and flashes the
+## soil volume the confirmed cut would remove; active hands boom/arm/bucket/swing
+## to the profile-following stage.
+func advance_slope_mode() -> String:
+	match _slope_mode:
+		SLOPE_MODE_OFF:
+			if _jolt_runtime == null or not _jolt_runtime.configured:
+				return slope_mode_state()
+			if level_assist_enabled:
+				set_level_assist_enabled(false)
+			_slope_mode = SLOPE_MODE_PREVIEW
+			_slope_preview_dirty = true
+			_slope_preview_accum = SLOPE_PREVIEW_REFRESH_S
+		SLOPE_MODE_PREVIEW:
+			if _jolt_runtime == null:
+				_exit_slope_mode()
+				return slope_mode_state()
+			var profile: RefCounted = _jolt_runtime.build_slope_profile(_slope_distance_m, _slope_angle_deg)
+			if profile != null and _jolt_runtime.confirm_slope_assist(profile):
+				_slope_profile = profile
+				_slope_mode = SLOPE_MODE_ACTIVE
+				_hide_slope_preview()
+		SLOPE_MODE_ACTIVE:
+			_exit_slope_mode()
+	return slope_mode_state()
+
+
+func cancel_slope_mode() -> void:
+	if _slope_mode != SLOPE_MODE_OFF:
+		_exit_slope_mode()
+
+
+func slope_mode_state() -> String:
+	match _slope_mode:
+		SLOPE_MODE_PREVIEW:
+			return "preview"
+		SLOPE_MODE_ACTIVE:
+			return "active"
+	return "off"
+
+
+func slope_status_snapshot() -> Dictionary:
+	var snapshot := {
+		"state": slope_mode_state(),
+		"distance_m": _slope_distance_m,
+		"angle_deg": _slope_angle_deg,
+	}
+	if _slope_mode == SLOPE_MODE_PREVIEW:
+		snapshot["cut_volume_m3"] = float(_slope_preview_result.get("volume_m3", 0.0))
+		snapshot["max_depth_m"] = float(_slope_preview_result.get("max_depth_m", 0.0))
+	if _slope_mode == SLOPE_MODE_ACTIVE and _slope_profile != null:
+		snapshot["toe_distance_m"] = _slope_profile.toe_s
+		snapshot["angle_deg"] = _slope_profile.angle_deg
+	return snapshot
+
+
+func _exit_slope_mode() -> void:
+	if _jolt_runtime != null:
+		_jolt_runtime.set_equipment_assist_enabled("slope_grade", false)
+	_slope_mode = SLOPE_MODE_OFF
+	_slope_profile = null
+	_slope_preview_result = {}
+	_hide_slope_preview()
+
+
+func _adjust_slope_params(equipment_axes: Vector4, delta: float) -> void:
+	## W/S rides the arm axis (z), A/D rides the swing axis (x): while the machine
+	## is frozen those two input axes become distance/angle adjustment instead.
+	var dist_dir := equipment_axes.z
+	var angle_dir := equipment_axes.x
+	if absf(dist_dir) < 0.05 and absf(angle_dir) < 0.05:
+		return
+	var rates := _slope_adjust_rates()
+	_slope_distance_m = clampf(
+		_slope_distance_m + dist_dir * rates.x * delta, SLOPE_DISTANCE_MIN_M, SLOPE_DISTANCE_MAX_M
+	)
+	_slope_angle_deg = clampf(
+		_slope_angle_deg + angle_dir * rates.y * delta, SLOPE_ANGLE_MIN_DEG, SLOPE_ANGLE_MAX_DEG
+	)
+	_slope_preview_dirty = true
+
+
+func _slope_adjust_rates() -> Vector2:
+	var defaults := Vector2(1.5, 15.0)
+	if _jolt_runtime == null:
+		return defaults
+	var params := _jolt_runtime.get_equipment_assist_params("slope_grade")
+	if params.is_empty():
+		return defaults
+	return Vector2(
+		float(params.get("distance_adjust_rate_m_s", defaults.x)),
+		float(params.get("angle_adjust_rate_deg_s", defaults.y))
+	)
+
+
+func _refresh_slope_preview(delta: float) -> void:
+	if _slope_mode != SLOPE_MODE_PREVIEW or _jolt_runtime == null:
+		return
+	_slope_preview_accum += delta
+	if _slope_preview_accum < SLOPE_PREVIEW_REFRESH_S or not _slope_preview_dirty:
+		return
+	_slope_preview_accum = 0.0
+	_slope_preview_dirty = false
+	var profile: RefCounted = _jolt_runtime.build_slope_profile(_slope_distance_m, _slope_angle_deg)
+	if profile == null:
+		_hide_slope_preview()
+		return
+	var preview := _jolt_runtime.update_slope_preview(profile)
+	if not bool(preview.get("ok", false)):
+		_hide_slope_preview()
+		return
+	_slope_preview_result = preview.get("result", {})
+	_slope_profile = profile
+	var node := _ensure_slope_preview_node()
+	node.show_preview(_slope_preview_result, profile)
+	node.set_readout(
+		"距离 %.1f m · 坡角 %+.1f° · 削土 %.2f m³" % [
+			_slope_distance_m,
+			_slope_angle_deg,
+			float(_slope_preview_result.get("volume_m3", 0.0)),
+		]
+	)
+
+
+func _ensure_slope_preview_node() -> SlopePreviewVisual:
+	if _slope_preview_node == null or not is_instance_valid(_slope_preview_node):
+		_slope_preview_node = SlopePreviewVisual.new()
+		_slope_preview_node.name = "SlopeCutPreview"
+		get_parent().add_child(_slope_preview_node)
+	return _slope_preview_node
+
+
+func _hide_slope_preview() -> void:
+	if _slope_preview_node != null and is_instance_valid(_slope_preview_node):
+		_slope_preview_node.hide_preview()
 
 
 func can_set_bucket_ground_mode(value: String) -> bool:
@@ -463,6 +623,7 @@ func _reset_motion() -> void:
 	_use_test_equipment_commands = false
 	_test_equipment_commands = Vector4.ZERO
 	_digging_response.reset_response("motion_reset")
+	_exit_slope_mode()
 	if AuthorityProfile.writes_product_pose(authority_profile) and _jolt_runtime != null:
 		var descriptor := PhysicsRigDescriptor.load_for_model(active_model_id)
 		var spawn := _authoritative_spawn_transform(descriptor) if descriptor != null else Transform3D.IDENTITY
@@ -495,8 +656,15 @@ func _on_world_reset(_generation: int) -> void:
 func _step_authoritative_chassis(delta: float) -> void:
 	if _jolt_runtime == null or not _jolt_runtime.configured:
 		return
-	if controller_enabled and _input_focused and Input.is_action_just_pressed("operator_level_assist"):
-		set_level_assist_enabled(not level_assist_enabled)
+	if controller_enabled and _input_focused:
+		if Input.is_action_just_pressed("operator_level_assist"):
+			set_level_assist_enabled(not level_assist_enabled)
+		if Input.is_action_just_pressed("operator_slope_assist"):
+			advance_slope_mode()
+		elif _slope_mode == SLOPE_MODE_PREVIEW and Input.is_action_just_pressed("ui_accept"):
+			advance_slope_mode()
+		elif _slope_mode == SLOPE_MODE_PREVIEW and Input.is_action_just_pressed("ui_cancel"):
+			_exit_slope_mode()
 	var left := 0.0
 	var right := 0.0
 	if controller_enabled and (
@@ -508,6 +676,9 @@ func _step_authoritative_chassis(delta: float) -> void:
 		else:
 			left = Input.get_action_strength("track_left_forward") - Input.get_action_strength("track_left_reverse")
 			right = Input.get_action_strength("track_right_forward") - Input.get_action_strength("track_right_reverse")
+	if _slope_mode == SLOPE_MODE_PREVIEW:
+		left = 0.0
+		right = 0.0
 	_jolt_runtime.set_enabled(controller_enabled)
 	_jolt_runtime.set_commands(left, right)
 	var equipment_axes := Vector4.ZERO
@@ -523,6 +694,10 @@ func _step_authoritative_chassis(delta: float) -> void:
 				else (_motion_client.get_authoritative_input_axes() if _motion_client != null else Vector4.ZERO)
 			)
 		)
+	if _slope_mode == SLOPE_MODE_PREVIEW:
+		_adjust_slope_params(equipment_axes, delta)
+		equipment_axes = Vector4.ZERO
+	_refresh_slope_preview(delta)
 	var scaled_axes := equipment_axes
 	if _bucket_ground_bypassed():
 		_digging_response.reset_response("bucket_ground_interaction_bypassed")
@@ -780,7 +955,8 @@ func _ensure_input_actions() -> void:
 		for existing in InputMap.action_get_events(action):
 			if existing is InputEventKey:
 				InputMap.action_erase_event(action, existing)
-		_add_key_event(action, int(TOGGLE_ACTIONS[action]))
+		for keycode in TOGGLE_ACTIONS[action]:
+			_add_key_event(action, keycode)
 
 
 func _add_key_event(action: String, keycode: int) -> void:

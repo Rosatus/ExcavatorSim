@@ -179,6 +179,12 @@ layout_mode = 2
 size_flags_horizontal = 3
 text = "末端辅助 (G)"
 
+[node name="SlopeAssist" type="Button" parent="StatusPanel/Margin/VBox/Tools"]
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "修坡 (T)"
+
 [node name="CANOutputToggle" type="Button" parent="StatusPanel/Margin/VBox/Tools"]
 layout_mode = 2
 size_flags_horizontal = 3
