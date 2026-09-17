@@ -54,6 +54,7 @@ $tests = @(
     # contracts; see task 09-16).
     "cut_resistance_test.gd",
     "bucket_level_assist_test.gd",
+    "slope_grade_assist_test.gd",
     "excavation_gameplay_test.gd",
     "visual_pass_test.gd",
     "visual_evidence_capture_test.gd"
