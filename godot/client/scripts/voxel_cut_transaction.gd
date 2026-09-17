@@ -31,6 +31,7 @@ var accounting_mode := "exact_sdf_volume"
 var native_path_count := 0
 var native_geometry_only := false
 var overburden_path_count := 0
+var clearance_path_count := 0
 var coverage_candidate_count := 0
 var coverage_new_count := 0
 var coverage_usec := 0
@@ -87,6 +88,7 @@ func to_dictionary() -> Dictionary:
 		"native_path_count": native_path_count,
 		"native_geometry_only": native_geometry_only,
 		"overburden_path_count": overburden_path_count,
+		"clearance_path_count": clearance_path_count,
 		"coverage_candidate_count": coverage_candidate_count,
 		"coverage_new_count": coverage_new_count,
 		"coverage_usec": coverage_usec,

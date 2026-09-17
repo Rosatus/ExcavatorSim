@@ -26,6 +26,11 @@ const MAX_NATIVE_COVERAGE_PROBES := 16384
 const MAX_NATIVE_DEPOSIT_PROBES := 4096
 const MAX_NATIVE_DEPOSIT_PATHS := 2
 const NATIVE_COVERAGE_STEP_VOXELS := 1.5
+# Applied clearance radius must exceed the half-diagonal of a voxel cell
+# (sqrt(3)/2 ~= 0.866) so every voxel center adjacent to the declared
+# clearance region is carved to air; a radius below that leaves solid
+# lattice samples inside the bucket envelope.
+const CLEARANCE_APPLY_RADIUS_VOXELS := 0.88
 const NATIVE_DIGEST_SAMPLE_LIMIT := 128
 const DIAGNOSTIC_SNAPSHOT_PERIOD_USEC := 250000
 const SDF_HALO_VOXELS := 2
@@ -948,7 +953,18 @@ func _commit_proposal(proposal: VoxelCutProposal) -> VoxelCutTransaction:
 	var original := _buffer_values(buffer, size)
 	transaction.pre_sdf_digest = _digest_values(original)
 	var full_values := original.duplicate()
-	var shapes := proposal.capsules + proposal.clearance_capsules
+	var shapes := proposal.capsules.duplicate()
+	# Clearance applies at a radius floor that covers the voxel lattice
+	# half-diagonal; the declared capsule radius alone can leave solid
+	# centers inside the bucket envelope. Copies keep the proposal
+	# contract's declared geometry untouched.
+	for capsule in proposal.clearance_capsules:
+		var applied := capsule.duplicate()
+		applied["radius_voxels"] = maxf(
+			float(capsule.get("radius_voxels", 0.0)),
+			CLEARANCE_APPLY_RADIUS_VOXELS
+		)
+		shapes.append(applied)
 	if shapes.size() > MAX_PROPOSAL_CAPSULES:
 		return _reject_transaction(transaction, "capsule_work_budget", started)
 	var changed_samples := _apply_shapes(full_values, size, origin, shapes)
@@ -1039,7 +1055,30 @@ func _commit_native_proposal(
 		return _reject_transaction(transaction, "voxel_area_not_editable", started_usec)
 	var phase_started := _diagnostic_clock_usec()
 	var geometry_candidates: Dictionary = {}
-	var coverage_coordinates := _native_coverage_coordinates(proposal.native_paths, origin, size, geometry_candidates)
+	# Clearance capsules mark the bucket-envelope volume that must be air after
+	# the commit. Convert them into two-point paths so they share the same
+	# coverage ledger and native removal pass as ordinary cut paths; their
+	# displaced soil is credited like any other cut mass instead of vanishing.
+	var edit_paths := proposal.native_paths
+	if not proposal.clearance_capsules.is_empty():
+		edit_paths = proposal.native_paths.duplicate()
+		for capsule in proposal.clearance_capsules:
+			var clearance_radius := maxf(
+				float(capsule.get("radius_voxels", 0.0)),
+				CLEARANCE_APPLY_RADIUS_VOXELS
+			)
+			edit_paths.append({
+				"path_id": String(capsule.get("source", "clearance")),
+				"role": "clearance",
+				"components": ["clearance"],
+				"points_voxels": PackedVector3Array([
+					capsule.get("a_voxels", Vector3.ZERO) as Vector3,
+					capsule.get("b_voxels", Vector3.ZERO) as Vector3,
+				]),
+				"radii_voxels": PackedFloat32Array([clearance_radius, clearance_radius]),
+			})
+	transaction.clearance_path_count = proposal.clearance_capsules.size()
+	var coverage_coordinates := _native_coverage_coordinates(edit_paths, origin, size, geometry_candidates)
 	transaction.coverage_usec = _diagnostic_clock_usec() - phase_started
 	transaction.coverage_candidate_count = coverage_coordinates.size()
 	if coverage_coordinates.is_empty():
@@ -1085,7 +1124,7 @@ func _commit_native_proposal(
 	_tool.channel = VoxelBuffer.CHANNEL_SDF
 	_tool.mode = VoxelTool.MODE_REMOVE
 	phase_started = _diagnostic_clock_usec()
-	for path in proposal.native_paths:
+	for path in edit_paths:
 		var points := path.get("points_voxels", PackedVector3Array()) as PackedVector3Array
 		var radii := path.get("radii_voxels", PackedFloat32Array()) as PackedFloat32Array
 		_tool.do_path(points, radii)
