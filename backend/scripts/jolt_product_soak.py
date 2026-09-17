@@ -125,6 +125,7 @@ def main() -> int:
                             allow_incomplete_scenario=args.allow_incomplete_scenario,
                             headless=args.headless,
                             replay_path=replay_path,
+                            replay_settle_seconds=args.replay_settle_seconds,
                             record_path=record_path,
                         )
                     )
@@ -211,6 +212,13 @@ def _build_parser() -> argparse.ArgumentParser:
         "--replay",
         type=Path,
         help="replay a recorded input trace (JSON) instead of the scripted scenario",
+    )
+    parser.add_argument(
+        "--replay-settle-seconds",
+        type=float,
+        default=0.0,
+        help="wait this many seconds after RUNNING before applying the replayed trace "
+        "(mirrors the recorder lead-in so the chassis is equally settled)",
     )
     parser.add_argument(
         "--record",
@@ -300,6 +308,7 @@ def _run_model(
     allow_incomplete_scenario: bool,
     headless: bool,
     replay_path: Path | None,
+    replay_settle_seconds: float,
     record_path: Path | None,
 ) -> dict[str, Any]:
     port = _reserve_port()
@@ -356,6 +365,8 @@ def _run_model(
         )
         if replay_path is not None:
             godot_command.extend(["--replay", str(replay_path)])
+            if replay_settle_seconds > 0.0:
+                godot_command.extend(["--replay-settle-seconds", str(replay_settle_seconds)])
         if allow_incomplete_scenario:
             godot_command.append("--allow-incomplete-scenario")
     samples: list[tuple[float, int]] = []

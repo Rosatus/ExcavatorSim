@@ -15,12 +15,16 @@ var _duration_seconds := 90.0
 var _warmup_seconds := 15.0
 var _allow_incomplete_scenario := false
 var _replay_path := ""
+var _replay_settle_seconds := 0.0
 var _replay_tracks: Array = []
 var _replay_equipment: Array = []
+var _replay_recorded_yaw: Array = []
 var _replay_base_tick := -1
 var _replay_applied_ticks := 0
 var _replay_loops := 0
 var _replay_model_mismatch := false
+var _replay_yaw_divergence_max_deg := 0.0
+var _replay_yaw_divergence_final_deg := 0.0
 var _failures: Array[String] = []
 
 
@@ -94,11 +98,17 @@ func _run() -> void:
 	if not _replay_path.is_empty() and not _load_replay():
 		_finish({}, "replay recording failed to load: %s" % _replay_path)
 		return
+	if not _replay_path.is_empty() and _replay_settle_seconds > 0.0:
+		var settle_ticks := int(_replay_settle_seconds * Engine.physics_ticks_per_second)
+		var settle_start := Engine.get_physics_frames()
+		while Engine.get_physics_frames() - settle_start < settle_ticks:
+			await physics_frame
 	_replay_base_tick = Engine.get_physics_frames()
 	var started_usec := Time.get_ticks_usec()
 	var previous_frame_usec := started_usec
 	var last_physics_tick := -1
 	var render_samples: Array[float] = []
+	var spike_frames: Array = []
 	var fixed_samples: Array[float] = []
 	var interaction_counts := {}
 	var transaction_counts := {}
@@ -108,6 +118,12 @@ func _run() -> void:
 	var maximum_runtime_count := 0
 	var start_transform := chassis.global_transform
 	var maximum_track_displacement_m := 0.0
+	var maximum_chassis_yaw_delta_rad := 0.0
+	var cumulative_chassis_yaw_rad := 0.0
+	var previous_chassis_yaw := 0.0
+	var have_previous_chassis_yaw := false
+	var chassis_yaw_timeline: Array = []
+	var next_yaw_sample_second := 0.0
 	var maximum_joint_motion := 0.0
 	var minimum_cutting_clearance_m := INF
 	var maximum_query_contacts := 0
@@ -173,9 +189,36 @@ func _run() -> void:
 		await process_frame
 		var now_usec := Time.get_ticks_usec()
 		if elapsed >= _warmup_seconds:
-			render_samples.append(float(now_usec - previous_frame_usec) / 1000.0)
+			var frame_ms := float(now_usec - previous_frame_usec) / 1000.0
+			render_samples.append(frame_ms)
+			if frame_ms > 33.3 and spike_frames.size() < 256:
+				spike_frames.append([elapsed, frame_ms])
 		var status := chassis.get_status_snapshot()
 		maximum_track_displacement_m = maxf(maximum_track_displacement_m, chassis.global_position.distance_to(start_transform.origin))
+		var chassis_forward := -chassis.global_transform.basis.z
+		var start_forward := -start_transform.basis.z
+		var chassis_yaw := atan2(-chassis_forward.x, -chassis_forward.z)
+		var chassis_yaw_delta := absf(wrapf(
+			chassis_yaw - atan2(-start_forward.x, -start_forward.z),
+			-PI,
+			PI
+		))
+		maximum_chassis_yaw_delta_rad = maxf(maximum_chassis_yaw_delta_rad, chassis_yaw_delta)
+		if have_previous_chassis_yaw:
+			cumulative_chassis_yaw_rad += wrapf(chassis_yaw - previous_chassis_yaw, -PI, PI)
+		previous_chassis_yaw = chassis_yaw
+		have_previous_chassis_yaw = true
+		if elapsed >= next_yaw_sample_second:
+			chassis_yaw_timeline.append([elapsed, rad_to_deg(cumulative_chassis_yaw_rad)])
+			next_yaw_sample_second = floorf(elapsed) + 1.0
+		if not _replay_recorded_yaw.is_empty():
+			var replay_tick := Engine.get_physics_frames() - _replay_base_tick
+			if replay_tick >= 0 and replay_tick < _replay_recorded_yaw.size():
+				var recorded_delta := float(_replay_recorded_yaw[replay_tick])
+				var replayed_delta := rad_to_deg(cumulative_chassis_yaw_rad)
+				var divergence := absf(replayed_delta - recorded_delta)
+				_replay_yaw_divergence_max_deg = maxf(_replay_yaw_divergence_max_deg, divergence)
+				_replay_yaw_divergence_final_deg = replayed_delta - recorded_delta
 		var physics_tick := int(status.get("physics_tick", -1))
 		if elapsed >= _warmup_seconds and physics_tick >= 0 and physics_tick != last_physics_tick:
 			fixed_samples.append(float(status.get("last_step_usec", 0)) / 1000.0)
@@ -329,12 +372,22 @@ func _run() -> void:
 		and presentation.get_active_model_id() == _model_id
 		and quality_contract_clean
 	)
+	var truth_publisher := scene.get_node_or_null("SimulationTruthPublisher") as SimulationTruthPublisher
+	var client_status := client.get_status_snapshot()
 	var contract_report := {
 		"clean": final_contract_clean and _failures.is_empty(),
 		"authority_profile": final_status.get("authority_profile", ""),
 		"active_model_id": presentation.get_active_model_id(),
 		"maximum_runtime_count": maximum_runtime_count,
 		"failures": _failures.duplicate(),
+		"truth_publisher": truth_publisher.get_status_snapshot() if truth_publisher != null else {},
+		"negotiated_optional_capabilities": client_status.get("negotiated_optional_capabilities", []),
+		"offered_optional_capabilities": client_status.get("offered_optional_capabilities", []),
+		"last_preflight_response_code": client_status.get("last_preflight_response_code", -1),
+		"last_preflight_result": client_status.get("last_preflight_result", -1),
+		"sensor_telemetry_pending": client_status.get("sensor_telemetry_pending", false),
+		"client_connection_state": client_status.get("connection_state", -1),
+		"client_last_error": client_status.get("last_error", {}),
 	}
 	var report := {
 		"schema_version": REPORT_SCHEMA_VERSION,
@@ -352,6 +405,8 @@ func _run() -> void:
 			"render_frame_p95_ms": _percentile(render_samples, 0.95),
 			"render_frame_p99_ms": _percentile(render_samples, 0.99),
 			"render_sample_count": render_samples.size(),
+			"spike_frame_count": spike_frames.size(),
+			"spike_frames": spike_frames,
 			"fixed_sample_count": fixed_samples.size(),
 			"engine_fps": Performance.get_monitor(Performance.TIME_FPS),
 			"static_memory_bytes": Performance.get_monitor(Performance.MEMORY_STATIC),
@@ -390,6 +445,9 @@ func _run() -> void:
 			"maximum_payload_mass_kg": maximum_payload_mass_kg,
 			"track_motion_observed": maximum_track_displacement_m > 0.1,
 			"maximum_track_displacement_m": maximum_track_displacement_m,
+			"maximum_chassis_yaw_delta_deg": rad_to_deg(maximum_chassis_yaw_delta_rad),
+			"cumulative_chassis_yaw_deg": rad_to_deg(cumulative_chassis_yaw_rad),
+			"chassis_yaw_timeline": chassis_yaw_timeline,
 			"articulation_observed": maximum_joint_motion > 0.05,
 			"maximum_joint_motion_rad": maximum_joint_motion,
 			"reset_completed": reset_completed,
@@ -400,6 +458,8 @@ func _run() -> void:
 				"applied_ticks": _replay_applied_ticks,
 				"loops": _replay_loops,
 				"model_mismatch": _replay_model_mismatch,
+				"yaw_divergence_max_deg": _replay_yaw_divergence_max_deg,
+				"yaw_divergence_final_deg": _replay_yaw_divergence_final_deg,
 			},
 		},
 	}
@@ -499,6 +559,18 @@ func _load_replay() -> bool:
 	_replay_equipment = recording.get("equipment", []) as Array
 	if _replay_tracks.size() != _replay_equipment.size() or _replay_equipment.is_empty():
 		return false
+	_replay_recorded_yaw.clear()
+	var recorded_yaw := recording.get("chassis_yaw_deg", []) as Array
+	var cumulative_yaw := 0.0
+	var previous_yaw := 0.0
+	var have_previous_yaw := false
+	for yaw_value in recorded_yaw:
+		var yaw_deg := float(yaw_value)
+		if have_previous_yaw:
+			cumulative_yaw += wrapf(yaw_deg - previous_yaw, -180.0, 180.0)
+		previous_yaw = yaw_deg
+		have_previous_yaw = true
+		_replay_recorded_yaw.append(cumulative_yaw)
 	_replay_model_mismatch = String(recording.get("model_id", "")) != _model_id
 	return true
 
@@ -769,6 +841,7 @@ func _parse_arguments() -> bool:
 			"--duration-seconds": _duration_seconds = value.to_float()
 			"--warmup-seconds": _warmup_seconds = value.to_float()
 			"--replay": _replay_path = value
+			"--replay-settle-seconds": _replay_settle_seconds = value.to_float()
 			_:
 				push_error("unknown soak argument: %s" % argument)
 				return false

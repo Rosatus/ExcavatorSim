@@ -87,6 +87,8 @@ func _run() -> void:
 	var started_usec := Time.get_ticks_usec()
 	var tracks: Array = []
 	var equipment: Array = []
+	var chassis_yaw: Array = []
+	var chassis_pos: Array = []
 	var active_ticks := 0
 	var last_title_tick := -1
 	var last_flush_tick := 0
@@ -108,11 +110,16 @@ func _run() -> void:
 				- Input.get_action_strength("track_right_reverse")
 			)
 		var axes := session.get_equipment_input_axes()
+		var forward := -chassis.global_transform.basis.z
+		var yaw_deg := rad_to_deg(atan2(-forward.x, -forward.z))
+		var pos := chassis.global_position
 		# Fill any physics ticks that elapsed within a single process frame; input
 		# state is constant across them so the current sample applies to all.
 		while tracks.size() <= tick:
 			tracks.append([left, right])
 			equipment.append([axes.x, axes.y, axes.z, axes.w])
+			chassis_yaw.append(yaw_deg)
+			chassis_pos.append([pos.x, pos.y, pos.z])
 		if left != 0.0 or right != 0.0 or axes != Vector4.ZERO:
 			active_ticks += 1
 		if tick - last_title_tick >= 12:
@@ -123,10 +130,10 @@ func _run() -> void:
 			)
 		if tick - last_flush_tick >= FLUSH_INTERVAL_TICKS:
 			last_flush_tick = tick
-			_write_recording(tracks, equipment)
+			_write_recording(tracks, equipment, chassis_yaw, chassis_pos)
 		if Input.is_physical_key_pressed(KEY_F9):
 			break
-	var ok := _write_recording(tracks, equipment)
+	var ok := _write_recording(tracks, equipment, chassis_yaw, chassis_pos)
 	print(
 		"INPUT_RECORDER ticks=%d active=%d path=%s"
 		% [tracks.size(), active_ticks, _record_path]
@@ -134,7 +141,7 @@ func _run() -> void:
 	_finish(ok and not tracks.is_empty(), "" if ok else "recording write failed")
 
 
-func _write_recording(tracks: Array, equipment: Array) -> bool:
+func _write_recording(tracks: Array, equipment: Array, chassis_yaw: Array, chassis_pos: Array) -> bool:
 	var payload := {
 		"schema": RECORDING_SCHEMA,
 		"model_id": _model_id,
@@ -145,6 +152,8 @@ func _write_recording(tracks: Array, equipment: Array) -> bool:
 		"tick_count": tracks.size(),
 		"tracks": tracks,
 		"equipment": equipment,
+		"chassis_yaw_deg": chassis_yaw,
+		"chassis_pos_m": chassis_pos,
 	}
 	var file := FileAccess.open(_record_path, FileAccess.WRITE)
 	if file == null:
