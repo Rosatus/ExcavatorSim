@@ -3,7 +3,7 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://dhk01p3j3pif3"
+uid="uid://bb3vcuppq3r8t"
 path="res://.godot/imported/SY135-NEO_excavator_godot.glb-fcf27d73acb2e435276c9c24c75ed294.scn"
 
 [deps]
@@ -41,5 +41,5 @@ materials/extract_format=0
 materials/extract_path=""
 _subresources={}
 gltf/naming_version=2
-gltf/embedded_image_handling=2
+gltf/embedded_image_handling=1
 gltf/texture_map_mode=1
