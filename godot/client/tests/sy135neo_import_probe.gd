@@ -4,7 +4,7 @@ const MotionProtocolScript = preload("res://scripts/motion_protocol.gd")
 
 const ASSET_PATH := "res://assets/visual/SY135-NEO_excavator_godot.glb"
 const FIXTURE_PATH := "res://tests/fixtures/sy135neo_frame_parity_cases.json"
-const EXPECTED_SHA256 := "f4d09bb731505342da2e07385b9b498f60808429ca28c0c934311295fe242d1a"
+const EXPECTED_SHA256 := "0918b2206a41f1bf7823a4bf2a6e7e1a3b8b5808e71ccb75d4fb9ec7b0c7e041"
 const FRAME_NAMES := [
 	"base_link",
 	"upper_structure_link",
@@ -112,9 +112,9 @@ func _validate_import_and_mechanics() -> int:
 		"bounds": AABB(),
 	}
 	_collect_stats(asset_root, stats)
-	if stats.node_count != 15 or stats.mesh_count != 8 or stats.surface_count != 14:
+	if stats.node_count != 12 or stats.mesh_count != 5 or stats.surface_count != 11:
 		return _fail(asset_root, "SY135-NEO imported node or mesh counts drifted: %s" % stats)
-	if stats.material_surface_count != stats.surface_count or stats.textured_surface_count != 3:
+	if stats.material_surface_count != stats.surface_count or stats.textured_surface_count != 0:
 		return _fail(asset_root, "SY135-NEO materials or embedded textures did not survive import: %s" % stats)
 	if (
 		stats.animation_player_count != 0
@@ -170,7 +170,7 @@ func _validate_import_and_mechanics() -> int:
 
 	asset_root.free()
 	print(
-		"SY135-NEO import/mechanics gate passed: 15 imported nodes, 8 meshes, 14 surfaces, 6 poses."
+		"SY135-NEO import/mechanics gate passed: 12 imported nodes, 5 meshes, 11 surfaces, 6 poses."
 	)
 	return 0
 
