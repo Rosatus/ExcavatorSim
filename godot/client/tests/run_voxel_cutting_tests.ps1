@@ -64,6 +64,7 @@ try {
         "voxel_continuous_lift_test.gd",
         "voxel_live_residual_test.gd",
         "voxel_residual_recut_test.gd",
+        "voxel_support_cleanup_test.gd",
         "soil_authority_migration_test.gd",
         "voxel_excavation_world_test.gd"
     )) {

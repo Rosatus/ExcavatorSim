@@ -31,6 +31,8 @@ const NATIVE_COVERAGE_STEP_VOXELS := 1.5
 # clearance region is carved to air; a radius below that leaves solid
 # lattice samples inside the bucket envelope.
 const CLEARANCE_APPLY_RADIUS_VOXELS := 0.88
+const MAX_SUPPORT_CLEANUP_COLUMNS := 512
+const MAX_SUPPORT_CLEANUP_SAMPLES := 16384
 const NATIVE_DIGEST_SAMPLE_LIMIT := 128
 const DIAGNOSTIC_SNAPSHOT_PERIOD_USEC := 250000
 const SDF_HALO_VOXELS := 2
@@ -1016,6 +1018,10 @@ func _commit_proposal(proposal: VoxelCutProposal) -> VoxelCutTransaction:
 	data_revision += 1
 	transaction.revision = data_revision
 	transaction.commit_usec = _diagnostic_clock_usec() - started
+	var cleanup := _apply_support_cleanup(edit_area)
+	transaction.support_cleanup_usec = int(cleanup.get("usec", 0))
+	transaction.support_deleted_samples = int(cleanup.get("deleted_samples", 0))
+	transaction.support_columns = int(cleanup.get("columns", 0))
 	_committed_count += 1
 	_operation_counts["cut"] = int(_operation_counts.get("cut", 0)) + 1
 	_affected_samples_total += transaction.affected_samples
@@ -1023,8 +1029,9 @@ func _commit_proposal(proposal: VoxelCutProposal) -> VoxelCutTransaction:
 	_commit_usec_total += transaction.commit_usec
 	_commit_usec_max = maxi(_commit_usec_max, transaction.commit_usec)
 	var readiness_started := _diagnostic_clock_usec()
+	var cleanup_area := cleanup.get("area", AABB()) as AABB
 	_issue_readiness_work(
-		edit_area,
+		edit_area if cleanup_area.size == Vector3.ZERO else edit_area.merge(cleanup_area),
 		data_revision,
 		&"voxel_bucket_cut",
 		proposal.probe_world,
@@ -1152,9 +1159,14 @@ func _commit_native_proposal(
 	_operation_counts["cut"] = int(_operation_counts.get("cut", 0)) + 1
 	_affected_samples_total += transaction.affected_samples
 	_affected_cells_total += transaction.affected_cells
+	var cleanup := _apply_support_cleanup(edit_area)
+	transaction.support_cleanup_usec = int(cleanup.get("usec", 0))
+	transaction.support_deleted_samples = int(cleanup.get("deleted_samples", 0))
+	transaction.support_columns = int(cleanup.get("columns", 0))
 	phase_started = _diagnostic_clock_usec()
+	var cleanup_area := cleanup.get("area", AABB()) as AABB
 	_issue_readiness_work(
-		edit_area,
+		edit_area if cleanup_area.size == Vector3.ZERO else edit_area.merge(cleanup_area),
 		data_revision,
 		&"voxel_bucket_cut_native",
 		proposal.probe_world,
@@ -2228,6 +2240,77 @@ func _apply_shapes(values: PackedFloat32Array, size: Vector3i, origin: Vector3i,
 						changed += 1
 						changed_out.append(index)
 	return changed
+
+
+# Voxel terrain carries no gravity: a cut can leave solid runs hanging over
+# the void it just opened. Soil is allowed to vanish rather than be tracked
+# precisely, so after each cut commit every affected column is scanned
+# bottom-up and any solid run whose base sits on air is deleted — including
+# everything stacked above it, since those runs lose support too. The edit
+# stays out of the material ledger (terrain-internal removal, not bucket
+# mass), matching the sparse coverage accounting contract.
+func _apply_support_cleanup(edit_area: AABB) -> Dictionary:
+	var started := _diagnostic_clock_usec()
+	var result := {"deleted_samples": 0, "columns": 0, "area": AABB(), "usec": 0}
+	var bounds := layout.voxel_bounds(_work_zone.voxel_scale_m)
+	var min_x := maxi(floori(edit_area.position.x) - 1, floori(bounds.position.x))
+	var max_x := mini(ceili(edit_area.end.x) + 1, ceili(bounds.end.x) - 1)
+	var min_z := maxi(floori(edit_area.position.z) - 1, floori(bounds.position.z))
+	var max_z := mini(ceili(edit_area.end.z) + 1, ceili(bounds.end.z) - 1)
+	var column_count := (max_x - min_x + 1) * (max_z - min_z + 1)
+	if column_count > MAX_SUPPORT_CLEANUP_COLUMNS:
+		# Clamp the scan rectangle around the edit center; columns outside the
+		# budget keep their overhang until a later commit touches them.
+		var center_x := roundi(edit_area.get_center().x)
+		var center_z := roundi(edit_area.get_center().z)
+		var half := int((sqrt(float(MAX_SUPPORT_CLEANUP_COLUMNS)) - 1.0) * 0.5)
+		min_x = center_x - half
+		max_x = center_x + half
+		min_z = center_z - half
+		max_z = center_z + half
+	# The lowest buffered row is the support reference under the edit; the
+	# scan never writes it, only reads its solidity.
+	var floor_y := maxi(floori(edit_area.position.y) - 2, floori(bounds.position.y))
+	var top_y := ceili(bounds.end.y) - 1 - WorkZoneConfig.PROTECTED_SHELL_VOXELS
+	var origin := Vector3i(min_x, floor_y, min_z)
+	var size := Vector3i(max_x - min_x + 1, top_y - floor_y + 1, max_z - min_z + 1)
+	if size.y <= 1:
+		result["usec"] = _diagnostic_clock_usec() - started
+		return result
+	var buffer := VoxelBuffer.new()
+	buffer.set_channel_depth(VoxelBuffer.CHANNEL_SDF, VoxelBuffer.DEPTH_16_BIT)
+	buffer.create(size.x, size.y, size.z)
+	_tool.copy(origin, buffer, SDF_CHANNEL_MASK, false)
+	var values := _buffer_values(buffer, size)
+	var deleted := 0
+	var columns := 0
+	for lx in size.x:
+		for lz in size.z:
+			columns += 1
+			var below_solid := values[_index(lx, 0, lz, size)] <= 0.0
+			var deleting := false
+			for ly in range(1, size.y):
+				var index := _index(lx, ly, lz, size)
+				if values[index] <= 0.0:
+					if deleting or not below_solid:
+						values[index] = 1.0
+						deleted += 1
+						deleting = true
+						below_solid = false
+					else:
+						below_solid = true
+				else:
+					below_solid = false
+				if deleted >= MAX_SUPPORT_CLEANUP_SAMPLES:
+					break
+	result["deleted_samples"] = deleted
+	result["columns"] = columns
+	if deleted > 0:
+		_write_values(buffer, size, values)
+		_tool.paste(origin, buffer, SDF_CHANNEL_MASK)
+		result["area"] = AABB(Vector3(origin), Vector3(size))
+	result["usec"] = _diagnostic_clock_usec() - started
+	return result
 
 
 func _cell_changes(before: PackedFloat32Array, after: PackedFloat32Array, size: Vector3i, origin: Vector3i, changed_samples: PackedInt32Array = PackedInt32Array()) -> Array[Dictionary]:
