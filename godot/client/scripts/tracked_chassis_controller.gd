@@ -9,8 +9,7 @@ const INPUT_ACTIONS := {
 	"track_right_reverse": {"key": KEY_H, "joy_button": JOY_BUTTON_RIGHT_SHOULDER},
 }
 const TOGGLE_ACTIONS := {
-	"operator_level_assist": [KEY_G],
-	"operator_slope_assist": [KEY_T],
+	"operator_assist": [KEY_T],
 }
 const SlopePreviewVisual := preload("res://scripts/slope_cut_preview_visual.gd")
 
@@ -24,6 +23,11 @@ const SLOPE_DISTANCE_MAX_M := 20.0
 const SLOPE_ANGLE_MIN_DEG := -60.0
 const SLOPE_ANGLE_MAX_DEG := 60.0
 const SLOPE_PREVIEW_REFRESH_S := 0.15
+const ASSIST_MENU_ENTRIES := [
+	{"id": "level", "label": "平地辅助"},
+	{"id": "slope", "label": "修坡辅助"},
+]
+const MENU_NAV_THRESHOLD := 0.5
 
 @export var controller_enabled := false
 @export var static_map_driving := false
@@ -76,6 +80,9 @@ var _slope_preview_result: Dictionary = {}
 var _slope_preview_dirty := true
 var _slope_preview_accum := 0.0
 var _slope_preview_node: SlopePreviewVisual = null
+var _assist_menu_open := false
+var _assist_menu_index := 0
+var _menu_nav_axis := 0.0
 
 
 func _ready() -> void:
@@ -283,6 +290,7 @@ func get_status_snapshot() -> Dictionary:
 	status["bucket_ground_mode"] = _bucket_ground_mode
 	status["level_assist_enabled"] = level_assist_enabled
 	status["slope_assist"] = slope_status_snapshot()
+	status["assist_menu"] = assist_menu_snapshot()
 	return status
 
 
@@ -330,6 +338,7 @@ func advance_slope_mode() -> String:
 				return slope_mode_state()
 			if level_assist_enabled:
 				set_level_assist_enabled(false)
+			set_assist_menu_open(false)
 			_slope_mode = SLOPE_MODE_PREVIEW
 			_slope_preview_dirty = true
 			_slope_preview_accum = SLOPE_PREVIEW_REFRESH_S
@@ -383,6 +392,68 @@ func _exit_slope_mode() -> void:
 	_slope_profile = null
 	_slope_preview_result = {}
 	_hide_slope_preview()
+
+
+## Single-hotkey assist picker: T opens the menu (machine frozen while open,
+## same intercept point as slope preview), W/S rides the arm axis for
+## navigation, Enter activates the highlighted entry, T/Esc closes. Each entry
+## maps to the owning assist's own advance/toggle semantics; cross-assist
+## exclusivity is the pipeline's terminal_surface group.
+func set_assist_menu_open(open: bool) -> void:
+	if open and _slope_mode == SLOPE_MODE_PREVIEW:
+		return
+	_assist_menu_open = open
+	_menu_nav_axis = 0.0
+	if open:
+		_assist_menu_index = clampi(_assist_menu_index, 0, ASSIST_MENU_ENTRIES.size() - 1)
+
+
+func is_assist_menu_open() -> bool:
+	return _assist_menu_open
+
+
+func activate_assist_entry(index: int) -> String:
+	if index < 0 or index >= ASSIST_MENU_ENTRIES.size():
+		return ""
+	set_assist_menu_open(false)
+	match String(ASSIST_MENU_ENTRIES[index].get("id", "")):
+		"level":
+			set_level_assist_enabled(not level_assist_enabled)
+			return "level"
+		"slope":
+			return "slope:" + advance_slope_mode()
+	return ""
+
+
+func assist_menu_snapshot() -> Dictionary:
+	var entries: Array = []
+	for entry in ASSIST_MENU_ENTRIES:
+		var row := {"id": entry["id"], "label": entry["label"], "state": "off"}
+		match String(entry["id"]):
+			"level":
+				row["state"] = "on" if level_assist_enabled else "off"
+			"slope":
+				row["state"] = slope_mode_state()
+		entries.append(row)
+	return {
+		"open": _assist_menu_open,
+		"index": _assist_menu_index,
+		"entries": entries,
+	}
+
+
+func _navigate_assist_menu(axis: float) -> void:
+	var count := ASSIST_MENU_ENTRIES.size()
+	if count == 0:
+		return
+	var direction := 0
+	if axis >= MENU_NAV_THRESHOLD and _menu_nav_axis < MENU_NAV_THRESHOLD:
+		direction = -1
+	elif axis <= -MENU_NAV_THRESHOLD and _menu_nav_axis > -MENU_NAV_THRESHOLD:
+		direction = 1
+	_menu_nav_axis = axis
+	if direction != 0:
+		_assist_menu_index = (_assist_menu_index + direction + count) % count
 
 
 func _adjust_slope_params(equipment_axes: Vector4, delta: float) -> void:
@@ -624,6 +695,7 @@ func _reset_motion() -> void:
 	_test_equipment_commands = Vector4.ZERO
 	_digging_response.reset_response("motion_reset")
 	_exit_slope_mode()
+	set_assist_menu_open(false)
 	if AuthorityProfile.writes_product_pose(authority_profile) and _jolt_runtime != null:
 		var descriptor := PhysicsRigDescriptor.load_for_model(active_model_id)
 		var spawn := _authoritative_spawn_transform(descriptor) if descriptor != null else Transform3D.IDENTITY
@@ -657,10 +729,16 @@ func _step_authoritative_chassis(delta: float) -> void:
 	if _jolt_runtime == null or not _jolt_runtime.configured:
 		return
 	if controller_enabled and _input_focused:
-		if Input.is_action_just_pressed("operator_level_assist"):
-			set_level_assist_enabled(not level_assist_enabled)
-		if Input.is_action_just_pressed("operator_slope_assist"):
-			advance_slope_mode()
+		if _assist_menu_open:
+			if Input.is_action_just_pressed("operator_assist") or Input.is_action_just_pressed("ui_cancel"):
+				set_assist_menu_open(false)
+			elif Input.is_action_just_pressed("ui_accept"):
+				activate_assist_entry(_assist_menu_index)
+		elif Input.is_action_just_pressed("operator_assist"):
+			if _slope_mode == SLOPE_MODE_PREVIEW:
+				advance_slope_mode()
+			else:
+				set_assist_menu_open(true)
 		elif _slope_mode == SLOPE_MODE_PREVIEW and Input.is_action_just_pressed("ui_accept"):
 			advance_slope_mode()
 		elif _slope_mode == SLOPE_MODE_PREVIEW and Input.is_action_just_pressed("ui_cancel"):
@@ -676,7 +754,7 @@ func _step_authoritative_chassis(delta: float) -> void:
 		else:
 			left = Input.get_action_strength("track_left_forward") - Input.get_action_strength("track_left_reverse")
 			right = Input.get_action_strength("track_right_forward") - Input.get_action_strength("track_right_reverse")
-	if _slope_mode == SLOPE_MODE_PREVIEW:
+	if _slope_mode == SLOPE_MODE_PREVIEW or _assist_menu_open:
 		left = 0.0
 		right = 0.0
 	_jolt_runtime.set_enabled(controller_enabled)
@@ -696,6 +774,9 @@ func _step_authoritative_chassis(delta: float) -> void:
 		)
 	if _slope_mode == SLOPE_MODE_PREVIEW:
 		_adjust_slope_params(equipment_axes, delta)
+		equipment_axes = Vector4.ZERO
+	elif _assist_menu_open:
+		_navigate_assist_menu(equipment_axes.z)
 		equipment_axes = Vector4.ZERO
 	_refresh_slope_preview(delta)
 	var scaled_axes := equipment_axes

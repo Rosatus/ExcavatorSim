@@ -195,6 +195,31 @@ func cancel_slope_assist() -> void:
 	status_changed.emit(get_status_snapshot())
 
 
+## Assist-menu mirror: T opens the picker (machine frozen while open),
+## activation dispatches to each assist's own advance/toggle semantics.
+func open_assist_menu() -> void:
+	if _chassis != null:
+		_chassis.set_assist_menu_open(true)
+	last_error.clear()
+	status_changed.emit(get_status_snapshot())
+
+
+func close_assist_menu() -> void:
+	if _chassis != null:
+		_chassis.set_assist_menu_open(false)
+	last_error.clear()
+	status_changed.emit(get_status_snapshot())
+
+
+func activate_assist_entry(index: int) -> String:
+	var result := ""
+	if _chassis != null:
+		result = _chassis.activate_assist_entry(index)
+	last_error.clear()
+	status_changed.emit(get_status_snapshot())
+	return result
+
+
 func get_status_snapshot() -> Dictionary:
 	return {
 		"authority_profile": String(ProjectSettings.get_setting("simulation/authority_profile", "jolt_authoritative")),
@@ -213,6 +238,7 @@ func get_status_snapshot() -> Dictionary:
 		"bucket_ground_transition_sequence": bucket_ground_transition_sequence,
 		"level_assist_enabled": _chassis.level_assist_enabled if _chassis != null else level_assist_enabled,
 		"slope_assist": _chassis.slope_status_snapshot() if _chassis != null else {"state": "off"},
+		"assist_menu": _chassis.assist_menu_snapshot() if _chassis != null else {"open": false, "index": 0, "entries": []},
 		"last_error": last_error,
 	}
 
