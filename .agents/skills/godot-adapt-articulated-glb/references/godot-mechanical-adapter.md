@@ -15,6 +15,27 @@ Recursively capture:
 Persist rest transforms only after source SHA and semantic mapping are approved. At runtime, fail
 loudly when the imported hierarchy, local origin, or scale drifts outside the manifest tolerance.
 
+## Rest pose is the semantic zero
+
+With the delta scheme below, the imported rest-local basis is the joint's zero reference: a joint
+angle of `0` renders exactly the GLB rest pose, and physics joint limits are anchored relative to
+it. Two consequences:
+
+1. **An exporter must normalize, not record.** If the source scene is assembled in an arbitrary
+   pose (transport, mid-work), the exporter must rigidly re-pose each sub-chain about its validated
+   pin so the pin-to-pin direction equals the contract link direction, then bake the mesh into the
+   pivot frame. Copying the authored world matrix as the pivot rest bakes a wrong zero that no
+   amount of correct delta math can repair — every pose is offset by the same constant.
+2. **Fixtures derived from the asset under test are tautologies.** A parity fixture generated from
+   the GLB rest proves the delta math round-trips, not that the zero is right. Anchor the zero
+   check to the authority model (URDF FK at zero) or to a proven sibling contract.
+
+For this repository's excavator contract the canonical zero is the *extended* arrangement: pivot
+`-Z` is the link direction, child pins sit at pure `(0, 0, -L)` locals with the URDF link lengths,
+and the boom/arm/bucket world bases are `RotX(+35)/RotX(-55)/RotX(-105)` (locals `+35/-90/-50`
+under identity slew). Mount points and link lengths are per-model geometry; the basis convention
+and the `-Z` rule are shared semantics.
+
 ## Convert coordinates once
 
 Define one rigid basis conversion `C` at the transport or presentation boundary:
@@ -87,12 +108,18 @@ At minimum test:
 
 1. Import identity: SHA, paths, parents, rest local origins/scales, resources, and bounds.
 2. Zero pose: every imported local/global rest transform is restored.
-3. Isolated poses: one test per independently driven joint, verifying subtree, axis, sign, and pin.
-4. Asymmetric pose: catches duplicated conversion, wrong multiplication order, and hierarchy drift.
-5. Invalid relations: missing/non-rigid/off-axis/origin-drifting inputs are mutation-free.
-6. Lifecycle: reconnect, stale, reset, and authority-generation changes restore/clear presentation.
-7. Passive linkage: fixed lengths, continuous branch, reachable movement, and unreachable retention.
-8. Visual review: materials, scale, neutral pose, rotation planes, penetrations, and linkage alignment.
+3. Zero cross-check: the zero pose's world pin/joint positions match the authority zero (URDF FK)
+   or the sibling contract within tolerance — this catches a wrong rest that self-generated
+   fixtures cannot see.
+4. Isolated poses: one test per independently driven joint, verifying subtree, axis, sign, and pin.
+5. Asymmetric pose: catches duplicated conversion, wrong multiplication order, and hierarchy drift.
+6. Invalid relations: missing/non-rigid/off-axis/origin-drifting inputs are mutation-free.
+7. Lifecycle: reconnect, stale, reset, and authority-generation changes restore/clear presentation.
+8. Passive linkage: fixed lengths, continuous branch, reachable movement, and unreachable retention.
+9. Live runtime check: read actual `Transform3D`s of the running pivot chain (and which model root
+   is active) rather than inferring the pose from a screenshot or stale import cache.
+10. Visual review: materials, scale, neutral pose, rotation planes, penetrations, and linkage
+    alignment.
 
 Headless tests prove contracts, not realism. Record a separate human visual gate before calling the
 asset production-ready.
