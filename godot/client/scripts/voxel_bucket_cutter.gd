@@ -90,23 +90,30 @@ func build_proposal(
 		rejected["reason"] = "cutting_edge_points_invalid"
 		return rejected
 	var maximum_motion := 0.0
+	for index in current_points.size():
+		maximum_motion = maxf(maximum_motion, (current_points[index] - previous_points[index]).length())
+	# Skip the SDF taps for the common stationary reject: samples are only
+	# needed to decide the engaged-episode continuation or the cut admission
+	# gates below. Stationary non-engaged frames reject without sampling.
+	var need_samples := maximum_motion >= MIN_MOTION_M \
+		or (was_engaged and (model_id == "sy135" or model_id == "sy135neo"))
 	var minimum_sdf := INF
 	var maximum_into := -INF
 	var valid_samples := 0
-	for index in current_points.size():
-		var motion := current_points[index] - previous_points[index]
-		maximum_motion = maxf(maximum_motion, motion.length())
-		var sample_value: Variant = sdf_sampler.call(current_points[index])
-		if not sample_value is Dictionary:
-			continue
-		var sample := sample_value as Dictionary
-		if not bool(sample.get("valid", false)):
-			continue
-		valid_samples += 1
-		minimum_sdf = minf(minimum_sdf, float(sample.get("sdf", INF)))
-		var gradient := sample.get("gradient_world", Vector3.UP) as Vector3
-		if gradient.is_finite() and gradient.length_squared() > 0.25:
-			maximum_into = maxf(maximum_into, -motion.dot(gradient.normalized()))
+	if need_samples:
+		for index in current_points.size():
+			var motion := current_points[index] - previous_points[index]
+			var sample_value: Variant = sdf_sampler.call(current_points[index])
+			if not sample_value is Dictionary:
+				continue
+			var sample := sample_value as Dictionary
+			if not bool(sample.get("valid", false)):
+				continue
+			valid_samples += 1
+			minimum_sdf = minf(minimum_sdf, float(sample.get("sdf", INF)))
+			var gradient := sample.get("gradient_world", Vector3.UP) as Vector3
+			if gradient.is_finite() and gradient.length_squared() > 0.25:
+				maximum_into = maxf(maximum_into, -motion.dot(gradient.normalized()))
 	rejected["minimum_sdf"] = minimum_sdf
 	rejected["into_material_m"] = maximum_into if is_finite(maximum_into) else 0.0
 	if maximum_motion < MIN_MOTION_M:

@@ -951,7 +951,7 @@ func _commit_proposal(proposal: VoxelCutProposal) -> VoxelCutTransaction:
 	buffer.create(size.x, size.y, size.z)
 	_tool.copy(origin, buffer, SDF_CHANNEL_MASK, false)
 	var original := _buffer_values(buffer, size)
-	transaction.pre_sdf_digest = _digest_values(original)
+	transaction.pre_sdf_digest = _digest_values(original) if diagnostics_enabled else ""
 	var full_values := original.duplicate()
 	var shapes := proposal.capsules.duplicate()
 	# Clearance applies at a radius floor that covers the voxel lattice
@@ -967,10 +967,11 @@ func _commit_proposal(proposal: VoxelCutProposal) -> VoxelCutTransaction:
 		shapes.append(applied)
 	if shapes.size() > MAX_PROPOSAL_CAPSULES:
 		return _reject_transaction(transaction, "capsule_work_budget", started)
-	var changed_samples := _apply_shapes(full_values, size, origin, shapes)
+	var changed_indices := PackedInt32Array()
+	var changed_samples := _apply_shapes(full_values, size, origin, shapes, changed_indices)
 	if changed_samples <= 0:
 		return _reject_transaction(transaction, "no_sdf_change", started)
-	var full_cells := _cell_changes(original, full_values, size, origin)
+	var full_cells := _cell_changes(original, full_values, size, origin, changed_indices)
 	var requested_volume := _sum_removed_volume(full_cells)
 	transaction.requested_volume_m3 = requested_volume
 	transaction.requested_mass_q = material_field.mass_q_for_volume(requested_volume)
@@ -1002,10 +1003,10 @@ func _commit_proposal(proposal: VoxelCutProposal) -> VoxelCutTransaction:
 		return _reject_transaction(transaction, "material_commit_invariant", started)
 	transaction.accepted_volume_m3 = material_field.volume_for_mass_q(transaction.accepted_mass_q)
 	transaction.affected_cells = final_cells.size()
-	transaction.affected_samples = _changed_sample_count(original, final_values)
+	transaction.affected_samples = changed_indices.size()
 	_write_values(buffer, size, final_values)
-	transaction.post_sdf_digest = _digest_values(final_values)
-	if transaction.post_sdf_digest == transaction.pre_sdf_digest:
+	transaction.post_sdf_digest = _digest_values(final_values) if diagnostics_enabled else ""
+	if original == final_values:
 		return _reject_transaction(transaction, "unchanged_sdf_digest", started)
 	var pre_hit_y := _ray_surface_y(proposal.probe_world)
 	_tool.paste(origin, buffer, SDF_CHANNEL_MASK)
@@ -1390,7 +1391,7 @@ func _commit_soil_proposal(proposal: VoxelSoilOperationProposal) -> VoxelCutTran
 	buffer.create(size.x, size.y, size.z)
 	_tool.copy(origin, buffer, SDF_CHANNEL_MASK, false)
 	var original := _buffer_values(buffer, size)
-	transaction.pre_sdf_digest = _digest_values(original)
+	transaction.pre_sdf_digest = _digest_values(original) if diagnostics_enabled else ""
 	var final_values := original.duplicate()
 	var material_stage: Dictionary = {}
 	var affected_cells: Array[Dictionary] = []
@@ -1433,8 +1434,8 @@ func _commit_soil_proposal(proposal: VoxelSoilOperationProposal) -> VoxelCutTran
 	transaction.affected_cells = affected_cells.size()
 	transaction.affected_samples = _changed_sample_count(original, final_values)
 	_write_values(buffer, size, final_values)
-	transaction.post_sdf_digest = _digest_values(final_values)
-	if transaction.post_sdf_digest == transaction.pre_sdf_digest:
+	transaction.post_sdf_digest = _digest_values(final_values) if diagnostics_enabled else ""
+	if original == final_values:
 		return _reject_transaction(transaction, "unchanged_sdf_digest", started)
 	var pre_hit_y := _ray_surface_y(proposal.deposit_world)
 	_tool.paste(origin, buffer, SDF_CHANNEL_MASK)
@@ -2082,16 +2083,26 @@ func _native_coverage_coordinates(
 					if coordinate.x < bounds_min.x or coordinate.y < bounds_min.y or coordinate.z < bounds_min.z \
 							or coordinate.x > bounds_max.x or coordinate.y > bounds_max.y or coordinate.z > bounds_max.z:
 						continue
-					if Vector3(coordinate).distance_to(sample) > radius + 0.55:
+					var dx := float(coordinate.x) - sample.x
+					var dy := float(coordinate.y) - sample.y
+					var dz := float(coordinate.z) - sample.z
+					var reach := radius + 0.55
+					if dx * dx + dy * dy + dz * dz > reach * reach:
 						continue
 					# Credit's broad stencil can reach outside the brush. Track strict
 					# geometric inclusion separately. A prior failed check cannot skip
 					# this segment, whose radius may include the same coordinate.
 					# Leave a small SDF quantization margin.
 					if distance_squared > 0.00000001:
-						var closest_alpha := clampf((Vector3(coordinate) - a).dot(direction) / distance_squared, 0.0, 1.0)
-						var exact_radius := lerpf(radii[segment_index], radii[segment_index + 1], closest_alpha)
-						if Vector3(coordinate).distance_to(a + direction * closest_alpha) < exact_radius - 0.02:
+						var ax := float(coordinate.x) - a.x
+						var ay := float(coordinate.y) - a.y
+						var az := float(coordinate.z) - a.z
+						var closest_alpha := clampf((ax * direction.x + ay * direction.y + az * direction.z) / distance_squared, 0.0, 1.0)
+						var exact_radius := lerpf(radii[segment_index], radii[segment_index + 1], closest_alpha) - 0.02
+						var ex := ax - direction.x * closest_alpha
+						var ey := ay - direction.y * closest_alpha
+						var ez := az - direction.z * closest_alpha
+						if exact_radius > 0.0 and ex * ex + ey * ey + ez * ez < exact_radius * exact_radius:
 							geometry_candidates[coordinate] = true
 					# Integer keys retain the old decimal-string lexical order so
 					# the capped sample subset and transaction digests stay identical.
@@ -2133,6 +2144,12 @@ func _solid_coordinates_from_buffer(unique: Dictionary, origin: Vector3i, size: 
 	_tool.copy(read_min, _coverage_buffer, SDF_CHANNEL_MASK, false)
 	var keys := unique.keys()
 	keys.sort()
+	# The channel is stored [z][x][y] (Y innermost) as signed 16-bit snorm, so
+	# sdf<=0 maps exactly to raw<=0. Testing the two bytes directly avoids one
+	# engine-boundary get_voxel_f call per probe.
+	var raw := _coverage_buffer.get_channel_as_byte_array(VoxelBuffer.CHANNEL_SDF)
+	var sx := _coverage_buffer_size.x
+	var sy := _coverage_buffer_size.y
 	for key_value in keys:
 		var coordinate := unique[key_value] as Vector3i
 		var local := coordinate - origin
@@ -2140,7 +2157,9 @@ func _solid_coordinates_from_buffer(unique: Dictionary, origin: Vector3i, size: 
 				or local.x >= size.x or local.y >= size.y or local.z >= size.z:
 			continue
 		var read_local := coordinate - read_min
-		if _coverage_buffer.get_voxel_f(read_local.x, read_local.y, read_local.z, VoxelBuffer.CHANNEL_SDF) > 0.0:
+		var byte_index := ((read_local.z * sx + read_local.x) * sy + read_local.y) * 2
+		var hi := raw[byte_index + 1]
+		if hi < 0x80 and (hi != 0 or raw[byte_index] != 0):
 			continue
 		result.append(coordinate)
 		if result.size() >= MAX_NATIVE_COVERAGE_CELLS:
@@ -2179,7 +2198,7 @@ func _write_values(buffer: VoxelBuffer, size: Vector3i, values: PackedFloat32Arr
 				buffer.set_voxel_f(values[_index(x, y, z, size)], x, y, z, VoxelBuffer.CHANNEL_SDF)
 
 
-func _apply_shapes(values: PackedFloat32Array, size: Vector3i, origin: Vector3i, shapes: Array[Dictionary]) -> int:
+func _apply_shapes(values: PackedFloat32Array, size: Vector3i, origin: Vector3i, shapes: Array[Dictionary], changed_out: PackedInt32Array = PackedInt32Array()) -> int:
 	var changed := 0
 	var changed_flags := PackedByteArray()
 	changed_flags.resize(values.size())
@@ -2207,28 +2226,63 @@ func _apply_shapes(values: PackedFloat32Array, size: Vector3i, origin: Vector3i,
 					if changed_flags[index] == 0:
 						changed_flags[index] = 1
 						changed += 1
+						changed_out.append(index)
 	return changed
 
 
-func _cell_changes(before: PackedFloat32Array, after: PackedFloat32Array, size: Vector3i, origin: Vector3i) -> Array[Dictionary]:
+func _cell_changes(before: PackedFloat32Array, after: PackedFloat32Array, size: Vector3i, origin: Vector3i, changed_samples: PackedInt32Array = PackedInt32Array()) -> Array[Dictionary]:
 	var changes: Array[Dictionary] = []
 	var cell_volume := pow(_work_zone.voxel_scale_m, 3.0)
-	for z in range(size.z - 1):
-		for y in range(size.y - 1):
-			for x in range(size.x - 1):
-				var pre := _cell_solid_fraction(before, size, x, y, z)
-				var post := _cell_solid_fraction(after, size, x, y, z)
-				if pre - post <= 0.000001:
-					continue
-				changes.append({
-					"coordinate": origin + Vector3i(x, y, z),
-					"pre_fraction": pre,
-					"post_fraction": post,
-					"cell_volume_m3": cell_volume,
-					"removed_volume_m3": (pre - post) * cell_volume,
-					"removed_mass_q": 0,
-				})
+	if changed_samples.is_empty():
+		for z in range(size.z - 1):
+			for y in range(size.y - 1):
+				for x in range(size.x - 1):
+					_cell_change_at(before, after, size, origin, x, y, z, cell_volume, changes)
+		return changes
+	# A cell's solid fraction can only change when one of its eight corners did.
+	# Pay the fraction cost only for cells adjacent to a changed sample, then
+	# emit them in the same zyx order a full scan would produce.
+	var cells_x := size.x - 1
+	var cells_y := size.y - 1
+	var cells_z := size.z - 1
+	var seen := PackedByteArray()
+	seen.resize(cells_x * cells_y * cells_z)
+	var cell_indices: Array[int] = []
+	for sample_index in changed_samples:
+		var x := sample_index % size.x
+		var remainder := sample_index / size.x
+		var y := remainder % size.y
+		var z := remainder / size.y
+		for dz in range(maxi(0, z - 1), mini(z, cells_z - 1) + 1):
+			for dy in range(maxi(0, y - 1), mini(y, cells_y - 1) + 1):
+				for dx in range(maxi(0, x - 1), mini(x, cells_x - 1) + 1):
+					var cell_index := dx + cells_x * (dy + cells_y * dz)
+					if seen[cell_index] == 0:
+						seen[cell_index] = 1
+						cell_indices.append(cell_index)
+	cell_indices.sort()
+	for cell_index in cell_indices:
+		var x := cell_index % cells_x
+		var remainder := cell_index / cells_x
+		var y := remainder % cells_y
+		var z := remainder / cells_y
+		_cell_change_at(before, after, size, origin, x, y, z, cell_volume, changes)
 	return changes
+
+
+func _cell_change_at(before: PackedFloat32Array, after: PackedFloat32Array, size: Vector3i, origin: Vector3i, x: int, y: int, z: int, cell_volume: float, changes: Array[Dictionary]) -> void:
+	var pre := _cell_solid_fraction(before, size, x, y, z)
+	var post := _cell_solid_fraction(after, size, x, y, z)
+	if pre - post <= 0.000001:
+		return
+	changes.append({
+		"coordinate": origin + Vector3i(x, y, z),
+		"pre_fraction": pre,
+		"post_fraction": post,
+		"cell_volume_m3": cell_volume,
+		"removed_volume_m3": (pre - post) * cell_volume,
+		"removed_mass_q": 0,
+	})
 
 
 func _cell_solid_fraction(values: PackedFloat32Array, size: Vector3i, x: int, y: int, z: int) -> float:
