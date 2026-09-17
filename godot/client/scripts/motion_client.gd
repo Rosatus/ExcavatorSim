@@ -77,6 +77,8 @@ var _pose_buffer: Array[Dictionary] = []
 var _preflight_request: HTTPRequest
 var _preflight_override: Variant = null
 var _offered_optional_capabilities: Array[String] = []
+var _last_preflight_response_code := -1
+var _last_preflight_result := -1
 var _feedback_elapsed := 0.0
 var _next_feedback_sequence := 0
 var _pending_bucket_feedback: Dictionary = {}
@@ -366,6 +368,9 @@ func get_status_snapshot() -> Dictionary:
 		"lifecycle": confirmed_lifecycle,
 		"capabilities": capabilities.duplicate(),
 		"negotiated_optional_capabilities": negotiated_optional_capabilities.duplicate(),
+		"offered_optional_capabilities": _offered_optional_capabilities.duplicate(),
+		"last_preflight_response_code": _last_preflight_response_code,
+		"last_preflight_result": _last_preflight_result,
 		"desired_model_id": desired_model_id,
 		"active_model_id": active_model_id,
 		"focused": _focused,
@@ -403,13 +408,15 @@ func _start_preflight() -> void:
 	_set_connection_state(STATE_PREFLIGHTING)
 	var result := _preflight_request.request(_endpoint_origin() + "/api/capabilities")
 	if result != OK:
-		_offered_optional_capabilities.clear()
+		_offered_optional_capabilities = _filter_optional_capabilities(MotionProtocol.OPTIONAL_CAPABILITIES)
 		_begin_connection()
 
 
 func _on_preflight_completed(_result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 	if connection_state != STATE_PREFLIGHTING:
 		return
+	_last_preflight_response_code = response_code
+	_last_preflight_result = _result
 	_offered_optional_capabilities.clear()
 	if response_code == 200:
 		var parsed: Variant = JSON.parse_string(body.get_string_from_utf8())
@@ -417,6 +424,11 @@ func _on_preflight_completed(_result: int, response_code: int, _headers: PackedS
 			var advertised: Variant = (parsed as Dictionary).get("optional_capabilities", [])
 			if advertised is Array:
 				_offered_optional_capabilities = _filter_optional_capabilities(advertised as Array)
+	if _offered_optional_capabilities.is_empty():
+		# The gateway intersects the client's offer with its own capabilities, so a
+		# failed preflight can safely offer the full optional list rather than
+		# silently disabling optional transports for the whole session.
+		_offered_optional_capabilities = _filter_optional_capabilities(MotionProtocol.OPTIONAL_CAPABILITIES)
 	_begin_connection()
 
 
