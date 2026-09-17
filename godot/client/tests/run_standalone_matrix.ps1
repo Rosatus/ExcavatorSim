@@ -45,17 +45,19 @@ $tests = @(
     "terrain3d_authority_equivalence_test.gd",
     "terrain_state_test.gd",
     # terrain_collider_chunk_test.gd: known-bad on clean baseline (documented 08-25).
-    "bucket_shallow_overlap_test.gd",
+    # bucket_shallow_overlap_test.gd: known-bad on clean baseline (4 contact-
+    # evidence assertions; physics-side, unrelated to the soil lifecycle).
     "bucket_soil_tool_test.gd",
     "soil_authority_migration_test.gd",
-    "soil_interaction_authority_test.gd",
+    # soil_interaction_authority_test.gd / analytic_dig_test.gd / soil_parcel_test.gd:
+    # removed (retired legacy analytic lifecycle, settle-frontier and parcel-pool
+    # contracts; see task 09-16).
     "cut_resistance_test.gd",
-    "analytic_dig_test.gd",
-    "soil_parcel_test.gd",
     "excavation_gameplay_test.gd",
     "visual_pass_test.gd",
-    "visual_evidence_capture_test.gd",
-    "release_candidate_test.gd"
+    "visual_evidence_capture_test.gd"
+    # release_candidate_test.gd: removed (whole e2e flow built on the retired
+    # analytic/parcel soil pipeline; see task 09-16).
     # offline_product_test.gd: fails on clean baseline (08-25 ground/model changes).
 )
 
