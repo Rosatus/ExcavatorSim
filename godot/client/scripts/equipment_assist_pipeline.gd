@@ -12,6 +12,7 @@ extends RefCounted
 
 const KCtx := preload("res://scripts/equipment_kinematics_context.gd")
 const BucketLevelAssistStage := preload("res://scripts/bucket_level_assist.gd")
+const SlopeGradeAssistStage := preload("res://scripts/slope_grade_assist.gd")
 
 const PROFILE_PATH := "res://resources/physics/assist_profiles.json"
 const SCHEMA_VERSION := "assist-profiles-v1"
@@ -56,6 +57,12 @@ func configure(descriptor: Dictionary, soil_contract: Dictionary, requested_mode
 		return false
 	_stages[level.stage_name] = level
 	_stage_order.append(level)
+	var slope := SlopeGradeAssistStage.new() as EquipmentAssistStage
+	if not slope.configure(_descriptor, _soil_contract, params.get("slope_grade", {}) as Dictionary):
+		last_error = "slope_grade assist rejected its profile"
+		return false
+	_stages[slope.stage_name] = slope
+	_stage_order.append(slope)
 	model_id = requested_model_id
 	configured = true
 	last_error = ""
@@ -78,8 +85,25 @@ func set_stage_enabled(stage_name: String, value: bool) -> bool:
 	var stage := _stages.get(stage_name) as EquipmentAssistStage
 	if stage == null or not stage.configured:
 		return false
+	# Mutual exclusion: enabling a grouped stage switches off its siblings —
+	# level and slope guidance cannot both own the work equipment.
+	if value and not stage.exclusive_group.is_empty():
+		for other_value in _stage_order:
+			var other := other_value as EquipmentAssistStage
+			if other != stage and other.exclusive_group == stage.exclusive_group:
+				other.set_enabled(false)
 	stage.set_enabled(value)
 	return true
+
+
+## Runtime parameter injection for stages whose task is parameterized after
+## configure (the confirmed slope profile). Returns false when the stage is
+## unknown or rejects the params.
+func set_stage_params(stage_name: String, params: Dictionary) -> bool:
+	var stage := _stages.get(stage_name) as EquipmentAssistStage
+	if stage == null or not stage.configured:
+		return false
+	return stage.apply_params(params)
 
 
 func is_stage_enabled(stage_name: String) -> bool:

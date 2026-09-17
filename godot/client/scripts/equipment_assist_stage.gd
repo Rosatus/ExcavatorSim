@@ -19,11 +19,25 @@ var enabled := false
 var configured := false
 var writes_mask := 0
 var holds_at_neutral := false
+## Stages sharing a non-empty group are mutually exclusive: enabling one
+## disables the others in the same group (level vs. slope guidance).
+var exclusive_group := ""
+## The parameter dictionary this stage was configured with — kept so
+## non-control consumers (preview cadence, UI readouts) can read back rates
+## and thresholds without re-loading the profile resource.
+var profile_params := {}
 
 
 func configure(_descriptor: Dictionary, _soil_contract: Dictionary, _params: Dictionary) -> bool:
 	configured = true
 	return true
+
+
+## Runtime parameter injection for stages whose task is parameterized after
+## configure (e.g. the slope stage's confirmed profile). Stages that accept
+## no live parameters return false.
+func apply_params(_params: Dictionary) -> bool:
+	return false
 
 
 func set_enabled(value: bool) -> void:
