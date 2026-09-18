@@ -80,7 +80,7 @@ var _slope_preview_result: Dictionary = {}
 var _slope_preview_dirty := true
 var _slope_preview_accum := 0.0
 var _slope_preview_node: SlopePreviewVisual = null
-var _slope_view_cache: Dictionary = {}
+var _assist_view_cache: Dictionary = {}
 var _assist_menu_open := false
 var _assist_menu_index := 0
 var _menu_nav_axis := 0.0
@@ -292,6 +292,7 @@ func get_status_snapshot() -> Dictionary:
 	status["level_assist_enabled"] = level_assist_enabled
 	status["slope_assist"] = slope_status_snapshot()
 	status["assist_menu"] = assist_menu_snapshot()
+	status["assist_view"] = _assist_view_cache
 	return status
 
 
@@ -325,7 +326,15 @@ func set_level_assist_enabled(value: bool) -> bool:
 	level_assist_enabled = value
 	if _jolt_runtime == null:
 		return false
-	return _jolt_runtime.set_equipment_assist_enabled("bucket_level", value)
+	var applied := _jolt_runtime.set_equipment_assist_enabled("bucket_level", value)
+	if value:
+		# Prime the shared cadence so the side view + flat ribbon appear on
+		# the next tick instead of after one refresh interval.
+		_slope_preview_accum = SLOPE_PREVIEW_REFRESH_S
+	elif String(_assist_view_cache.get("mode", "")) == "level":
+		_assist_view_cache = {}
+		_hide_slope_preview()
+	return applied
 
 
 ## Advance the slope-assist state machine (bound to T/Enter and the UI control):
@@ -384,9 +393,14 @@ func slope_status_snapshot() -> Dictionary:
 	if _slope_mode == SLOPE_MODE_ACTIVE and _slope_profile != null:
 		snapshot["toe_distance_m"] = _slope_profile.toe_s
 		snapshot["angle_deg"] = _slope_profile.angle_deg
-	if not _slope_view_cache.is_empty():
-		snapshot["view"] = _slope_view_cache
 	return snapshot
+
+
+## Latest side-view snapshot for whichever terminal-surface assist is live —
+## slope preview/active or level grading — empty otherwise. One channel so
+## the HUD panel needs no per-assist lookup.
+func assist_view_snapshot() -> Dictionary:
+	return _assist_view_cache
 
 
 func _exit_slope_mode() -> void:
@@ -396,7 +410,7 @@ func _exit_slope_mode() -> void:
 	_slope_mode = SLOPE_MODE_OFF
 	_slope_profile = null
 	_slope_preview_result = {}
-	_slope_view_cache = {}
+	_assist_view_cache = {}
 	_hide_slope_preview()
 
 
@@ -493,7 +507,10 @@ func _slope_adjust_rates() -> Vector2:
 
 
 func _refresh_slope_preview(delta: float) -> void:
-	if _slope_mode == SLOPE_MODE_OFF or _jolt_runtime == null:
+	if _jolt_runtime == null:
+		return
+	if _slope_mode == SLOPE_MODE_OFF:
+		_refresh_level_view(delta)
 		return
 	if _slope_mode == SLOPE_MODE_ACTIVE:
 		_refresh_slope_view(delta)
@@ -515,7 +532,7 @@ func _refresh_slope_preview(delta: float) -> void:
 	_slope_profile = profile
 	var node := _ensure_slope_preview_node()
 	node.show_preview(_slope_preview_result, profile)
-	_slope_view_cache = _jolt_runtime.slope_view_snapshot(
+	_assist_view_cache = _jolt_runtime.slope_view_snapshot(
 		profile,
 		float(_slope_preview_result.get("s_min", 0.0)),
 		float(_slope_preview_result.get("s_max", 0.0)),
@@ -534,7 +551,7 @@ func _refresh_slope_view(delta: float) -> void:
 	_slope_preview_accum = 0.0
 	if _slope_profile == null:
 		return
-	_slope_view_cache = _jolt_runtime.slope_view_snapshot(
+	_assist_view_cache = _jolt_runtime.slope_view_snapshot(
 		_slope_profile,
 		float(_slope_preview_result.get("s_min", 0.0)),
 		float(_slope_preview_result.get("s_max", 0.0)),
@@ -542,6 +559,34 @@ func _refresh_slope_view(delta: float) -> void:
 		float(_slope_preview_result.get("volume_m3", 0.0)),
 		"active"
 	)
+
+
+## Level assist rides the same side-view + ribbon machinery minus the blink:
+## while it owns the equipment the flat tracked plane refreshes on the shared
+## cadence and the world ghost shows the pad height the tooth is holding.
+func _refresh_level_view(delta: float) -> void:
+	if not level_assist_enabled:
+		return
+	_slope_preview_accum += delta
+	if _slope_preview_accum < SLOPE_PREVIEW_REFRESH_S:
+		return
+	_slope_preview_accum = 0.0
+	var view := _jolt_runtime.level_view_snapshot()
+	if view.is_empty():
+		_assist_view_cache = {}
+		_hide_slope_preview()
+		return
+	_assist_view_cache = view
+	var profile: RefCounted = view.get("profile")
+	if profile != null:
+		_ensure_slope_preview_node().show_preview(
+			{
+				"s_min": float(view.get("s_min", 0.0)),
+				"s_max": float(view.get("s_max", 0.0)),
+				"half_width_m": float(view.get("half_width", 0.6)),
+			},
+			profile
+		)
 
 
 func _ensure_slope_preview_node() -> SlopePreviewVisual:
@@ -877,6 +922,8 @@ func _configure_jolt_runtime(catalog_entry: Dictionary) -> bool:
 
 
 func _destroy_jolt_runtime() -> void:
+	_assist_view_cache = {}
+	_hide_slope_preview()
 	if _jolt_runtime == null:
 		return
 	_jolt_runtime.teardown()

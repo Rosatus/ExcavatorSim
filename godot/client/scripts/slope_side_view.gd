@@ -26,6 +26,7 @@ func _ready() -> void:
 	custom_minimum_size = Vector2(360, 220)
 	_font = get_theme_default_font()
 	mouse_filter = MOUSE_FILTER_IGNORE
+	clip_contents = true
 
 
 func set_view(view: Dictionary) -> void:
@@ -77,6 +78,12 @@ func _draw() -> void:
 		hi = hi.max(pt)
 	lo = lo.min(Vector2(s_min, target_h.call(s_min)))
 	hi = hi.max(Vector2(s_max, target_h.call(s_max)))
+	# The chassis silhouette hangs 3.4 m behind the swing pivot — outside the
+	# link/terrain extents — so it must join the content bounds or it draws
+	# past the panel's left edge.
+	var sp: Vector2 = pivots["swing_joint"]
+	lo = lo.min(sp + Vector2(-3.6, -1.3))
+	hi = hi.max(sp + Vector2(-0.05, 0.8))
 	var span := (hi - lo).max(Vector2(1.0, 1.0))
 	var draw_area := size - Vector2(MARGIN, MARGIN) * 2.0
 	var scale := minf(draw_area.x / span.x, draw_area.y / span.y)
@@ -118,7 +125,6 @@ func _draw() -> void:
 		draw_line(p0 + Vector2(0, -4), p0 + Vector2(0, 4), TARGET_COLOR, 1.5)
 	# Chassis silhouette anchored at the swing pivot: tracks, body, cab, and a
 	# facing arrow — the machine always sits on the s<0 side of the profile.
-	var sp: Vector2 = pivots["swing_joint"]
 	var chassis := PackedVector2Array()
 	_draw_plane_rect(to_px, sp + Vector2(-3.1, -0.5), sp + Vector2(-0.3, 0.35), CHASSIS_COLOR, false, 2.0)
 	_draw_plane_rect(to_px, sp + Vector2(-3.4, -1.15), sp + Vector2(-0.1, -0.5), CHASSIS_COLOR, true)
@@ -140,16 +146,19 @@ func _draw() -> void:
 	var tooth_err := float(_view.get("tooth_err", 0.0))
 	var target_at_tooth: Vector2 = to_px.call(Vector2(tooth_pt.x, target_h.call(tooth_pt.x)))
 	draw_line(tooth_px, target_at_tooth, TOOTH_COLOR, 1.0)
-	_draw_text(
-		Vector2(MARGIN, MARGIN + 4),
-		"修坡%s · d=%.1fm θ=%+.0f° 削土=%.2fm³" % [
-			"预览" if String(_view.get("mode", "")) == "preview" else "作业",
-			float(_view.get("distance_m", toe_s)),
-			float(_view.get("angle_deg", 0.0)),
-			float(_view.get("volume_m3", 0.0)),
-		]
-	)
-	_draw_text(tooth_px + Vector2(8, -8), "%+.0fcm" % (tooth_err * 100.0))
+	var title := ""
+	match String(_view.get("mode", "")):
+		"level":
+			title = "平地作业 · 目标高 %+.2fm" % toe_h
+		_:
+			title = "修坡%s · d=%.1fm θ=%+.0f° 削土=%.2fm³" % [
+				"预览" if String(_view.get("mode", "")) == "preview" else "作业",
+				float(_view.get("distance_m", toe_s)),
+				float(_view.get("angle_deg", 0.0)),
+				float(_view.get("volume_m3", 0.0)),
+			]
+	_draw_text(Vector2(MARGIN, MARGIN + 4), title)
+	_draw_text(tooth_px + Vector2(8, -8), "%+dcm" % roundi(tooth_err * 100.0))
 
 
 func _draw_text(pos: Vector2, text: String) -> void:

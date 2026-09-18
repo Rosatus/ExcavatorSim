@@ -7,6 +7,7 @@ extends Node
 signal lifecycle_changed(lifecycle: String, authority_epoch: String, generation: int)
 signal authority_changed(session_id: String, authority_epoch: String, generation: int)
 signal model_changed(model_id: String)
+signal attachment_changed(attachment_id: String)
 signal bucket_ground_mode_changed(mode: String)
 signal status_changed(snapshot: Dictionary)
 
@@ -20,11 +21,13 @@ const MODEL_IDS := ["sy205", "sy135", "sy135neo"]
 @export var motion_client_path := NodePath("../MotionClient")
 @export var chassis_path := NodePath("../ChassisMotionRoot")
 @export var excavation_world_path := NodePath("../TerrainRoot/ExcavationWorld")
+@export var attachment_rig_path := NodePath("../AttachmentRig")
 @export var gateway_enabled := false
 @export var lifecycle_input_enabled := true
 
 var lifecycle := LIFECYCLE_STOPPED
 var active_model_id := "sy205"
+var active_attachment_id := "standard_bucket"
 var authority_epoch := ""
 var generation := 0
 var focused := true
@@ -38,6 +41,7 @@ var _presentation: MotionPresentation
 var _motion_client: MotionClient
 var _chassis: TrackedChassisController
 var _excavation: ExcavationWorld
+var _attachment_rig: AttachmentRig
 var _bucket_ground_mode_pending := false
 
 
@@ -48,6 +52,7 @@ func _ready() -> void:
 	_motion_client = get_node_or_null(motion_client_path) as MotionClient
 	_chassis = get_node_or_null(chassis_path) as TrackedChassisController
 	_excavation = get_node_or_null(excavation_world_path) as ExcavationWorld
+	_attachment_rig = get_node_or_null(attachment_rig_path) as AttachmentRig
 	call_deferred("_activate_initial_model")
 
 
@@ -154,6 +159,37 @@ func get_equipment_input_axes() -> Vector4:
 	return _motion_client.get_authoritative_input_axes()
 
 
+func get_attachment_input_axes() -> Vector2:
+	if lifecycle != LIFECYCLE_RUNNING or not focused or _motion_client == null:
+		return Vector2.ZERO
+	return _motion_client.get_attachment_input_axes()
+
+
+func request_attachment_switch(attachment_id: String) -> bool:
+	if _attachment_rig == null:
+		last_error = {"code": "attachment_rig_unavailable", "message": attachment_id}
+		status_changed.emit(get_status_snapshot())
+		return false
+	if not _attachment_rig.request_attachment(attachment_id):
+		last_error = {
+			"code": "attachment_activation_failed",
+			"message": "%s: %s" % [attachment_id, _attachment_rig.get_catalog_error()],
+		}
+		status_changed.emit(get_status_snapshot())
+		return false
+	active_attachment_id = _attachment_rig.active_attachment_id()
+	last_error.clear()
+	attachment_changed.emit(active_attachment_id)
+	status_changed.emit(get_status_snapshot())
+	return true
+
+
+func get_attachment_status_snapshot() -> Dictionary:
+	if _attachment_rig == null:
+		return {"attachment_id": active_attachment_id}
+	return _attachment_rig.get_status_snapshot()
+
+
 func request_bucket_ground_mode(mode: String) -> bool:
 	if not BucketGroundInteractionMode.is_valid(mode):
 		last_error = {"code": "invalid_bucket_ground_mode", "message": mode}
@@ -230,6 +266,7 @@ func get_status_snapshot() -> Dictionary:
 		"lifecycle": lifecycle,
 		"focused": focused,
 		"active_model_id": active_model_id,
+		"active_attachment_id": active_attachment_id,
 		"gateway_enabled": gateway_enabled,
 		"gateway_state": "disabled" if not gateway_enabled else "optional",
 		"bucket_ground_mode": bucket_ground_mode,
@@ -239,6 +276,7 @@ func get_status_snapshot() -> Dictionary:
 		"level_assist_enabled": _chassis.level_assist_enabled if _chassis != null else level_assist_enabled,
 		"slope_assist": _chassis.slope_status_snapshot() if _chassis != null else {"state": "off"},
 		"assist_menu": _chassis.assist_menu_snapshot() if _chassis != null else {"open": false, "index": 0, "entries": []},
+		"assist_view": _chassis.assist_view_snapshot() if _chassis != null else {},
 		"last_error": last_error,
 	}
 

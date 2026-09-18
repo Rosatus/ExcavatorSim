@@ -473,6 +473,51 @@ func slope_view_snapshot(
 	volume_m3: float,
 	mode: String
 ) -> Dictionary:
+	return _view_snapshot(profile, s_min, s_max, half_width_m, volume_m3, mode)
+
+
+## Level-assist guidance frame: the latched horizontal plane is a degenerate
+## slope profile (grade 0, toe at the anchor), so the same snapshot shape —
+## and therefore the same HUD panel — carries it. The reach band is swept
+## against that flat surface exactly like the slope band. The profile rides
+## along in the dict so the controller can rebuild the world-space ribbon.
+func level_view_snapshot() -> Dictionary:
+	if not _assist_configured or _articulation == null or _body == null:
+		return {}
+	var stage := _assist_pipeline.get_stage("bucket_level")
+	if stage == null or not stage.enabled:
+		return {}
+	var ctx := _assist_pipeline.build_context(
+		_articulation, _body.global_transform, 1.0 / 60.0, _assist_context,
+		_body.linear_velocity, _body.angular_velocity
+	)
+	var height_ref := float((stage.get_status_snapshot() as Dictionary).get("height_ref_m", 0.0))
+	var profile := SlopeProfileScript.create(
+		ctx.bucket_ref_world, ctx.horizontal, 0.0, 0.0, height_ref
+	)
+	var band := SlopeCutPreviewScript.reach_band(
+		profile,
+		_articulation,
+		_body.global_transform,
+		_cutting_edge_local(),
+		ctx.joint_limits,
+		SlopeCutPreviewScript.DEFAULT_SWEEP_STEPS
+	)
+	var view := _view_snapshot(
+		profile, band.x, band.y, _cutting_edge_half_width(), 0.0, "level"
+	)
+	view["profile"] = profile
+	return view
+
+
+func _view_snapshot(
+	profile: RefCounted,
+	s_min: float,
+	s_max: float,
+	half_width_m: float,
+	volume_m3: float,
+	mode: String
+) -> Dictionary:
 	if profile == null or not _assist_configured or _articulation == null or _body == null:
 		return {}
 	var ctx := _assist_pipeline.build_context(

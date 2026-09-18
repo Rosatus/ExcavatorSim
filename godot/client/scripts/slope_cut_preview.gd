@@ -37,7 +37,7 @@ static func compute(
 	half_width_m: float = 0.6,
 	sweep_steps: int = DEFAULT_SWEEP_STEPS
 ) -> Dictionary:
-	var band := _reach_band(profile, articulation, chassis_transform, edge_local, joint_limits, sweep_steps)
+	var band := reach_band(profile, articulation, chassis_transform, edge_local, joint_limits, sweep_steps)
 	var s_min := float(band.x)
 	var s_max := float(band.y)
 	var result := {
@@ -125,8 +125,9 @@ static func preview_uniforms(
 ## Joint-limit FK sweep: the tooth's reachable along-axis interval while
 ## able to ride the target surface (within SURFACE_RIDE_TOL_M of it). The
 ## swing joint stays at its current position — the preview freezes it
-## exactly the way the active stage does.
-static func _reach_band(
+## exactly the way the active stage does. Public: the level-assist view
+## sweeps the same band against its flat tracked plane.
+static func reach_band(
 	profile: RefCounted,
 	articulation: RefCounted,
 	chassis_transform: Transform3D,

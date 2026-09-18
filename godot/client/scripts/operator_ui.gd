@@ -437,10 +437,11 @@ func _build_assist_menu() -> void:
 	add_child(_assist_menu_panel)
 
 
-## Slope guidance side view: a right-edge panel mirroring the chassis
-## slope_assist.view snapshot — machine links, terrain and target profile in
-## the cabin-facing plane. Visible only while the slope mode is preview or
-## active; the chassis leaves `view` empty otherwise.
+## Assist guidance side view: a right-edge panel mirroring the chassis
+## `assist_view` snapshot — machine links, terrain and target profile in the
+## cabin-facing plane. Visible while a terminal-surface assist is live
+## (slope preview/active or level grading); the chassis leaves it empty
+## otherwise.
 func _build_slope_side_view() -> void:
 	_slope_side_view = SlopeSideView.new()
 	_slope_side_view.name = "SlopeSideView"
@@ -1250,10 +1251,9 @@ func _sync_slope_side_view() -> void:
 	if _slope_side_view == null:
 		return
 	var status := _product_session.get_status_snapshot() if _product_session != null else {}
-	var slope := status.get("slope_assist", {}) as Dictionary
-	var view := slope.get("view", {}) as Dictionary
+	var view := status.get("assist_view", {}) as Dictionary
 	var mode := String(view.get("mode", ""))
-	_slope_side_view.visible = mode == "preview" or mode == "active"
+	_slope_side_view.visible = mode == "preview" or mode == "active" or mode == "level"
 	if _slope_side_view.visible:
 		_slope_side_view.set_view(view)
 
