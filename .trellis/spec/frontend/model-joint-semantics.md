@@ -90,10 +90,18 @@ pixi run python backend/scripts/sync_sy205_joint_contract.py [--check]
   ribbon (`SlopeCutPreviewVisual`) draws only the finished-surface skin
   with a no-depth edge line; and `SlopeSideView` renders the cabin-plane
   2D guidance panel (links, terrain strip, target line, cut fill, tooth
-  offset) from `slope_assist.view` status, shown in preview and active
-  modes only. `VoxelWorkZone.set_cut_preview` is the duck-typed sink the
-  runtime discovers beside TerrainWorld — presentation only, never voxel
-  data.
+  offset) from the top-level `assist_view` status, shown in preview and
+  active modes only. `VoxelWorkZone.set_cut_preview` is the duck-typed sink
+  the runtime discovers beside TerrainWorld — presentation only, never
+  voxel data.
+- Bucket-level assist reuses the same guidance channel without any blink:
+  `JoltChassisTrackRuntime.level_view_snapshot` builds a degenerate
+  zero-grade `SlopeProfile` at the stage's latched `height_ref_m`, sweeps
+  the same `SlopeCutPreview.reach_band`, and publishes `assist_view` with
+  `mode: "level"`; the controller also shows the flat target ribbon while
+  level grading is live. `assist_view` is a single top-level status slot —
+  whichever terminal-surface assist is live fills it (slope modes take
+  priority over level).
 - SY135 hinge axes remain +X. SY205's three work-equipment axes are -X because
   its segment geometry is baked in different asset coordinates. Its swing
   remains +Y. Keep SY205 rest transforms and anchors unchanged.

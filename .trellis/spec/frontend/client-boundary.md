@@ -265,6 +265,7 @@ JoltChassisTrackRuntime.confirm_slope_assist(profile: RefCounted, preview_result
 JoltChassisTrackRuntime.set_slope_cut_preview(uniforms: Dictionary) -> void
 JoltChassisTrackRuntime.clear_slope_cut_preview() -> void
 JoltChassisTrackRuntime.slope_view_snapshot(profile: RefCounted, s_min: float, s_max: float, half_width_m: float, volume_m3: float, mode: String) -> Dictionary
+JoltChassisTrackRuntime.level_view_snapshot() -> Dictionary
 JoltChassisTrackRuntime.set_assist_context(context: Dictionary) -> void
 EquipmentAssistPipeline.configure(descriptor: Dictionary, soil_contract: Dictionary, model_id: String) -> bool
 EquipmentAssistPipeline.step(commands: Vector4, articulation, chassis_transform, delta: float, external: Dictionary) -> Dictionary
@@ -281,6 +282,7 @@ TrackedChassisController.set_assist_menu_open(open: bool) -> void
 TrackedChassisController.is_assist_menu_open() -> bool
 TrackedChassisController.activate_assist_entry(index: int) -> String
 TrackedChassisController.assist_menu_snapshot() -> Dictionary
+TrackedChassisController.assist_view_snapshot() -> Dictionary
 ProductSession.advance_slope_assist() -> String
 ProductSession.cancel_slope_assist() -> void
 ProductSession.open_assist_menu() -> void

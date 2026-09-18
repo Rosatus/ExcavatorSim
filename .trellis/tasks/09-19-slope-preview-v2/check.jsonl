@@ -10,3 +10,12 @@
 {"file": "godot/client/tests/slope_preview_v2_test.gd", "reason": "Pure-function contracts: uniform pack field correctness and side-view plane projection."}
 {"file": "godot/client/tests/run_standalone_matrix.ps1", "reason": "slope_preview_v2_test registered."}
 {"file": "godot/client/scripts/attachment_rig.gd", "reason": "Two Variant-inference warning-errors (pop_back/pop_front) unblocked the whole compile chain; untracked steelwrist WIP, fix only, not committed by this task."}
+{"file": "godot/client/scripts/slope_side_view.gd", "reason": "Fix: chassis silhouette extents now join content bounds (was spilling left of panel); clip_contents on; tooth_err uses roundi so -0cm reads +0cm; title branches on mode (level shows flat target height)."}
+{"file": "godot/client/scripts/slope_cut_preview.gd", "reason": "reach_band made public for the level-assist flat-plane sweep."}
+{"file": "godot/client/scripts/jolt_chassis_track_runtime.gd", "reason": "slope_view_snapshot body extracted to _view_snapshot; new level_view_snapshot builds degenerate zero-grade SlopeProfile at stage height_ref_m, sweeps reach_band, publishes mode level with profile ref for ribbon reuse."}
+{"file": "godot/client/scripts/tracked_chassis_controller.gd", "reason": "_slope_view_cache renamed _assist_view_cache; view moved to top-level assist_view status (one slot, whichever terminal-surface assist is live); _refresh_level_view on shared cadence; flat target ribbon while level grading; cache+ribbon cleared on level off/runtime teardown."}
+{"file": "godot/client/scripts/product_session.gd", "reason": "status snapshot gains assist_view from chassis.assist_view_snapshot()."}
+{"file": "godot/client/scripts/operator_ui.gd", "reason": "_sync_slope_side_view reads assist_view; visible for preview/active/level."}
+{"file": "godot/client/tests/bucket_level_assist_test.gd", "reason": "Integration assertion: enabled stage publishes level-mode view with flat grade, joints, tooth, terrain strip, consistent tooth_err."}
+{"file": ".trellis/spec/frontend/client-boundary.md", "reason": "level_view_snapshot + assist_view_snapshot signatures recorded."}
+{"file": ".trellis/spec/frontend/model-joint-semantics.md", "reason": "assist_view single-slot contract; level reuses guidance channel without blink."}
