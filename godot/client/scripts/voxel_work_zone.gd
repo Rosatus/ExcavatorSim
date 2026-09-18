@@ -4,6 +4,7 @@ extends Node3D
 var layout := preload("res://scripts/voxel_zone_layout.gd").new()
 
 const WorkZoneConfig = preload("res://scripts/voxel_work_zone_config.gd")
+const SUPPORT_APRON_M := 1.0
 const CollisionReadiness = preload("res://scripts/voxel_collision_readiness.gd")
 
 ## Runtime owner of the finite Voxel Tools terrain instance. Excavation policy
@@ -59,7 +60,7 @@ func build_runtime() -> bool:
 	# ground and clip its presentation to the exact semantic rectangle.
 	# Terrain3D heightmap holes also remove neighboring collision triangles.
 	# A hidden, immutable one-metre apron bridges that native grid seam.
-	generator.apron_m = 1.0
+	generator.apron_m = SUPPORT_APRON_M
 	var mesher := VoxelMesherTransvoxel.new()
 	mesher.texturing_mode = VoxelMesherTransvoxel.TEXTURES_NONE
 	mesher.transitions_enabled = false
@@ -97,7 +98,7 @@ func build_runtime() -> bool:
 	collision_viewer.requires_collisions = true
 	add_child(collision_viewer)
 
-	initial_ticket = readiness.issue(layout.voxel_bounds(voxel_scale_m), &"initial_surface")
+	initial_ticket = readiness.issue(support_voxel_bounds(), &"initial_surface")
 	latest_ticket = initial_ticket
 	return true
 
@@ -133,8 +134,21 @@ func get_ticket_status(ticket: Dictionary) -> Dictionary:
 	return readiness.status(ticket)
 
 
+func support_voxel_bounds() -> AABB:
+	var bounds: AABB = layout.voxel_bounds(voxel_scale_m)
+	var apron := Vector3(SUPPORT_APRON_M / voxel_scale_m, 0.0, SUPPORT_APRON_M / voxel_scale_m)
+	return AABB(bounds.position - apron, bounds.size + apron * 2.0)
+
+
 func is_support_ready_at(world_position: Vector3) -> bool:
-	return layout.owns_world_xz(Vector2(world_position.x, world_position.z)) \
+	# Apron is immutable physical ground outside the semantic soil rectangle.
+	# Check its own block readiness; never borrow a clamped interior receipt.
+	var minimum: Vector3 = layout.MIN_WORLD
+	var maximum: Vector3 = layout.MAX_WORLD
+	return world_position.x >= minimum.x - SUPPORT_APRON_M \
+		and world_position.x < maximum.x + SUPPORT_APRON_M \
+		and world_position.z >= minimum.z - SUPPORT_APRON_M \
+		and world_position.z < maximum.z + SUPPORT_APRON_M \
 		and readiness.is_point_ready(layout.world_to_voxel(world_position, voxel_scale_m))
 
 

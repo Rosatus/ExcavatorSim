@@ -18,3 +18,9 @@ Texture budgets must cover GLB-extracted images as well as copied source texture
 Automatic map excavation must pass the operator/Jolt query path: BucketProxySweeper validates the explicit map root and its static (0,0) collision identity, while ExcavationWorld compares tick/epoch/revision to the current chassis snapshot. Never compare a map query to the disabled training TerrainCollider/TerrainState. Test via actual equipment commands after reset, not only direct soil-authority calls.
 
 Terrain3D control holes erase adjacent triangles and VoxelTerrain bounds round to mesh blocks. Visual soil/native-ground seams therefore clip fragments against the same semantic XZ rectangle; collision control holes remain separate native data. The finite soil generator includes a hidden immutable 1 m collision apron outside the editable domain to bridge native heightmap-hole expansion. The four warning lines retain the semantic perimeter. Validate rays immediately inside/outside all four edges plus real rendered shader uniforms and screenshots; control-map point tests alone miss this seam regression.
+
+
+Track support accepts the immutable 1 m apron outside the semantic soil rectangle
+only when the hit point's own canonical collision block is ready. Initial surface
+readiness registers the apron blocks as well as the interior. This does not
+expand `owns_world_xz`, editable soil bounds or excavation authorization.

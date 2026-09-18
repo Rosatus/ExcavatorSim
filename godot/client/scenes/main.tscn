@@ -32,7 +32,9 @@
 [ext_resource type="Script" uid="uid://bd60adgsxty22" path="res://scripts/voxel_work_zone.gd" id="21_voxel_work_zone"]
 [ext_resource type="Script" uid="uid://ctpstsp0cduf6" path="res://scripts/voxel_work_zone_boundary.gd" id="22_voxel_boundary"]
 [ext_resource type="PackedScene" uid="uid://70u0t7ch254e" path="res://assets/visual/SY135_excavator_godot.glb" id="26_j8jky"]
-[ext_resource type="PackedScene" uid="uid://dhk01p3j3pif3" path="res://assets/visual/SY135-NEO_excavator_godot.glb" id="27_kmb1v"]
+[ext_resource type="PackedScene" uid="uid://bb3vcuppq3r8t" path="res://assets/visual/SY135-NEO_excavator_godot.glb" id="27_kmb1v"]
+[ext_resource type="PackedScene" uid="uid://wr3mys4indqd" path="res://assets/visual/GB12_S50_Bucket.glb" id="28_pibwh"]
+[ext_resource type="PackedScene" uid="uid://2k7m5avjycbj" path="res://assets/visual/XTR13_Tiltrotator_Animated.glb" id="29_c6pm6"]
 [ext_resource type="Script" uid="uid://qq1xalkljnbw" path="res://scripts/performance_capture.gd" id="40_performance_capture"]
 [ext_resource type="Script" uid="uid://ddv3skxe7le6h" path="res://scripts/main_map.gd" id="41_main_map"]
 [ext_resource type="Script" uid="uid://bfhoisjtla7wv" path="res://scripts/attachment_rig.gd" id="42_attachment_rig"]
@@ -47,12 +49,12 @@ shader_parameter/atm_darkness = 0.5
 shader_parameter/atm_sun_intensity = 18.0
 shader_parameter/atm_day_tint = Color(0.807843, 0.909804, 1, 1)
 shader_parameter/atm_horizon_light_tint = Color(0.980392, 0.635294, 0.462745, 1)
-shader_parameter/atm_night_tint = Color(0, 0, 0, 0)
+shader_parameter/atm_night_tint = Color(0.13014722, 0.15436107, 0.1937077, 0.77180535)
 shader_parameter/atm_level_params = Vector3(1, 0, 0)
 shader_parameter/atm_thickness = 0.7
 shader_parameter/atm_beta_ray = Vector3(5.804544e-06, 1.3562913e-05, 3.311258e-05)
 shader_parameter/atm_beta_mie = Vector3(3.038e-08, 3.038e-08, 3.038e-08)
-shader_parameter/sun_light_color = Color(0.9930354, 0.8338935, 0.7541484, 1)
+shader_parameter/sun_light_color = Color(0.98, 0.523, 0.294, 1)
 shader_parameter/sun_disk_color = Color(0.996094, 0.541334, 0.140076, 1)
 shader_parameter/sun_disk_intensity = 30.0
 shader_parameter/sun_disk_size = 0.02
@@ -66,7 +68,7 @@ shader_parameter/moon_texture_flip_u = false
 shader_parameter/moon_texture_flip_v = false
 shader_parameter/moon_size = 0.07
 shader_parameter/atm_moon_mie_tint = Color(0.137255, 0.184314, 0.292196, 1)
-shader_parameter/atm_moon_mie_intensity = 0.2591217643022537
+shader_parameter/atm_moon_mie_intensity = 0.0
 shader_parameter/atm_moon_partial_mie_phase = Vector3(0.36, 1.64, 1.6)
 shader_parameter/starmap_color = Color(0.709804, 0.709804, 0.709804, 0.854902)
 shader_parameter/starmap_texture = ExtResource("7_yq6so")
@@ -74,7 +76,7 @@ shader_parameter/starmap_flip_u = false
 shader_parameter/starmap_flip_v = false
 shader_parameter/starmap_alignment = Vector3(2.68288, -0.25891, 0.40101)
 shader_parameter/star_rotation_offset = 9.38899
-shader_parameter/star_rotation = -12.72148882059529
+shader_parameter/star_rotation = -14.152383455031632
 shader_parameter/star_tilt = -1.2915436464758039
 shader_parameter/star_field_color = Color(1, 1, 1, 1)
 shader_parameter/star_field_texture = ExtResource("6_2f3dj")
@@ -90,8 +92,8 @@ shader_parameter/cirrus_absorption = 2.0
 shader_parameter/cirrus_sky_tint_fade = 0.5
 shader_parameter/cirrus_size = 1.0
 shader_parameter/cirrus_uv = Vector2(0.16, 0.11)
-shader_parameter/cirrus_position1 = Vector2(0.9445764, 0.9445764)
-shader_parameter/cirrus_position2 = Vector2(0.9445764, 0.9445764)
+shader_parameter/cirrus_position1 = Vector2(0.03474006, 0.03474006)
+shader_parameter/cirrus_position2 = Vector2(0.03474006, 0.03474006)
 shader_parameter/cirrus_texture = ExtResource("2_y6deb")
 shader_parameter/cumulus_visible = true
 shader_parameter/cumulus_intensity = 0.6
@@ -101,7 +103,7 @@ shader_parameter/cumulus_absorption = 2.0
 shader_parameter/cumulus_noise_freq = 2.7
 shader_parameter/cumulus_sky_tint_fade = 0.0
 shader_parameter/cumulus_size = 0.5
-shader_parameter/cumulus_position = Vector2(9.730102, 9.730102)
+shader_parameter/cumulus_position = Vector2(180.35391, 180.35391)
 shader_parameter/cumulus_texture = ExtResource("3_og1vs")
 shader_parameter/cumulus_partial_mie_phase = Vector3(0.957564, 1.042436, 0.412)
 shader_parameter/cumulus_mie_intensity = 1.0
@@ -111,7 +113,7 @@ shader_parameter/azimuthal_grid_rotation_offset = 0.03
 shader_parameter/show_equatorial_grid = false
 shader_parameter/equatorial_grid_color = Color(0, 0.75, 1, 1)
 shader_parameter/equatorial_grid_rotation_offset = 0.03
-shader_parameter/moon_matrix = Basis(-0.74877745, 0.6371449, 0.18269837, -0.2563833, -0.024229668, -0.96627146, -0.6112282, -0.7703631, 0.18149596)
+shader_parameter/moon_matrix = Basis(-0.86917734, -0.4753446, -0.13630289, 0.21346848, -0.11204395, -0.9705038, 0.44605175, -0.87263614, 0.19885713)
 
 [sub_resource type="Sky" id="Sky_5q0nq"]
 sky_material = SubResource("ShaderMaterial_qkpxi")
@@ -120,7 +122,8 @@ sky_material = SubResource("ShaderMaterial_qkpxi")
 background_mode = 2
 sky = SubResource("Sky_5q0nq")
 ambient_light_source = 3
-ambient_light_color = Color(0.72082865, 0.6053101, 0.54742444, 1)
+ambient_light_color = Color(0.235156, 0.27890667, 0.35, 1)
+ambient_light_sky_contribution = 0.7
 reflected_light_source = 2
 tonemap_mode = 3
 tonemap_white = 6.0
@@ -152,32 +155,33 @@ script = ExtResource("41_main_map")
 environment = SubResource("Environment_dgi5k")
 camera_attributes = SubResource("CameraAttributesPractical_j8jky")
 script = ExtResource("14_sky3d")
-current_time = 16.17562666666765
+current_time = 19.791466666339442
 wind_direction = 2.35619451204804
 
 [node name="SunLight" type="DirectionalLight3D" parent="WorldEnvironment" unique_id=1271245286]
-transform = Transform3D(0.46201983, 0.28901675, -0.83845514, 0, 0.9454097, 0.32588416, 0.8868696, -0.15056494, 0.43679804, -0.83845514, 0.32588416, 0.43679804)
-light_color = Color(0.9930354, 0.8338935, 0.7541484, 1)
-shadow_enabled = true
+transform = Transform3D(0.0637266, -0.47084635, -0.8799106, 0, 0.8817028, -0.47180533, 0.9979674, 0.030066548, 0.056187913, -0.8799106, -0.47180533, 0.056187913)
+light_color = Color(0.98, 0.523, 0.294, 1)
+light_energy = 0.0
 
 [node name="MoonLight" type="DirectionalLight3D" parent="WorldEnvironment" unique_id=526965036]
-transform = Transform3D(0, -0.7914544, -0.6112282, 0.2293195, 0.5949397, -0.7703631, 0.9733512, -0.14016655, 0.18149593, -0.6112282, -0.7703631, 0.18149593)
+transform = Transform3D(0, -0.89500725, 0.44605175, 0.22218493, -0.4349025, -0.8726361, 0.97500455, 0.09910598, 0.19885711, 0.44605175, -0.8726361, 0.19885711)
 light_color = Color(0.572549, 0.776471, 0.956863, 1)
 light_energy = 0.0
 
 [node name="SkyDome" type="Node" parent="WorldEnvironment" unique_id=1193753276]
 script = ExtResource("9_fv21b")
-sun_azimuth = -4.2321177
-sun_altitude = -1.2388495
-moon_azimuth = -4.423745
-moon_altitude = -2.4502068
+sun_azimuth = -4.648619
+sun_altitude = -2.0621336
+moon_azimuth = -1.9901656
+moon_altitude = -2.6313705
 wind_direction = 2.35619451204804
 
 [node name="TimeOfDay" type="Node" parent="WorldEnvironment" unique_id=1869329603]
 script = ExtResource("10_tel4y")
 dome_path = NodePath("../SkyDome")
-current_time = 16.17562666666765
-day = 23
+current_time = 19.791466666339442
+day = 20
+month = 2
 
 [node name="KeyLight" type="DirectionalLight3D" parent="." unique_id=1459257187]
 transform = Transform3D(0.7960838, 0.4546647, -0.3994128, 0, 0.6599831, 0.7512804, 0.6051864, -0.5980822, 0.52540183, 0, 0, 0)
@@ -276,6 +280,12 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -6.531704)
 [node name="SY135-NEO_excavator_godot" parent="ChassisMotionRoot/PresentationRoot" unique_id=758467489 instance=ExtResource("27_kmb1v")]
 transform = Transform3D(0.01730697, 0, 0.9998502, 0, 1, 0, -0.9998502, 0, 0.01730697, -5.613986, 0, 0)
 
+[node name="Steelwrist | Detachable animated assembly" parent="ChassisMotionRoot/PresentationRoot" unique_id=582300309 instance=ExtResource("28_pibwh")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.9948325, 0.852499, 0)
+
+[node name="Steelwrist | Detachable animated assembly2" parent="ChassisMotionRoot/PresentationRoot" unique_id=1299396834 instance=ExtResource("29_c6pm6")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.891221, 0.87557584, 0)
+
 [node name="MotionClient" type="Node" parent="." unique_id=358783374]
 script = ExtResource("2_motion_client")
 desired_model_id = "sy135"
@@ -289,7 +299,7 @@ lifecycle_input_enabled = false
 script = ExtResource("3_motion_presentation")
 presentation_root_path = NodePath("../ChassisMotionRoot/PresentationRoot")
 
-[node name="AttachmentRig" type="Node3D" parent="."]
+[node name="AttachmentRig" type="Node3D" parent="." unique_id=1753407237]
 script = ExtResource("42_attachment_rig")
 motion_presentation_path = NodePath("../MotionPresentation")
 product_session_path = NodePath("../ProductSession")

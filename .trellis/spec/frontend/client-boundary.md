@@ -241,6 +241,37 @@ Correct: resolve motion in the controller, but render each held semantic action 
 
 ## Scenario: Jolt-authoritative hybrid chassis and work equipment
 
+> Track-contact revision (2026-09-18): `TrackContactSolver` replaces the historical
+> four-ray suspension and hull-mask handoff described in older sections below.
+> The authoritative body always retains terrain collision. Rounded convex left/
+> right track hulls plus a raised belly provide obstacle and bottoming protection;
+> body-up sphere sweeps span each belt's width and length. Per-station coefficients
+> are normalized to preserve the v1 descriptor's total spring/damper/load budget.
+> Only loaded, upward-facing, physically hit and ownership/readiness-approved
+> contacts carry drive. There is no synthetic heightfield support on a missed
+> sweep, attitude-normal servo, force-history filter or extra yaw-assist torque.
+> Tangential drive/brake/lateral forces share one friction budget, and legacy
+> per-tick slew values are interpreted at a 60 Hz reference then scaled by dt.
+> Track snapshots retain truth field types/provenance and add `track_probes` /
+> `track_rejections`; compatibility hull-release/switch telemetry stays false/0
+> because ownership no longer switches. Support impulses are commanded load*dt,
+> not measured Jolt collision impulses; zero contact penetration is not evidence
+> that the hull has no overlap. Response telemetry no longer modifies velocity.
+>
+> Voxel support includes the immutable one-metre collision apron, with its own
+> canonical blocks included in the initial readiness ticket. Editable/semantic
+> soil ownership does not grow; pending apron blocks cannot borrow readiness from
+> an interior point. Missed/unready support relies on the permanent physical hull.
+> Actual loaded TrackHull contacts also provide traction from their measured
+> Jolt normal impulse/dt, without reapplying that load as spring support. Belly,
+> upper hull, unowned/unready ground and steep walls do not grant powered grip.
+> Initial sweep overlaps are queried explicitly. Held direction remains a drive
+> target during rollback; only neutral uses the no-crossing brake. Contact normals
+> from Jolt direct-body state are world-space despite the `local_normal` name.
+> Parameters and imported bounds remain provisional. This revision has parser
+> checks only; driving/obstacle/landing acceptance is user-owned by explicit
+> instruction, and historical passing track tests do not validate the new core.
+
 ### 1. Scope / Trigger
 
 Use this contract when `simulation/authority_profile` is
