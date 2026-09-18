@@ -84,7 +84,7 @@ func _draw() -> void:
 	# past the panel's left edge.
 	var sp: Vector2 = pivots["swing_joint"]
 	lo = lo.min(sp + Vector2(-3.6, -1.3))
-	hi = hi.max(sp + Vector2(-0.05, 0.8))
+	hi = hi.max(sp + Vector2(-0.05, 1.0))
 	var span := (hi - lo).max(Vector2(1.0, 1.0))
 	var draw_area := size - Vector2(MARGIN, MARGIN) * 2.0
 	var scale := minf(draw_area.x / span.x, draw_area.y / span.y)
@@ -146,14 +146,24 @@ func _draw() -> void:
 			arc_pts.append(knee_px + Vector2(cos(a), sin(a)) * 22.0)
 		draw_polyline(arc_pts, TARGET_COLOR, 1.5)
 	draw_circle(knee_px, 3.0, TOOTH_COLOR)
-	# Chassis silhouette anchored at the swing pivot: tracks, body, cab, and a
-	# facing arrow — the machine always sits on the s<0 side of the profile.
-	# The body fills opaque so the bench line behind it stays masked.
-	var chassis := PackedVector2Array()
-	_draw_plane_rect(to_px, sp + Vector2(-3.1, -0.5), sp + Vector2(-0.3, 0.35), BODY_FILL, true)
-	_draw_plane_rect(to_px, sp + Vector2(-3.1, -0.5), sp + Vector2(-0.3, 0.35), CHASSIS_COLOR, false, 2.0)
+	# Chassis silhouette anchored at the swing pivot: track frame, a turret
+	# body with the cab bump forward and the counterweight slab aft, and a
+	# facing arrow — the machine read side-on. The body fills opaque so the
+	# bench line behind it stays masked.
 	_draw_plane_rect(to_px, sp + Vector2(-3.4, -1.15), sp + Vector2(-0.1, -0.5), CHASSIS_COLOR, true)
-	var arrow_base: Vector2 = to_px.call(sp + Vector2(-0.9, 0.45))
+	var body := PackedVector2Array([
+		to_px.call(sp + Vector2(-3.25, -0.5)),
+		to_px.call(sp + Vector2(-3.25, 0.05)),
+		to_px.call(sp + Vector2(-1.7, 0.28)),
+		to_px.call(sp + Vector2(-1.25, 0.55)),
+		to_px.call(sp + Vector2(-0.7, 0.55)),
+		to_px.call(sp + Vector2(-0.45, -0.5)),
+	])
+	draw_colored_polygon(body, BODY_FILL)
+	draw_polyline(body + PackedVector2Array([body[0]]), CHASSIS_COLOR, 2.0)
+	_draw_text(to_px.call(sp + Vector2(-1.95, -0.02)) + Vector2(-13.0, 5.0), "机身")
+	var chassis := PackedVector2Array()
+	var arrow_base: Vector2 = to_px.call(sp + Vector2(-0.9, 0.72))
 	chassis.append(arrow_base + Vector2(14, 0))
 	chassis.append(arrow_base + Vector2(-5, -7))
 	chassis.append(arrow_base + Vector2(-5, 7))

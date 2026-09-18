@@ -25,3 +25,4 @@
 {"file": "godot/client/scripts/slope_side_view.gd", "reason": "Measurement anchoring: anchor tick + d dimension line s=0->toe, theta arc at the knee, toe knee marker; tooth err drawn as 2px dimension stub labeled at midpoint; facing arrow now points +s toward the work; body silhouette fills opaque to mask the bench line behind it."}
 {"file": "godot/client/scripts/jolt_chassis_track_runtime.gd", "reason": "Centerline terrain strip extended left to s=-6 so the ground line runs under the machine silhouette."}
 {"file": ".trellis/spec/frontend/model-joint-semantics.md", "reason": "Edge-line contract: drawn only while a graded section is in band."}
+{"file": "godot/client/scripts/slope_side_view.gd", "reason": "Silhouette reshaped into a readable machine: track frame + turret polygon (cab bump forward, counterweight slab aft), 机身 label inside the body, facing arrow above the cab pointing +s."}
