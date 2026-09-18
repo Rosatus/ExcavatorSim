@@ -55,6 +55,7 @@ $tests = @(
     "cut_resistance_test.gd",
     "bucket_level_assist_test.gd",
     "slope_grade_assist_test.gd",
+    "slope_preview_v2_test.gd",
     "assist_menu_test.gd",
     "excavation_gameplay_test.gd",
     "visual_pass_test.gd",
