@@ -49,6 +49,7 @@ static func compute(
 		"t_values": PackedFloat32Array(),
 		"terrain": [],
 		"target": [],
+		"half_width_m": half_width_m,
 		"toe_world": profile.toe_world() if profile != null else Vector3.ZERO,
 	}
 	if profile == null or s_max <= s_min:
@@ -92,6 +93,33 @@ static func compute(
 	result["volume_m3"] = volume
 	result["max_depth_m"] = max_depth
 	return result
+
+
+## Shader uniform pack for the voxel-soil preview: the analytic profile plus
+## the reachable band, packed exactly the way voxel_soil_bounded.gdshader's
+## fragment test consumes them. mode 1 = preview blink, 2 = static mark while
+## the assist cuts. Pure packing, unit-testable.
+static func preview_uniforms(
+	profile: RefCounted,
+	s_min: float,
+	s_max: float,
+	half_width_m: float,
+	mode: int = 1,
+	pulse_hz: float = 0.0
+) -> Dictionary:
+	if profile == null or mode == 0:
+		return {"cut_mode": 0}
+	var pack := {
+		"cut_mode": mode,
+		"cut_origin_xz": profile.origin_xz,
+		"cut_axis": profile.axis,
+		"cut_band": Vector4(s_min, s_max, half_width_m, profile.toe_s),
+		"cut_toe_height": profile.toe_height,
+		"cut_tan_theta": profile.grade,
+	}
+	if pulse_hz > 0.0:
+		pack["cut_pulse_hz"] = pulse_hz
+	return pack
 
 
 ## Joint-limit FK sweep: the tooth's reachable along-axis interval while

@@ -80,6 +80,7 @@ var _slope_preview_result: Dictionary = {}
 var _slope_preview_dirty := true
 var _slope_preview_accum := 0.0
 var _slope_preview_node: SlopePreviewVisual = null
+var _slope_view_cache: Dictionary = {}
 var _assist_menu_open := false
 var _assist_menu_index := 0
 var _menu_nav_axis := 0.0
@@ -347,10 +348,11 @@ func advance_slope_mode() -> String:
 				_exit_slope_mode()
 				return slope_mode_state()
 			var profile: RefCounted = _jolt_runtime.build_slope_profile(_slope_distance_m, _slope_angle_deg)
-			if profile != null and _jolt_runtime.confirm_slope_assist(profile):
+			if profile != null and _jolt_runtime.confirm_slope_assist(profile, _slope_preview_result):
 				_slope_profile = profile
 				_slope_mode = SLOPE_MODE_ACTIVE
-				_hide_slope_preview()
+				# The finished-surface ribbon stays up as the design reference
+				# while the soil mark flips from blinking to a static tint.
 		SLOPE_MODE_ACTIVE:
 			_exit_slope_mode()
 	return slope_mode_state()
@@ -382,15 +384,19 @@ func slope_status_snapshot() -> Dictionary:
 	if _slope_mode == SLOPE_MODE_ACTIVE and _slope_profile != null:
 		snapshot["toe_distance_m"] = _slope_profile.toe_s
 		snapshot["angle_deg"] = _slope_profile.angle_deg
+	if not _slope_view_cache.is_empty():
+		snapshot["view"] = _slope_view_cache
 	return snapshot
 
 
 func _exit_slope_mode() -> void:
 	if _jolt_runtime != null:
 		_jolt_runtime.set_equipment_assist_enabled("slope_grade", false)
+		_jolt_runtime.clear_slope_cut_preview()
 	_slope_mode = SLOPE_MODE_OFF
 	_slope_profile = null
 	_slope_preview_result = {}
+	_slope_view_cache = {}
 	_hide_slope_preview()
 
 
@@ -487,7 +493,10 @@ func _slope_adjust_rates() -> Vector2:
 
 
 func _refresh_slope_preview(delta: float) -> void:
-	if _slope_mode != SLOPE_MODE_PREVIEW or _jolt_runtime == null:
+	if _slope_mode == SLOPE_MODE_OFF or _jolt_runtime == null:
+		return
+	if _slope_mode == SLOPE_MODE_ACTIVE:
+		_refresh_slope_view(delta)
 		return
 	_slope_preview_accum += delta
 	if _slope_preview_accum < SLOPE_PREVIEW_REFRESH_S or not _slope_preview_dirty:
@@ -506,12 +515,32 @@ func _refresh_slope_preview(delta: float) -> void:
 	_slope_profile = profile
 	var node := _ensure_slope_preview_node()
 	node.show_preview(_slope_preview_result, profile)
-	node.set_readout(
-		"距离 %.1f m · 坡角 %+.1f° · 削土 %.2f m³" % [
-			_slope_distance_m,
-			_slope_angle_deg,
-			float(_slope_preview_result.get("volume_m3", 0.0)),
-		]
+	_slope_view_cache = _jolt_runtime.slope_view_snapshot(
+		profile,
+		float(_slope_preview_result.get("s_min", 0.0)),
+		float(_slope_preview_result.get("s_max", 0.0)),
+		float(_slope_preview_result.get("half_width_m", 0.6)),
+		float(_slope_preview_result.get("volume_m3", 0.0)),
+		"preview"
+	)
+
+
+## Active-mode cadence: the link figure tracks the real arm while the
+## centerline strip reflects soil already cut. Same refresh gate as preview.
+func _refresh_slope_view(delta: float) -> void:
+	_slope_preview_accum += delta
+	if _slope_preview_accum < SLOPE_PREVIEW_REFRESH_S:
+		return
+	_slope_preview_accum = 0.0
+	if _slope_profile == null:
+		return
+	_slope_view_cache = _jolt_runtime.slope_view_snapshot(
+		_slope_profile,
+		float(_slope_preview_result.get("s_min", 0.0)),
+		float(_slope_preview_result.get("s_max", 0.0)),
+		float(_slope_preview_result.get("half_width_m", 0.6)),
+		float(_slope_preview_result.get("volume_m3", 0.0)),
+		"active"
 	)
 
 

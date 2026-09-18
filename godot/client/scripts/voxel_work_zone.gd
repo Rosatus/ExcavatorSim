@@ -142,6 +142,22 @@ func get_voxel_tool() -> VoxelTool:
 	return terrain.get_voxel_tool() if terrain != null else null
 
 
+## Slope-cut preview sink: pushes the analytic profile into the bounded-soil
+## material so the real terrain surface itself marks the soil a confirmed pass
+## removes. Pure presentation — no voxel data is touched. Unknown keys are
+## ignored by the shader so callers can pass the whole pack verbatim.
+func set_cut_preview(uniforms: Dictionary) -> void:
+	var material := (terrain.material_override as ShaderMaterial) if terrain != null else null
+	if material == null:
+		return
+	for key in uniforms:
+		material.set_shader_parameter(String(key), uniforms[key])
+
+
+func clear_cut_preview() -> void:
+	set_cut_preview({"cut_mode": 0})
+
+
 func get_status_snapshot() -> Dictionary:
 	return {
 		"generation": readiness.generation,

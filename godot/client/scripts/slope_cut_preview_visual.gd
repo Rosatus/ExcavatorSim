@@ -1,140 +1,103 @@
 class_name SlopeCutPreviewVisual
 extends Node3D
 
-## Renders the pending slope cut as a translucent soil wedge: a top skin
-## following the sampled terrain, a floor on the target profile, and side
-## walls where the cut region ends — literally the chunk of soil this pass
-## would remove. The wedge pulses while the operator adjusts parameters so
-## it reads as a preview, not committed terrain.
+## Renders the slope profile's finished surface as a translucent ghost ribbon
+## — the "after" picture of the pass. The target surface is analytic (flat
+## bench then straight grade) so the ribbon is built from breakpoints, not
+## terrain samples. Depth-tested so it surfaces only inside the blink-open
+## hole or where the target already floats above ground; a no-depth edge line
+## keeps the design line readable in every blink phase. Static while the
+## assist cuts — the voxel soil shader owns the blinking.
 
-const WALL_EPS := 0.04
-const PULSE_HZ := 2.2
-const PULSE_MIN_ALPHA := 0.22
-const PULSE_MAX_ALPHA := 0.55
+const EDGE_LIFT_M := 0.03
+const SURFACE_COLOR := Color(0.62, 0.5, 0.32, 0.4)
+const EDGE_COLOR := Color(1.0, 0.75, 0.25, 0.85)
 
 var _mesh_instance: MeshInstance3D
-var _material: StandardMaterial3D
-var _readout: Label3D
-var _phase := 0.0
+var _line_instance: MeshInstance3D
 
 
 func _ready() -> void:
-	_material = StandardMaterial3D.new()
-	_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_material.albedo_color = Color(1.0, 0.45, 0.1, PULSE_MIN_ALPHA)
-	_material.no_depth_test = true
-	_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var surface_material := StandardMaterial3D.new()
+	surface_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	surface_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	surface_material.albedo_color = SURFACE_COLOR
+	surface_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_mesh_instance = MeshInstance3D.new()
-	_mesh_instance.material_override = _material
+	_mesh_instance.material_override = surface_material
 	_mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_mesh_instance)
-	_readout = Label3D.new()
-	_readout.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_readout.no_depth_test = true
-	_readout.font_size = 72
-	_readout.outline_size = 12
-	_readout.modulate = Color(1.0, 0.85, 0.4)
-	_readout.outline_modulate = Color(0.0, 0.0, 0.0, 0.85)
-	add_child(_readout)
+	var line_material := StandardMaterial3D.new()
+	line_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	line_material.no_depth_test = true
+	line_material.albedo_color = EDGE_COLOR
+	_line_instance = MeshInstance3D.new()
+	_line_instance.material_override = line_material
+	_line_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_line_instance)
 	visible = false
 
 
-func _process(delta: float) -> void:
-	if not visible:
-		return
-	_phase = fposmod(_phase + delta * PULSE_HZ, 1.0)
-	var pulse := 0.5 - 0.5 * cos(_phase * TAU)
-	var color := _material.albedo_color
-	color.a = lerpf(PULSE_MIN_ALPHA, PULSE_MAX_ALPHA, pulse)
-	_material.albedo_color = color
-
-
-## Rebuild the wedge from a SlopeCutPreview.compute() result: cells whose
-## sampled terrain rises above the target profile get a terrain cap, a
-## target floor, and walls along every edge facing a non-cut cell.
+## Rebuild the finished-surface ribbon from the preview band: quads over
+## s∈[s_min,s_max] split at the slope toe, spanning ±half_width, plus edge
+## lines along both swath borders and the toe cross-line.
 func show_preview(result: Dictionary, profile: RefCounted) -> void:
 	if profile == null:
 		hide_preview()
 		return
-	var s_values := result.get("s_values", PackedFloat32Array()) as PackedFloat32Array
-	var t_values := result.get("t_values", PackedFloat32Array()) as PackedFloat32Array
-	var terrain_rows := result.get("terrain", []) as Array
-	var target_rows := result.get("target", []) as Array
-	if s_values.size() < 2 or t_values.size() < 2 or terrain_rows.size() != s_values.size():
+	var s_min := float(result.get("s_min", 0.0))
+	var s_max := float(result.get("s_max", 0.0))
+	var half_w := float(result.get("half_width_m", 0.6))
+	if s_max <= s_min or half_w <= 0.0:
 		hide_preview()
 		return
+	var s_breaks := PackedFloat32Array([s_min])
+	if profile.toe_s > s_min and profile.toe_s < s_max:
+		s_breaks.append(profile.toe_s)
+	s_breaks.append(s_max)
 	var axis: Vector2 = profile.axis
 	var perp := Vector2(-axis.y, axis.x)
 	var origin: Vector2 = profile.origin_xz
-	var rows := s_values.size()
-	var cols := t_values.size()
-	var depth := []
-	for r in rows:
-		var row := PackedFloat32Array()
-		row.resize(cols)
-		for c in cols:
-			row[c] = float((terrain_rows[r] as PackedFloat32Array)[c]) - float((target_rows[r] as PackedFloat32Array)[c])
-		depth.append(row)
-	var verts := PackedVector3Array()
-	var world := func(s: float, t: float, h: float) -> Vector3:
+	var world := func(s: float, t: float) -> Vector3:
 		var xz: Vector2 = origin + axis * s + perp * t
-		return Vector3(xz.x, h, xz.y)
-	for r in range(rows - 1):
-		for c in range(cols - 1):
-			var d00 := float((depth[r] as PackedFloat32Array)[c])
-			var d10 := float((depth[r + 1] as PackedFloat32Array)[c])
-			var d01 := float((depth[r] as PackedFloat32Array)[c + 1])
-			var d11 := float((depth[r + 1] as PackedFloat32Array)[c + 1])
-			if minf(minf(d00, d10), minf(d01, d11)) <= 0.0:
-				continue
-			var s0 := float(s_values[r])
-			var s1 := float(s_values[r + 1])
-			var t0 := float(t_values[c])
-			var t1 := float(t_values[c + 1])
-			var th00 := float((terrain_rows[r] as PackedFloat32Array)[c]) + WALL_EPS
-			var th10 := float((terrain_rows[r + 1] as PackedFloat32Array)[c]) + WALL_EPS
-			var th01 := float((terrain_rows[r] as PackedFloat32Array)[c + 1]) + WALL_EPS
-			var th11 := float((terrain_rows[r + 1] as PackedFloat32Array)[c + 1]) + WALL_EPS
-			var ta00 := float((target_rows[r] as PackedFloat32Array)[c])
-			var ta10 := float((target_rows[r + 1] as PackedFloat32Array)[c])
-			var ta01 := float((target_rows[r] as PackedFloat32Array)[c + 1])
-			var ta11 := float((target_rows[r + 1] as PackedFloat32Array)[c + 1])
-			# Terrain cap (the soil skin that disappears).
-			_quad(verts, world.call(s0, t0, th00), world.call(s1, t0, th10), world.call(s1, t1, th11), world.call(s0, t1, th01))
-			# Target floor (the finished surface left behind).
-			_quad(verts, world.call(s0, t0, ta00), world.call(s0, t1, ta01), world.call(s1, t1, ta11), world.call(s1, t0, ta10))
-			# Walls along grid edges that face a non-cut neighbour.
-			if r == 0 or float((depth[r - 1] as PackedFloat32Array)[c]) <= 0.0:
-				_quad(verts, world.call(s0, t0, ta00), world.call(s0, t1, ta01), world.call(s0, t1, th01), world.call(s0, t0, th00))
-			if r == rows - 2 or float((depth[r + 2] as PackedFloat32Array)[c]) <= 0.0:
-				_quad(verts, world.call(s1, t0, ta10), world.call(s1, t0, th10), world.call(s1, t1, th11), world.call(s1, t1, ta11))
-			if c == 0 or float((depth[r] as PackedFloat32Array)[c - 1]) <= 0.0:
-				_quad(verts, world.call(s0, t0, ta00), world.call(s0, t0, th00), world.call(s1, t0, th10), world.call(s1, t0, ta10))
-			if c == cols - 2 or float((depth[r] as PackedFloat32Array)[c + 1]) <= 0.0:
-				_quad(verts, world.call(s0, t1, ta01), world.call(s1, t1, ta11), world.call(s1, t1, th11), world.call(s0, t1, th01))
-	if verts.is_empty():
-		hide_preview()
-		return
+		return Vector3(xz.x, profile.height_at(s) + EDGE_LIFT_M, xz.y)
+	var verts := PackedVector3Array()
+	for i in range(s_breaks.size() - 1):
+		var s0 := s_breaks[i]
+		var s1 := s_breaks[i + 1]
+		_quad(verts, world.call(s0, -half_w), world.call(s1, -half_w), world.call(s1, half_w), world.call(s0, half_w))
+	_mesh_instance.mesh = _tri_mesh(verts)
+	var lines := PackedVector3Array()
+	for t in [-half_w, half_w]:
+		lines.append(world.call(s_min, t))
+		lines.append(world.call(s_max, t))
+	if profile.toe_s > s_min and profile.toe_s < s_max:
+		lines.append(world.call(profile.toe_s, -half_w))
+		lines.append(world.call(profile.toe_s, half_w))
+	_line_instance.mesh = _line_mesh(lines)
+	visible = true
+
+
+func hide_preview() -> void:
+	visible = false
+
+
+func _tri_mesh(verts: PackedVector3Array) -> ArrayMesh:
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = verts
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	_mesh_instance.mesh = mesh
-	_readout.position = profile.toe_world() + Vector3(0.0, 1.2, 0.0)
-	visible = true
+	return mesh
 
 
-## Live parameter line rendered above the slope toe while adjusting —
-## distance / angle / estimated removal volume in world space so it stays
-## readable with the menu collapsed.
-func set_readout(text: String) -> void:
-	_readout.text = text
-
-
-func hide_preview() -> void:
-	visible = false
+func _line_mesh(verts: PackedVector3Array) -> ArrayMesh:
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, arrays)
+	return mesh
 
 
 func _quad(verts: PackedVector3Array, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> void:

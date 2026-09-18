@@ -370,8 +370,8 @@ func build_slope_profile(distance_m: float, angle_deg: float) -> RefCounted:
 
 ## Preview the pending cut: the reachable band along the profile axis plus
 ## the terrain cells rising above the target surface inside it. Returns
-## {"ok", "profile", "result"} — result carries the sampled grids for the
-## wedge visual and the volume estimate for the UI readout.
+## {"ok", "profile", "result"} — result carries the sampled grids feeding
+## the soil-shader band uniforms and the volume estimate for the HUD readout.
 func update_slope_preview(profile: RefCounted) -> Dictionary:
 	if profile == null or not _assist_configured or _articulation == null or _body == null:
 		return {"ok": false}
@@ -393,17 +393,130 @@ func update_slope_preview(profile: RefCounted) -> Dictionary:
 		_cutting_edge_half_width(),
 		int(params.get("preview_sweep_steps", 24))
 	)
+	# The voxel soil material marks the would-be-removed surface itself:
+	# mode 1 blinks while the operator adjusts, mode 2 keeps a static tint
+	# while the assist cuts (the mark self-erases as soil actually leaves).
+	var half_width := _cutting_edge_half_width()
+	set_slope_cut_preview(
+		SlopeCutPreviewScript.preview_uniforms(
+			profile,
+			float(result.get("s_min", 0.0)),
+			float(result.get("s_max", 0.0)),
+			half_width,
+			1,
+			float(params.get("preview_pulse_hz", 2.2))
+		)
+	)
 	return {"ok": true, "profile": profile, "result": result}
 
 
 ## Confirm the previewed slope: inject the frozen profile and enable the
-## stage (mutual exclusion drops the level assist if it was on).
-func confirm_slope_assist(profile: RefCounted) -> bool:
+## stage (mutual exclusion drops the level assist if it was on). The preview
+## band arrives with the call so the soil mark can flip from blinking to a
+## static tint without re-sweeping reachability.
+func confirm_slope_assist(profile: RefCounted, preview_result: Dictionary = {}) -> bool:
 	if profile == null or not _assist_configured:
 		return false
 	if not _assist_pipeline.set_stage_params("slope_grade", {"profile": profile}):
 		return false
+	var half_width := float(preview_result.get("half_width_m", _cutting_edge_half_width()))
+	set_slope_cut_preview(
+		SlopeCutPreviewScript.preview_uniforms(
+			profile,
+			float(preview_result.get("s_min", 0.0)),
+			float(preview_result.get("s_max", 0.0)),
+			half_width,
+			2
+		)
+	)
 	return set_equipment_assist_enabled("slope_grade", true)
+
+
+## Feed the analytic preview into the voxel soil material — the terrain marks
+## its own would-be-removed surface. Missing zone is a no-op (static maps and
+## bare runtimes have no voxel work zone sibling).
+func set_slope_cut_preview(uniforms: Dictionary) -> void:
+	var zone := _voxel_preview_sink()
+	if zone != null:
+		zone.set_cut_preview(uniforms)
+
+
+func clear_slope_cut_preview() -> void:
+	var zone := _voxel_preview_sink()
+	if zone != null:
+		zone.clear_cut_preview()
+
+
+## Duck-typed lookup: the work zone sits next to TerrainWorld under the same
+## terrain root, reached by capability rather than a hardcoded sibling path.
+func _voxel_preview_sink() -> Node:
+	if _terrain_world == null or not _terrain_world.is_inside_tree():
+		return null
+	var parent := _terrain_world.get_parent()
+	if parent == null:
+		return null
+	for child in parent.get_children():
+		if child.has_method("set_cut_preview"):
+			return child
+	return null
+
+
+## Everything the side-view HUD draws in one frame: joint pivots and tooth
+## projected into the profile plane, the centerline terrain strip, and the
+## live tooth-to-target offset. terrain polyline is (s, h) pairs so the view
+## needs no projection math beyond the static helper.
+func slope_view_snapshot(
+	profile: RefCounted,
+	s_min: float,
+	s_max: float,
+	half_width_m: float,
+	volume_m3: float,
+	mode: String
+) -> Dictionary:
+	if profile == null or not _assist_configured or _articulation == null or _body == null:
+		return {}
+	var ctx := _assist_pipeline.build_context(
+		_articulation, _body.global_transform, 1.0 / 60.0, _assist_context,
+		_body.linear_velocity, _body.angular_velocity
+	)
+	var joints := {}
+	for joint_name in ["swing_joint", "boom_joint", "arm_joint", "bucket_joint"]:
+		joints[joint_name] = ctx.joint_pivot_world.get(joint_name, Vector3.ZERO)
+	var tooth: Vector3 = ctx.bucket_ref_world
+	return {
+		"mode": mode,
+		"origin_xz": profile.origin_xz,
+		"axis": profile.axis,
+		"toe_s": profile.toe_s,
+		"toe_h": profile.toe_height,
+		"grade": profile.grade,
+		"angle_deg": profile.angle_deg,
+		"s_min": s_min,
+		"s_max": s_max,
+		"half_width": half_width_m,
+		"volume_m3": volume_m3,
+		"joints": joints,
+		"tooth": tooth,
+		"tooth_err": tooth.y - profile.height_at(profile.along(tooth)),
+		"terrain": _sample_profile_centerline(profile, s_min - 1.0, s_max + 1.0),
+	}
+
+
+## Terrain heights along the profile centerline (t = 0): the soil strip the
+## bucket actually rides, sampled through the same authoritative query the
+## cut probe uses so the drawn line matches what gets dug.
+func _sample_profile_centerline(
+	profile: RefCounted, s0: float, s1: float, step_m: float = 0.25
+) -> PackedVector2Array:
+	var line := PackedVector2Array()
+	var s := s0
+	while s <= s1 + 0.0001:
+		var world_xz: Vector2 = profile.origin_xz + profile.axis * s
+		var height := _sample_soil_height(world_xz)
+		if is_finite(height):
+			line.append(Vector2(s, height))
+		s += step_m
+	return line
 
 
 func _cutting_edge_local() -> Vector3:
