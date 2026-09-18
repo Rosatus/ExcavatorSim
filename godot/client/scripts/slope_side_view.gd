@@ -147,12 +147,33 @@ func _draw() -> void:
 			arc_pts.append(knee_px + Vector2(cos(a), sin(a)) * 22.0)
 		draw_polyline(arc_pts, TARGET_COLOR, 1.5)
 	draw_circle(knee_px, 3.0, TOOTH_COLOR)
-	# Chassis box: one rectangle enclosing undercarriage, upper structure and
-	# the upper↔boom pin — the link dots landing inside it are the pin
-	# indicators. Facing arrow above the box points down-range.
-	_draw_plane_rect(
-		to_px, sp + Vector2(-3.5, -1.2), Vector2(boom_sp.x + 0.3, box_top), CHASSIS_COLOR, false, 2.0
-	)
+	# Chassis figure standing on the ground line: a capsule-with-wheels track
+	# underneath, a divider at track top, and a rounded-rect upper structure
+	# reaching forward to the upper↔boom pin — the link dots landing inside
+	# are the pin indicators. Facing arrow above the body points down-range.
+	var ground_y := sp.y - 1.25
+	var wheel_r := 0.32
+	var body_right := maxf(boom_sp.x + 0.3, sp.x - 0.2)
+	var rear_px: Vector2 = to_px.call(Vector2(sp.x - 3.1, ground_y + wheel_r))
+	var front_px: Vector2 = to_px.call(Vector2(sp.x - 0.6, ground_y + wheel_r))
+	var r_px := wheel_r * scale
+	draw_line(rear_px + Vector2(0, r_px), front_px + Vector2(0, r_px), CHASSIS_COLOR, 2.0)
+	draw_line(rear_px + Vector2(0, -r_px), front_px + Vector2(0, -r_px), CHASSIS_COLOR, 2.0)
+	draw_arc(front_px, r_px, -PI / 2.0, PI / 2.0, 12, CHASSIS_COLOR, 2.0)
+	draw_arc(rear_px, r_px, PI / 2.0, PI * 1.5, 12, CHASSIS_COLOR, 2.0)
+	for c_px in [rear_px, front_px]:
+		draw_circle(c_px, r_px * 0.78, CHASSIS_COLOR, false, 1.5)
+		draw_circle(c_px, 2.0, CHASSIS_COLOR)
+	var divider_y := ground_y + wheel_r * 2.0 + 0.12
+	var body_style := StyleBoxFlat.new()
+	body_style.bg_color = Color(CHASSIS_COLOR, 0.14)
+	body_style.border_color = CHASSIS_COLOR
+	body_style.set_border_width_all(2)
+	body_style.corner_radius_top_left = 8
+	body_style.corner_radius_top_right = 8
+	var body_a: Vector2 = to_px.call(Vector2(sp.x - 3.35, box_top))
+	var body_b: Vector2 = to_px.call(Vector2(body_right, divider_y))
+	draw_style_box(body_style, Rect2(body_a, body_b - body_a))
 	var chassis := PackedVector2Array()
 	var arrow_base: Vector2 = to_px.call(Vector2(sp.x - 0.9, box_top + 0.25))
 	chassis.append(arrow_base + Vector2(14, 0))

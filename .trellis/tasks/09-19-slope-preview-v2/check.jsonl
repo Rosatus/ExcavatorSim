@@ -27,3 +27,4 @@
 {"file": ".trellis/spec/frontend/model-joint-semantics.md", "reason": "Edge-line contract: drawn only while a graded section is in band."}
 {"file": "godot/client/scripts/slope_side_view.gd", "reason": "Silhouette reshaped into a readable machine: track frame + turret polygon (cab bump forward, counterweight slab aft), 机身 label inside the body, facing arrow above the cab pointing +s."}
 {"file": "godot/client/scripts/slope_side_view.gd", "reason": "Silhouette simplified to a single rectangle per user feedback: box spans rear counterweight to the upper-boom pin (boom_joint pivot + margin), tracks to cab top; pin dots come from the link figure; facing arrow above the box."}
+{"ts":"sideview","item":"chassis figure: ground-standing track capsule + wheels + divider + rounded upper body","result":"pass","note":"track = stadium outline + 2 wheel circles on ground line; upper = rounded StyleBoxFlat to boom pin; explicit Variant-typed px vars"}
