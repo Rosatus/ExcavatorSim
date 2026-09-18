@@ -314,6 +314,11 @@ JSON,soak 用 `--replay` 注入同一测试通道回放，形成可重复的"真
   流式/commit 集中爆发。这是 scripted soak 看不到、acceptance 最相关的
   残余问题，供 M2/M3 归因。
 
+- 默认 soak 已切到真实挖掘回放：`pixi run soak-jolt-quick` = sy135/balanced/
+  normal + `--replay manual-dig-sy135-balanced-normal-90s-turn180.json` +
+  62s 单遍 + `--allow-incomplete-scenario`（支车复现率非 100%，否则
+  scenario_support 偶发误伤）。`soak-jolt-release`/`quality-matrix` 仍走
+  scripted scenario。
 - Current milestone: M1 完成 + 真实挖掘回放基线成立（soak 门全过）。
 - Blockers: 无（用户 WIP `equipment_assist_pipeline.gd`/`slope_cut_preview.gd`
   编译错误会连带阻断 soak，属并行开发噪音）。
