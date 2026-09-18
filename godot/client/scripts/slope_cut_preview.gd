@@ -35,9 +35,16 @@ static func compute(
 	height_sampler: Callable,
 	cell_m: float = 0.25,
 	half_width_m: float = 0.6,
-	sweep_steps: int = DEFAULT_SWEEP_STEPS
+	sweep_steps: int = DEFAULT_SWEEP_STEPS,
+	swept_band: Vector2 = Vector2(0.0, -1.0)
 ) -> Dictionary:
-	var band := reach_band(profile, articulation, chassis_transform, edge_local, joint_limits, sweep_steps)
+	# swept_band carries a pre-swept reach band (x <= y) so callers that
+	# refresh against a frozen machine can cache the expensive FK sweep and
+	# pay only the terrain grid per refresh. The default sentinel (x > y)
+	# means "sweep it here" and preserves the standalone-call behaviour.
+	var band := swept_band
+	if band.x > band.y:
+		band = reach_band(profile, articulation, chassis_transform, edge_local, joint_limits, sweep_steps)
 	var s_min := float(band.x)
 	var s_max := float(band.y)
 	var result := {

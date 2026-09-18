@@ -67,6 +67,22 @@ var _assist_pipeline := AssistPipeline.new()
 var _assist_context: Dictionary = {}
 var _assist_enable: Dictionary = {}
 var _assist_configured := false
+# Cached level-assist reach band: the flat profile tracks the live forward
+# axis, so its swept envelope is nearly invariant in profile space. Re-sweep
+# only when the latched height or cutting edge changes (plus a slow drift
+# fallback) instead of paying ~14k FK evaluations every refresh.
+var _level_band := Vector2.ZERO
+var _level_band_height := 0.0
+var _level_band_edge := Vector3.ZERO
+var _level_band_ms := 0
+var _level_band_valid := false
+# Same idea for the frozen-machine preview: the band only moves when the
+# profile parameters (d/theta adjust) or the cutting edge do, so the
+# expensive sweep runs on change instead of every refresh tick.
+var _preview_band := Vector2.ZERO
+var _preview_band_key := ""
+var _preview_band_edge := Vector3.ZERO
+var _preview_band_valid := false
 
 func collision_layers_snapshot() -> Dictionary:
 	if _descriptor.is_empty():
@@ -389,16 +405,39 @@ func update_slope_preview(profile: RefCounted) -> Dictionary:
 	var stage := _assist_pipeline.get_stage("slope_grade")
 	var params: Dictionary = stage.profile_params if stage != null else {}
 	var sampler := func(world_xz: Vector2) -> float: return _sample_soil_height(world_xz)
+	var edge := _cutting_edge_local()
+	# The machine is frozen while previewing, so the swept reach band only
+	# changes with the profile parameters the operator adjusts (or a tool
+	# swap). Re-sweep on change at a reduced step count — the band is an
+	# envelope for marking/volume, not a precision surface — and feed the
+	# cheap terrain grid every refresh.
+	var band_key := "%s|%s|%.3f|%.3f|%.4f|%.3f" % [
+		str(profile.origin_xz), str(profile.axis), profile.toe_s,
+		profile.toe_height, profile.grade, profile.knee_blend_m
+	]
+	if not _preview_band_valid or band_key != _preview_band_key or edge != _preview_band_edge:
+		_preview_band = SlopeCutPreviewScript.reach_band(
+			profile,
+			_articulation,
+			_body.global_transform,
+			edge,
+			ctx.joint_limits,
+			mini(int(params.get("preview_sweep_steps", 24)), 12)
+		)
+		_preview_band_key = band_key
+		_preview_band_edge = edge
+		_preview_band_valid = true
 	var result := SlopeCutPreviewScript.compute(
 		profile,
 		_articulation,
 		_body.global_transform,
-		_cutting_edge_local(),
+		edge,
 		ctx.joint_limits,
 		sampler,
 		float(params.get("preview_cell_m", 0.25)),
 		_cutting_edge_half_width(),
-		int(params.get("preview_sweep_steps", 24))
+		int(params.get("preview_sweep_steps", 24)),
+		_preview_band
 	)
 	# The voxel soil material marks the would-be-removed surface itself:
 	# mode 1 blinks while the operator adjusts, mode 2 keeps a static tint
@@ -519,16 +558,26 @@ func level_view_snapshot() -> Dictionary:
 	var profile := SlopeProfileScript.create(
 		ctx.bucket_ref_world, ctx.horizontal, 0.0, 0.0, height_ref
 	)
-	var band := SlopeCutPreviewScript.reach_band(
-		profile,
-		_articulation,
-		_body.global_transform,
-		_cutting_edge_local(),
-		ctx.joint_limits,
-		SlopeCutPreviewScript.DEFAULT_SWEEP_STEPS
-	)
+	var edge := _cutting_edge_local()
+	var need_sweep := not _level_band_valid \
+		or absf(height_ref - _level_band_height) > 0.05 \
+		or edge != _level_band_edge \
+		or Time.get_ticks_msec() - _level_band_ms > 5000
+	if need_sweep:
+		_level_band = SlopeCutPreviewScript.reach_band(
+			profile,
+			_articulation,
+			_body.global_transform,
+			edge,
+			ctx.joint_limits,
+			10
+		)
+		_level_band_height = height_ref
+		_level_band_edge = edge
+		_level_band_ms = Time.get_ticks_msec()
+		_level_band_valid = true
 	var view := _view_snapshot(
-		profile, band.x, band.y, _cutting_edge_half_width(), 0.0, "level"
+		profile, _level_band.x, _level_band.y, _cutting_edge_half_width(), 0.0, "level"
 	)
 	view["profile"] = profile
 	return view
