@@ -111,6 +111,30 @@ func _test_model(model_id: String) -> void:
 		failures.append("%s bucket pitch drifted %.4f rad during arm drive" % [model_id, peak_attitude_error])
 	print("%s drive: travel=%.3f m, peak height err=%.4f m, peak pitch err=%.5f rad" % [model_id, travel, peak_height_error, peak_attitude_error])
 
+	# Side-view guidance frame: while the stage is enabled the runtime must
+	# publish a level-mode snapshot carrying the flat target plane, live
+	# joint pivots, the tooth marker, and the centerline terrain strip.
+	var view := runtime.level_view_snapshot()
+	if String(view.get("mode", "")) != "level":
+		failures.append("%s level_view_snapshot missing or wrong mode" % model_id)
+	else:
+		if float(view.get("grade", 1.0)) != 0.0:
+			failures.append("%s level view carried a non-flat target grade" % model_id)
+		for key in ["origin_xz", "axis", "toe_h", "s_min", "s_max", "joints", "tooth", "tooth_err", "terrain"]:
+			if key not in view:
+				failures.append("%s level view missing %s" % [model_id, key])
+		var joints := view.get("joints", {}) as Dictionary
+		for joint_name in ["swing_joint", "boom_joint", "arm_joint", "bucket_joint"]:
+			if joint_name not in joints:
+				failures.append("%s level view missing joint %s" % [model_id, joint_name])
+		var tooth: Vector3 = view.get("tooth", Vector3.ZERO)
+		if not tooth.is_finite():
+			failures.append("%s level view tooth non-finite" % model_id)
+		if absf(float(view.get("tooth_err", 1.0)) - (tooth.y - float(view.get("toe_h", 0.0)))) > 0.001:
+			failures.append("%s level view tooth_err inconsistent with flat target" % model_id)
+		if len(view.get("terrain", PackedVector2Array())) < 2:
+			failures.append("%s level view terrain strip too short" % model_id)
+
 	# Boom and bucket operator input are fully owned by the assist: they must
 	# not move any joint while enabled.
 	runtime.reset(spawn)
