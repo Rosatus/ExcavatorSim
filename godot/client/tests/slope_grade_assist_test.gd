@@ -33,6 +33,8 @@ func _run() -> void:
 	if ProjectSettings.get_setting("physics/3d/physics_engine") != "Jolt Physics":
 		return _fail("Jolt Physics is not selected")
 	_test_profile_math()
+	_test_profile_reanchor()
+	_test_knee_blend()
 	_test_pipeline_contracts()
 	_test_preview_compute()
 	for model_id in ["sy135", "sy205"]:
@@ -79,6 +81,64 @@ func _test_profile_math() -> void:
 	var toe_s := (Vector2(toe.x, toe.z) - Vector2(tooth.x, tooth.z)).dot(rising.axis)
 	if absf(toe_s - 3.0) > 0.001 or not is_equal_approx(toe.y, 0.0):
 		failures.append("toe_world does not sit at distance/height")
+
+
+## Machine-following anchor: capture once, then reanchor() must reproduce
+## the origin on an unmoved machine, translate it rigidly with the pivot,
+## and rotate it around the pivot with the heading.
+func _test_profile_reanchor() -> void:
+	var profile := Profile.create(
+		Vector3(2.0, 0.5, -1.0), Vector3(1.0, 0.0, 0.0), 3.0, 15.0, 0.0
+	)
+	var pivot := Vector2(0.0, 0.0)
+	profile.capture_anchor(pivot)
+	var origin0 := profile.origin_xz
+	profile.reanchor(Vector3(1.0, 0.0, 0.0), pivot)
+	if profile.origin_xz.distance_to(origin0) > 0.0001:
+		failures.append("reanchor moved the origin on a stationary machine")
+	# Undercarriage drives 5 m forward: the whole surface follows.
+	profile.reanchor(Vector3(1.0, 0.0, 0.0), pivot + Vector2(5.0, 0.0))
+	if profile.origin_xz.distance_to(origin0 + Vector2(5.0, 0.0)) > 0.0001:
+		failures.append("reanchor did not translate the surface with the pivot")
+	# Machine yaws 90°: the anchor keeps its (s, t) offset in the new frame.
+	profile.reanchor(Vector3(0.0, 0.0, 1.0), pivot)
+	if not profile.axis.is_equal_approx(Vector2(0.0, 1.0)):
+		failures.append("reanchor did not adopt the live heading")
+	var expect := pivot + Vector2(0.0, 1.0) * 2.0 + Vector2(-1.0, 0.0) * -1.0
+	if profile.origin_xz.distance_to(expect) > 0.001:
+		failures.append("reanchor rotated the anchor off its machine-relative offset")
+
+
+## Smooth toe knee: C1 at both blend joints, mid-knee lifts w/4 above the
+## sharp corner, grade ramps 0 -> full across the band instead of stepping.
+func _test_knee_blend() -> void:
+	var profile := Profile.create(
+		Vector3(0.0, 0.0, 0.0), Vector3(1.0, 0.0, 0.0), 3.0, 20.0, 0.0
+	)
+	profile.knee_blend_m = 0.2
+	var g := tan(deg_to_rad(20.0))
+	var w := 0.2
+	# Outside the band the surface is identical to the sharp profile.
+	for s in [2.5, 2.79]:
+		if absf(profile.height_at(s)) > 0.0001:
+			failures.append("blended profile lifted the bench outside the knee (s=%.2f)" % s)
+			break
+	if absf(profile.height_at(4.0) - g * 1.0) > 0.001:
+		failures.append("blended profile broke the grade beyond the knee")
+	# C1 joints: height and grade are continuous at both band edges.
+	if absf(profile.height_at(3.0 - w)) > 0.0001 or absf(profile.grade_at(3.0 - w)) > 0.0001:
+		failures.append("blended profile is not C0/C1 at the bench joint")
+	if absf(profile.grade_at(3.0 + w) - g) > 0.0001:
+		failures.append("blended profile does not reach full grade at the grade joint")
+	# Mid-knee: the surface rounds over the corner, grade is halfway in.
+	if absf(profile.height_at(3.0) - g * w / 4.0) > 0.0005:
+		failures.append("blended profile mid-knee height wrong")
+	if absf(profile.grade_at(3.0) - g * 0.5) > 0.0001:
+		failures.append("blended profile mid-knee grade wrong")
+	# Blend off: the sharp piecewise surface comes back verbatim.
+	profile.knee_blend_m = 0.0
+	if absf(profile.height_at(3.0)) > 0.0001 or absf(profile.grade_at(2.99)) > 0.0001:
+		failures.append("zero blend did not restore the sharp profile")
 
 
 ## Pipeline plumbing that needs no Jolt body: registration, exclusive group
