@@ -78,14 +78,26 @@ func _draw() -> void:
 		hi = hi.max(pt)
 	lo = lo.min(Vector2(s_min, target_h.call(s_min)))
 	hi = hi.max(Vector2(s_max, target_h.call(s_max)))
-	# The chassis box hangs behind the swing pivot and reaches forward to the
-	# upper↔boom pin — outside the link/terrain extents — so it must join the
-	# content bounds or it draws past the panel's left edge.
+	# The chassis figure hangs behind the swing pivot and reaches forward to
+	# the upper↔boom pin — outside the link/terrain extents — so it must join
+	# the content bounds or it draws past the panel's left edge. Its ground
+	# line is the sampled terrain under the track mid, so the tracks stand
+	# on the drawn ground instead of a fixed pivot offset.
 	var sp: Vector2 = pivots["swing_joint"]
 	var boom_sp: Vector2 = pivots["boom_joint"]
-	var box_top := maxf(sp.y + 0.8, boom_sp.y + 0.35)
-	lo = lo.min(sp + Vector2(-3.6, -1.3))
-	hi = hi.max(Vector2(boom_sp.x + 0.4, box_top + 0.4))
+	var box_top := maxf(sp.y + 0.75, boom_sp.y + 0.2)
+	var ground_y := sp.y - 1.2
+	if terrain.size() >= 2:
+		var track_mid := sp.x - 1.8
+		var gi := 0
+		while gi < terrain.size() - 2 and terrain[gi + 1].x < track_mid:
+			gi += 1
+		var ga := terrain[gi]
+		var gb := terrain[gi + 1]
+		var gw := gb.x - ga.x
+		ground_y = ga.y if absf(gw) < 0.001 else lerpf(ga.y, gb.y, clampf((track_mid - ga.x) / gw, 0.0, 1.0))
+	lo = lo.min(Vector2(sp.x - 3.6, ground_y - 0.1))
+	hi = hi.max(Vector2(maxf(boom_sp.x, sp.x) + 0.4, box_top + 0.4))
 	var span := (hi - lo).max(Vector2(1.0, 1.0))
 	var draw_area := size - Vector2(MARGIN, MARGIN) * 2.0
 	var scale := minf(draw_area.x / span.x, draw_area.y / span.y)
@@ -147,15 +159,16 @@ func _draw() -> void:
 			arc_pts.append(knee_px + Vector2(cos(a), sin(a)) * 22.0)
 		draw_polyline(arc_pts, TARGET_COLOR, 1.5)
 	draw_circle(knee_px, 3.0, TOOTH_COLOR)
-	# Chassis figure standing on the ground line: a capsule-with-wheels track
-	# underneath, a divider at track top, and a rounded-rect upper structure
-	# reaching forward to the upper↔boom pin — the link dots landing inside
-	# are the pin indicators. Facing arrow above the body points down-range.
-	var ground_y := sp.y - 1.25
-	var wheel_r := 0.32
+	# Chassis figure standing on the sampled ground: the undercarriage band
+	# runs from the terrain line up to the swing pivot (the slew ring doubles
+	# as the divider), a capsule track with two wheels fills it, and a
+	# chamfered upper-structure polygon reaches forward to the boom pin.
+	var under_h := maxf(sp.y - ground_y, 0.3)
+	var wheel_r := clampf(under_h * 0.4, 0.12, 0.65)
 	var body_right := maxf(boom_sp.x + 0.3, sp.x - 0.2)
-	var rear_px: Vector2 = to_px.call(Vector2(sp.x - 3.1, ground_y + wheel_r))
-	var front_px: Vector2 = to_px.call(Vector2(sp.x - 0.6, ground_y + wheel_r))
+	var rear_x := sp.x - 3.4
+	var rear_px: Vector2 = to_px.call(Vector2(sp.x - 2.9, ground_y + wheel_r))
+	var front_px: Vector2 = to_px.call(Vector2(sp.x - 0.7, ground_y + wheel_r))
 	var r_px := wheel_r * scale
 	draw_line(rear_px + Vector2(0, r_px), front_px + Vector2(0, r_px), CHASSIS_COLOR, 2.0)
 	draw_line(rear_px + Vector2(0, -r_px), front_px + Vector2(0, -r_px), CHASSIS_COLOR, 2.0)
@@ -164,16 +177,25 @@ func _draw() -> void:
 	for c_px in [rear_px, front_px]:
 		draw_circle(c_px, r_px * 0.78, CHASSIS_COLOR, false, 1.5)
 		draw_circle(c_px, 2.0, CHASSIS_COLOR)
-	var divider_y := ground_y + wheel_r * 2.0 + 0.12
-	var body_style := StyleBoxFlat.new()
-	body_style.bg_color = Color(CHASSIS_COLOR, 0.14)
-	body_style.border_color = CHASSIS_COLOR
-	body_style.set_border_width_all(2)
-	body_style.corner_radius_top_left = 8
-	body_style.corner_radius_top_right = 8
-	var body_a: Vector2 = to_px.call(Vector2(sp.x - 3.35, box_top))
-	var body_b: Vector2 = to_px.call(Vector2(body_right, divider_y))
-	draw_style_box(body_style, Rect2(body_a, body_b - body_a))
+	# Divider: the turntable deck edge at the slew ring, overhanging the body
+	# a hair on both ends so the upper/under split reads explicitly.
+	var deck_a: Vector2 = to_px.call(Vector2(rear_x - 0.1, sp.y))
+	var deck_b: Vector2 = to_px.call(Vector2(body_right + 0.08, sp.y))
+	draw_line(deck_a, deck_b, CHASSIS_COLOR, 2.0)
+	# Upper structure: one flat-decked polygon with a chamfered front-top
+	# corner (cab nose facing the work) — minimal but no longer a plain box.
+	var cham_w := minf(0.5, (body_right - rear_x) * 0.25)
+	var cham_h := minf(0.35, (box_top - sp.y) * 0.4)
+	var body_pts := PackedVector2Array([
+		to_px.call(Vector2(rear_x, sp.y)),
+		to_px.call(Vector2(rear_x, box_top)),
+		to_px.call(Vector2(body_right - cham_w, box_top)),
+		to_px.call(Vector2(body_right, box_top - cham_h)),
+		to_px.call(Vector2(body_right, sp.y)),
+	])
+	draw_colored_polygon(body_pts, Color(CHASSIS_COLOR, 0.14))
+	body_pts.append(body_pts[0])
+	draw_polyline(body_pts, CHASSIS_COLOR, 2.0)
 	var chassis := PackedVector2Array()
 	var arrow_base: Vector2 = to_px.call(Vector2(sp.x - 0.9, box_top + 0.25))
 	chassis.append(arrow_base + Vector2(14, 0))
