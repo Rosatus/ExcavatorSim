@@ -111,13 +111,19 @@ pixi run python backend/scripts/sync_sy205_joint_contract.py [--check]
   so `follow_profile` reposes it with one transform write, the soil mark
   chases with ~10 uniform writes, and the side-view snapshot is a context
   build plus a bilinear centerline strip — all cheap enough to run every
-  physics tick while active. The genuinely expensive 24^3 FK reach sweep
-  stays preview-only at the 10 Hz gate, so the active-mode visuals glide
-  instead of stepping.
+  physics tick while active. The genuinely expensive FK reach sweep is
+  never on the per-tick path: `SlopeCutPreview.compute` accepts a
+  pre-swept `swept_band`, and both consumers cache it — the preview keys
+  its band on the profile parameters plus the cutting edge (re-swept only
+  when the operator adjusts, at capped step count), while the level view
+  keys on the latched height and edge with a 5 s drift fallback, since the
+  flat profile's live-axis tracking makes its band nearly invariant in
+  profile space. An unkeyed 24^3 sweep every 0.15 s refresh was a
+  ~100 ms periodic hitch — do not reintroduce it.
 - Bucket-level assist reuses the same guidance channel without any blink:
   `JoltChassisTrackRuntime.level_view_snapshot` builds a degenerate
-  zero-grade `SlopeProfile` at the stage's latched `height_ref_m`, sweeps
-  the same `SlopeCutPreview.reach_band`, and publishes `assist_view` with
+  zero-grade `SlopeProfile` at the stage's latched `height_ref_m`, reuses
+  the cached `reach_band` envelope, and publishes `assist_view` with
   `mode: "level"`; the controller also shows the flat target ribbon while
   level grading is live. `assist_view` is a single top-level status slot —
   whichever terminal-surface assist is live fills it (slope modes take
