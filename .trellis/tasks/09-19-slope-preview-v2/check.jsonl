@@ -21,3 +21,7 @@
 {"file": ".trellis/spec/frontend/model-joint-semantics.md", "reason": "assist_view single-slot contract; level reuses guidance channel without blink."}
 {"file": "godot/client/scripts/slope_cut_preview_visual.gd", "reason": "Removed the no-depth edge-line mesh (swath borders + toe line): at near-ground level only the borders were visible and read as a distracting stray line from under the chassis. Ribbon surface kept."}
 {"file": ".trellis/spec/frontend/model-joint-semantics.md", "reason": "Ghost ribbon spec drops the edge line."}
+{"file": "godot/client/scripts/slope_cut_preview_visual.gd", "reason": "Edge lines restored but gated on a graded section inside the band (grade!=0 and toe_s<s_max): bench borders, toe cross-line, and grade borders draw for slope profiles; flat/level ribbons draw skin only so no stray line runs out from under the machine."}
+{"file": "godot/client/scripts/slope_side_view.gd", "reason": "Measurement anchoring: anchor tick + d dimension line s=0->toe, theta arc at the knee, toe knee marker; tooth err drawn as 2px dimension stub labeled at midpoint; facing arrow now points +s toward the work; body silhouette fills opaque to mask the bench line behind it."}
+{"file": "godot/client/scripts/jolt_chassis_track_runtime.gd", "reason": "Centerline terrain strip extended left to s=-6 so the ground line runs under the machine silhouette."}
+{"file": ".trellis/spec/frontend/model-joint-semantics.md", "reason": "Edge-line contract: drawn only while a graded section is in band."}

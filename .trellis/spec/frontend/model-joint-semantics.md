@@ -87,9 +87,12 @@ pixi run python backend/scripts/sync_sy205_joint_contract.py [--check]
   `cut_*` uniforms (`SlopeCutPreview.preview_uniforms` packs them) and
   blinks the real terrain surface above the target profile between tinted
   and discarded — the mark self-erases as digging proceeds; the ghost
-  ribbon (`SlopeCutPreviewVisual`) draws only the finished-surface skin
-  (no edge lines — the swath border read as a distracting stray line at
-  ground level); and `SlopeSideView` renders the cabin-plane
+  ribbon (`SlopeCutPreviewVisual`) draws the finished-surface skin plus
+  no-depth edge lines (bench borders, toe cross-line, grade borders) —
+  but only while a graded section is inside the band: a flat ribbon's
+  borders lie on the ground and read as a stray line from under the
+  machine, so level/flat cases draw the skin alone; and `SlopeSideView`
+  renders the cabin-plane
   2D guidance panel (links, terrain strip, target line, cut fill, tooth
   offset) from the top-level `assist_view` status, shown in preview and
   active modes only. `VoxelWorkZone.set_cut_preview` is the duck-typed sink

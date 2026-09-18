@@ -13,6 +13,7 @@ const CUT_FILL := Color(0.9, 0.35, 0.15, 0.35)
 const TARGET_COLOR := Color(0.4, 0.85, 1.0)
 const LINK_COLOR := Color(0.88, 0.9, 0.95)
 const CHASSIS_COLOR := Color(0.55, 0.58, 0.65)
+const BODY_FILL := Color(0.09, 0.1, 0.13, 1.0)
 const TOOTH_COLOR := Color(1.0, 0.8, 0.2)
 const TEXT_COLOR := Color(0.9, 0.92, 0.95)
 const MARGIN := 14.0
@@ -123,15 +124,39 @@ func _draw() -> void:
 	for s_mark in [s_min, s_max]:
 		var p0: Vector2 = to_px.call(Vector2(s_mark, target_h.call(s_mark)))
 		draw_line(p0 + Vector2(0, -4), p0 + Vector2(0, 4), TARGET_COLOR, 1.5)
+	# Measurement anchors: the title's d spans s=0 (the profile anchor, the
+	# tooth position at confirm) to the toe knee, and θ is the grade's lean
+	# off the bench — both need on-canvas marks or they float free of the
+	# drawing.
+	var knee_px: Vector2 = to_px.call(Vector2(knee, target_h.call(knee)))
+	if toe_s > 0.05:
+		var anchor_px: Vector2 = to_px.call(Vector2(0.0, target_h.call(0.0)))
+		var dim_off := Vector2(0.0, -10.0)
+		draw_line(anchor_px + Vector2(0, -5), anchor_px + Vector2(0, 5), TEXT_COLOR, 1.5)
+		draw_line(anchor_px + dim_off, knee_px + dim_off, TEXT_COLOR, 1.0)
+		draw_line(anchor_px + dim_off + Vector2(0, -3), anchor_px + dim_off + Vector2(0, 3), TEXT_COLOR, 1.0)
+		draw_line(knee_px + dim_off + Vector2(0, -3), knee_px + dim_off + Vector2(0, 3), TEXT_COLOR, 1.0)
+		_draw_text((anchor_px + knee_px) * 0.5 + dim_off + Vector2(-4.0, -4.0), "d")
+	# Theta arc at the toe knee: bench direction sweeps into the grade.
+	var px_ang := atan2(-grade, 1.0)
+	if absf(px_ang) > 0.03 and knee > view_s0 and knee < view_s1:
+		var arc_pts := PackedVector2Array()
+		for i in range(9):
+			var a := lerpf(0.0, px_ang, float(i) / 8.0)
+			arc_pts.append(knee_px + Vector2(cos(a), sin(a)) * 22.0)
+		draw_polyline(arc_pts, TARGET_COLOR, 1.5)
+	draw_circle(knee_px, 3.0, TOOTH_COLOR)
 	# Chassis silhouette anchored at the swing pivot: tracks, body, cab, and a
 	# facing arrow — the machine always sits on the s<0 side of the profile.
+	# The body fills opaque so the bench line behind it stays masked.
 	var chassis := PackedVector2Array()
+	_draw_plane_rect(to_px, sp + Vector2(-3.1, -0.5), sp + Vector2(-0.3, 0.35), BODY_FILL, true)
 	_draw_plane_rect(to_px, sp + Vector2(-3.1, -0.5), sp + Vector2(-0.3, 0.35), CHASSIS_COLOR, false, 2.0)
 	_draw_plane_rect(to_px, sp + Vector2(-3.4, -1.15), sp + Vector2(-0.1, -0.5), CHASSIS_COLOR, true)
 	var arrow_base: Vector2 = to_px.call(sp + Vector2(-0.9, 0.45))
-	chassis.append(arrow_base + Vector2(-7, -5))
-	chassis.append(arrow_base + Vector2(7, -5))
-	chassis.append(arrow_base + Vector2(0, -14))
+	chassis.append(arrow_base + Vector2(14, 0))
+	chassis.append(arrow_base + Vector2(-5, -7))
+	chassis.append(arrow_base + Vector2(-5, 7))
 	draw_colored_polygon(chassis, CHASSIS_COLOR)
 	# Link figure and tooth marker.
 	var link_px := PackedVector2Array()
@@ -142,10 +167,12 @@ func _draw() -> void:
 		draw_circle(to_px.call(pt), 3.0, LINK_COLOR)
 	var tooth_px: Vector2 = to_px.call(tooth_pt)
 	draw_circle(tooth_px, 5.0, TOOTH_COLOR)
-	# Tooth offset from the target surface, the number the operator steers by.
+	# Tooth offset from the target surface, the number the operator steers by
+	# — a dimension stub from the tooth down to the design line, labeled at
+	# its midpoint so the text rides the measurement it belongs to.
 	var tooth_err := float(_view.get("tooth_err", 0.0))
 	var target_at_tooth: Vector2 = to_px.call(Vector2(tooth_pt.x, target_h.call(tooth_pt.x)))
-	draw_line(tooth_px, target_at_tooth, TOOTH_COLOR, 1.0)
+	draw_line(tooth_px, target_at_tooth, TOOTH_COLOR, 2.0)
 	var title := ""
 	match String(_view.get("mode", "")):
 		"level":
@@ -158,7 +185,7 @@ func _draw() -> void:
 				float(_view.get("volume_m3", 0.0)),
 			]
 	_draw_text(Vector2(MARGIN, MARGIN + 4), title)
-	_draw_text(tooth_px + Vector2(8, -8), "%+dcm" % roundi(tooth_err * 100.0))
+	_draw_text(tooth_px.lerp(target_at_tooth, 0.5) + Vector2(10.0, 4.0), "%+dcm" % roundi(tooth_err * 100.0))
 
 
 func _draw_text(pos: Vector2, text: String) -> void:

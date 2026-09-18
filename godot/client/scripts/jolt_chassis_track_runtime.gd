@@ -543,7 +543,7 @@ func _view_snapshot(
 		"joints": joints,
 		"tooth": tooth,
 		"tooth_err": tooth.y - profile.height_at(profile.along(tooth)),
-		"terrain": _sample_profile_centerline(profile, s_min - 1.0, s_max + 1.0),
+		"terrain": _sample_profile_centerline(profile, minf(s_min - 1.0, -6.0), s_max + 1.0),
 	}
 
 
