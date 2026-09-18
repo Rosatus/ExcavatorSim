@@ -39,7 +39,8 @@ const TRACK_FIELDS := [
 	]
 const OPTIONAL_TRACK_RESPONSE_FIELDS := [
 	"drive_effort_slew_n_per_tick", "brake_effort_slew_n_per_tick",
-	"acceleration_window_s", "brake_stop_window_s",
+	"acceleration_window_s", "brake_stop_window_s", "minimum_traction_ratio",
+	"recovery_speed_m_s",
 ]
 const OPTIONAL_TRACK_ORIENTATION_FIELDS := ["local_forward_axis"]
 const BODY_FRAMES := {
@@ -326,6 +327,8 @@ func _validate_tracks(value: Variant) -> bool:
 	for field in OPTIONAL_TRACK_RESPONSE_FIELDS:
 		if tracks.has(field) and not _positive_number(tracks.get(field)):
 			return _reject("tracks.%s" % field, "must be finite and positive when present")
+	if tracks.has("minimum_traction_ratio") and float(tracks["minimum_traction_ratio"]) > 0.5:
+		return _reject("tracks.minimum_traction_ratio", "must be at most 0.5")
 	var points: Variant = tracks.get("traction_points_per_side")
 	if not _integer_in_range(points, 2, 16):
 		return _reject("tracks.traction_points_per_side", "must be an integer from 2 to 16")

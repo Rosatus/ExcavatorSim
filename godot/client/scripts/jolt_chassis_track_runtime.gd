@@ -102,6 +102,10 @@ var _left_support_load_n := 0.0
 var _right_support_load_n := 0.0
 var _left_saturated := false
 var _right_saturated := false
+var _left_recovery_active := false
+var _right_recovery_active := false
+var _left_traction_floor_n := 0.0
+var _right_traction_floor_n := 0.0
 var _contacts: Array[Dictionary] = []
 var _quality_flags: Array[String] = []
 var _last_step_usec := 0
@@ -1042,6 +1046,8 @@ func _capture_post_step_snapshot() -> void:
 		"track_rejections": _track_rejections.duplicate(true),
 		"left_contact_count": _left_contact_count, "right_contact_count": _right_contact_count,
 		"left_saturated": _left_saturated, "right_saturated": _right_saturated,
+		"left_recovery_active": _left_recovery_active, "right_recovery_active": _right_recovery_active,
+		"left_traction_floor_n": _left_traction_floor_n, "right_traction_floor_n": _right_traction_floor_n,
 		"grounded": _left_contact_count + _right_contact_count > 0,
 		"track_support_source_counts": _track_support_source_counts.duplicate(true),
 		"terrain_generation": _terrain_identity.x, "terrain_revision": _terrain_identity.y,
@@ -1307,6 +1313,10 @@ func _apply_track_forces() -> void:
 	_right_effort_n = float(right["effort_n"])
 	_left_saturated = bool(left["saturated"])
 	_right_saturated = bool(right["saturated"])
+	_left_recovery_active = bool(left.get("recovery_active", false))
+	_right_recovery_active = bool(right.get("recovery_active", false))
+	_left_traction_floor_n = float(left.get("traction_floor_n", 0.0))
+	_right_traction_floor_n = float(right.get("traction_floor_n", 0.0))
 	_contacts.assign(result["contacts"])
 	_track_support_source_counts = result["sources"]
 	_track_probes = result["probes"]
@@ -1409,6 +1419,10 @@ func _clear_tick_telemetry() -> void:
 	_right_support_load_n = 0.0
 	_left_saturated = false
 	_right_saturated = false
+	_left_recovery_active = false
+	_right_recovery_active = false
+	_left_traction_floor_n = 0.0
+	_right_traction_floor_n = 0.0
 	_contacts.clear()
 	_quality_flags.clear()
 	_track_support_source_counts.clear()
@@ -1564,6 +1578,8 @@ func _empty_snapshot() -> Dictionary:
 		"bucket_ground_interaction": _bucket_ground_interaction_status(),
 		"left_support_load_n": 0.0,
 		"right_support_load_n": 0.0,
+		"left_recovery_active": false, "right_recovery_active": false,
+		"left_traction_floor_n": 0.0, "right_traction_floor_n": 0.0,
 		"posture_error_rad": 0.0,
 		"terrain_normal_alignment_deg": 0.0,
 		"lowest_clearance_m": 0.0,

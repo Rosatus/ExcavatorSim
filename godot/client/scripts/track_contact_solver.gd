@@ -146,6 +146,21 @@ func step(body: RigidBody3D, commands: Vector2, delta: float, terrain_mask: int,
 		samples = loaded_samples
 		var speed := speed_sum / load_sum if load_sum > 0.01 else 0.0
 		_effort[side] = _drive_effort(commands[side], speed, _effort[side], delta, not samples.is_empty())
+		# Keep normal Coulomb traction for loaded contact, but provide a small,
+		# bounded recovery floor when only a corner or one station still touches
+		# the ground. This avoids a soft-lock without making an airborne track
+		# powered: the floor exists only after the same valid-contact filters above.
+		var minimum_ratio := clampf(float(_tracks.get("minimum_traction_ratio", 0.0)), 0.0, 0.5)
+		var recovery_speed := maxf(0.05, float(_tracks.get("recovery_speed_m_s", 0.22)))
+		# Do not inject recovery force while the operator is braking through a
+		# non-zero velocity. The normal effort must cross zero first so reversal
+		# remains smooth and predictable.
+		var same_direction := speed * commands[side] >= -0.02
+		var recovery_active := not samples.is_empty() and absf(commands[side]) > 0.01 and absf(speed) < recovery_speed and same_direction
+		var contact_quality := 0.0
+		for sample in samples:
+			contact_quality = maxf(contact_quality, clampf((sample["normal"] as Vector3).dot(Vector3.UP), 0.0, 1.0))
+		var minimum_side_force := float(_tracks["max_drive_force_n"]) * minimum_ratio * contact_quality if recovery_active else 0.0
 		var saturated := false
 		var slip := 0.0
 		for sample in samples:
@@ -156,6 +171,8 @@ func step(body: RigidBody3D, commands: Vector2, delta: float, terrain_mask: int,
 			var lateral: Vector3 = sample["lateral"]
 			var weight := float(sample["traction_load"]) / maxf(load_sum, 0.001)
 			var drive := _effort[side] * weight
+			if minimum_side_force > 0.0:
+				drive = signf(commands[side]) * maxf(absf(drive), minimum_side_force * weight)
 			var pivot := clampf(sqrt(maxf(0.0,-commands.x*commands.y)),0.0,1.0)
 			var lateral_scale := lerpf(1.0,float(_tracks["pivot_lateral_resistance_scale"]),pivot)
 			var side_force := -(sample["velocity"] as Vector3).dot(lateral) * float(_tracks["lateral_resistance_n_per_m_s"]) * lateral_scale * weight
@@ -163,7 +180,10 @@ func step(body: RigidBody3D, commands: Vector2, delta: float, terrain_mask: int,
 			# A neutral brake can hold a slope within the same Coulomb budget.
 			if absf(commands[side]) < 0.001:
 				force += Vector3.UP.slide(normal) * (float(_dynamics["mass_kg"]) * 9.80665 * 0.5 * weight)
-			var cap := float(_tracks["friction"]) * float(sample["traction_load"])
+			var cap := maxf(
+				float(_tracks["friction"]) * float(sample["traction_load"]),
+				minimum_side_force * weight
+			)
 			if force.length() > cap:
 				force = force.limit_length(cap)
 				saturated = true
@@ -179,7 +199,7 @@ func step(body: RigidBody3D, commands: Vector2, delta: float, terrain_mask: int,
 			output["sources"][source] = int(output["sources"].get(source,0)) + 1
 			output["contacts"].append({"body":"chassis","other":String((sample["collider"] as Node).name),"point":point,"normal":normal,"impulse_n_s":load*delta,"penetration_m":0.0,"track_side":side_name,"support_source":source})
 			output["probes"].append({"side":side_name,"station":sample["station"],"point":point,"normal":normal,"compression_m":sample["compression"],"load_n":load,"hull_load_n":sample["hull_load"],"traction_load_n":sample["traction_load"],"source":source})
-		output[side_name] = {"contact_count":samples.size(),"speed_m_s":speed,"slip_ratio":slip/float(samples.size()) if not samples.is_empty() else 0.0,"support_load_n":load_sum,"effort_n":_effort[side],"saturated":saturated}
+		output[side_name] = {"contact_count":samples.size(),"speed_m_s":speed,"slip_ratio":slip/float(samples.size()) if not samples.is_empty() else 0.0,"support_load_n":load_sum,"effort_n":_effort[side],"saturated":saturated,"recovery_active":recovery_active,"traction_floor_n":minimum_side_force}
 	return output
 
 func _sweep(body: RigidBody3D, local_point: Vector3, up: Vector3, mask: int) -> Dictionary:
