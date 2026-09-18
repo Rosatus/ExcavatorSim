@@ -14,6 +14,10 @@ uniform vec2 cut_axis = vec2(1.0, 0.0);
 uniform vec4 cut_band = vec4(0.0, 0.0, 0.6, 0.0); // x=s_min y=s_max z=half_width w=toe_s
 uniform float cut_toe_height = 0.0;
 uniform float cut_tan_theta = 0.0;
+// Half-width of the smooth relu rounding the toe knee — the same C1 blend
+// the tracked SlopeProfile uses so the mark boundary matches the surface
+// the assist actually cuts (0 = sharp piecewise knee).
+uniform float cut_knee_w = 0.0;
 uniform vec4 cut_tint : source_color = vec4(1.0, 0.55, 0.15, 1.0);
 uniform float cut_pulse_hz = 2.2;
 varying vec3 soil_world;
@@ -29,7 +33,14 @@ void fragment() {
   vec2 rel = soil_world.xz - cut_origin_xz;
   float s = dot(rel, cut_axis);
   float t = dot(rel, vec2(-cut_axis.y, cut_axis.x));
-  float target_h = cut_toe_height + (s > cut_band.w ? cut_tan_theta * (s - cut_band.w) : 0.0);
+  float x = s - cut_band.w;
+  float rise = x;
+  if (cut_knee_w > 0.0 && x < cut_knee_w) {
+   rise = x <= -cut_knee_w ? 0.0 : (x + cut_knee_w) * (x + cut_knee_w) / (4.0 * cut_knee_w);
+  } else if (x < 0.0) {
+   rise = 0.0;
+  }
+  float target_h = cut_toe_height + cut_tan_theta * rise;
   cut_marked = s >= cut_band.x && s <= cut_band.y && abs(t) <= cut_band.z && soil_world.y > target_h;
   if (cut_marked && cut_mode == 1 && fract(TIME * cut_pulse_hz) > 0.5) { discard; }
  }

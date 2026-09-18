@@ -53,8 +53,15 @@ func _draw() -> void:
 	var joints := _view.get("joints", {}) as Dictionary
 	var tooth: Vector3 = _view.get("tooth", Vector3.ZERO)
 	var terrain := _view.get("terrain", PackedVector2Array()) as PackedVector2Array
+	var knee_w := float(_view.get("knee_w", 0.0))
+	# Same smooth-relu the tracked SlopeProfile uses at the toe knee — the
+	# drawn line is the surface the tooth actually follows.
 	var target_h := func(s: float) -> float:
-		return toe_h + (grade * (s - toe_s) if s > toe_s else 0.0)
+		var x := s - toe_s
+		if knee_w > 0.0 and x > -knee_w and x < knee_w:
+			var u := x + knee_w
+			return toe_h + grade * u * u / (4.0 * knee_w)
+		return toe_h + grade * maxf(x, 0.0)
 	# Collect the link figure in plane coordinates: swing pivot marks the
 	# rotation column, the work joints chain to the tooth.
 	var link_pts := PackedVector2Array()
@@ -128,10 +135,10 @@ func _draw() -> void:
 	var view_s1 := hi.x
 	var knee := clampf(toe_s, view_s0, view_s1)
 	var target_px := PackedVector2Array()
-	target_px.append(to_px.call(Vector2(view_s0, toe_h)))
-	if knee > view_s0:
-		target_px.append(to_px.call(Vector2(knee, toe_h)))
-	target_px.append(to_px.call(Vector2(view_s1, target_h.call(view_s1))))
+	var steps := 48
+	for i in range(steps + 1):
+		var s_i := lerpf(view_s0, view_s1, float(i) / steps)
+		target_px.append(to_px.call(Vector2(s_i, target_h.call(s_i))))
 	draw_polyline(target_px, TARGET_COLOR, 2.5)
 	# Reachable band markers on the target surface.
 	for s_mark in [s_min, s_max]:

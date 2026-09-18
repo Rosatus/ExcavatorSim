@@ -116,6 +116,7 @@ static func preview_uniforms(
 		"cut_band": Vector4(s_min, s_max, half_width_m, profile.toe_s),
 		"cut_toe_height": profile.toe_height,
 		"cut_tan_theta": profile.grade,
+		"cut_knee_w": profile.knee_blend_m,
 	}
 	if pulse_hz > 0.0:
 		pack["cut_pulse_hz"] = pulse_hz

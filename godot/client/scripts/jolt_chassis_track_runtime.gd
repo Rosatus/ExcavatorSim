@@ -365,7 +365,14 @@ func build_slope_profile(distance_m: float, angle_deg: float) -> RefCounted:
 	var toe_height := _sample_soil_height(toe_xz)
 	if not is_finite(toe_height):
 		return null
-	return SlopeProfileScript.create(ctx.bucket_ref_world, ctx.horizontal, distance_m, angle_deg, toe_height)
+	var profile := SlopeProfileScript.create(ctx.bucket_ref_world, ctx.horizontal, distance_m, angle_deg, toe_height)
+	var stage := _assist_pipeline.get_stage("slope_grade")
+	if stage != null:
+		profile.knee_blend_m = float((stage.profile_params as Dictionary).get("knee_blend_m", 0.0))
+	if ctx.joint_pivot_world.has("swing_joint"):
+		var pivot := ctx.joint_pivot_world["swing_joint"] as Vector3
+		profile.capture_anchor(Vector2(pivot.x, pivot.z))
+	return profile
 
 
 ## Preview the pending cut: the reachable band along the profile axis plus
@@ -445,6 +452,23 @@ func clear_slope_cut_preview() -> void:
 	var zone := _voxel_preview_sink()
 	if zone != null:
 		zone.clear_cut_preview()
+
+
+## Re-push the mode-2 soil mark while the assist runs: the profile
+## re-anchors onto the live heading every tick, so the static tint must
+## chase it or the mark stays where the machine was at confirm.
+func refresh_slope_cut_mark(profile: RefCounted, preview_result: Dictionary) -> void:
+	if profile == null:
+		return
+	set_slope_cut_preview(
+		SlopeCutPreviewScript.preview_uniforms(
+			profile,
+			float(preview_result.get("s_min", 0.0)),
+			float(preview_result.get("s_max", 0.0)),
+			float(preview_result.get("half_width_m", _cutting_edge_half_width())),
+			2
+		)
+	)
 
 
 ## Duck-typed lookup: the work zone sits next to TerrainWorld under the same
@@ -536,6 +560,7 @@ func _view_snapshot(
 		"toe_h": profile.toe_height,
 		"grade": profile.grade,
 		"angle_deg": profile.angle_deg,
+		"knee_w": profile.knee_blend_m,
 		"s_min": s_min,
 		"s_max": s_max,
 		"half_width": half_width_m,

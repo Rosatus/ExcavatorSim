@@ -27,7 +27,8 @@
         "angle_adjust_rate_deg_s": 15.0,
         "preview_cell_m": 0.25,
         "preview_sweep_steps": 24,
-        "preview_pulse_hz": 2.2
+        "preview_pulse_hz": 2.2,
+        "knee_blend_m": 0.2
       }
     },
     "sy135": {
@@ -56,7 +57,8 @@
         "angle_adjust_rate_deg_s": 15.0,
         "preview_cell_m": 0.25,
         "preview_sweep_steps": 24,
-        "preview_pulse_hz": 2.2
+        "preview_pulse_hz": 2.2,
+        "knee_blend_m": 0.2
       }
     },
     "sy205": {
@@ -85,7 +87,8 @@
         "angle_adjust_rate_deg_s": 15.0,
         "preview_cell_m": 0.25,
         "preview_sweep_steps": 24,
-        "preview_pulse_hz": 2.2
+        "preview_pulse_hz": 2.2,
+        "knee_blend_m": 0.2
       }
     },
     "sy135neo": {
@@ -114,7 +117,8 @@
         "angle_adjust_rate_deg_s": 15.0,
         "preview_cell_m": 0.25,
         "preview_sweep_steps": 24,
-        "preview_pulse_hz": 2.2
+        "preview_pulse_hz": 2.2,
+        "knee_blend_m": 0.2
       }
     }
   }

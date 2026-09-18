@@ -543,7 +543,10 @@ func _refresh_slope_preview(delta: float) -> void:
 
 
 ## Active-mode cadence: the link figure tracks the real arm while the
-## centerline strip reflects soil already cut. Same refresh gate as preview.
+## centerline strip reflects soil already cut. The profile re-anchors onto
+## the live heading every physics tick, so the soil mark, the ghost ribbon
+## and the HUD all re-derive from it here — driving the undercarriage
+## along the slope keeps every guidance channel on the current forward.
 func _refresh_slope_view(delta: float) -> void:
 	_slope_preview_accum += delta
 	if _slope_preview_accum < SLOPE_PREVIEW_REFRESH_S:
@@ -551,6 +554,8 @@ func _refresh_slope_view(delta: float) -> void:
 	_slope_preview_accum = 0.0
 	if _slope_profile == null:
 		return
+	_jolt_runtime.refresh_slope_cut_mark(_slope_profile, _slope_preview_result)
+	_ensure_slope_preview_node().show_preview(_slope_preview_result, _slope_profile)
 	_assist_view_cache = _jolt_runtime.slope_view_snapshot(
 		_slope_profile,
 		float(_slope_preview_result.get("s_min", 0.0)),
