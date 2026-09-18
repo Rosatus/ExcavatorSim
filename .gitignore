@@ -45,3 +45,10 @@ godot/client/addons/terrain_3d/bin/~libterrain.windows.debug.x86_64.dll
 # large local asset archives and editor tool state (regenerated/local-only)
 godot/worldbuilding/**/*.zip
 .workbuddy/
+
+# Local manual driving captures and one-off attachment inspection output.
+/backend/scripts/godot/recordings/
+/xtr13_inspect.json
+
+# Editor-generated runnable preset for the local map-authoring project.
+/godot/worldbuilding/construction/export_presets.cfg
