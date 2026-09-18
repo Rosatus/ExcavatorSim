@@ -107,7 +107,13 @@ pixi run python backend/scripts/sync_sy205_joint_contract.py [--check]
   offset) from the top-level `assist_view` status, shown in preview and
   active modes only. `VoxelWorkZone.set_cut_preview` is the duck-typed sink
   the runtime discovers beside TerrainWorld — presentation only, never
-  voxel data.
+  voxel data. Refresh economics: the ribbon's vertices are profile-local
+  so `follow_profile` reposes it with one transform write, the soil mark
+  chases with ~10 uniform writes, and the side-view snapshot is a context
+  build plus a bilinear centerline strip — all cheap enough to run every
+  physics tick while active. The genuinely expensive 24^3 FK reach sweep
+  stays preview-only at the 10 Hz gate, so the active-mode visuals glide
+  instead of stepping.
 - Bucket-level assist reuses the same guidance channel without any blink:
   `JoltChassisTrackRuntime.level_view_snapshot` builds a degenerate
   zero-grade `SlopeProfile` at the stage's latched `height_ref_m`, sweeps

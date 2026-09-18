@@ -40,7 +40,9 @@ func _ready() -> void:
 
 
 ## Rebuild the finished-surface ribbon from the preview band: quads over
-## s∈[s_min,s_max] split at the slope toe, spanning ±half_width.
+## s∈[s_min,s_max] split at the slope toe, spanning ±half_width. Vertices
+## are PROFILE-LOCAL (s, height above toe, t) so a re-anchored profile is
+## chased by follow_profile() — a transform write, never a mesh rebuild.
 func show_preview(result: Dictionary, profile: RefCounted) -> void:
 	if profile == null:
 		hide_preview()
@@ -55,17 +57,13 @@ func show_preview(result: Dictionary, profile: RefCounted) -> void:
 	if profile.toe_s > s_min and profile.toe_s < s_max:
 		s_breaks.append(profile.toe_s)
 	s_breaks.append(s_max)
-	var axis: Vector2 = profile.axis
-	var perp := Vector2(-axis.y, axis.x)
-	var origin: Vector2 = profile.origin_xz
-	var world := func(s: float, t: float) -> Vector3:
-		var xz: Vector2 = origin + axis * s + perp * t
-		return Vector3(xz.x, profile.height_at(s) + EDGE_LIFT_M, xz.y)
+	var local := func(s: float, t: float) -> Vector3:
+		return Vector3(s, profile.height_at(s) - profile.toe_height + EDGE_LIFT_M, t)
 	var verts := PackedVector3Array()
 	for i in range(s_breaks.size() - 1):
 		var s0 := s_breaks[i]
 		var s1 := s_breaks[i + 1]
-		_quad(verts, world.call(s0, -half_w), world.call(s1, -half_w), world.call(s1, half_w), world.call(s0, half_w))
+		_quad(verts, local.call(s0, -half_w), local.call(s1, -half_w), local.call(s1, half_w), local.call(s0, half_w))
 	_mesh_instance.mesh = _tri_mesh(verts)
 	# Edge lines trace the design surface: bench borders to the toe, the toe
 	# cross-line, and the swath borders down the grade. On a flat ribbon —
@@ -78,15 +76,33 @@ func show_preview(result: Dictionary, profile: RefCounted) -> void:
 		var grade_start := maxf(profile.toe_s, s_min)
 		for t in [-half_w, half_w]:
 			if profile.toe_s > s_min:
-				lines.append(world.call(s_min, t))
-				lines.append(world.call(bench_end, t))
-			lines.append(world.call(grade_start, t))
-			lines.append(world.call(s_max, t))
+				lines.append(local.call(s_min, t))
+				lines.append(local.call(bench_end, t))
+			lines.append(local.call(grade_start, t))
+			lines.append(local.call(s_max, t))
 		if profile.toe_s > s_min and profile.toe_s < s_max:
-			lines.append(world.call(profile.toe_s, -half_w))
-			lines.append(world.call(profile.toe_s, half_w))
+			lines.append(local.call(profile.toe_s, -half_w))
+			lines.append(local.call(profile.toe_s, half_w))
 	_line_instance.mesh = _line_mesh(lines) if not lines.is_empty() else null
+	follow_profile(profile)
 	visible = true
+
+
+## Repose the ribbon on the (re-anchored) profile: the mesh is profile-local
+## so following a moving machine is one transform write — no vertex work at
+## all, safe to call every physics tick.
+func follow_profile(profile: RefCounted) -> void:
+	if profile == null:
+		return
+	var axis: Vector2 = profile.axis
+	global_transform = Transform3D(
+		Basis(
+			Vector3(axis.x, 0.0, axis.y),
+			Vector3.UP,
+			Vector3(-axis.y, 0.0, axis.x)
+		),
+		Vector3(profile.origin_xz.x, profile.toe_height, profile.origin_xz.y)
+	)
 
 
 func hide_preview() -> void:

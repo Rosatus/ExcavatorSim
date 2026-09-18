@@ -542,20 +542,17 @@ func _refresh_slope_preview(delta: float) -> void:
 	)
 
 
-## Active-mode cadence: the link figure tracks the real arm while the
-## centerline strip reflects soil already cut. The profile re-anchors onto
-## the live heading every physics tick, so the soil mark, the ghost ribbon
-## and the HUD all re-derive from it here — driving the undercarriage
-## along the slope keeps every guidance channel on the current forward.
+## Active-mode follow, every physics tick: the stage re-anchors the
+## profile onto the live heading at the same rate, so chasing it is a
+## handful of shader-uniform writes and one ribbon transform — no mesh
+## rebuilds, no terrain sweeps. The heavier snapshot (context + centerline
+## strip) rides the same cadence so the HUD glides instead of stepping;
+## the genuinely expensive FK reach sweep stays preview-only.
 func _refresh_slope_view(delta: float) -> void:
-	_slope_preview_accum += delta
-	if _slope_preview_accum < SLOPE_PREVIEW_REFRESH_S:
-		return
-	_slope_preview_accum = 0.0
 	if _slope_profile == null:
 		return
 	_jolt_runtime.refresh_slope_cut_mark(_slope_profile, _slope_preview_result)
-	_ensure_slope_preview_node().show_preview(_slope_preview_result, _slope_profile)
+	_ensure_slope_preview_node().follow_profile(_slope_profile)
 	_assist_view_cache = _jolt_runtime.slope_view_snapshot(
 		_slope_profile,
 		float(_slope_preview_result.get("s_min", 0.0)),
