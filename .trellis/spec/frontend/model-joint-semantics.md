@@ -64,11 +64,20 @@ pixi run python backend/scripts/sync_sy205_joint_contract.py [--check]
   live in `AssistRateSolver`, the per-tick law in `GuidedProfileStage`, and
   each stage only declares its target surface. Its differences are declared,
   not reimplemented: `writes_mask` adds the swing channel (held at zero so
-  the profile plane cannot rotate), the tracked surface is a confirmed
-  `SlopeProfile` (piecewise: flat bench at toe height for `s < toe_s`,
-  `tan(angle)` grade beyond — positive angles rise away from the machine),
-  and the horizontal task axis is the profile's frozen anchor axis rather
-  than the live outward direction. Its flags are namespaced
+  the slew cannot rotate the profile plane relative to the chassis), the
+  tracked surface is a confirmed `SlopeProfile` (piecewise: flat bench at
+  toe height for `s < toe_s`, `tan(angle)` grade beyond — positive angles
+  rise away from the machine), and the horizontal task axis is the
+  profile's anchor axis. The profile is NOT frozen: `capture_anchor`
+  records the origin's (s,t) offset from the swing pivot once, and the
+  stage's `step` override calls `reanchor` every enabled tick with the
+  live upper forward + swing pivot — the surface rides with the machine
+  so the undercarriage can drive or yaw along the slope and grading
+  continues on the current heading. The toe knee is C1-rounded by
+  `knee_blend_m` (assist_profiles.json; a smooth-relu quadratic blend,
+  max deviation `grade*w/4`) so the grade feedforward ramps across the
+  toe instead of stepping and kicking the tooth off the surface through
+  its own momentum. Its flags are namespaced
   `slope_assist_infeasible` / `slope_assist_reversing` with identical block
   semantics. Both stages sit in exclusive group `terminal_surface` —
   enabling one disables the other — and `slope_grade` refuses to enable
@@ -79,9 +88,10 @@ pixi run python backend/scripts/sync_sy205_joint_contract.py [--check]
   slope angle, `update_slope_preview` sweeps the reachable band via
   `KinematicArticulationState.frames_for_positions` and samples terrain
   through the same `TerrainState` the dig system reads (physics raycast
-  outside the grid), and confirm freezes exactly the previewed profile into
-  the stage. The toe height is sampled terrain at the junction point, so
-  the bench always starts at real ground level.
+  outside the grid), and confirm injects exactly the previewed profile
+  into the stage — after which it follows the live heading via the
+  per-tick re-anchor. The toe height is sampled terrain at the junction
+  point, so the bench always starts at real ground level.
 - Slope cut preview presentation is two layered views, no wedge mesh: the
   voxel soil shader (`voxel_soil_bounded.gdshader`) takes analytic
   `cut_*` uniforms (`SlopeCutPreview.preview_uniforms` packs them) and

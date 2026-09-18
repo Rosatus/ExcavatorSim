@@ -264,6 +264,7 @@ JoltChassisTrackRuntime.update_slope_preview(profile: RefCounted) -> Dictionary
 JoltChassisTrackRuntime.confirm_slope_assist(profile: RefCounted, preview_result: Dictionary = {}) -> bool
 JoltChassisTrackRuntime.set_slope_cut_preview(uniforms: Dictionary) -> void
 JoltChassisTrackRuntime.clear_slope_cut_preview() -> void
+JoltChassisTrackRuntime.refresh_slope_cut_mark(profile: RefCounted, preview_result: Dictionary) -> void
 JoltChassisTrackRuntime.slope_view_snapshot(profile: RefCounted, s_min: float, s_max: float, half_width_m: float, volume_m3: float, mode: String) -> Dictionary
 JoltChassisTrackRuntime.level_view_snapshot() -> Dictionary
 JoltChassisTrackRuntime.set_assist_context(context: Dictionary) -> void
