@@ -13,7 +13,6 @@ const CUT_FILL := Color(0.9, 0.35, 0.15, 0.35)
 const TARGET_COLOR := Color(0.4, 0.85, 1.0)
 const LINK_COLOR := Color(0.88, 0.9, 0.95)
 const CHASSIS_COLOR := Color(0.55, 0.58, 0.65)
-const BODY_FILL := Color(0.09, 0.1, 0.13, 1.0)
 const TOOTH_COLOR := Color(1.0, 0.8, 0.2)
 const TEXT_COLOR := Color(0.9, 0.92, 0.95)
 const MARGIN := 14.0
@@ -79,12 +78,14 @@ func _draw() -> void:
 		hi = hi.max(pt)
 	lo = lo.min(Vector2(s_min, target_h.call(s_min)))
 	hi = hi.max(Vector2(s_max, target_h.call(s_max)))
-	# The chassis silhouette hangs 3.4 m behind the swing pivot — outside the
-	# link/terrain extents — so it must join the content bounds or it draws
-	# past the panel's left edge.
+	# The chassis box hangs behind the swing pivot and reaches forward to the
+	# upper↔boom pin — outside the link/terrain extents — so it must join the
+	# content bounds or it draws past the panel's left edge.
 	var sp: Vector2 = pivots["swing_joint"]
+	var boom_sp: Vector2 = pivots["boom_joint"]
+	var box_top := maxf(sp.y + 0.8, boom_sp.y + 0.35)
 	lo = lo.min(sp + Vector2(-3.6, -1.3))
-	hi = hi.max(sp + Vector2(-0.05, 1.0))
+	hi = hi.max(Vector2(boom_sp.x + 0.4, box_top + 0.4))
 	var span := (hi - lo).max(Vector2(1.0, 1.0))
 	var draw_area := size - Vector2(MARGIN, MARGIN) * 2.0
 	var scale := minf(draw_area.x / span.x, draw_area.y / span.y)
@@ -146,24 +147,14 @@ func _draw() -> void:
 			arc_pts.append(knee_px + Vector2(cos(a), sin(a)) * 22.0)
 		draw_polyline(arc_pts, TARGET_COLOR, 1.5)
 	draw_circle(knee_px, 3.0, TOOTH_COLOR)
-	# Chassis silhouette anchored at the swing pivot: track frame, a turret
-	# body with the cab bump forward and the counterweight slab aft, and a
-	# facing arrow — the machine read side-on. The body fills opaque so the
-	# bench line behind it stays masked.
-	_draw_plane_rect(to_px, sp + Vector2(-3.4, -1.15), sp + Vector2(-0.1, -0.5), CHASSIS_COLOR, true)
-	var body := PackedVector2Array([
-		to_px.call(sp + Vector2(-3.25, -0.5)),
-		to_px.call(sp + Vector2(-3.25, 0.05)),
-		to_px.call(sp + Vector2(-1.7, 0.28)),
-		to_px.call(sp + Vector2(-1.25, 0.55)),
-		to_px.call(sp + Vector2(-0.7, 0.55)),
-		to_px.call(sp + Vector2(-0.45, -0.5)),
-	])
-	draw_colored_polygon(body, BODY_FILL)
-	draw_polyline(body + PackedVector2Array([body[0]]), CHASSIS_COLOR, 2.0)
-	_draw_text(to_px.call(sp + Vector2(-1.95, -0.02)) + Vector2(-13.0, 5.0), "机身")
+	# Chassis box: one rectangle enclosing undercarriage, upper structure and
+	# the upper↔boom pin — the link dots landing inside it are the pin
+	# indicators. Facing arrow above the box points down-range.
+	_draw_plane_rect(
+		to_px, sp + Vector2(-3.5, -1.2), Vector2(boom_sp.x + 0.3, box_top), CHASSIS_COLOR, false, 2.0
+	)
 	var chassis := PackedVector2Array()
-	var arrow_base: Vector2 = to_px.call(sp + Vector2(-0.9, 0.72))
+	var arrow_base: Vector2 = to_px.call(Vector2(sp.x - 0.9, box_top + 0.25))
 	chassis.append(arrow_base + Vector2(14, 0))
 	chassis.append(arrow_base + Vector2(-5, -7))
 	chassis.append(arrow_base + Vector2(-5, 7))
