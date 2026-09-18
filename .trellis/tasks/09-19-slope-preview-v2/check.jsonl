@@ -1,0 +1,12 @@
+{"file": "godot/client/assets/terrain/shaders/voxel_soil_bounded.gdshader", "reason": "cut_* uniforms + analytic region test: real terrain surface blinks (mode 1) or tints (mode 2) the soil above the target profile; TIME-driven pulse, no per-frame CPU."}
+{"file": "godot/client/scripts/voxel_work_zone.gd", "reason": "set_cut_preview/clear_cut_preview sink on the shared soil material_override; presentation-only, zero voxel data mutation."}
+{"file": "godot/client/scripts/slope_cut_preview.gd", "reason": "preview_uniforms() pure packer mirrors profile+band into shader fields; compute() now also returns half_width_m for the ghost ribbon."}
+{"file": "godot/client/scripts/slope_cut_preview_visual.gd", "reason": "Wedge mesh retired: finished-surface ribbon from profile breakpoints (no terrain sampling) + no-depth edge line; static during active as design reference."}
+{"file": "godot/client/scripts/slope_side_view.gd", "reason": "New 2D guidance panel: links, terrain strip, target line, cut fill, tooth offset; project_to_plane static helper is unit-tested."}
+{"file": "godot/client/scripts/jolt_chassis_track_runtime.gd", "reason": "Uniform push on update/confirm (mode 1->2), duck-typed VoxelWorkZone discovery beside TerrainWorld, slope_view_snapshot + centerline terrain sampler."}
+{"file": "godot/client/scripts/tracked_chassis_controller.gd", "reason": "View cache + active-cadence refresh, confirm keeps ribbon and passes band for mode-2 tint, exit clears soil mark and view cache, status.slope_assist.view."}
+{"file": "godot/client/scripts/operator_ui.gd", "reason": "Right-edge SlopeSideView panel built in code, synced from session status, visible in preview/active only."}
+{"file": "godot/client/resources/physics/assist_profiles.json", "reason": "preview_pulse_hz per-model parameter feeding the shader blink rate."}
+{"file": "godot/client/tests/slope_preview_v2_test.gd", "reason": "Pure-function contracts: uniform pack field correctness and side-view plane projection."}
+{"file": "godot/client/tests/run_standalone_matrix.ps1", "reason": "slope_preview_v2_test registered."}
+{"file": "godot/client/scripts/attachment_rig.gd", "reason": "Two Variant-inference warning-errors (pop_back/pop_front) unblocked the whole compile chain; untracked steelwrist WIP, fix only, not committed by this task."}

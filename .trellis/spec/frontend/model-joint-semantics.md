@@ -82,6 +82,18 @@ pixi run python backend/scripts/sync_sy205_joint_contract.py [--check]
   outside the grid), and confirm freezes exactly the previewed profile into
   the stage. The toe height is sampled terrain at the junction point, so
   the bench always starts at real ground level.
+- Slope cut preview presentation is two layered views, no wedge mesh: the
+  voxel soil shader (`voxel_soil_bounded.gdshader`) takes analytic
+  `cut_*` uniforms (`SlopeCutPreview.preview_uniforms` packs them) and
+  blinks the real terrain surface above the target profile between tinted
+  and discarded — the mark self-erases as digging proceeds; the ghost
+  ribbon (`SlopeCutPreviewVisual`) draws only the finished-surface skin
+  with a no-depth edge line; and `SlopeSideView` renders the cabin-plane
+  2D guidance panel (links, terrain strip, target line, cut fill, tooth
+  offset) from `slope_assist.view` status, shown in preview and active
+  modes only. `VoxelWorkZone.set_cut_preview` is the duck-typed sink the
+  runtime discovers beside TerrainWorld — presentation only, never voxel
+  data.
 - SY135 hinge axes remain +X. SY205's three work-equipment axes are -X because
   its segment geometry is baked in different asset coordinates. Its swing
   remains +Y. Keep SY205 rest transforms and anchors unchanged.

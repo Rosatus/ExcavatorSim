@@ -261,7 +261,10 @@ JoltChassisTrackRuntime.set_equipment_assist_params(stage_name: String, params: 
 JoltChassisTrackRuntime.get_equipment_assist_params(stage_name: String) -> Dictionary
 JoltChassisTrackRuntime.build_slope_profile(distance_m: float, angle_deg: float) -> RefCounted
 JoltChassisTrackRuntime.update_slope_preview(profile: RefCounted) -> Dictionary
-JoltChassisTrackRuntime.confirm_slope_assist(profile: RefCounted) -> bool
+JoltChassisTrackRuntime.confirm_slope_assist(profile: RefCounted, preview_result: Dictionary = {}) -> bool
+JoltChassisTrackRuntime.set_slope_cut_preview(uniforms: Dictionary) -> void
+JoltChassisTrackRuntime.clear_slope_cut_preview() -> void
+JoltChassisTrackRuntime.slope_view_snapshot(profile: RefCounted, s_min: float, s_max: float, half_width_m: float, volume_m3: float, mode: String) -> Dictionary
 JoltChassisTrackRuntime.set_assist_context(context: Dictionary) -> void
 EquipmentAssistPipeline.configure(descriptor: Dictionary, soil_contract: Dictionary, model_id: String) -> bool
 EquipmentAssistPipeline.step(commands: Vector4, articulation, chassis_transform, delta: float, external: Dictionary) -> Dictionary
@@ -1936,6 +1939,8 @@ VoxelCollisionReadiness.mark_meshed(ticket: Dictionary) -> bool
 VoxelCollisionReadiness.acknowledge_query(ticket: Dictionary) -> bool
 VoxelCollisionReadiness.is_point_ready(voxel_position: Vector3) -> bool
 VoxelWorkZone.is_support_ready_at(world_position: Vector3) -> bool
+VoxelWorkZone.set_cut_preview(uniforms: Dictionary) -> void
+VoxelWorkZone.clear_cut_preview() -> void
 ```
 
 ### 3. Contracts
