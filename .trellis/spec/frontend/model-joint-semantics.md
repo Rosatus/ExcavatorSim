@@ -88,7 +88,8 @@ pixi run python backend/scripts/sync_sy205_joint_contract.py [--check]
   blinks the real terrain surface above the target profile between tinted
   and discarded — the mark self-erases as digging proceeds; the ghost
   ribbon (`SlopeCutPreviewVisual`) draws only the finished-surface skin
-  with a no-depth edge line; and `SlopeSideView` renders the cabin-plane
+  (no edge lines — the swath border read as a distracting stray line at
+  ground level); and `SlopeSideView` renders the cabin-plane
   2D guidance panel (links, terrain strip, target line, cut fill, tooth
   offset) from the top-level `assist_view` status, shown in preview and
   active modes only. `VoxelWorkZone.set_cut_preview` is the duck-typed sink

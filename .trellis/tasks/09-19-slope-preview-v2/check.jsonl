@@ -19,3 +19,5 @@
 {"file": "godot/client/tests/bucket_level_assist_test.gd", "reason": "Integration assertion: enabled stage publishes level-mode view with flat grade, joints, tooth, terrain strip, consistent tooth_err."}
 {"file": ".trellis/spec/frontend/client-boundary.md", "reason": "level_view_snapshot + assist_view_snapshot signatures recorded."}
 {"file": ".trellis/spec/frontend/model-joint-semantics.md", "reason": "assist_view single-slot contract; level reuses guidance channel without blink."}
+{"file": "godot/client/scripts/slope_cut_preview_visual.gd", "reason": "Removed the no-depth edge-line mesh (swath borders + toe line): at near-ground level only the borders were visible and read as a distracting stray line from under the chassis. Ribbon surface kept."}
+{"file": ".trellis/spec/frontend/model-joint-semantics.md", "reason": "Ghost ribbon spec drops the edge line."}

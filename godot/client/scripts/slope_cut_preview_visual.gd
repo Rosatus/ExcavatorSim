@@ -5,16 +5,13 @@ extends Node3D
 ## — the "after" picture of the pass. The target surface is analytic (flat
 ## bench then straight grade) so the ribbon is built from breakpoints, not
 ## terrain samples. Depth-tested so it surfaces only inside the blink-open
-## hole or where the target already floats above ground; a no-depth edge line
-## keeps the design line readable in every blink phase. Static while the
+## hole or where the target already floats above ground. Static while the
 ## assist cuts — the voxel soil shader owns the blinking.
 
 const EDGE_LIFT_M := 0.03
 const SURFACE_COLOR := Color(0.62, 0.5, 0.32, 0.4)
-const EDGE_COLOR := Color(1.0, 0.75, 0.25, 0.85)
 
 var _mesh_instance: MeshInstance3D
-var _line_instance: MeshInstance3D
 
 
 func _ready() -> void:
@@ -27,20 +24,11 @@ func _ready() -> void:
 	_mesh_instance.material_override = surface_material
 	_mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_mesh_instance)
-	var line_material := StandardMaterial3D.new()
-	line_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	line_material.no_depth_test = true
-	line_material.albedo_color = EDGE_COLOR
-	_line_instance = MeshInstance3D.new()
-	_line_instance.material_override = line_material
-	_line_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(_line_instance)
 	visible = false
 
 
 ## Rebuild the finished-surface ribbon from the preview band: quads over
-## s∈[s_min,s_max] split at the slope toe, spanning ±half_width, plus edge
-## lines along both swath borders and the toe cross-line.
+## s∈[s_min,s_max] split at the slope toe, spanning ±half_width.
 func show_preview(result: Dictionary, profile: RefCounted) -> void:
 	if profile == null:
 		hide_preview()
@@ -67,14 +55,6 @@ func show_preview(result: Dictionary, profile: RefCounted) -> void:
 		var s1 := s_breaks[i + 1]
 		_quad(verts, world.call(s0, -half_w), world.call(s1, -half_w), world.call(s1, half_w), world.call(s0, half_w))
 	_mesh_instance.mesh = _tri_mesh(verts)
-	var lines := PackedVector3Array()
-	for t in [-half_w, half_w]:
-		lines.append(world.call(s_min, t))
-		lines.append(world.call(s_max, t))
-	if profile.toe_s > s_min and profile.toe_s < s_max:
-		lines.append(world.call(profile.toe_s, -half_w))
-		lines.append(world.call(profile.toe_s, half_w))
-	_line_instance.mesh = _line_mesh(lines)
 	visible = true
 
 
@@ -88,15 +68,6 @@ func _tri_mesh(verts: PackedVector3Array) -> ArrayMesh:
 	arrays[Mesh.ARRAY_VERTEX] = verts
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	return mesh
-
-
-func _line_mesh(verts: PackedVector3Array) -> ArrayMesh:
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = verts
-	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, arrays)
 	return mesh
 
 
