@@ -44,7 +44,7 @@ func _run() -> void:
 	var epoch := session.authority_epoch
 	key(ui, KEY_ESCAPE)
 	check(paused and session.lifecycle == "paused", "menu did not pause simulation")
-	check(ui._can_output_button.is_visible_in_tree() and ui._gateway_button.is_visible_in_tree() and ui._pc001_handshake_lamp.is_visible_in_tree(), "hardware controls hidden in menu")
+	check(not ui._can_output_button.is_visible_in_tree() and not ui._gateway_button.is_visible_in_tree() and not ui._pc001_handshake_lamp.is_visible_in_tree(), "hardware dock visible in menu")
 	check(root.gui_get_focus_owner() == ui._menu["resume"], "initial menu focus missing")
 	check(not camera.can_process(), "camera remains active in menu")
 	check(not camera._dragging and camera._menu_input_blocked, "menu did not cancel camera drag")
@@ -64,6 +64,37 @@ func _run() -> void:
 		await process_frame
 		var rect := ui._status_panel.get_global_rect()
 		check(rect.position.x >= 0 and rect.position.y >= 0 and rect.end.x <= resolution.x and rect.end.y <= resolution.y, "menu exceeds viewport: %s" % rect)
+		check(absf(rect.get_center().x - resolution.x / 2.0) < 2.0, "menu not horizontally centered: %s" % rect)
+	ui.set_ui_theme_for_test("industrial")
+	await process_frame
+	await process_frame
+	check(paused, "theme switch closed the menu")
+	check(ui._pc001_handshake_lamp.is_visible_in_tree(), "industrial menu lamp missing")
+	check(ui._menu.get("hardware") == null, "industrial theme kept a floating dock")
+	(ui._menu["tabs"] as TabContainer).current_tab = 2
+	await process_frame
+	check(ui._can_output_button.is_visible_in_tree() and ui._gateway_button.is_visible_in_tree(), "industrial CAN controls not reachable in advanced page")
+	key(ui, KEY_ESCAPE)
+	check(not paused and not ui._pc001_handshake_lamp.is_visible_in_tree(), "industrial dock visible while driving")
+	key(ui, KEY_ESCAPE)
+	check(paused, "menu did not reopen under industrial theme")
+	ui.set_ui_theme_for_test("sany")
+	await process_frame
+	await process_frame
+	check(paused, "sany theme switch closed the menu")
+	check(ui._pc001_handshake_lamp.is_visible_in_tree(), "sany menu lamp missing")
+	check(ui._menu.get("hardware") == null, "sany theme kept a floating dock")
+	check(ui._menu.get("backdrop") != null, "sany theme lost the console backdrop")
+	key(ui, KEY_ESCAPE)
+	check(not paused and not ui._pc001_handshake_lamp.is_visible_in_tree(), "sany dock visible while driving")
+	key(ui, KEY_ESCAPE)
+	check(paused, "menu did not reopen under sany theme")
+	ui.set_ui_theme_for_test("debug")
+	await process_frame
+	await process_frame
+	check(ui._menu.get("hardware") != null, "debug theme lost its dock")
+	check((ui._menu["theme_selector"] as OptionButton).item_count == 3, "theme selector missing the sany option")
+	check(root.gui_get_focus_owner() == ui._menu["resume"], "menu focus lost after theme switch")
 	var joy := InputEventJoypadButton.new()
 	joy.button_index = JOY_BUTTON_RIGHT_SHOULDER
 	joy.pressed = true

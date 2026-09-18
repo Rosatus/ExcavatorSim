@@ -25,6 +25,9 @@ var _manifest_path := ""
 var _parity_fixture_path := ""
 var _soil_contract_path := ""
 var _soil_contract: Dictionary = {}
+var _attachment_tool_node: Node3D = null
+var _attachment_contract: Dictionary = {}
+var _attachment_id := ""
 var _frame_nodes: Dictionary = {}
 var _authority_zero_globals: Dictionary = {}
 var _physics_rest_globals: Dictionary = {}
@@ -75,6 +78,7 @@ var _linkage_last_warning_reason := ""
 var _linkage_initialized := false
 signal model_replacing
 signal model_activated(model_id: String, asset_root: Node3D)
+signal attachment_changed(attachment_id: String)
 
 
 func _ready() -> void:
@@ -135,7 +139,65 @@ func get_active_model_id() -> String:
 
 
 func get_soil_contract() -> Dictionary:
+	if not _attachment_contract.is_empty():
+		return _attachment_contract.duplicate(true)
 	return _soil_contract.duplicate(true)
+
+
+## Soil proxies/regions are authored in the tool's local space but keep the
+## semantic "bucket_link" frame name; resolve that name to the attachment tool
+## node while an attachment contract is active so cutting/contain/spill follow
+## the real tool including tilt and rotation.
+func get_soil_frame_node(frame_name: String) -> Node3D:
+	if frame_name == "bucket_link" and _attachment_tool_node != null and is_instance_valid(_attachment_tool_node):
+		return _attachment_tool_node
+	return get_frame_node(frame_name)
+
+
+func get_active_attachment_id() -> String:
+	return _attachment_id
+
+
+func set_attachment_context(tool_node: Node3D, contract: Dictionary, attachment_id: String) -> bool:
+	_attachment_tool_node = tool_node
+	_attachment_id = attachment_id
+	if contract.is_empty():
+		_attachment_contract = {}
+		if not _soil_contract.is_empty():
+			if not _soil_tool.configure(_soil_contract):
+				_contract_error = "model bucket tool restore failed: %s" % _soil_tool.validation_error
+				push_error(_contract_error)
+				return false
+	else:
+		var descriptor := SoilContractDescriptor.from_dictionary_for_test(contract)
+		if not descriptor.is_valid_for(_active_model_id):
+			_contract_error = "attachment soil contract is invalid: %s" % descriptor.validation_error()
+			push_error(_contract_error)
+			return false
+		if not _soil_tool.configure(contract):
+			_contract_error = "attachment bucket tool is invalid: %s" % _soil_tool.validation_error
+			push_error(_contract_error)
+			return false
+		_attachment_contract = contract.duplicate(true)
+	clear_bucket_pose_history()
+	_rebuild_semantic_debug()
+	attachment_changed.emit(attachment_id)
+	return true
+
+
+func clear_attachment_context() -> void:
+	if _attachment_tool_node == null and _attachment_contract.is_empty() and _attachment_id.is_empty():
+		return
+	_attachment_tool_node = null
+	_attachment_contract = {}
+	_attachment_id = ""
+	if not _soil_contract.is_empty():
+		if not _soil_tool.configure(_soil_contract):
+			_contract_error = "model bucket tool restore failed: %s" % _soil_tool.validation_error
+			push_error(_contract_error)
+	clear_bucket_pose_history()
+	_rebuild_semantic_debug()
+	attachment_changed.emit("")
 
 
 func sample_bucket_pose_fixed(world_generation: int, authority_generation: int) -> Dictionary:
@@ -158,10 +220,10 @@ func sample_bucket_pose_fixed(world_generation: int, authority_generation: int) 
 	var session_id := String(status.get("session_id", ""))
 	var simulation_epoch := String(status.get("simulation_epoch", ""))
 	var model_id := _active_model_id
-	var identity := "%s|%s|%s|%d|%d" % [model_id, session_id, simulation_epoch, world_generation, authority_generation]
+	var identity := "%s|%s|%s|%s|%d|%d" % [model_id, _attachment_id, session_id, simulation_epoch, world_generation, authority_generation]
 	var reason := "ok"
 	var valid := not _previous_bucket_proxies.is_empty() and identity == _previous_bucket_identity
-	var bucket_frame := get_frame_node("bucket_link")
+	var bucket_frame := get_soil_frame_node("bucket_link")
 	if bucket_frame == null:
 		clear_bucket_pose_history()
 		return {"valid": false, "reason": "bucket_frame_unavailable"}
@@ -183,11 +245,11 @@ func sample_bucket_pose_fixed(world_generation: int, authority_generation: int) 
 	if not valid:
 		soil_tool_snapshot["valid"] = false
 		soil_tool_snapshot["reason"] = reason
-	var proxies := _soil_contract.get("proxies", {}) as Dictionary
+	var proxies := get_soil_contract().get("proxies", {}) as Dictionary
 	var cutting_contract := proxies.get("cutting_edge", {}) as Dictionary
 	var opening_contract := proxies.get("opening", {}) as Dictionary
 	var cutting_direction_world := (current["cutting_edge"] as Transform3D).basis * _vector3_from_array(cutting_contract.get("direction_godot", []))
-	var opening_frame := get_frame_node(String(opening_contract.get("frame", "")))
+	var opening_frame := get_soil_frame_node(String(opening_contract.get("frame", "")))
 	if opening_frame == null:
 		clear_bucket_pose_history()
 		return {"valid": false, "reason": "opening_frame_unavailable"}
@@ -205,7 +267,7 @@ func sample_bucket_pose_fixed(world_generation: int, authority_generation: int) 
 		"current": current.duplicate(true),
 		"cutting_direction_world": cutting_direction_world.normalized(),
 		"opening_normal_world": opening_normal_world.normalized(),
-		"contract": _soil_contract.duplicate(true),
+		"contract": get_soil_contract(),
 		"soil_tool": soil_tool_snapshot.duplicate(true),
 	}
 	_previous_bucket_proxies = current.duplicate(true)
@@ -249,7 +311,7 @@ func get_bucket_contact_world() -> Variant:
 			return node.global_position
 		return null
 	if mode == "frame_offset":
-		var frame := get_frame_node(String(contact.get("frame", "bucket_link")))
+		var frame := get_soil_frame_node(String(contact.get("frame", "bucket_link")))
 		var raw_offset: Variant = contact.get("offset_godot", [0.0, 0.0, 0.0])
 		if frame != null and raw_offset is Array and (raw_offset as Array).size() == 3:
 			return frame.global_transform * Vector3(float(raw_offset[0]), float(raw_offset[1]), float(raw_offset[2]))
@@ -372,6 +434,9 @@ func _activate_model(model_id: String) -> bool:
 
 
 func _clear_contract_state() -> void:
+	_attachment_tool_node = null
+	_attachment_contract = {}
+	_attachment_id = ""
 	_frame_nodes.clear()
 	_authority_zero_globals.clear()
 	_physics_rest_globals.clear()
@@ -533,9 +598,9 @@ func _load_soil_contract(model_id: String) -> bool:
 
 
 func _soil_proxy_transform(proxy_name: String) -> Variant:
-	var proxies: Dictionary = _soil_contract.get("proxies", {})
+	var proxies: Dictionary = get_soil_contract().get("proxies", {})
 	var proxy: Dictionary = proxies.get(proxy_name, {})
-	var frame := get_frame_node(String(proxy.get("frame", "")))
+	var frame := get_soil_frame_node(String(proxy.get("frame", "")))
 	if frame == null:
 		return null
 	return frame.global_transform * get_soil_proxy_local_transform(proxy_name)
@@ -544,7 +609,7 @@ func _soil_proxy_transform(proxy_name: String) -> Variant:
 func get_soil_proxy_local_transform(proxy_name: String) -> Transform3D:
 	# Shared by world sampling and rigid visual attachments; never sampled from
 	# an old world pose to reconstruct a local offset on a moving frame.
-	var proxies: Dictionary = _soil_contract.get("proxies", {})
+	var proxies: Dictionary = get_soil_contract().get("proxies", {})
 	var proxy: Dictionary = proxies.get(proxy_name, {})
 	var center := _vector3_from_array(proxy.get("center_godot", []))
 	var local_basis := Basis.IDENTITY
@@ -614,7 +679,7 @@ func _rebuild_semantic_debug() -> void:
 		_soil_debug_root.add_child(_semantic_debug_root)
 	for child in _semantic_debug_root.get_children():
 		child.free()
-	var tool := _soil_contract.get("bucket_tool", {}) as Dictionary
+	var tool := get_soil_contract().get("bucket_tool", {}) as Dictionary
 	for region_value in tool.get("regions", []):
 		var region := region_value as Dictionary
 		var region_id := String(region.get("region_id", ""))
@@ -643,7 +708,7 @@ func _rebuild_semantic_debug() -> void:
 func _update_soil_debug_proxies(current: Dictionary, semantic_regions: Array = []) -> void:
 	if _soil_debug_root == null or not _soil_debug_root.visible:
 		return
-	var proxies: Dictionary = _soil_contract.get("proxies", {})
+	var proxies: Dictionary = get_soil_contract().get("proxies", {})
 	for proxy_name in ["cutting_edge", "top_edge", "opening", "cavity", "shell", "rear_support"]:
 		var mesh_instance := _soil_debug_root.get_node_or_null(NodePath(proxy_name)) as MeshInstance3D
 		if mesh_instance == null or not current.has(proxy_name):

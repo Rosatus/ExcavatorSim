@@ -117,6 +117,8 @@ func _initialize() -> void:
 			_motion_client.authority_changed.connect(_on_authority_changed)
 	if not _presentation.model_activated.is_connected(_on_model_activated):
 		_presentation.model_activated.connect(_on_model_activated)
+	if not _presentation.attachment_changed.is_connected(_on_attachment_changed):
+		_presentation.attachment_changed.connect(_on_attachment_changed)
 	if not terrain_world.world_reset.is_connected(_on_world_reset):
 		terrain_world.world_reset.connect(_on_world_reset)
 	_soil_authority_modes.set_requested_mode(soil_material_lifecycle_mode)
@@ -590,7 +592,7 @@ func _bucket_tooth_world() -> Variant:
 	var contract := _presentation.get_soil_contract()
 	var cutting: Dictionary = (contract.get("proxies", {}) as Dictionary).get("cutting_edge", {})
 	var raw_center: Variant = cutting.get("center_godot", [])
-	var frame := _presentation.get_frame_node(String(cutting.get("frame", "bucket_link")))
+	var frame := _presentation.get_soil_frame_node(String(cutting.get("frame", "bucket_link")))
 	if frame == null or not raw_center is Array or (raw_center as Array).size() != 3:
 		return null
 	var center := Vector3(float(raw_center[0]), float(raw_center[1]), float(raw_center[2]))
@@ -797,7 +799,15 @@ func _on_authority_changed(_session_id: String, _simulation_epoch: String, gener
 
 
 func _on_model_activated(_model_id: String, _asset_root: Node3D) -> void:
-	if not _clear_local_material("model_activated"):
+	_reconfigure_tool_contract("model_activated")
+
+
+func _on_attachment_changed(_attachment_id: String) -> void:
+	_reconfigure_tool_contract("attachment_changed")
+
+
+func _reconfigure_tool_contract(reason: String) -> void:
+	if not _clear_local_material(reason):
 		return
 	var contract := _presentation.get_soil_contract()
 	_sync_local_tooth_offset(contract)

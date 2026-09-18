@@ -87,6 +87,7 @@ var _pending_shadow_truth: Dictionary = {}
 var _sensor_elapsed := 0.0
 var _pending_sensor_telemetry: Dictionary = {}
 var _equipment_command_mapper := EquipmentCommandMapper.new()
+var _attachment_input_mapper := AttachmentInputMapper.new()
 
 
 func _ready() -> void:
@@ -356,6 +357,22 @@ func get_authoritative_input_axes() -> Vector4:
 	if not _focused:
 		return Vector4.ZERO
 	return _equipment_command_mapper.to_joint_axes(_read_operator_axes())
+
+
+func configure_attachment_profile(controls: Dictionary) -> void:
+	_attachment_input_mapper.configure(controls)
+
+
+func clear_attachment_profile() -> void:
+	_attachment_input_mapper.clear()
+
+
+## Attachment command axes (tilt, rotate) in [-1, 1]; zero while no attachment
+## profile is configured or the window is unfocused.
+func get_attachment_input_axes() -> Vector2:
+	if not _focused or not _attachment_input_mapper.is_active():
+		return Vector2.ZERO
+	return _attachment_input_mapper.read_attachment_axes()
 
 
 func get_status_snapshot() -> Dictionary:
@@ -859,9 +876,8 @@ func _send_payload(payload: Dictionary) -> bool:
 
 
 func _read_operator_axes() -> Vector4:
-	if _test_axes_override:
-		return _test_axes
-	return _equipment_command_mapper.read_operator_axes()
+	var axes := _test_axes if _test_axes_override else _equipment_command_mapper.read_operator_axes()
+	return _attachment_input_mapper.mask_operator_axes(axes)
 
 
 func _handle_lifecycle_actions() -> void:

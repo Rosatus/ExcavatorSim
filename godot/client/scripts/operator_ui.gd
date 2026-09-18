@@ -11,6 +11,8 @@ const SlopeSideView := preload("res://scripts/slope_side_view.gd")
 const CONFIG_PATH := "user://operator_ui.cfg"
 const CONFIG_SECTION := "onboarding"
 const CONFIG_GUIDE_DISMISSED := "guide_dismissed"
+const CONFIG_SECTION_UI := "ui"
+const CONFIG_UI_THEME := "theme"
 
 @export var motion_client_path := NodePath("../MotionClient")
 @export var product_session_path := NodePath("../ProductSession")
@@ -19,9 +21,11 @@ const CONFIG_GUIDE_DISMISSED := "guide_dismissed"
 @export var camera_path := NodePath("../Camera3D")
 @export var feedback_path := NodePath("../MachineFeedback")
 @export var visual_quality_path := NodePath("../VisualQualityController")
+@export var attachment_rig_path := NodePath("../AttachmentRig")
 
 var _motion_client: MotionClient
 var _product_session: ProductSession
+var _attachment_rig: AttachmentRig
 var _excavation_world: ExcavationWorld
 var _chassis: TrackedChassisController
 var _camera: CameraRig
@@ -52,88 +56,144 @@ var _page_tween: Tween
 var _saved_mouse_mode := Input.MOUSE_MODE_VISIBLE
 var _hud: ControlInputHUD
 var _menu_tween: Tween
+var _close_tween: Tween
 var _quality_before_test := "balanced"
 var _ignore_quality_toggle := false
 
-@onready var _status_panel: PanelContainer = $StatusPanel
-@onready var _panel_toggle_button: Button = $PanelToggle
-@onready var _title_label: Label = $StatusPanel/Margin/VBox/Title
-@onready var _model_selector: OptionButton = $StatusPanel/Margin/VBox/Header/ModelSelector
-@onready var _lifecycle_badge: Label = $StatusPanel/Margin/VBox/Header/LifecycleBadge
-@onready var _operation_label: Label = $StatusPanel/Margin/VBox/Operation
-@onready var _bucket_status_label: Label = $StatusPanel/Margin/VBox/BucketStatus
-@onready var _bucket_fill: ProgressBar = $StatusPanel/Margin/VBox/BucketFill
-@onready var _control_hint: Label = $StatusPanel/Margin/VBox/ControlHint
-@onready var _automatic_soil_hint: Label = $StatusPanel/Margin/VBox/AutomaticSoilHint
-@onready var _camera_mode_label: Label = $StatusPanel/Margin/VBox/CameraRow/Mode
-@onready var _camera_selector: OptionButton = $StatusPanel/Margin/VBox/CameraRow/Selector
-@onready var _reset_view_button: Button = $StatusPanel/Margin/VBox/CameraRow/ResetView
-@onready var _warning_label: Label = $StatusPanel/Margin/VBox/Warning
-@onready var _completion_label: Label = $StatusPanel/Margin/VBox/Completion
-@onready var _connection_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/Connection
-@onready var _authority_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/Authority
-@onready var _lifecycle_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/Lifecycle
-@onready var _diagnostics_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/Diagnostics
-@onready var _can_status_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/CANStatus
-@onready var _can_output_button: Button = $StatusPanel/Margin/VBox/Tools/CANOutputToggle
-@onready var _gateway_button: Button = $StatusPanel/Margin/VBox/Tools/GatewayRestartButton
-@onready var _pc001_handshake_lamp: Panel = $StatusPanel/Margin/VBox/Tools/PC001HandshakeStatus/Lamp
-@onready var _pc001_handshake_label: Label = $StatusPanel/Margin/VBox/Tools/PC001HandshakeStatus/Label
-@onready var _timed_can_button: Button = $StatusPanel/Margin/VBox/Tools/TimedCANTrigger
-@onready var _gateway_host_edit: LineEdit = $StatusPanel/Margin/VBox/AdvancedPanel/GatewayHost
-@onready var _gateway_port_edit: LineEdit = $StatusPanel/Margin/VBox/AdvancedPanel/GatewayPort
-@onready var _unlimited_bucket_button: CheckButton = $StatusPanel/Margin/VBox/AdvancedPanel/UnlimitedBucketCapacity
-@onready var _cutting_diagnostics_button: CheckButton = $StatusPanel/Margin/VBox/AdvancedPanel/CuttingDiagnostics
+var _status_panel: PanelContainer
+var _panel_toggle_button: Button
+var _title_label: Label
+var _model_selector: OptionButton
+var _coupler_selector: OptionButton
+var _attachment_selector: OptionButton
+var _ignore_attachment_selection := false
+var _lifecycle_badge: Label
+var _operation_label: Label
+var _bucket_status_label: Label
+var _bucket_fill: ProgressBar
+var _control_hint: Label
+var _automatic_soil_hint: Label
+var _camera_mode_label: Label
+var _camera_selector: OptionButton
+var _reset_view_button: Button
+var _warning_label: Label
+var _completion_label: Label
+var _connection_label: Label
+var _authority_label: Label
+var _lifecycle_label: Label
+var _diagnostics_label: Label
+var _can_status_label: Label
+var _can_output_button: Button
+var _gateway_button: Button
+var _pc001_handshake_lamp: Panel
+var _pc001_handshake_label: Label
+var _timed_can_button: Button
+var _gateway_host_edit: LineEdit
+var _gateway_port_edit: LineEdit
+var _unlimited_bucket_button: CheckButton
+var _cutting_diagnostics_button: CheckButton
 
 const GATEWAY_CONFIG_PATH := "user://ict_config.cfg"
-@onready var _bucket_volume_label: Label = $StatusPanel/Margin/VBox/AdvancedPanel/BucketVolume
-@onready var _advanced_panel: VBoxContainer = $StatusPanel/Margin/VBox/AdvancedPanel
-@onready var _reset_button: Button = $StatusPanel/Margin/VBox/Actions/Reset
-@onready var _mute_audio_button: CheckButton = $StatusPanel/Margin/VBox/Tools/MuteAudio
-@onready var _test_graphics_button: CheckButton = $StatusPanel/Margin/VBox/Tools/TestGraphics
-@onready var _bucket_passthrough_button: CheckButton = $StatusPanel/Margin/VBox/Tools/BucketPassthrough
-@onready var _level_assist_button: CheckButton = $StatusPanel/Margin/VBox/Tools/LevelAssist
-@onready var _slope_assist_button: Button = $StatusPanel/Margin/VBox/Tools/SlopeAssist
+var _bucket_volume_label: Label
+var _advanced_panel: VBoxContainer
+var _reset_button: Button
+var _mute_audio_button: CheckButton
+var _test_graphics_button: CheckButton
+var _bucket_passthrough_button: CheckButton
+var _level_assist_button: CheckButton
+var _slope_assist_button: Button
+var _guide_panel: PanelContainer
+var _guide_title_label: Label
+var _guide_intro_label: Label
+var _guide_device_label: Label
+var _guide_controls_label: Label
+var _guide_recovery_label: Label
+var _guide_close_button: Button
+var _confirmation: ConfirmationDialog
 var _assist_menu_panel: PanelContainer
 var _assist_menu_rows_box: VBoxContainer
 var _assist_menu_rows: Array[Button] = []
+var _assist_menu_stripe: ColorRect
+var _assist_menu_tick: ColorRect
+var _assist_menu_title: Label
+var _assist_menu_micro: Label
+var _assist_menu_hint: Label
 var _slope_side_view: SlopeSideView
-@onready var _guide_panel: PanelContainer = $GuidePanel
-@onready var _guide_title_label: Label = $GuidePanel/Margin/VBox/Title
-@onready var _guide_intro_label: Label = $GuidePanel/Margin/VBox/Intro
-@onready var _guide_device_label: Label = $GuidePanel/Margin/VBox/Device
-@onready var _guide_controls_label: Label = $GuidePanel/Margin/VBox/Controls
-@onready var _guide_recovery_label: Label = $GuidePanel/Margin/VBox/Recovery
-@onready var _guide_close_button: Button = $GuidePanel/Margin/VBox/Close
-@onready var _confirmation: ConfirmationDialog = $DestructiveConfirmation
+var _ui_theme := GameSkin.VARIANT_DEBUG
 
 
 func _init() -> void:
 	# Instantiate bindings only at runtime, so the main scene never displays
 	# the pre-composition control layout in the editor.
+	_instantiate_menu_controls()
+
+
+func _instantiate_menu_controls() -> void:
 	var controls := MenuControls.instantiate()
 	for child in controls.get_children():
 		controls.remove_child(child)
+		# The instantiated scene owns these nodes; clear ownership so adding
+		# and reparenting them under OperatorUI stays consistent on rebuild.
+		_clear_owner_recursive(child)
 		add_child(child)
 	controls.free()
 
 
-func _ready() -> void:
-	_motion_client = get_node_or_null(motion_client_path) as MotionClient
-	_product_session = get_node_or_null(product_session_path) as ProductSession
-	_excavation_world = get_node_or_null(excavation_world_path) as ExcavationWorld
-	_chassis = get_node_or_null(chassis_path) as TrackedChassisController
-	_camera = get_node_or_null(camera_path) as CameraRig
-	_feedback = get_node_or_null(feedback_path) as MachineFeedback
-	_visual_quality = get_node_or_null(visual_quality_path) as VisualQualityController
-	_performance_capture = get_node_or_null("../PerformanceCapture") as Capture
-	process_mode = Node.PROCESS_MODE_ALWAYS
-	_confirmation.theme = GameSkin.create()
-	_confirmation.ok_button_text = "确认"
-	_confirmation.cancel_button_text = "取消"
-	_apply_static_copy()
-	_configure_model_selector()
-	_configure_camera_selector()
+static func _clear_owner_recursive(node: Node) -> void:
+	node.owner = null
+	for child in node.get_children():
+		_clear_owner_recursive(child)
+
+
+func _bind_controls() -> void:
+	_status_panel = $StatusPanel
+	_panel_toggle_button = $PanelToggle
+	_title_label = $StatusPanel/Margin/VBox/Title
+	_model_selector = $StatusPanel/Margin/VBox/Header/ModelSelector
+	_lifecycle_badge = $StatusPanel/Margin/VBox/Header/LifecycleBadge
+	_operation_label = $StatusPanel/Margin/VBox/Operation
+	_bucket_status_label = $StatusPanel/Margin/VBox/BucketStatus
+	_bucket_fill = $StatusPanel/Margin/VBox/BucketFill
+	_control_hint = $StatusPanel/Margin/VBox/ControlHint
+	_automatic_soil_hint = $StatusPanel/Margin/VBox/AutomaticSoilHint
+	_camera_mode_label = $StatusPanel/Margin/VBox/CameraRow/Mode
+	_camera_selector = $StatusPanel/Margin/VBox/CameraRow/Selector
+	_reset_view_button = $StatusPanel/Margin/VBox/CameraRow/ResetView
+	_warning_label = $StatusPanel/Margin/VBox/Warning
+	_completion_label = $StatusPanel/Margin/VBox/Completion
+	_connection_label = $StatusPanel/Margin/VBox/AdvancedPanel/Connection
+	_authority_label = $StatusPanel/Margin/VBox/AdvancedPanel/Authority
+	_lifecycle_label = $StatusPanel/Margin/VBox/AdvancedPanel/Lifecycle
+	_diagnostics_label = $StatusPanel/Margin/VBox/AdvancedPanel/Diagnostics
+	_can_status_label = $StatusPanel/Margin/VBox/AdvancedPanel/CANStatus
+	_can_output_button = $StatusPanel/Margin/VBox/Tools/CANOutputToggle
+	_gateway_button = $StatusPanel/Margin/VBox/Tools/GatewayRestartButton
+	_pc001_handshake_lamp = $StatusPanel/Margin/VBox/Tools/PC001HandshakeStatus/Lamp
+	_pc001_handshake_label = $StatusPanel/Margin/VBox/Tools/PC001HandshakeStatus/Label
+	_timed_can_button = $StatusPanel/Margin/VBox/Tools/TimedCANTrigger
+	_gateway_host_edit = $StatusPanel/Margin/VBox/AdvancedPanel/GatewayHost
+	_gateway_port_edit = $StatusPanel/Margin/VBox/AdvancedPanel/GatewayPort
+	_unlimited_bucket_button = $StatusPanel/Margin/VBox/AdvancedPanel/UnlimitedBucketCapacity
+	_cutting_diagnostics_button = $StatusPanel/Margin/VBox/AdvancedPanel/CuttingDiagnostics
+	_bucket_volume_label = $StatusPanel/Margin/VBox/AdvancedPanel/BucketVolume
+	_advanced_panel = $StatusPanel/Margin/VBox/AdvancedPanel
+	_reset_button = $StatusPanel/Margin/VBox/Actions/Reset
+	_mute_audio_button = $StatusPanel/Margin/VBox/Tools/MuteAudio
+	_test_graphics_button = $StatusPanel/Margin/VBox/Tools/TestGraphics
+	_bucket_passthrough_button = $StatusPanel/Margin/VBox/Tools/BucketPassthrough
+	_level_assist_button = $StatusPanel/Margin/VBox/Tools/LevelAssist
+	_slope_assist_button = $StatusPanel/Margin/VBox/Tools/SlopeAssist
+	_guide_panel = $GuidePanel
+	_guide_title_label = $GuidePanel/Margin/VBox/Title
+	_guide_intro_label = $GuidePanel/Margin/VBox/Intro
+	_guide_device_label = $GuidePanel/Margin/VBox/Device
+	_guide_controls_label = $GuidePanel/Margin/VBox/Controls
+	_guide_recovery_label = $GuidePanel/Margin/VBox/Recovery
+	_guide_close_button = $GuidePanel/Margin/VBox/Close
+	_confirmation = $DestructiveConfirmation
+
+
+func _connect_controls() -> void:
 	_panel_toggle_button.pressed.connect(_on_panel_toggle_pressed)
 	_reset_button.pressed.connect(_on_reset_pressed)
 	_mute_audio_button.toggled.connect(_on_audio_muted)
@@ -146,12 +206,32 @@ func _ready() -> void:
 	_can_output_button.pressed.connect(_on_can_output_pressed)
 	_gateway_button.pressed.connect(_on_gateway_restart_pressed)
 	_timed_can_button.pressed.connect(_on_timed_can_pressed)
-	_load_gateway_config()
 	_guide_close_button.pressed.connect(_on_guide_closed)
 	_reset_view_button.pressed.connect(_on_reset_view_pressed)
 	_confirmation.window_input.connect(_on_confirmation_input)
 	_confirmation.confirmed.connect(_on_destructive_confirmed)
 	_confirmation.canceled.connect(_on_destructive_canceled)
+
+
+func _ready() -> void:
+	_motion_client = get_node_or_null(motion_client_path) as MotionClient
+	_product_session = get_node_or_null(product_session_path) as ProductSession
+	_excavation_world = get_node_or_null(excavation_world_path) as ExcavationWorld
+	_attachment_rig = get_node_or_null(attachment_rig_path) as AttachmentRig
+	_chassis = get_node_or_null(chassis_path) as TrackedChassisController
+	_camera = get_node_or_null(camera_path) as CameraRig
+	_feedback = get_node_or_null(feedback_path) as MachineFeedback
+	_visual_quality = get_node_or_null(visual_quality_path) as VisualQualityController
+	_performance_capture = get_node_or_null("../PerformanceCapture") as Capture
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	_ui_theme = _load_ui_theme()
+	_bind_controls()
+	_connect_controls()
+	_apply_dialog_theme()
+	_apply_static_copy()
+	_configure_model_selector()
+	_configure_camera_selector()
+	_load_gateway_config()
 	if _excavation_world != null:
 		_excavation_world.excavation_changed.connect(_on_excavation_changed)
 	if _motion_client != null:
@@ -164,21 +244,19 @@ func _ready() -> void:
 	if _product_session != null:
 		_product_session.status_changed.connect(_on_product_status_changed)
 		_product_session.model_changed.connect(_on_product_model_changed)
+		_product_session.attachment_changed.connect(_on_attachment_changed)
 	if _camera != null:
 		_camera.mode_changed.connect(_on_camera_mode_changed)
 	var can_bridge := _can_bridge()
 	if can_bridge != null and can_bridge.has_signal("ict_link_status_changed"):
 		can_bridge.connect("ict_link_status_changed", _on_pc001_link_status_changed)
-	_menu = MenuLayout.build(self)
-	_configure_map_selector()
+	_menu = MenuLayout.build(self, _ui_theme)
+	_wire_built_menu()
 	_build_capture_controls()
 	_hud = $ControlInputHUD as ControlInputHUD
+	_hud.set_theme_variant(_ui_theme)
 	_advanced_panel.visible = true
-	(_menu["resume"] as Button).pressed.connect(_on_panel_toggle_pressed)
-	(_menu["tabs"] as TabContainer).tab_changed.connect(_on_menu_tab_changed)
-	(_menu["tabs"] as TabContainer).get_tab_bar().focus_mode = Control.FOCUS_ALL
 	get_viewport().size_changed.connect(_layout_menu)
-	(_menu["hardware"] as Control).resized.connect(_layout_menu)
 	_layout_menu()
 	_set_panel_collapsed(true)
 	_sync_test_graphics_toggle()
@@ -189,6 +267,248 @@ func _ready() -> void:
 	_refresh_prompt_copy()
 	_refresh()
 	_refresh_model_selector()
+	_refresh_attachment_selector()
+
+
+func _apply_dialog_theme() -> void:
+	_confirmation.theme = GameSkin.create(_ui_theme)
+	_confirmation.ok_button_text = "确认"
+	_confirmation.cancel_button_text = "取消"
+	_style_assist_menu()
+
+
+## Single-hotkey assist picker (T): a small centered panel mirrored from the
+## chassis assist_menu status block. Keyboard W/S navigates, Enter activates,
+## T/Esc closes — rows stay clickable when the pointer is free.
+func _build_assist_menu() -> void:
+	_assist_menu_panel = PanelContainer.new()
+	_assist_menu_panel.name = "AssistMenu"
+	_assist_menu_panel.visible = false
+	_assist_menu_panel.custom_minimum_size = Vector2(280, 0)
+	_assist_menu_panel.set_anchors_preset(Control.PRESET_CENTER)
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 14)
+	margin.add_theme_constant_override("margin_right", 14)
+	margin.add_theme_constant_override("margin_top", 10)
+	margin.add_theme_constant_override("margin_bottom", 10)
+	_assist_menu_panel.add_child(margin)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	margin.add_child(box)
+	# Console chrome: hazard edge, accent tick and a micro label — hidden under
+	# the debug theme, which keeps the plain centered dialog.
+	_assist_menu_stripe = ColorRect.new()
+	_assist_menu_stripe.custom_minimum_size = Vector2(0, 4)
+	var stripe_material := ShaderMaterial.new()
+	stripe_material.shader = load("res://shaders/hazard_stripes.gdshader")
+	stripe_material.set_shader_parameter("scroll_px_s", 18.0)
+	_assist_menu_stripe.material = stripe_material
+	_assist_menu_stripe.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(_assist_menu_stripe)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 8)
+	box.add_child(head)
+	_assist_menu_tick = ColorRect.new()
+	_assist_menu_tick.custom_minimum_size = Vector2(4, 16)
+	head.add_child(_assist_menu_tick)
+	_assist_menu_title = Label.new()
+	_assist_menu_title.text = "辅助控制"
+	_assist_menu_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(_assist_menu_title)
+	_assist_menu_micro = Label.new()
+	_assist_menu_micro.text = "ASSIST"
+	_assist_menu_micro.add_theme_font_size_override("font_size", 10)
+	_assist_menu_micro.add_theme_color_override("font_color", GameSkin.MUTED)
+	_assist_menu_micro.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	head.add_child(_assist_menu_micro)
+	_assist_menu_rows_box = VBoxContainer.new()
+	_assist_menu_rows_box.name = "Rows"
+	box.add_child(_assist_menu_rows_box)
+	_assist_menu_hint = Label.new()
+	_assist_menu_hint.text = "W/S 选择 · Enter 确认 · T/Esc 关闭"
+	_assist_menu_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_assist_menu_hint.add_theme_font_size_override("font_size", 11)
+	box.add_child(_assist_menu_hint)
+	add_child(_assist_menu_panel)
+	_style_assist_menu()
+
+
+## Re-apply variant chrome to the assist picker: theme swap, stripe tint,
+## title styling, and a row rebuild since rows carry variant-specific styles.
+func _style_assist_menu() -> void:
+	if _assist_menu_panel == null:
+		return
+	var console := GameSkin.is_console_variant(_ui_theme)
+	var accent := GameSkin.accent_for(_ui_theme)
+	_assist_menu_panel.theme = GameSkin.create(_ui_theme)
+	_assist_menu_panel.modulate.a = 1.0
+	_assist_menu_panel.scale = Vector2.ONE
+	_assist_menu_stripe.visible = console
+	(_assist_menu_stripe.material as ShaderMaterial).set_shader_parameter("stripe_color", accent)
+	_assist_menu_tick.visible = console
+	_assist_menu_tick.color = accent
+	_assist_menu_micro.visible = console
+	_assist_menu_title.add_theme_color_override("font_color", accent if console else GameSkin.PAPER)
+	_assist_menu_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if console else HORIZONTAL_ALIGNMENT_CENTER
+	_assist_menu_hint.add_theme_color_override("font_color", GameSkin.MUTED if console else GameSkin.PAPER)
+	for row in _assist_menu_rows:
+		row.queue_free()
+	_assist_menu_rows.clear()
+	_sync_assist_menu()
+
+
+## Open pop for the assist picker under console variants: fade plus a small
+## elastic scale from the panel centre. Deferred so the panel's laid-out size
+## is known before the pivot is set.
+func _pop_assist_menu() -> void:
+	if _assist_menu_panel == null or not _assist_menu_panel.visible:
+		return
+	_assist_menu_panel.pivot_offset = _assist_menu_panel.size * 0.5
+	_assist_menu_panel.scale = Vector2(0.9, 0.9)
+	var pop := _assist_menu_panel.create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	pop.tween_property(_assist_menu_panel, "modulate:a", 1.0, 0.14)
+	pop.parallel().tween_property(_assist_menu_panel, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## Assist guidance side view: a right-edge panel mirroring the chassis
+## `assist_view` snapshot — machine links, terrain and target profile in the
+## cabin-facing plane. Visible while a terminal-surface assist is live
+## (slope preview/active or level grading); the chassis leaves it empty
+## otherwise.
+func _build_slope_side_view() -> void:
+	_slope_side_view = SlopeSideView.new()
+	_slope_side_view.name = "SlopeSideView"
+	_slope_side_view.visible = false
+	_slope_side_view.set_theme_variant(_ui_theme)
+	_slope_side_view.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+	_slope_side_view.offset_left = -380.0
+	_slope_side_view.offset_right = -20.0
+	_slope_side_view.offset_top = -110.0
+	_slope_side_view.offset_bottom = 110.0
+	add_child(_slope_side_view)
+
+
+func _wire_built_menu() -> void:
+	(_menu["resume"] as Button).pressed.connect(_on_panel_toggle_pressed)
+	var tabs := _menu["tabs"] as TabContainer
+	tabs.tab_changed.connect(_on_menu_tab_changed)
+	tabs.get_tab_bar().focus_mode = Control.FOCUS_ALL
+	_configure_attachment_selector()
+	_configure_map_selector()
+	_configure_theme_selector()
+	var dock := _menu.get("hardware") as Control
+	if dock != null:
+		dock.resized.connect(_layout_menu)
+
+
+func _load_ui_theme() -> String:
+	var config := ConfigFile.new()
+	if config.load(CONFIG_PATH) != OK:
+		return GameSkin.VARIANT_DEBUG
+	var variant := String(config.get_value(CONFIG_SECTION_UI, CONFIG_UI_THEME, GameSkin.VARIANT_DEBUG))
+	return variant if variant in GameSkin.VARIANTS else GameSkin.VARIANT_DEBUG
+
+
+func _configure_theme_selector() -> void:
+	var selector := _menu["theme_selector"] as OptionButton
+	selector.add_item("界面主题：调试")
+	selector.set_item_metadata(0, GameSkin.VARIANT_DEBUG)
+	selector.add_item("界面主题：工业重机")
+	selector.set_item_metadata(1, GameSkin.VARIANT_INDUSTRIAL)
+	selector.add_item("界面主题：三一重工")
+	selector.set_item_metadata(2, GameSkin.VARIANT_SANY)
+	selector.tooltip_text = "切换界面主题，立即生效并记住选择。工业重机与三一重工主题下驾驶时只保留右下操作提示。"
+	_refresh_theme_selector()
+	selector.item_selected.connect(_on_ui_theme_selected)
+
+
+func _refresh_theme_selector() -> void:
+	var selector := _menu.get("theme_selector") as OptionButton
+	if selector == null:
+		return
+	for index in range(selector.item_count):
+		if String(selector.get_item_metadata(index)) == _ui_theme:
+			selector.select(index)
+			break
+
+
+func _on_ui_theme_selected(index: int) -> void:
+	var selector := _menu["theme_selector"] as OptionButton
+	_apply_ui_theme(String(selector.get_item_metadata(index)))
+
+
+func _apply_ui_theme(variant: String) -> void:
+	if variant not in GameSkin.VARIANTS or variant == _ui_theme:
+		_refresh_theme_selector()
+		return
+	_ui_theme = variant
+	var config := ConfigFile.new()
+	config.load(CONFIG_PATH)
+	config.set_value(CONFIG_SECTION_UI, CONFIG_UI_THEME, variant)
+	config.save(CONFIG_PATH)
+	_rebuild_menu_theme()
+
+
+## Runtime theme switch: the two variants compose different menu structures
+## (dock, header lamp, CAN controls), so the composed UI is torn down and
+## rebuilt from the pre-composition scene while gameplay stays paused.
+func _rebuild_menu_theme() -> void:
+	if _menu_tween != null:
+		_menu_tween.kill()
+	if _page_tween != null:
+		_page_tween.kill()
+	if is_instance_valid(_confirmation):
+		_confirmation.hide()
+	_pending_action = ""
+	_pending_model_id = ""
+	var stale: Array[Node] = []
+	for key in ["root", "hardware"]:
+		var node := _menu.get(key) as Node
+		if is_instance_valid(node):
+			stale.append(node)
+	for node in [_panel_toggle_button, _guide_panel, _confirmation]:
+		if is_instance_valid(node):
+			stale.append(node)
+	for node in stale:
+		# Detach immediately so the re-instantiated controls keep their exact
+		# scene names; queue_free alone would collide until the frame ends.
+		if node.get_parent() != null:
+			node.get_parent().remove_child(node)
+		node.queue_free()
+	_menu = {}
+	_instantiate_menu_controls()
+	_bind_controls()
+	_connect_controls()
+	_apply_dialog_theme()
+	_apply_static_copy()
+	_configure_model_selector()
+	_configure_camera_selector()
+	_load_gateway_config()
+	_menu = MenuLayout.build(self, _ui_theme)
+	_wire_built_menu()
+	_build_capture_controls()
+	_advanced_panel.visible = true
+	_hud.set_theme_variant(_ui_theme)
+	if _slope_side_view != null:
+		_slope_side_view.set_theme_variant(_ui_theme)
+	_guide_panel.visible = false
+	_layout_menu()
+	_set_panel_collapsed(_panel_collapsed)
+	_refresh_prompt_copy()
+	_sync_test_graphics_toggle()
+	_refresh()
+	_refresh_model_selector()
+	_refresh_capture_status()
+	if not _panel_collapsed:
+		(_menu["resume"] as Button).grab_focus()
+
+
+func set_ui_theme_for_test(variant: String) -> void:
+	_apply_ui_theme(variant)
+
+
+func get_ui_theme_for_test() -> String:
+	return _ui_theme
 
 
 func _apply_static_copy() -> void:
@@ -222,6 +542,8 @@ func _process(delta: float) -> void:
 		return
 	_menu_visual_time += delta
 	(_menu["atmosphere"] as ShaderMaterial).set_shader_parameter("ui_time", _menu_visual_time)
+	if GameSkin.is_console_variant(_ui_theme) and _pc001_handshake_lamp != null:
+		_pc001_handshake_lamp.modulate.a = 0.72 + 0.28 * (0.5 + 0.5 * sin(_menu_visual_time * 5.0))
 	_menu_refresh_elapsed += delta
 	if _menu_refresh_elapsed >= 0.2:
 		_menu_refresh_elapsed = 0.0
@@ -303,7 +625,13 @@ func _menu_navigation_direction(event: InputEvent) -> int:
 
 func _move_menu_focus(direction: int) -> void:
 	var tabs := _menu["tabs"] as TabContainer
-	var controls: Array[Control] = [_menu["resume"] as Control, tabs.get_tab_bar()]
+	var controls: Array[Control] = [_menu["resume"] as Control]
+	var nav: Array = _menu.get("nav", [])
+	if nav.is_empty():
+		controls.append(tabs.get_tab_bar())
+	else:
+		for item in nav:
+			controls.append(item)
 	_collect_menu_focus(tabs.get_current_tab_control(), controls)
 	var index := controls.find(get_viewport().gui_get_focus_owner())
 	controls[wrapi(index + direction, 0, controls.size())].grab_focus()
@@ -325,12 +653,15 @@ func _layout_menu() -> void:
 		return
 	var viewport_size := get_viewport().get_visible_rect().size
 	(_menu["atmosphere"] as ShaderMaterial).set_shader_parameter("aspect_ratio", viewport_size.x / maxf(viewport_size.y, 1.0))
-	var dock_width := (_menu["hardware"] as Control).size.x
-	var available_left := dock_width + 56.0
-	var extent := Vector2(clampf(viewport_size.x - available_left - 28.0, 1.0, 760.0), clampf(viewport_size.y - 48.0, 1.0, 660.0))
-	var center_shift := available_left / 2.0 - 14.0
-	_status_panel.offset_left = center_shift - extent.x / 2.0
-	_status_panel.offset_right = center_shift + extent.x / 2.0
+	# The open menu centers on the viewport in all themes; the dock no longer
+	# reserves space beside it. Console variants use a near-fullscreen console.
+	var console := GameSkin.is_console_variant(String(_menu.get("variant", "")))
+	var extent := Vector2(
+		clampf(viewport_size.x - 72.0, 1.0, 1360.0) if console else clampf(viewport_size.x - 56.0, 1.0, 780.0),
+		clampf(viewport_size.y - 64.0, 1.0, 820.0) if console else clampf(viewport_size.y - 48.0, 1.0, 700.0)
+	)
+	_status_panel.offset_left = -extent.x / 2.0
+	_status_panel.offset_right = extent.x / 2.0
 	_status_panel.offset_top = -extent.y / 2.0
 	_status_panel.offset_bottom = extent.y / 2.0
 	_panel_toggle_button.position = Vector2(28, viewport_size.y - 70)
@@ -342,13 +673,30 @@ func _on_menu_tab_changed(_index: int) -> void:
 		_page_tween.kill()
 	var tabs := _menu["tabs"] as TabContainer
 	for index in range(tabs.get_tab_count()):
-		tabs.get_tab_control(index).modulate.a = 1.0
+		var other := tabs.get_tab_control(index)
+		other.modulate.a = 1.0
+		other.scale = Vector2.ONE
 	var page := tabs.get_current_tab_control()
 	page.modulate.a = 0.65
+	var nav: Array = _menu.get("nav", [])
+	if not nav.is_empty():
+		page.pivot_offset = Vector2(0.0, page.size.y * 0.5)
+		page.scale = Vector2(0.9, 1.0)
+		page.modulate.a = 0.0
 	_page_tween = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	_page_tween.tween_property(page, "modulate:a", 1.0, 0.16)
-	# The tab bar keeps controller focus; Down enters the selected page.
-	(_menu["tabs"] as TabContainer).get_tab_bar().grab_focus()
+	if not nav.is_empty():
+		_page_tween.parallel().tween_property(page, "scale:x", 1.0, 0.22).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	# Navigation keeps controller focus; Down enters the selected page.
+	if nav.is_empty():
+		tabs.get_tab_bar().grab_focus()
+	else:
+		for index in nav.size():
+			(nav[index] as BaseButton).set_pressed_no_signal(index == tabs.current_tab)
+		(nav[tabs.current_tab] as Control).grab_focus()
+		var title := _menu.get("page_title") as Label
+		if title != null:
+			title.text = tabs.get_tab_title(tabs.current_tab)
 
 
 func _exit_tree() -> void:
@@ -403,57 +751,6 @@ func _on_slope_assist_pressed() -> void:
 	_sync_slope_assist_button()
 
 
-## Single-hotkey assist picker (T): a small centered panel mirrored from the
-## chassis assist_menu status block. Keyboard W/S navigates, Enter activates,
-## T/Esc closes — rows stay clickable when the pointer is free.
-func _build_assist_menu() -> void:
-	_assist_menu_panel = PanelContainer.new()
-	_assist_menu_panel.name = "AssistMenu"
-	_assist_menu_panel.visible = false
-	_assist_menu_panel.custom_minimum_size = Vector2(260, 0)
-	_assist_menu_panel.set_anchors_preset(Control.PRESET_CENTER)
-	_assist_menu_panel.theme = GameSkin.create()
-	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 14)
-	margin.add_theme_constant_override("margin_right", 14)
-	margin.add_theme_constant_override("margin_top", 10)
-	margin.add_theme_constant_override("margin_bottom", 10)
-	_assist_menu_panel.add_child(margin)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 6)
-	margin.add_child(box)
-	var title := Label.new()
-	title.text = "辅助控制"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(title)
-	_assist_menu_rows_box = VBoxContainer.new()
-	_assist_menu_rows_box.name = "Rows"
-	box.add_child(_assist_menu_rows_box)
-	var hint := Label.new()
-	hint.text = "W/S 选择 · Enter 确认 · T/Esc 关闭"
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.add_theme_font_size_override("font_size", 11)
-	box.add_child(hint)
-	add_child(_assist_menu_panel)
-
-
-## Assist guidance side view: a right-edge panel mirroring the chassis
-## `assist_view` snapshot — machine links, terrain and target profile in the
-## cabin-facing plane. Visible while a terminal-surface assist is live
-## (slope preview/active or level grading); the chassis leaves it empty
-## otherwise.
-func _build_slope_side_view() -> void:
-	_slope_side_view = SlopeSideView.new()
-	_slope_side_view.name = "SlopeSideView"
-	_slope_side_view.visible = false
-	_slope_side_view.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
-	_slope_side_view.offset_left = -380.0
-	_slope_side_view.offset_right = -20.0
-	_slope_side_view.offset_top = -110.0
-	_slope_side_view.offset_bottom = 110.0
-	add_child(_slope_side_view)
-
-
 func _on_unlimited_bucket_toggled(enabled: bool) -> void:
 	if _excavation_world == null \
 			or not _excavation_world.set_voxel_unlimited_bucket_for_testing(enabled):
@@ -502,19 +799,20 @@ func _build_capture_controls() -> void:
 	_capture_status = Label.new()
 	_capture_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	group.add_child(_capture_status)
-	_capture_badge = Label.new()
-	_capture_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_capture_badge.add_theme_color_override("font_color", GameSkin.ACCENT)
-	_capture_badge.add_theme_color_override("font_shadow_color", Color.BLACK)
-	_capture_badge.add_theme_constant_override("shadow_offset_x", 1)
-	_capture_badge.add_theme_constant_override("shadow_offset_y", 1)
-	add_child(_capture_badge)
-	_capture_badge.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	_capture_badge.offset_left = -350
-	_capture_badge.offset_right = -24
-	_capture_badge.offset_top = 20
-	_capture_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	if _performance_capture != null:
+	if _capture_badge == null:
+		_capture_badge = Label.new()
+		_capture_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_capture_badge.add_theme_color_override("font_shadow_color", Color.BLACK)
+		_capture_badge.add_theme_constant_override("shadow_offset_x", 1)
+		_capture_badge.add_theme_constant_override("shadow_offset_y", 1)
+		add_child(_capture_badge)
+		_capture_badge.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+		_capture_badge.offset_left = -350
+		_capture_badge.offset_right = -24
+		_capture_badge.offset_top = 20
+		_capture_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_capture_badge.add_theme_color_override("font_color", GameSkin.accent_for(_ui_theme))
+	if _performance_capture != null and not _performance_capture.state_changed.is_connected(_refresh_capture_status):
 		_performance_capture.state_changed.connect(_refresh_capture_status)
 	_refresh_capture_status()
 
@@ -723,6 +1021,114 @@ func _on_destructive_canceled() -> void:
 	_refresh_model_selector()
 	_refresh_map_selector()
 	(_menu["resume"] as Button).grab_focus()
+
+
+func _configure_attachment_selector() -> void:
+	_coupler_selector = _menu.get("coupler_selector") as OptionButton
+	_attachment_selector = _menu.get("attachment_selector") as OptionButton
+	if _coupler_selector != null:
+		_coupler_selector.clear()
+		var coupler_ids: Array[String] = []
+		if _attachment_rig != null:
+			coupler_ids = _attachment_rig.coupler_ids()
+		if coupler_ids.is_empty():
+			coupler_ids.append("none")
+		for index in range(coupler_ids.size()):
+			var coupler_id := coupler_ids[index]
+			var display := _attachment_rig.coupler_display_name(coupler_id) if _attachment_rig != null else coupler_id
+			_coupler_selector.add_item("快换：%s" % display)
+			_coupler_selector.set_item_metadata(index, coupler_id)
+		_coupler_selector.tooltip_text = "切换快换立即生效；属具列表仅显示当前快换支持的属具，不兼容的属具会自动更换。"
+		_coupler_selector.item_selected.connect(_on_coupler_selected)
+	if _attachment_selector != null:
+		_attachment_selector.tooltip_text = "属具列表仅显示当前快换支持的属具；切换立即生效并清空斗内土量。Steelwrist 旋转器：Q+J/L 倾转 · O+A/D 回转。"
+		_attachment_selector.item_selected.connect(_on_tool_selected)
+	_refresh_attachment_selector()
+
+
+## The tool list is scoped to the active coupler: only tools whose
+## supported_couplers contains it are shown, so an incompatible combination
+## is never selectable. Rebuilt on every refresh (coupler switches repopulate
+## it); programmatic rebuilds never fire item_selected.
+func _populate_tool_selector() -> void:
+	if _attachment_selector == null:
+		return
+	var coupler_id := _active_coupler_id()
+	_attachment_selector.clear()
+	var index := 0
+	if _attachment_rig != null:
+		for tool_id in _attachment_rig.tool_ids():
+			if not _attachment_rig.tool_supported_couplers(tool_id).has(coupler_id):
+				continue
+			_attachment_selector.add_item("属具：%s" % _attachment_rig.tool_display_name(tool_id))
+			_attachment_selector.set_item_metadata(index, tool_id)
+			index += 1
+	if index == 0:
+		_attachment_selector.add_item("属具：无可用属具")
+		_attachment_selector.set_item_metadata(0, "")
+
+
+func _refresh_attachment_selector() -> void:
+	_ignore_attachment_selection = true
+	var coupler_id := _active_coupler_id()
+	var tool_id := _active_tool_id()
+	_populate_tool_selector()
+	if _coupler_selector != null:
+		for index in range(_coupler_selector.item_count):
+			if String(_coupler_selector.get_item_metadata(index)) == coupler_id:
+				_coupler_selector.select(index)
+				break
+	if _attachment_selector != null:
+		for index in range(_attachment_selector.item_count):
+			if String(_attachment_selector.get_item_metadata(index)) == tool_id:
+				_attachment_selector.select(index)
+				break
+	_ignore_attachment_selection = false
+
+
+func _active_coupler_id() -> String:
+	return _product_session.active_coupler_id if _product_session != null else "none"
+
+
+func _active_tool_id() -> String:
+	return _product_session.active_tool_id if _product_session != null else "standard_bucket"
+
+
+func _on_coupler_selected(index: int) -> void:
+	if _ignore_attachment_selection:
+		return
+	var coupler_id := String(_coupler_selector.get_item_metadata(index))
+	if coupler_id == _active_coupler_id():
+		return
+	var tool_before := _active_tool_id()
+	if _product_session != null and _is_local_authority():
+		if not _product_session.request_coupler_switch(coupler_id):
+			_completion_label.text = "快换切换失败：%s" % String(_product_session.last_error.get("message", coupler_id))
+		elif _active_tool_id() != tool_before:
+			# The coupler swap forced a tool re-resolution; surface it so the
+			# auto-change is visible rather than a silent edit.
+			var tool_name := _attachment_rig.tool_display_name(_active_tool_id()) if _attachment_rig != null else _active_tool_id()
+			_completion_label.text = "属具已自动更换为：%s" % tool_name
+	_refresh_attachment_selector()
+	_refresh_prompt_copy()
+
+
+func _on_tool_selected(index: int) -> void:
+	if _ignore_attachment_selection:
+		return
+	var tool_id := String(_attachment_selector.get_item_metadata(index))
+	if tool_id == _active_tool_id():
+		return
+	if _product_session != null and _is_local_authority():
+		if not _product_session.request_tool_switch(tool_id):
+			_completion_label.text = "属具切换失败：%s" % String(_product_session.last_error.get("message", tool_id))
+	_refresh_attachment_selector()
+	_refresh_prompt_copy()
+
+
+func _on_attachment_changed(_attachment_id: String) -> void:
+	_refresh_attachment_selector()
+	_refresh_prompt_copy()
 
 
 func _configure_map_selector() -> void:
@@ -973,12 +1379,20 @@ func _set_panel_collapsed(collapsed: bool) -> void:
 	_panel_collapsed = collapsed
 	if _menu.is_empty():
 		return
-	(_menu["root"] as Control).visible = not collapsed
+	var root := _menu["root"] as Control
+	var console := GameSkin.is_console_variant(_ui_theme)
+	# Console variants keep the root alive through a short fade-out when closing;
+	# the panel content still snaps off instantly like a powered-down screen.
+	root.visible = not collapsed or (console and changed)
+	(_menu["panel"] as Control).visible = not collapsed
 	_hud.visible = collapsed
 	_panel_toggle_button.visible = collapsed
-	_panel_toggle_button.text = "Esc  /  菜单"
+	_panel_toggle_button.text = "≡  Esc  /  菜单" if console else "Esc  /  菜单"
 	_panel_toggle_button.focus_mode = Control.FOCUS_NONE
-	_panel_toggle_button.theme = GameSkin.create()
+	_panel_toggle_button.theme = GameSkin.create(_ui_theme)
+	var dock := _menu.get("hardware") as Control
+	if dock != null:
+		dock.visible = collapsed
 	if not changed:
 		return
 	if _camera != null:
@@ -996,9 +1410,18 @@ func _set_panel_collapsed(collapsed: bool) -> void:
 		(_menu["resume"] as Button).grab_focus()
 		if _menu_tween != null:
 			_menu_tween.kill()
-		(_menu["root"] as Control).modulate.a = 0.0
-		_menu_tween = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-		_menu_tween.tween_property(_menu["root"], "modulate:a", 1.0, 0.22).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		if is_instance_valid(_close_tween):
+			_close_tween.kill()
+		if console:
+			_boot_menu_industrial()
+		else:
+			root.modulate.a = 0.0
+			var panel := _menu["panel"] as Control
+			panel.pivot_offset = panel.size * 0.5
+			panel.scale = Vector2(0.965, 0.965)
+			_menu_tween = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+			_menu_tween.tween_property(root, "modulate:a", 1.0, 0.22).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+			_menu_tween.parallel().tween_property(panel, "scale", Vector2.ONE, 0.24).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	else:
 		_confirmation.hide()
 		if _menu_owns_pause:
@@ -1013,6 +1436,56 @@ func _set_panel_collapsed(collapsed: bool) -> void:
 		var focus := get_viewport().gui_get_focus_owner()
 		if focus != null:
 			focus.release_focus()
+		if console:
+			root.modulate.a = 1.0
+			_close_tween = root.create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+			_close_tween.tween_property(root, "modulate:a", 0.0, 0.12)
+			_close_tween.tween_callback(_hide_menu_root_if_collapsed)
+
+
+## Power-on sequence for the industrial console: a fast display flicker,
+## an energy scanline sweeping down the plate, then staggered element cascades.
+func _boot_menu_industrial() -> void:
+	var root := _menu["root"] as Control
+	root.modulate.a = 0.0
+	_menu_tween = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_menu_tween.tween_property(root, "modulate:a", 1.0, 0.05)
+	_menu_tween.tween_property(root, "modulate:a", 0.45, 0.035)
+	_menu_tween.tween_property(root, "modulate:a", 1.0, 0.1)
+	var backdrop := _menu.get("backdrop") as Control
+	if backdrop != null:
+		backdrop.set("scan", -0.08)
+		var sweep := backdrop.create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+		sweep.tween_property(backdrop, "scan", 1.08, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		sweep.tween_callback(func(): backdrop.set("scan", -1.0))
+	var boot := _menu.get("boot", {}) as Dictionary
+	var delay := 0.09
+	for item in boot.get("rail", []):
+		_cascade_in(item, delay, 0.0)
+		delay += 0.05
+	for item in boot.get("right", []):
+		_cascade_in(item, delay, 1.0)
+		delay += 0.05
+	for item in boot.get("fade", []):
+		(item as Control).modulate.a = 0.0
+		var fade := (item as Control).create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+		fade.tween_interval(delay)
+		fade.tween_property(item, "modulate:a", 1.0, 0.22)
+
+
+func _cascade_in(item: Control, delay: float, pivot_x: float) -> void:
+	item.modulate.a = 0.0
+	item.pivot_offset = Vector2(item.size.x * pivot_x, item.size.y * 0.5)
+	item.scale = Vector2(0.82, 0.82)
+	var tween := item.create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.tween_interval(delay)
+	tween.tween_property(item, "modulate:a", 1.0, 0.16)
+	tween.parallel().tween_property(item, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+func _hide_menu_root_if_collapsed() -> void:
+	if _panel_collapsed and not _menu.is_empty():
+		(_menu["root"] as Control).hide()
 
 
 func set_panel_collapsed_for_test(collapsed: bool) -> void:
@@ -1212,9 +1685,18 @@ func _sync_assist_menu() -> void:
 	var status := _product_session.get_status_snapshot() if _product_session != null else {}
 	var menu := status.get("assist_menu", {}) as Dictionary
 	var open := bool(menu.get("open", false))
+	var was_open := _assist_menu_panel.visible
 	_assist_menu_panel.visible = open
 	if not open:
+		# Reset any mid-flight open pop so a later debug-variant open or a
+		# style rebuild never inherits a frozen half-faded panel.
+		_assist_menu_panel.modulate.a = 1.0
+		_assist_menu_panel.scale = Vector2.ONE
 		return
+	if not was_open and GameSkin.is_console_variant(_ui_theme):
+		_assist_menu_panel.modulate.a = 0.0
+		call_deferred("_pop_assist_menu")
+	var console := GameSkin.is_console_variant(_ui_theme)
 	var entries := menu.get("entries", []) as Array
 	if _assist_menu_rows.size() != entries.size():
 		for row in _assist_menu_rows:
@@ -1223,6 +1705,8 @@ func _sync_assist_menu() -> void:
 		for i in entries.size():
 			var row := Button.new()
 			row.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			if console:
+				GameSkin.apply_nav_button(row, GameSkin.accent_for(_ui_theme))
 			var index := i
 			row.pressed.connect(_on_assist_menu_row_pressed.bind(index))
 			_assist_menu_rows_box.add_child(row)
@@ -1234,8 +1718,11 @@ func _sync_assist_menu() -> void:
 		var row := _assist_menu_rows[i]
 		var state := String(entry.get("state", "off"))
 		row.text = "%d  %s · %s" % [i + 1, String(entry.get("label", "")), state_names.get(state, state)]
-		if i == selected:
-			row.add_theme_color_override("font_color", GameSkin.ACCENT)
+		if console:
+			# Nav styling carries the selection: accent left bar plus lit text.
+			row.set_pressed_no_signal(i == selected)
+		elif i == selected:
+			row.add_theme_color_override("font_color", GameSkin.accent_for(_ui_theme))
 			row.text = "▶ " + row.text
 		else:
 			row.remove_theme_color_override("font_color")
@@ -1415,7 +1902,9 @@ func _operation_color(value: String) -> Color:
 func _refresh_prompt_copy() -> void:
 	if _hud != null:
 		_hud.set_prompt_mode(_prompt_mode)
-	_control_hint.text = UIStrings.CONTROL_HINT_GAMEPAD if _prompt_mode == "gamepad" else UIStrings.CONTROL_HINT_KEYBOARD
+	var tiltrotator_active := _attachment_rig != null and _attachment_rig.is_tiltrotator_active()
+	var keyboard_hint := UIStrings.CONTROL_HINT_ATTACHMENT_KEYBOARD if tiltrotator_active else UIStrings.CONTROL_HINT_KEYBOARD
+	_control_hint.text = UIStrings.CONTROL_HINT_GAMEPAD if _prompt_mode == "gamepad" else keyboard_hint
 	_guide_device_label.text = "当前输入：手柄" if _prompt_mode == "gamepad" else "当前输入：键盘与鼠标"
 	_guide_controls_label.text = UIStrings.GUIDE_GAMEPAD if _prompt_mode == "gamepad" else UIStrings.GUIDE_KEYBOARD
 

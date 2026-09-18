@@ -35,6 +35,7 @@
 [ext_resource type="PackedScene" uid="uid://dhk01p3j3pif3" path="res://assets/visual/SY135-NEO_excavator_godot.glb" id="27_kmb1v"]
 [ext_resource type="Script" uid="uid://qq1xalkljnbw" path="res://scripts/performance_capture.gd" id="40_performance_capture"]
 [ext_resource type="Script" uid="uid://ddv3skxe7le6h" path="res://scripts/main_map.gd" id="41_main_map"]
+[ext_resource type="Script" uid="uid://bfhoisjtla7wv" path="res://scripts/attachment_rig.gd" id="42_attachment_rig"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_qkpxi"]
 shader = ExtResource("1_pm3ni")
@@ -287,6 +288,12 @@ lifecycle_input_enabled = false
 [node name="MotionPresentation" type="Node3D" parent="." unique_id=2082115328]
 script = ExtResource("3_motion_presentation")
 presentation_root_path = NodePath("../ChassisMotionRoot/PresentationRoot")
+
+[node name="AttachmentRig" type="Node3D" parent="."]
+script = ExtResource("42_attachment_rig")
+motion_presentation_path = NodePath("../MotionPresentation")
+product_session_path = NodePath("../ProductSession")
+motion_client_path = NodePath("../MotionClient")
 
 [node name="SimulationTruthPublisher" type="Node" parent="." unique_id=874374906]
 script = ExtResource("16_truth_publisher")

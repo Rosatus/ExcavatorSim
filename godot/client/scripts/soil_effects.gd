@@ -106,7 +106,7 @@ func _bind_fill_pose(model_id: String, cavity_contract: Dictionary, current: Dic
 		return true
 	if model_id != _presentation.get_active_model_id():
 		return false
-	var frame := _presentation.get_frame_node(String(cavity_contract.get("frame", "")))
+	var frame := _presentation.get_soil_frame_node(String(cavity_contract.get("frame", "")))
 	if not is_instance_valid(frame):
 		return false
 	if _fill_mesh.get_parent() != frame:

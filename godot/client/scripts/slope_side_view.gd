@@ -7,6 +7,8 @@ extends Control
 ## live offset from the target. Fed by the session status snapshot
 ## (slope_assist.view); the owner toggles visibility, drawing is stateless.
 
+const GameSkin := preload("res://scripts/game_ui_theme.gd")
+
 const PANEL_BG := Color(0.07, 0.08, 0.1, 0.85)
 const TERRAIN_COLOR := Color(0.62, 0.5, 0.32)
 const CUT_FILL := Color(0.9, 0.35, 0.15, 0.35)
@@ -20,6 +22,7 @@ const FONT_SIZE := 13
 
 var _view: Dictionary = {}
 var _font: Font
+var _variant := GameSkin.VARIANT_DEBUG
 
 
 func _ready() -> void:
@@ -27,6 +30,15 @@ func _ready() -> void:
 	_font = get_theme_default_font()
 	mouse_filter = MOUSE_FILTER_IGNORE
 	clip_contents = true
+
+
+## Theme hook: console variants reframe the panel as a chamfered instrument
+## plate; the semantic guidance colors (terrain, target, tooth) never change.
+func set_theme_variant(variant: String) -> void:
+	if variant == _variant:
+		return
+	_variant = variant
+	queue_redraw()
 
 
 func set_view(view: Dictionary) -> void:
@@ -113,7 +125,36 @@ func _draw() -> void:
 			MARGIN + (p.x - lo.x) * scale + (draw_area.x - span.x * scale) * 0.5,
 			size.y - MARGIN - (p.y - lo.y) * scale - (draw_area.y - span.y * scale) * 0.5
 		)
-	draw_rect(Rect2(Vector2.ZERO, size), PANEL_BG)
+	var console := GameSkin.is_console_variant(_variant)
+	var accent := GameSkin.accent_for(_variant)
+	if console:
+		# Instrument plate: rounded steel slab, double rim and a header band
+		# behind the title line.
+		var plate := _rounded_poly(Rect2(Vector2(1.5, 1.5), size - Vector2(3.0, 3.0)), 10.0)
+		draw_colored_polygon(plate, Color(0.048, 0.062, 0.075, 0.94))
+		var plate_ring := PackedVector2Array(plate)
+		plate_ring.append(plate[0])
+		draw_polyline(plate_ring, Color(0.64, 0.70, 0.72, 0.30), 1.2, true)
+		var rim := _rounded_poly(Rect2(Vector2(5.0, 5.0), size - Vector2(10.0, 10.0)), 7.0)
+		rim.append(rim[0])
+		draw_polyline(rim, Color(0.64, 0.70, 0.72, 0.10), 1.0, true)
+		draw_rect(Rect2(6.0, 6.0, size.x - 12.0, 22.0), Color(0.02, 0.028, 0.034, 0.6))
+		draw_rect(Rect2(6.0, 28.0, size.x - 12.0, 1.0), Color(accent, 0.45))
+		draw_rect(Rect2(9.0, 10.0, 3.0, 15.0), accent)
+		# Faint metre grid under the guidance drawing.
+		var grid_c := Color(0.72, 0.76, 0.80, 0.05)
+		var g0 := int(floorf(lo.y))
+		var g1 := int(ceilf(hi.y))
+		if g1 - g0 <= 32:
+			for h_i in range(g0, g1 + 1):
+				draw_line(to_px.call(Vector2(lo.x, h_i)), to_px.call(Vector2(hi.x, h_i)), grid_c, 1.0)
+		var s0 := int(floorf(lo.x))
+		var s1 := int(ceilf(hi.x))
+		if s1 - s0 <= 48:
+			for s_i in range(s0, s1 + 1):
+				draw_line(to_px.call(Vector2(s_i, lo.y)), to_px.call(Vector2(s_i, hi.y)), grid_c, 1.0)
+	else:
+		draw_rect(Rect2(Vector2.ZERO, size), PANEL_BG)
 	# Cut fill: terrain cells above the target inside the reachable band.
 	for i in range(terrain.size() - 1):
 		var a := terrain[i]
@@ -151,12 +192,15 @@ func _draw() -> void:
 	var knee_px: Vector2 = to_px.call(Vector2(knee, target_h.call(knee)))
 	if toe_s > 0.05:
 		var anchor_px: Vector2 = to_px.call(Vector2(0.0, target_h.call(0.0)))
-		var dim_off := Vector2(0.0, -10.0)
+		# The knee's smoothed-relax height differs slightly from the anchor's,
+		# so a point-to-point dimension line would lean with the profile. Keep
+		# the dimension strictly horizontal with vertical end ticks instead.
+		var dim_y := minf(anchor_px.y, knee_px.y) - 10.0
 		draw_line(anchor_px + Vector2(0, -5), anchor_px + Vector2(0, 5), TEXT_COLOR, 1.5)
-		draw_line(anchor_px + dim_off, knee_px + dim_off, TEXT_COLOR, 1.0)
-		draw_line(anchor_px + dim_off + Vector2(0, -3), anchor_px + dim_off + Vector2(0, 3), TEXT_COLOR, 1.0)
-		draw_line(knee_px + dim_off + Vector2(0, -3), knee_px + dim_off + Vector2(0, 3), TEXT_COLOR, 1.0)
-		_draw_text((anchor_px + knee_px) * 0.5 + dim_off + Vector2(-4.0, -4.0), "d")
+		draw_line(Vector2(anchor_px.x, dim_y), Vector2(knee_px.x, dim_y), TEXT_COLOR, 1.0)
+		draw_line(Vector2(anchor_px.x, dim_y - 3), Vector2(anchor_px.x, dim_y + 3), TEXT_COLOR, 1.0)
+		draw_line(Vector2(knee_px.x, dim_y - 3), Vector2(knee_px.x, dim_y + 3), TEXT_COLOR, 1.0)
+		_draw_text(Vector2((anchor_px.x + knee_px.x) * 0.5 - 4.0, dim_y - 4.0), "d")
 	# Theta arc at the toe knee: bench direction sweeps into the grade.
 	var px_ang := atan2(-grade, 1.0)
 	if absf(px_ang) > 0.03 and knee > view_s0 and knee < view_s1:
@@ -237,13 +281,36 @@ func _draw() -> void:
 				float(_view.get("volume_m3", 0.0)),
 				err_cm,
 			]
-	_draw_text(Vector2(MARGIN, MARGIN + 4), title)
+	_draw_text(Vector2(MARGIN, MARGIN + 4), title, accent if console else TEXT_COLOR)
 
 
-func _draw_text(pos: Vector2, text: String) -> void:
+func _draw_text(pos: Vector2, text: String, color: Color = TEXT_COLOR) -> void:
 	if _font == null:
 		return
-	draw_string(_font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, FONT_SIZE, TEXT_COLOR)
+	draw_string(_font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, FONT_SIZE, color)
+
+
+## Closed polygon outline of a rounded rect: each corner gets a 90° arc of
+## six segments, walked clockwise in screen space (y down).
+static func _rounded_poly(r: Rect2, radius: float) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	var x0 := r.position.x
+	var y0 := r.position.y
+	var x1 := r.end.x
+	var y1 := r.end.y
+	var corners := [
+		[Vector2(x0 + radius, y0 + radius), PI],
+		[Vector2(x1 - radius, y0 + radius), -PI / 2.0],
+		[Vector2(x1 - radius, y1 - radius), 0.0],
+		[Vector2(x0 + radius, y1 - radius), PI / 2.0],
+	]
+	for c in corners:
+		var center: Vector2 = c[0]
+		var a0: float = c[1]
+		for j in range(7):
+			var a := a0 + (PI / 2.0) * float(j) / 6.0
+			pts.append(center + Vector2(cos(a), sin(a)) * radius)
+	return pts
 
 
 ## Plane-space rect through the y-flipped view transform: p_lo is the

@@ -2,6 +2,7 @@ shader_type canvas_item;
 render_mode unshaded;
 uniform float ui_time = 0.0;
 uniform float aspect_ratio = 1.7778;
+uniform float fx_strength = 0.0;
 void fragment() {
  vec2 p = UV * vec2(aspect_ratio, 1.0);
  float phase = ui_time * 0.018;
@@ -16,5 +17,10 @@ void fragment() {
  vec3 base = mix(vec3(0.035, 0.065, 0.085), vec3(0.09, 0.115, 0.13), UV.y);
  base += exp(-dot(a,a)*3.8) * vec3(0.13,0.075,0.025) + exp(-dot(b,b)*2.7) * vec3(0.01,0.065,0.085);
  base += line * edge_mask * vec3(0.08,0.085,0.075) * 0.32;
- COLOR = vec4(base, 0.86);
+ float vig = smoothstep(0.35, 1.0, length(UV - vec2(0.5)) * 1.45);
+ float scan = sin(UV.y * 640.0 + ui_time * 1.7);
+ base *= 1.0 - fx_strength * vig * 0.5;
+ base += fx_strength * scan * 0.010;
+ base += fx_strength * exp(-dot(a,a)*3.8) * vec3(0.10,0.05,0.01);
+ COLOR = vec4(base, mix(0.86, 0.93, fx_strength));
 }

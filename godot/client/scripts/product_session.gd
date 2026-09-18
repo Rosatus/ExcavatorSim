@@ -27,7 +27,8 @@ const MODEL_IDS := ["sy205", "sy135", "sy135neo"]
 
 var lifecycle := LIFECYCLE_STOPPED
 var active_model_id := "sy205"
-var active_attachment_id := "standard_bucket"
+var active_coupler_id := "none"
+var active_tool_id := "standard_bucket"
 var authority_epoch := ""
 var generation := 0
 var focused := true
@@ -165,28 +166,46 @@ func get_attachment_input_axes() -> Vector2:
 	return _motion_client.get_attachment_input_axes()
 
 
-func request_attachment_switch(attachment_id: String) -> bool:
+func request_coupler_switch(coupler_id: String) -> bool:
+	return _request_attachment_switch(coupler_id, active_tool_id)
+
+
+func request_tool_switch(tool_id: String) -> bool:
+	return _request_attachment_switch(active_coupler_id, tool_id)
+
+
+func _request_attachment_switch(coupler_id: String, tool_id: String) -> bool:
 	if _attachment_rig == null:
-		last_error = {"code": "attachment_rig_unavailable", "message": attachment_id}
+		last_error = {"code": "attachment_rig_unavailable", "message": "%s+%s" % [coupler_id, tool_id]}
 		status_changed.emit(get_status_snapshot())
 		return false
-	if not _attachment_rig.request_attachment(attachment_id):
+	var accepted := false
+	if coupler_id != active_coupler_id:
+		accepted = _attachment_rig.request_coupler(coupler_id)
+	else:
+		accepted = _attachment_rig.request_tool(tool_id)
+	if not accepted:
 		last_error = {
 			"code": "attachment_activation_failed",
-			"message": "%s: %s" % [attachment_id, _attachment_rig.get_catalog_error()],
+			"message": "%s+%s: %s" % [coupler_id, tool_id, _attachment_rig.get_catalog_error()],
 		}
 		status_changed.emit(get_status_snapshot())
 		return false
-	active_attachment_id = _attachment_rig.active_attachment_id()
+	active_coupler_id = _attachment_rig.active_coupler_id()
+	active_tool_id = _attachment_rig.active_tool_id()
 	last_error.clear()
-	attachment_changed.emit(active_attachment_id)
+	attachment_changed.emit(_attachment_rig.active_attachment_id())
 	status_changed.emit(get_status_snapshot())
 	return true
 
 
+func active_attachment_id() -> String:
+	return "%s+%s" % [active_coupler_id, active_tool_id]
+
+
 func get_attachment_status_snapshot() -> Dictionary:
 	if _attachment_rig == null:
-		return {"attachment_id": active_attachment_id}
+		return {"coupler_id": active_coupler_id, "tool_id": active_tool_id}
 	return _attachment_rig.get_status_snapshot()
 
 
@@ -266,7 +285,9 @@ func get_status_snapshot() -> Dictionary:
 		"lifecycle": lifecycle,
 		"focused": focused,
 		"active_model_id": active_model_id,
-		"active_attachment_id": active_attachment_id,
+		"active_attachment_id": active_attachment_id(),
+		"active_coupler_id": active_coupler_id,
+		"active_tool_id": active_tool_id,
 		"gateway_enabled": gateway_enabled,
 		"gateway_state": "disabled" if not gateway_enabled else "optional",
 		"bucket_ground_mode": bucket_ground_mode,

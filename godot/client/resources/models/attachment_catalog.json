@@ -1,0 +1,84 @@
+{
+  "schema_version": "excavator-attachment-catalog-v2",
+  "default_coupler_id": "none",
+  "default_tool_id": "standard_bucket",
+  "couplers": [
+    {
+      "coupler_id": "none",
+      "display_name": "无（直接销接）",
+      "kind": "direct_pin"
+    },
+    {
+      "coupler_id": "xtr13",
+      "display_name": "Steelwrist XTR13",
+      "kind": "tiltrotator",
+      "mount": {
+        "parent_frame": "bucket_link"
+      },
+      "rotator_glb_path": "res://assets/visual/XTR13_Tiltrotator_Animated.glb",
+      "rotator_glb_sha256": "61386e5c1658770083b26f5aff213c570c23225b16c31e6390ad200b4a0f68cc",
+      "rotator_root_node": "XTR13_ROOT",
+      "socket_node_path": "XTR13_ROOT/UPPER_FIXED/TILT_Y/ROTATE_Z/S50_TOOL_SOCKET",
+      "tilt_rig_path": "res://resources/attachments/xtr13_tilt_rig.json",
+      "tilt_rig_sha256": "536e336d03e8fee309daddb4821a81508a613828a7f9cd0adf92df376eab006c",
+      "joints": {
+        "tilt_node_path": "XTR13_ROOT/UPPER_FIXED/TILT_Y",
+        "tilt_local_axis": "z",
+        "tilt_range_deg": [
+          -45.0,
+          45.0
+        ],
+        "tilt_rate_dps": 60.0,
+        "rotate_node_path": "XTR13_ROOT/UPPER_FIXED/TILT_Y/ROTATE_Z",
+        "rotate_local_axis": "y",
+        "rotate_rate_dps": 90.0
+      },
+      "controls": {
+        "tilt": {
+          "modifier_key": "KEY_Q",
+          "negative_action": "operator_bucket_curl",
+          "positive_action": "operator_bucket_dump",
+          "masked_axis": 3
+        },
+        "rotate": {
+          "modifier_key": "KEY_O",
+          "negative_action": "operator_swing_left",
+          "positive_action": "operator_swing_right",
+          "masked_axis": 0
+        }
+      },
+      "hidden_frame": "bucket_link"
+    }
+  ],
+  "tools": [
+    {
+      "tool_id": "standard_bucket",
+      "display_name": "标准铲斗",
+      "kind": "native",
+      "supported_couplers": [
+        "none"
+      ]
+    },
+    {
+      "tool_id": "gb12",
+      "display_name": "GB12 铲斗",
+      "kind": "bucket",
+      "supported_couplers": [
+        "xtr13"
+      ],
+      "tool_glb_path": "res://assets/visual/GB12_S50_Bucket.glb",
+      "tool_glb_sha256": "429b6801d9970d3d41ada9524a022f637753bf36b6f8e6f9449aef11ff7210ec",
+      "tool_root_node": "GB12_ROOT",
+      "soil_contract_path": "res://resources/attachments/gb12_s50_soil_contract.json",
+      "soil_contract_sha256": "2480f25aade917ab77ad9979985782cda0fdf22fa014c2997a98a8fd23684fd2"
+    },
+    {
+      "tool_id": "no_tool",
+      "display_name": "无工具",
+      "kind": "none",
+      "supported_couplers": [
+        "xtr13"
+      ]
+    }
+  ]
+}

@@ -37,6 +37,7 @@ $tests = @(
     "sy205_glb_test.gd",
     # "motion_client_test.gd",
     "model_switch_test.gd",
+    "attachment_switch_test.gd",
     "initial_model_singular_test.gd",
     "tracked_chassis_locomotion_test.gd",
     "bucket_ground_lift_test.gd",
