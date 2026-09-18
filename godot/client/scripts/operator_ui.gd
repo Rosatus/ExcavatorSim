@@ -7,6 +7,7 @@ const Capture := preload("res://scripts/performance_capture.gd")
 const MenuControls := preload("res://scenes/operator_menu_controls.tscn")
 
 const UIStrings := preload("res://scripts/operator_ui_strings.gd")
+const SlopeSideView := preload("res://scripts/slope_side_view.gd")
 const CONFIG_PATH := "user://operator_ui.cfg"
 const CONFIG_SECTION := "onboarding"
 const CONFIG_GUIDE_DISMISSED := "guide_dismissed"
@@ -96,6 +97,7 @@ const GATEWAY_CONFIG_PATH := "user://ict_config.cfg"
 var _assist_menu_panel: PanelContainer
 var _assist_menu_rows_box: VBoxContainer
 var _assist_menu_rows: Array[Button] = []
+var _slope_side_view: SlopeSideView
 @onready var _guide_panel: PanelContainer = $GuidePanel
 @onready var _guide_title_label: Label = $GuidePanel/Margin/VBox/Title
 @onready var _guide_intro_label: Label = $GuidePanel/Margin/VBox/Intro
@@ -182,6 +184,7 @@ func _ready() -> void:
 	_sync_test_graphics_toggle()
 	_guide_panel.visible = false
 	_build_assist_menu()
+	_build_slope_side_view()
 	call_deferred("_start_product_gameplay")
 	_refresh_prompt_copy()
 	_refresh()
@@ -432,6 +435,22 @@ func _build_assist_menu() -> void:
 	hint.add_theme_font_size_override("font_size", 11)
 	box.add_child(hint)
 	add_child(_assist_menu_panel)
+
+
+## Slope guidance side view: a right-edge panel mirroring the chassis
+## slope_assist.view snapshot — machine links, terrain and target profile in
+## the cabin-facing plane. Visible only while the slope mode is preview or
+## active; the chassis leaves `view` empty otherwise.
+func _build_slope_side_view() -> void:
+	_slope_side_view = SlopeSideView.new()
+	_slope_side_view.name = "SlopeSideView"
+	_slope_side_view.visible = false
+	_slope_side_view.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+	_slope_side_view.offset_left = -380.0
+	_slope_side_view.offset_right = -20.0
+	_slope_side_view.offset_top = -110.0
+	_slope_side_view.offset_bottom = 110.0
+	add_child(_slope_side_view)
 
 
 func _on_unlimited_bucket_toggled(enabled: bool) -> void:
@@ -1100,6 +1119,7 @@ func _refresh() -> void:
 	_sync_level_assist_toggle()
 	_sync_slope_assist_button()
 	_sync_assist_menu()
+	_sync_slope_side_view()
 	_sync_unlimited_bucket_toggle()
 	_sync_cutting_diagnostics_toggle()
 
@@ -1224,6 +1244,18 @@ func _on_assist_menu_row_pressed(index: int) -> void:
 	if _product_session != null:
 		_product_session.activate_assist_entry(index)
 	_sync_assist_menu()
+
+
+func _sync_slope_side_view() -> void:
+	if _slope_side_view == null:
+		return
+	var status := _product_session.get_status_snapshot() if _product_session != null else {}
+	var slope := status.get("slope_assist", {}) as Dictionary
+	var view := slope.get("view", {}) as Dictionary
+	var mode := String(view.get("mode", ""))
+	_slope_side_view.visible = mode == "preview" or mode == "active"
+	if _slope_side_view.visible:
+		_slope_side_view.set_view(view)
 
 
 func _sync_unlimited_bucket_toggle(status: Dictionary = {}) -> void:
