@@ -212,24 +212,25 @@ func _draw() -> void:
 	var tooth_px: Vector2 = to_px.call(tooth_pt)
 	draw_circle(tooth_px, 5.0, TOOTH_COLOR)
 	# Tooth offset from the target surface, the number the operator steers by
-	# — a dimension stub from the tooth down to the design line, labeled at
-	# its midpoint so the text rides the measurement it belongs to.
+	# — a dimension stub from the tooth down to the design line; the value
+	# itself rides the title line as a labeled field, not floating text.
 	var tooth_err := float(_view.get("tooth_err", 0.0))
 	var target_at_tooth: Vector2 = to_px.call(Vector2(tooth_pt.x, target_h.call(tooth_pt.x)))
 	draw_line(tooth_px, target_at_tooth, TOOTH_COLOR, 2.0)
+	var err_cm := roundi(tooth_err * 100.0)
 	var title := ""
 	match String(_view.get("mode", "")):
 		"level":
-			title = "平地作业 · 目标高 %+.2fm" % toe_h
+			title = "平地作业 · 目标高 %+.2fm · 齿尖 %+dcm" % [toe_h, err_cm]
 		_:
-			title = "修坡%s · d=%.1fm θ=%+.0f° 削土=%.2fm³" % [
+			title = "修坡%s · d=%.1fm θ=%+.0f° 削土=%.2fm³ · 齿尖 %+dcm" % [
 				"预览" if String(_view.get("mode", "")) == "preview" else "作业",
 				float(_view.get("distance_m", toe_s)),
 				float(_view.get("angle_deg", 0.0)),
 				float(_view.get("volume_m3", 0.0)),
+				err_cm,
 			]
 	_draw_text(Vector2(MARGIN, MARGIN + 4), title)
-	_draw_text(tooth_px.lerp(target_at_tooth, 0.5) + Vector2(10.0, 4.0), "%+dcm" % roundi(tooth_err * 100.0))
 
 
 func _draw_text(pos: Vector2, text: String) -> void:
