@@ -1,0 +1,65 @@
+{
+  "schema_version": "bucket-soil-bake-v1",
+  "tool_id": "gb12",
+  "fill_profile_id": "gb12_s50",
+  "asset_path": "res://assets/visual/GB12_S50_Bucket.glb",
+  "asset_sha256": "429b6801d9970d3d41ada9524a022f637753bf36b6f8e6f9449aef11ff7210ec",
+  "root_node": "GB12_ROOT",
+  "contract_path": "res://resources/attachments/gb12_s50_soil_contract.json",
+  "profile_path": "res://resources/visual/gb12_s50_bucket_fill_profile.json",
+  "catalog_path": "res://resources/models/attachment_catalog.json",
+  "lining_nodes": [
+    "GB12 | continuous rolled bowl",
+    "GB12 | tapered cheek 1",
+    "GB12 | tapered cheek -1",
+    "GB12 | folded high-stiffness crown beam",
+    "GB12 | lip top land",
+    "GB12 | internal tapered gusset",
+    "GB12 | internal tapered gusset_001"
+  ],
+  "mouth_anchors": [
+    {
+      "node": "GB12 | lip top land",
+      "near_tool_local": [
+        -0.7367,
+        -0.7238,
+        0.5973
+      ]
+    },
+    {
+      "node": "GB12 | lip top land",
+      "near_tool_local": [
+        0.7367,
+        -0.7238,
+        0.5973
+      ]
+    },
+    {
+      "node": "GB12 | folded high-stiffness crown beam",
+      "near_tool_local": [
+        0.683,
+        -0.1901,
+        0.256
+      ]
+    },
+    {
+      "node": "GB12 | folded high-stiffness crown beam",
+      "near_tool_local": [
+        -0.683,
+        -0.1901,
+        0.256
+      ]
+    }
+  ],
+  "anchor_tolerance_m": 0.002,
+  "cavity_depth_m": 0.44,
+  "release_opening_down_dot": 0.15,
+  "columns": 25,
+  "rows": 33,
+  "x_bounds": [
+    -0.77,
+    0.77
+  ],
+  "z_padding_m": 0.05,
+  "evidence": "Mouth runs from lip top to crown front underside; rear rolled-bowl rim is covered. Anchors ordered with outward normal. Threshold is behavior tuning, not measured geometry."
+}

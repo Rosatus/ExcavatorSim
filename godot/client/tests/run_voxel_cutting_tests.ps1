@@ -60,6 +60,7 @@ try {
         "soil_effects_visual_mound_test.gd",
         "soil_release_visual_quality_test.gd",
         "soil_dump_completion_test.gd",
+        "soil_deposit_surface_test.gd",
         "voxel_lift_exit_test.gd",
         "voxel_continuous_lift_test.gd",
         "voxel_live_residual_test.gd",

@@ -1,58 +1,64 @@
 class_name SoilDepositSurface
 extends RefCounted
 
-## A disposable surface plan, never a second terrain or a persistent pile ledger.
-## Heights and volumes are in voxel units. The caller samples the current SDF
-## again for every commit so excavation cannot resurrect an old pile.
-const GRID_RADIUS := 8
-const GRID_SIZE := GRID_RADIUS * 2 + 1
-const GRID_STEP := 3
-const SOLVE_STEPS := 18
+## Transaction-local surface routing. Only incoming material moves; the sampled
+## ground is immutable. Every parcel starts at the source column and can leave
+## a column only across a downhill edge at the repose angle. No remote minimum
+## can receive material without a continuous traversable path from the source.
+const INITIAL_RADIUS := 8
+const MAX_RADIUS := 128
+const PARCEL_VOLUME_VOXELS := 0.125
+const MAX_ROUTE_STEPS := 200000
+const NEIGHBORS := [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1),
+	Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(1, 1)]
 
 
-static func plan(heights: PackedFloat32Array, volume: float, slope: float) -> Dictionary:
-	if heights.size() != GRID_SIZE * GRID_SIZE or volume <= 0.0:
+static func plan(
+	heights: PackedFloat64Array, side: int, source: Vector2, volume: float, slope: float
+) -> Dictionary:
+	if side < 3 or heights.size() != side * side or not source.is_finite() \
+			or not is_finite(volume) or volume <= 0.0 or not is_finite(slope) or slope <= 0.0:
 		return {}
-	var costs := PackedFloat32Array()
-	costs.resize(heights.size())
-	var low := INF
-	var ceiling := INF
-	for z in GRID_SIZE:
-		for x in GRID_SIZE:
-			var i := z * GRID_SIZE + x
-			var distance := Vector2(x - GRID_RADIUS, z - GRID_RADIUS).length() * GRID_STEP
-			# Rounded apex, with the same asymptotic angle of repose.
-			var radial := sqrt(distance * distance + 1.0) - 1.0
-			costs[i] = heights[i] + slope * radial
-			low = minf(low, costs[i])
-			if x <= 1 or z <= 1 or x >= GRID_SIZE - 2 or z >= GRID_SIZE - 2:
-				ceiling = minf(ceiling, costs[i])
-	if not is_finite(low) or not is_finite(ceiling) or ceiling <= low:
+	var sx := roundi(source.x)
+	var sz := roundi(source.y)
+	if sx < 0 or sz < 0 or sx >= side or sz >= side:
 		return {}
-	var high := minf(ceiling, low + volume / float(GRID_STEP * GRID_STEP) + 1.0)
-	for iteration in SOLVE_STEPS:
-		var middle := (low + high) * 0.5
-		var used := 0.0
-		for i in costs.size():
-			used += maxf(0.0, middle - costs[i]) * GRID_STEP * GRID_STEP
-		if used > volume:
-			high = middle
-		else:
-			low = middle
-	var additions := PackedFloat32Array()
+	var start := sz * side + sx
+	if not is_finite(heights[start]):
+		return {}
+	var surface := heights.duplicate()
+	var additions := PackedFloat64Array()
 	additions.resize(heights.size())
-	var accepted := 0.0
-	for i in costs.size():
-		additions[i] = maxf(0.0, low - costs[i])
-		accepted += additions[i] * GRID_STEP * GRID_STEP
-	return {"additions": additions, "volume_voxels": accepted}
-
-
-static func interpolate(values: PackedFloat32Array, x: int, z: int) -> float:
-	var gx := clampi(x / GRID_STEP, 0, GRID_SIZE - 2)
-	var gz := clampi(z / GRID_STEP, 0, GRID_SIZE - 2)
-	var tx := clampf(float(x - gx * GRID_STEP) / GRID_STEP, 0.0, 1.0)
-	var tz := clampf(float(z - gz * GRID_STEP) / GRID_STEP, 0.0, 1.0)
-	var i := gz * GRID_SIZE + gx
-	return lerpf(lerpf(values[i], values[i + 1], tx),
-		lerpf(values[i + GRID_SIZE], values[i + GRID_SIZE + 1], tx), tz)
+	var remaining := volume
+	var steps := 0
+	var cursor := start
+	while remaining > 0.000000001 and steps < MAX_ROUTE_STEPS:
+		steps += 1
+		var x := cursor % side
+		var z := cursor / side
+		# We need the missing neighbours before deciding whether this parcel
+		# can stop. The caller grows the domain and reruns this disposable plan.
+		if x <= 1 or z <= 1 or x >= side - 2 or z >= side - 2:
+			return {"boundary_active": true}
+		var lowest := INF
+		var next := -1
+		for offset in NEIGHBORS:
+			var neighbor: int = (z + offset.y) * side + x + offset.x
+			var distance := 1.0 if offset.x == 0 or offset.y == 0 else sqrt(2.0)
+			var threshold := surface[neighbor] + slope * distance
+			if threshold < lowest:
+				lowest = threshold
+				next = neighbor
+		if next >= 0 and surface[cursor] >= lowest - 0.000000001:
+			cursor = next
+			continue
+		# Stop on supporting terrain until its repose capacity is consumed.
+		# Bounded parcels keep alternative downhill routes responsive as the
+		# receiving surface rises; no predetermined rim retention percentage.
+		var added := minf(remaining, minf(PARCEL_VOLUME_VOXELS, lowest - surface[cursor]))
+		surface[cursor] += added
+		additions[cursor] += added
+		remaining -= added
+		cursor = start
+	return {"additions": additions, "volume_voxels": volume - remaining,
+		"boundary_active": false, "route_steps": steps, "budget_limited": remaining > 0.000000001}

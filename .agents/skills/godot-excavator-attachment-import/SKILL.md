@@ -1,6 +1,6 @@
 ---
 name: godot-excavator-attachment-import
-description: "Import swap-in work attachments (tiltrotators, quick-coupler tools, buckets, breakers, grapples) into the ExcavatorSim Godot client: mount under the bucket_link frame, bake authored passive-mechanism animation into a runtime lookup table, wire modifier-key controls, bind soil contracts, and verify against the source clip. Use when adding a new attachment to attachment_catalog.json, adapting a Blender-animated attachment GLB, adding a modifier-key control pair, or diagnosing passive linkage / morph-track misbehaviour during attachment joint drive."
+description: "Import swap-in work attachments into the ExcavatorSim Godot client: mount frames, animated passive mechanisms, modifier-key controls, and soil contracts. Use when adding an attachment, adapting a bucket's contained soil and real mouth-based unloading, or diagnosing attachment joint/linkage motion."
 ---
 
 # Import Excavator Attachments
@@ -119,9 +119,15 @@ Soil systems resolve through indirection so the active tool drives ground contac
   attachment tool frame + its contract when mounted, falling back to the host bucket otherwise.
   Point every consumer (excavation world, soil effects, debug overlay) at these accessors.
 - Author a per-attachment soil contract (`resources/attachments/*_soil_contract.json`) as a copy
-  of a proven sibling contract; the rig patches `model_id` to the attachment id at load.
+  of a proven sibling contract; the rig patches `model_id` to the host model at load.
+  `fill_profile_id` identifies the tool geometry independently of that host identity.
 - On `attachment_changed`: clear bucket payload/local material and reconfigure soil effects
   against the new frame; terrain state is preserved.
+
+For a soil-holding bucket, read [contained soil adaptation](references/contained-soil-adaptation.md).
+Use its data-driven recipe, shared baker and preview tools; do not add a tool name to runtime
+fill registries or copy GB12's hardcoded coordinates. A tool without a soil cavity does not
+receive a bucket soil contract; keep its capability absent rather than borrowing the host bucket.
 
 ## 8. Verify against ground truth
 

@@ -9,6 +9,7 @@ const CATALOG_PATH := "res://resources/models/model_catalog.json"
 const SCHEMA_VERSION := "excavator-soil-contract-v1"
 const TOOL_SCHEMA_VERSION := "bucket-soil-tool-v1"
 const MIN_DUMP_OPENING_DOWN_DOT := 0.15
+const Geometry = preload("res://scripts/bucket_soil_geometry.gd")
 const TOP_LEVEL_FIELDS := [
 	"schema_version", "model_id", "material_density_kg_m3",
 	"nominal_capacity_m3", "heaped_capacity_m3", "cell_grid",
@@ -79,8 +80,10 @@ func is_valid_for(model_id: String) -> bool:
 	_validation_error = ""
 	if not _expected_sha256.is_empty() and _actual_sha256 != _expected_sha256:
 		return _reject("soil_contract_sha256", "does not match model catalog")
-	if not _exact_fields(_data, TOP_LEVEL_FIELDS, "descriptor"):
+	if not _exact_fields(_data, TOP_LEVEL_FIELDS, "descriptor", ["fill_profile_id", "soil_geometry"]):
 		return false
+	if _data.has("fill_profile_id") and (not _data.fill_profile_id is String or String(_data.fill_profile_id).is_empty()):
+		return _reject("fill_profile_id", "must be a nonempty string")
 	if _data.get("schema_version") != SCHEMA_VERSION:
 		return _reject("schema_version", "must equal %s" % SCHEMA_VERSION)
 	if _data.get("model_id") != model_id or model_id.is_empty():
@@ -96,6 +99,10 @@ func is_valid_for(model_id: String) -> bool:
 		return false
 	if not _validate_proxies(_data.get("proxies")):
 		return false
+	if _data.has("soil_geometry"):
+		var error := Geometry.validate(_data.soil_geometry, _data)
+		if not error.is_empty():
+			return _reject("soil_geometry", error)
 	return _validate_bucket_tool(_data.get("bucket_tool"))
 
 
@@ -124,8 +131,12 @@ func _validate_interaction(value: Variant) -> bool:
 	if not value is Dictionary:
 		return _reject("interaction", "must be an object")
 	var interaction := value as Dictionary
-	if not _exact_fields(interaction, INTERACTION_FIELDS, "interaction"):
+	if not _exact_fields(interaction, INTERACTION_FIELDS, "interaction", ["release_opening_down_dot"]):
 		return false
+	if interaction.has("release_opening_down_dot"):
+		var release: Variant = interaction.release_opening_down_dot
+		if not _finite_number(release) or float(release) < MIN_DUMP_OPENING_DOWN_DOT or float(release) >= 1.0:
+			return _reject("interaction.release_opening_down_dot", "must be within [0.15, 1)")
 	for field in ["contact_tolerance_m", "maximum_cut_depth_m", "minimum_sweep_m", "cut_radius_m", "deposit_radius_m"]:
 		if not _positive_number(interaction.get(field)):
 			return _reject("interaction.%s" % field, "must be finite and positive")
@@ -429,12 +440,12 @@ func _vector3(value: Variant) -> Vector3:
 	return Vector3(float(data[0]), float(data[1]), float(data[2]))
 
 
-func _exact_fields(value: Dictionary, required: Array, path: String) -> bool:
+func _exact_fields(value: Dictionary, required: Array, path: String, optional: Array = []) -> bool:
 	for field in required:
 		if not value.has(field):
 			return _reject("%s.%s" % [path, field], "is required")
 	for field in value:
-		if not required.has(field):
+		if not required.has(field) and not optional.has(field):
 			return _reject("%s.%s" % [path, field], "is not allowed")
 	return true
 

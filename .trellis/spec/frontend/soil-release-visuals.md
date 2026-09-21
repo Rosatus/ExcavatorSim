@@ -16,8 +16,39 @@ mass remains in the bucket. The current-SDF repose surface plan is staged, then
 geometry and stable ledger are committed synchronously. Rejected deposits do not
 debit stock; clipped deposits retain their remainder. Soil proposals accept only
 `deposit`; the product queue is bounded FIFO. Cutting retains its scheduler priority.
-Ledger mass is exact; coarse surface column geometry remains approximate.
+Ledger mass is exact; voxel surface column geometry remains approximate.
 Collision acknowledgement may lag the visible SDF by the engine rebuild interval.
+
+### Receiving surface (2026-09-18)
+
+Route incoming material from the column below the release point over the current
+SDF first-hit surface. A parcel can cross only an adjacent downhill edge whose
+height difference reaches the repose slope. Otherwise it rests at that column
+until its capacity is consumed. Each parcel starts at the source again, so the
+updated surface can redirect subsequent material. A remote low pit cannot
+receive material across an intervening ridge. Existing ground is never lowered.
+
+The transaction-local solver uses bounded parcels (0.125 voxel volume) and a
+bounded route-step budget. Only represented additions debit stock; work left by
+a budget limit stays in the bucket. This is a discrete quasi-static surface
+routing approximation, not a particle flight or continuous settling system.
+Do not interpolate thickness from low pit samples onto higher rim samples, nor
+allocate volume globally by absolute elevation without a traversable route.
+
+A sampling perimeter is not a physical capacity limit. Start with a small
+voxel-resolution domain and grow it when newly added soil reaches its border.
+Do not use the minimum outer-ring height/cost as an upper bound on pile volume:
+a low pit at that border falsely reports a full receiver and strands bucket
+stock. Computational domain/staging limits still reject without debiting mass
+and have distinct reasons. Work-zone ownership and protected-shell checks remain.
+
+Surface scans batch-copy the current SDF and read signed-16 `[z][x][y]` samples;
+height/gradient must match the scalar first-positive-to-nonpositive scan. Reuse
+samples only while expanding one transaction, never across terrain revisions.
+`soil_deposit_surface_test.gd` checks volume, repose, vertical-datum invariance,
+supported rim accumulation, connected overflow, intervening ridges, domain
+growth, batch/scalar parity, and stationary unloading
+on a receiving surface captured from the failing recorded-input replay.
 
 ## Visual events
 
@@ -114,6 +145,13 @@ their runtime options and tests are removed. SY135 retains texture/color soil
 detail on a planar top. SY205 retains its existing relief and profile bytes.
 Visual full volume may change; ledger capacity does not.
 
+SY135 fill containment uses a one-cell maximum envelope of the measured lining
+and a 3 mm inward clearance. This prevents interpolated fill triangles from
+bridging sharp shell transitions; do not push its underside outward for contact.
+The baked measurements and body-mouth plane stay unchanged. Check generated
+face corners, edge midpoints and centroids against imported bucket triangles
+from low stock through full stock, not only against the baked sample points.
+
 ### Validation / error matrix
 | Condition | Expected |
 |---|---|
@@ -141,6 +179,64 @@ closure, monotonic growth, determinism and unchanged SY205 relief.
 ### Wrong vs correct
 Wrong: update fill world pose only in a 30 Hz inventory callback.
 Correct: fixed cavity-local transform under the rendered bucket frame.
+
+## GB12 attachment soil (2026-09-18)
+
+The attachment contract keeps the host `model_id` for authority identity and
+adds optional `fill_profile_id: gb12_s50` for visual geometry. SoilEffects selects
+and invalidates by both identities; attachment changes hide the old fill and
+stale snapshots from a different profile cannot bind to the new tool.
+The mesh remains rigidly parented under GB12_ROOT's contract-local cavity.
+
+`tools/bake_bucket_soil.gd` consumes `gb12_s50_soil_bake.json`, measures the
+imported GB12 GLB, updates its soil contract and catalog hash, and bakes the
+independent lining profile. `--check` detects drift without writing;
+`tools/preview_bucket_soil.gd` renders three stock levels from the same recipe.
+The actual mouth joins the lip top to the crown beam's front underside; the
+rolled bowl's rear edge lies under the covered mounting crown and is not the
+outlet rim. The measured normal is approximately (0, 0.538754, 0.842463).
+Use the maximum triangle height across each grid footprint so narrow internal
+gussets cannot disappear between rays. The runtime lining envelope and 65 mm
+mouth clearance keep the stock surface contained. Nominal ledger capacity is
+unchanged; the visual volume is approximate.
+
+Optional `interaction.release_opening_down_dot` overrides the runtime's default
+0.5 gate floor, still bounded below by the contract dump threshold and the
+shared 0.15 minimum. GB12 uses 0.15 (mouth normal 8.63 degrees below horizontal).
+Its world normal includes host articulation, XTR13 tilt and rotation. Standard
+buckets omit the field and retain 0.5. Confirmation, cutting/obstruction guards,
+pending-mass ownership and committed deposit accounting remain shared.
+`gb12_soil_test.gd` checks source geometry, fill containment, lifecycle and
+48 compound poses; `gb12_soil_dump_test.gd` checks shallow-angle release,
+closed-mouth retention and mass conservation on voxel terrain.
+
+### Reusable attachment geometry
+
+New soil-holding attachments supply optional `soil_geometry` using
+`bucket-soil-geometry-v1`: `mouth_polygon_godot`, `cavity_depth_m`,
+`fill_profile_path`/`fill_profile_sha256`, and `source_glb_path`/`source_glb_sha256`.
+The polygon is the one authoritative tool-local opening. Its first edge defines
+width and its right-hand normal points out. Only a single convex planar mouth
+(3–32 points) and a height-field lining are supported. Unsupported shapes fail
+validation; the baker does not infer multiple outlets or articulated cavities.
+
+`bucket_soil_geometry.gd` derives the mouth/cavity frames and validates generated
+proxy/semantic projections, source identity and fill profile provenance. The
+attachment loader also matches that source to the tool GLB in the catalog.
+`BucketSoilTool` samples the actual opening polygon and uses the shared cavity
+frame. `MotionPresentation` supplies that same frame to fill and world poses;
+`bucket_soil_release.gd` uses the opening frame's +Y for geometry-backed tools.
+The authority still owns confirmation/obstruction and all ledger transactions.
+
+`BucketFillSurface.configure_contract` loads the pinned profile directly; new
+tool IDs must not be added to `PROFILE_PATHS` (native compatibility only).
+Generated profiles dry samples outside the mouth and clip interpolated faces
+to its polygon. `bucket_soil_geometry_test.gd` verifies arbitrary rotated mouth
+frames, invalid polygons/provenance, stale state and a new unregistered ID.
+`tools/tests/bucket_soil_bake_test.gd` checks deterministic in-memory baking and
+failure without writes for stale sources, missing meshes, moved/crossed anchors
+and output/input aliases. Adaptation procedure lives in the attachment skill's
+`references/contained-soil-adaptation.md`; do not duplicate tool-specific bake code.
 
 ## Mode retirement
 

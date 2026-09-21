@@ -5,16 +5,20 @@ extends RefCounted
 const PROFILE_PATHS := {
 	"sy135": "res://resources/visual/sy135_bucket_fill_profile.json",
 	"sy135neo": "res://resources/visual/sy135neo_bucket_fill_profile.json",
+	"sy80u": "res://resources/visual/sy80u_bucket_fill_profile.json",
 	"sy205": "res://resources/visual/sy205_bucket_fill_profile.json",
 }
 const SURFACE_RELIEF_M := 0.065
 const CONTACT_OVERLAP_M := 0.002
+const LINING_CLEARANCE_M := 0.003
+const Geometry = preload("res://scripts/bucket_soil_geometry.gd")
 
 var _columns := 0
 var _rows := 0
 var _direction := 1.0
 var _body_opening := Plane()
 var _has_body_opening := false
+var _mouth_boundary: Array[Vector2] = []
 var _x_bounds := Vector2.ZERO
 var _z_bounds := Vector2.ZERO
 var _floors := PackedFloat32Array()
@@ -28,7 +32,19 @@ var _colors := PackedColorArray()
 var _indices := PackedInt32Array()
 
 
+func configure_contract(contract: Dictionary, cavity_size: Vector3) -> bool:
+	_full_weight = 0.0
+	if not contract.has("soil_geometry"):
+		return configure(String(contract.get("fill_profile_id", contract.get("model_id", ""))), cavity_size)
+	var geometry: Variant = contract.soil_geometry
+	if not Geometry.validate(geometry, contract).is_empty():
+		return false
+	var profile: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(geometry.fill_profile_path))
+	return _configure_profile(profile)
+
+
 func configure(model_id: String, cavity_size: Vector3) -> bool:
+	_full_weight = 0.0
 	var profile: Dictionary
 	if PROFILE_PATHS.has(model_id):
 		profile = JSON.parse_string(FileAccess.get_file_as_string(PROFILE_PATHS[model_id])) as Dictionary
@@ -37,6 +53,11 @@ func configure(model_id: String, cavity_size: Vector3) -> bool:
 		profile = _generic_profile(cavity_size)
 	else:
 		return false
+	return _configure_profile(profile)
+
+
+func _configure_profile(profile: Dictionary) -> bool:
+	_full_weight = 0.0
 	_columns = int(profile.get("columns", 0))
 	_rows = int(profile.get("rows", 0))
 	_floors = PackedFloat32Array(profile.get("floor_heights", []))
@@ -46,13 +67,23 @@ func configure(model_id: String, cavity_size: Vector3) -> bool:
 	_x_bounds = Vector2(float(profile["x_bounds"][0]), float(profile["x_bounds"][1]))
 	_z_bounds = Vector2(float(profile["z_bounds"][0]), float(profile["z_bounds"][1]))
 	var rim: Array = profile.get("body_opening_rim_cavity_local", [])
-	_has_body_opening = rim.size() == 4
+	_has_body_opening = rim.size() >= 3
+	_mouth_boundary.clear()
+	if bool(profile.get("clip_to_mouth_polygon", false)):
+		for point in rim:
+			_mouth_boundary.append(Vector2(point[0], point[2]))
 	_full_level = float(profile["rim_height"]) - SURFACE_RELIEF_M
 	if _has_body_opening:
 		var points: Array[Vector3] = []
 		for point in rim:
 			points.append(Vector3(point[0], point[1], point[2]))
 		_body_opening = Plane(points[0], points[1], points[2])
+		if not _mouth_boundary.is_empty():
+			var measured := Geometry.mouth(rim)
+			if measured.is_empty():
+				return false
+			var frame: Transform3D = measured.transform
+			_body_opening = Plane(frame.basis.y, frame.origin)
 		if absf(_body_opening.normal.y) < 0.001:
 			return false
 		# The measured body rim excludes teeth. Move the free plane inward by
@@ -60,11 +91,26 @@ func configure(model_id: String, cavity_size: Vector3) -> bool:
 		_full_level = _direction * _body_opening.d / _body_opening.normal.y - SURFACE_RELIEF_M / absf(_body_opening.normal.y)
 	_minimum_level = INF
 	_full_weight = 0.0
+	if _has_body_opening:
+		# A linear grid cell can bridge the sharp lip/back-wall transitions
+		# between ray samples. Use the surrounding lining envelope so that
+		# those interpolated triangles remain on the cavity side of the shell.
+		var measured := _floors.duplicate()
+		for row in _rows:
+			for column in _columns:
+				var index := row * _columns + column
+				for neighbor_row in range(maxi(0, row - 1), mini(_rows, row + 2)):
+					for neighbor_column in range(maxi(0, column - 1), mini(_columns, column + 2)):
+						_floors[index] = maxf(_floors[index], measured[neighbor_row * _columns + neighbor_column])
 	_relief.resize(_floors.size())
 	for row in _rows:
 		for column in _columns:
 			var index := row * _columns + column
 			var point := _grid_position(column, row)
+			# SY135's thin lining cannot hide an outward contact overlap. Move
+			# the clipping floor inward too, so the closed edge stays contained.
+			if _has_body_opening:
+				_floors[index] += LINING_CLEARANCE_M
 			_relief[index] = _surface_relief(point.x, point.y)
 			_minimum_level = minf(_minimum_level, _floors[index] - _relief[index])
 			_full_weight += maxf(0.0, _full_level + _relief[index] - _floors[index])
@@ -138,11 +184,42 @@ func _append_clipped(triangle: Array[Vector4]) -> void:
 			polygon.append(current)
 		previous = current
 		previous_depth = depth
+	if not _mouth_boundary.is_empty():
+		polygon = _clip_to_mouth(polygon)
 	# At every clipped edge top == bottom, so the two skins close without a
 	# rectangular skirt. Profile borders are above the maximum soil surface.
 	for index in range(1, polygon.size() - 1):
 		_append_face(polygon[0], polygon[index], polygon[index + 1], true)
 		_append_face(polygon[0], polygon[index], polygon[index + 1], false)
+
+
+func _clip_to_mouth(polygon: Array[Vector4]) -> Array[Vector4]:
+	var signed_area := 0.0
+	for index in _mouth_boundary.size():
+		signed_area += _mouth_boundary[index].cross(_mouth_boundary[(index + 1) % _mouth_boundary.size()])
+	for index in _mouth_boundary.size():
+		if polygon.is_empty():
+			break
+		var start := _mouth_boundary[index]
+		var edge := _mouth_boundary[(index + 1) % _mouth_boundary.size()] - start
+		var clipped: Array[Vector4] = []
+		var previous := polygon.back() as Vector4
+		var previous_distance := edge.cross(Vector2(previous.x, previous.y) - start) * signf(signed_area)
+		for point in polygon:
+			var distance := edge.cross(Vector2(point.x, point.y) - start) * signf(signed_area)
+			if (distance >= 0.0) != (previous_distance >= 0.0):
+				var hit := previous.lerp(point, previous_distance / (previous_distance - distance))
+				# A clipped perimeter must close top against bottom. The baker
+				# keeps lining above full level outside the mouth, so this is a
+				# final bound for interpolated cells at the polygon boundary.
+				hit.w = hit.z
+				clipped.append(hit)
+			if distance >= 0.0:
+				clipped.append(point)
+			previous = point
+			previous_distance = distance
+		polygon = clipped
+	return polygon
 
 
 func _intersection(a: Vector4, b: Vector4) -> Vector4:
@@ -179,7 +256,8 @@ func _append_face(a: Vector4, b: Vector4, c: Vector4, top: bool) -> void:
 
 
 func _position(sample: Vector4, top: bool) -> Vector3:
-	var height := sample.w if top else sample.z - CONTACT_OVERLAP_M * clampf((sample.w - sample.z) / 0.01, 0.0, 1.0)
+	var overlap := 0.0 if _has_body_opening else CONTACT_OVERLAP_M
+	var height := sample.w if top else sample.z - overlap * clampf((sample.w - sample.z) / 0.01, 0.0, 1.0)
 	return Vector3(sample.x, _direction * height, sample.y)
 
 

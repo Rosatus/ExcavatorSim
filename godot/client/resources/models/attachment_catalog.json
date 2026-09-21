@@ -70,7 +70,7 @@
       "tool_glb_sha256": "429b6801d9970d3d41ada9524a022f637753bf36b6f8e6f9449aef11ff7210ec",
       "tool_root_node": "GB12_ROOT",
       "soil_contract_path": "res://resources/attachments/gb12_s50_soil_contract.json",
-      "soil_contract_sha256": "2480f25aade917ab77ad9979985782cda0fdf22fa014c2997a98a8fd23684fd2"
+      "soil_contract_sha256": "7f4157a5e1fc0f78ea93fc674d2c973c4862db641a4a73404cace5f7ea9c19e5"
     },
     {
       "tool_id": "no_tool",

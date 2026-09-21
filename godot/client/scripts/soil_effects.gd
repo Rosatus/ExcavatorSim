@@ -28,6 +28,7 @@ var _fill_material: StandardMaterial3D
 var _last_fill_ratio := -1.0
 var _last_cavity_size := Vector3.ZERO
 var _last_fill_model_id := ""
+var _last_fill_profile_id := ""
 var _fill_surface := BucketFillSurface.new()
 var _generation := -1
 var _budget := 1800
@@ -73,6 +74,7 @@ func _ready() -> void:
 	_requires_live_fill_frame = _presentation != null
 	if _presentation != null:
 		_presentation.model_replacing.connect(_on_fill_model_replacing)
+		_presentation.attachment_changed.connect(_on_fill_attachment_changed)
 	_connect_excavation()
 
 
@@ -97,7 +99,12 @@ func _on_fill_model_replacing() -> void:
 	_last_fill_ratio = -1.0
 
 
-func _bind_fill_pose(model_id: String, cavity_contract: Dictionary, current: Dictionary) -> bool:
+func _on_fill_attachment_changed(_attachment_id: String) -> void:
+	_on_fill_model_replacing()
+	_last_visual_snapshot = {}
+
+
+func _bind_fill_pose(model_id: String, cavity_contract: Dictionary, current: Dictionary, profile_id: String) -> bool:
 	if not is_instance_valid(_presentation):
 		if _requires_live_fill_frame:
 			return false
@@ -105,6 +112,9 @@ func _bind_fill_pose(model_id: String, cavity_contract: Dictionary, current: Dic
 		_fill_mesh.global_transform = current["cavity"]
 		return true
 	if model_id != _presentation.get_active_model_id():
+		return false
+	var active_contract := _presentation.get_soil_contract()
+	if profile_id != String(active_contract.get("fill_profile_id", active_contract.get("model_id", ""))):
 		return false
 	var frame := _presentation.get_soil_frame_node(String(cavity_contract.get("frame", "")))
 	if not is_instance_valid(frame):
@@ -187,6 +197,7 @@ func clear_for_generation(generation: int) -> void:
 	_last_fill_ratio = -1.0
 	_last_cavity_size = Vector3.ZERO
 	_last_fill_model_id = ""
+	_last_fill_profile_id = ""
 	_fill_update_accumulator_s = FILL_UPDATE_PERIOD_S
 	_snapshot_poll_accumulator_s = 0.0
 	_reset_clod_pool()
@@ -558,15 +569,16 @@ func _update_fill(status: Dictionary, current: Dictionary, contract: Dictionary)
 	if quantized_fill_ratio <= 0.0:
 		quantized_fill_ratio = fill_ratio
 	var model_id := String(contract.get("model_id", ""))
+	var profile_id := String(contract.get("fill_profile_id", model_id))
 	var cavity_changed := not cavity_size.is_equal_approx(_last_cavity_size)
-	var model_changed := model_id != _last_fill_model_id
+	var model_changed := model_id != _last_fill_model_id or profile_id != _last_fill_profile_id
 	var first_fill := _last_fill_ratio < 0.0
 	var quantized_changed := absf(quantized_fill_ratio - _last_fill_ratio) + 0.000001 >= FILL_RATIO_QUANTUM
 	if cavity_changed or model_changed or first_fill or (
 		quantized_changed and _fill_update_accumulator_s + 0.000001 >= FILL_UPDATE_PERIOD_S
 	):
 		if cavity_changed or model_changed or first_fill:
-			if not _fill_surface.configure(model_id, cavity_size):
+			if not _fill_surface.configure_contract(contract, cavity_size):
 				_fill_mesh.visible = false
 				_last_fill_ratio = -1.0
 				return
@@ -574,8 +586,9 @@ func _update_fill(status: Dictionary, current: Dictionary, contract: Dictionary)
 		_last_fill_ratio = quantized_fill_ratio
 		_last_cavity_size = cavity_size
 		_last_fill_model_id = model_id
+		_last_fill_profile_id = profile_id
 		_fill_update_accumulator_s = 0.0
-	_fill_mesh.visible = _bind_fill_pose(model_id, cavity_contract, current) and _fill_array_mesh.get_surface_count() > 0
+	_fill_mesh.visible = _bind_fill_pose(model_id, cavity_contract, current, profile_id) and _fill_array_mesh.get_surface_count() > 0
 
 
 func _update_flow(status: Dictionary, current: Dictionary, pose: Dictionary) -> void:

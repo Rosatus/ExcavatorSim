@@ -141,6 +141,28 @@ func _check_imported_contact(mesh_node: MeshInstance3D, contract: Dictionary, pr
 			if nearest > 0.002:
 				return _fail("SY135 opening anchor no longer matches the imported body rim: %s m" % nearest)
 	var direction := float(profile["growth_direction_y"])
+	if profile["model_id"] == "sy135":
+		for ratio in [0.005, 0.05, 0.25, 0.5, 0.75, 1.0]:
+			var fill: PackedVector3Array = surface.build_arrays(ratio)[Mesh.ARRAY_VERTEX]
+			for face in range(0, fill.size(), 3):
+				# Check corners, edge midpoints and interiors against source triangles.
+				for point: Vector3 in [fill[face], fill[face + 1], fill[face + 2],
+						(fill[face] + fill[face + 1]) * 0.5,
+						(fill[face + 1] + fill[face + 2]) * 0.5,
+						(fill[face + 2] + fill[face]) * 0.5,
+						(fill[face] + fill[face + 1] + fill[face + 2]) / 3.0]:
+					var start := Vector3(point.x, direction * 2.0, point.z)
+					var end := Vector3(point.x, -direction * 2.0, point.z)
+					var lining := -INF
+					for index in range(0, indices.size(), 3):
+						var hit: Variant = Geometry3D.segment_intersects_triangle(start, end,
+							mesh_to_cavity * positions[indices[index]],
+							mesh_to_cavity * positions[indices[index + 1]],
+							mesh_to_cavity * positions[indices[index + 2]])
+						if hit is Vector3:
+							lining = maxf(lining, (hit as Vector3).y * direction)
+					if not is_finite(lining) or point.y * direction < lining - 0.0005:
+						return _fail("SY135 soil penetrates imported lining at stock %s, point %s (outside by %s m)" % [ratio, point, lining - point.y * direction])
 	var samples := 0
 	# Independently intersect the imported triangles, not the baked JSON mesh.
 	for row in [10, 14, 18, 22]:

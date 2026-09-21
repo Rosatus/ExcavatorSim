@@ -702,14 +702,15 @@ func _dump_pose(contract: Dictionary, opening_world: Vector3, identity: String) 
 
 
 func _dump_pose_with_normal(contract: Dictionary, opening_world: Vector3, opening_normal: Vector3, identity: String) -> Dictionary:
+	var opening_basis := Basis(Quaternion(Vector3.UP, opening_normal.normalized()))
 	return {
 		"valid": true,
 		"reason": "ok",
 		"model_id": String(contract.get("model_id", "")),
 		"identity": identity,
 		"opening_normal_world": opening_normal,
-		"current": {"opening": Transform3D(Basis.IDENTITY, opening_world)},
-		"previous": {"opening": Transform3D(Basis.IDENTITY, opening_world)},
+		"current": {"opening": Transform3D(opening_basis, opening_world)},
+		"previous": {"opening": Transform3D(opening_basis, opening_world)},
 		"contract": contract,
 	}
 

@@ -13,6 +13,8 @@ var model_id := ""
 var validation_error := ""
 var _tool: Dictionary = {}
 var _regions: Array[Dictionary] = []
+var _mouth_geometry: Dictionary = {}
+var _cavity_transform := Transform3D.IDENTITY
 
 
 func configure(contract: Dictionary) -> bool:
@@ -24,6 +26,10 @@ func configure(contract: Dictionary) -> bool:
 		return false
 	model_id = candidate_model
 	_tool = descriptor.tool_contract()
+	if contract.has("soil_geometry"):
+		var geometry_script = preload("res://scripts/bucket_soil_geometry.gd")
+		_mouth_geometry = geometry_script.mouth(contract.soil_geometry.mouth_polygon_godot)
+		_cavity_transform = geometry_script.cavity(contract.soil_geometry)
 	for value in _tool.get("regions", []):
 		_regions.append((value as Dictionary).duplicate(true))
 	configured = true
@@ -36,6 +42,8 @@ func reset() -> void:
 	validation_error = ""
 	_tool.clear()
 	_regions.clear()
+	_mouth_geometry.clear()
+	_cavity_transform = Transform3D.IDENTITY
 
 
 func compose_snapshot(
@@ -297,6 +305,10 @@ func _sweep_sampling(previous: Transform3D, current: Transform3D) -> Dictionary:
 
 
 func _local_sample_points(region: Dictionary) -> Array[Vector3]:
+	if not _mouth_geometry.is_empty() and region.get("region_id") == "opening":
+		var mouth_points: Array[Vector3] = [_mouth_geometry.transform.origin]
+		mouth_points.append_array(_mouth_geometry.points)
+		return mouth_points
 	var center := _vector3(region["center_godot"])
 	var outward := _vector3(region["outward_normal_godot"])
 	var shape := region["shape"] as Dictionary
@@ -326,6 +338,11 @@ func _local_sample_points(region: Dictionary) -> Array[Vector3]:
 
 
 func _debug_local_transform(region: Dictionary) -> Transform3D:
+	if not _mouth_geometry.is_empty():
+		if region.get("region_id") == "opening":
+			return _mouth_geometry.transform
+		if region.get("region_id") == "inner_shell":
+			return _cavity_transform
 	var center := _vector3(region["center_godot"])
 	var outward := _vector3(region["outward_normal_godot"])
 	var shape := region["shape"] as Dictionary
