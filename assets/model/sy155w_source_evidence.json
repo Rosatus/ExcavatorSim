@@ -1,0 +1,152 @@
+{
+  "model_id": "sy155w",
+  "external_inputs": [
+    {
+      "path": "C:\\code\\blender\\Excavator\\SY155W\\SANY_SY155W_Animated.glb",
+      "sha256": "c7eea3e28a976765502ee0b886af41ff4df8280c1f7f6c5fb40b099a0bc0f3a4",
+      "byte_size": 25250448,
+      "hash_mode": "raw"
+    },
+    {
+      "path": "C:\\code\\blender\\Excavator\\SY155W\\scripts\\build_sy155w.py",
+      "sha256": "9cb63ace46d05cbfcb305ca505e0c89efdc7e89840279e0e0d94fe157ea7bcbc",
+      "byte_size": 34018,
+      "hash_mode": "raw"
+    },
+    {
+      "path": "C:\\code\\blender\\Excavator\\SY155W\\reports\\source_samples.json",
+      "sha256": "dda88b63ab71d87d462a8a7bb0c3bb55050f8b99c6e20ee39b543b6041f03d80",
+      "byte_size": 9336038,
+      "hash_mode": "raw"
+    }
+  ],
+  "regenerate": "pixi run python tools/import_sy155w.py --source <original SY155W directory>",
+  "neutral_source_frame": 91,
+  "joint_degrees": [
+    58,
+    -47,
+    -99,
+    97
+  ],
+  "source_is_unmodified": true,
+  "default_attachment": "xtr13+gb12",
+  "native_bucket_removed_nodes": 35,
+  "cylinders": [
+    [
+      "BOOM_LIFT_L",
+      "SLEW",
+      [
+        1.02,
+        0.09,
+        0.3
+      ],
+      "BOOM_BASE",
+      [
+        1.4,
+        0.32,
+        -0.17
+      ]
+    ],
+    [
+      "BOOM_LIFT_R",
+      "SLEW",
+      [
+        1.02,
+        -0.55,
+        0.3
+      ],
+      "BOOM_BASE",
+      [
+        1.4,
+        -0.32,
+        -0.17
+      ]
+    ],
+    [
+      "BOOM_ARTICULATION",
+      "BOOM_BASE",
+      [
+        0.5,
+        0,
+        -0.36
+      ],
+      "BOOM_OUTER",
+      [
+        0.78,
+        0,
+        -0.43
+      ]
+    ],
+    [
+      "STICK_CYLINDER",
+      "BOOM_OUTER",
+      [
+        0.59,
+        0,
+        0.54
+      ],
+      "STICK",
+      [
+        -0.6,
+        0,
+        0.18
+      ]
+    ],
+    [
+      "BUCKET_CYLINDER",
+      "STICK",
+      [
+        0.26,
+        0,
+        0.4
+      ],
+      "BUCKET_ROCKER",
+      [
+        0.32,
+        0,
+        0
+      ]
+    ],
+    [
+      "BLADE_CYLINDER",
+      "CHASSIS",
+      [
+        -1.8,
+        0,
+        0.86
+      ],
+      "BLADE_PIVOT",
+      [
+        -0.4235,
+        0,
+        -0.02
+      ]
+    ]
+  ],
+  "default_tool_transform_in_bucket_link": [
+    [
+      1.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      1.0,
+      0.0,
+      -0.530000031
+    ],
+    [
+      0.0,
+      0.0,
+      1.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ]
+}

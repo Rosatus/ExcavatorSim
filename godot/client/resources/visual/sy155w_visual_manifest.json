@@ -1,0 +1,1126 @@
+{
+  "schema_version": "sy155w-visual-v1",
+  "asset_id": "sy155w-excavator",
+  "asset_path": "res://assets/visual/SY155W_excavator_godot.glb",
+  "source": {
+    "path": "C:\\code\\blender\\Excavator\\SY155W\\SANY_SY155W_Animated.glb",
+    "sha256": "c7eea3e28a976765502ee0b886af41ff4df8280c1f7f6c5fb40b099a0bc0f3a4",
+    "runtime_sha256": "de2d015f0d63cbfa9dd453cc30f7b57806f44a033ff1d9ea099198ef77fc4344",
+    "byte_size": 25250448,
+    "adaptation": "repaired source blend; sample frame 91; rigid pivot coordinate changes; omit bucket subtree and animation players",
+    "semantic_zero_provenance": "Independent build_sy155w.py params(Work_Cycle, .25): [58,-47,-99,97] degrees; own two-piece-boom authority neutral"
+  },
+  "inspection": {
+    "scene_count": 1,
+    "gltf_node_count": 1324,
+    "mesh_count": 795,
+    "material_count": 16,
+    "embedded_image_count": 6,
+    "animation_count": 0,
+    "removed_bucket_nodes": 35
+  },
+  "coordinate_system": {
+    "source_authoring": "right_handed_blender_z_up",
+    "godot_runtime": "right_handed_gltf_y_up",
+    "python_to_godot_position": "(x, y, z) -> (x, z, -y)",
+    "python_to_godot_transform": "C * T_python * inverse(C)",
+    "runtime_axes": {
+      "base_link": "none",
+      "upper_structure_link": "Y",
+      "boom_link": "X",
+      "arm_link": "X",
+      "bucket_link": "X"
+    }
+  },
+  "local_kinematics": {
+    "mode": "adjacent_frame_local_rotation_delta",
+    "base_frame": "base_link",
+    "origin_policy": "preserve_imported_parent_local_position",
+    "rotation_policy": "clean_single_runtime_axis",
+    "invalid_policy": "retain_last_valid_local_pose",
+    "frame_contracts": {
+      "base_link": {
+        "parent_frame": "",
+        "runtime_axis": "none",
+        "parent_local_position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "upper_structure_link": {
+        "parent_frame": "base_link",
+        "runtime_axis": "Y",
+        "parent_local_position": [
+          0.0,
+          1.2000000476837158,
+          0.0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "boom_link": {
+        "parent_frame": "upper_structure_link",
+        "runtime_axis": "X",
+        "parent_local_position": [
+          0.23000000417232513,
+          0.38999998569488525,
+          -0.6499999761581421
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "arm_link": {
+        "parent_frame": "boom_link",
+        "runtime_axis": "X",
+        "parent_local_position": [
+          -1.4901161193847656e-08,
+          5.960464477539063e-08,
+          -3.1000001430511475
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "via_local_axis": "boom_fold"
+      },
+      "bucket_link": {
+        "parent_frame": "arm_link",
+        "runtime_axis": "X",
+        "parent_local_position": [
+          -1.4901161193847656e-08,
+          -8.940696716308594e-08,
+          -2.500000238418579
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      }
+    }
+  },
+  "pivot_contract": {
+    "tolerance_m": 0.002,
+    "nodes": {
+      "CHASSIS": {
+        "node_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS",
+        "parent_path": "SY155W_Runtime/SY155W_ROOT",
+        "local_position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "runtime_axis": "none"
+      },
+      "SLEW": {
+        "node_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW",
+        "parent_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS",
+        "local_position": [
+          0.0,
+          1.2000000476837158,
+          0.0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "runtime_axis": "Y"
+      },
+      "BOOM_BASE": {
+        "node_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE",
+        "parent_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW",
+        "local_position": [
+          0.23000000417232513,
+          0.38999998569488525,
+          -0.6499999761581421
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "runtime_axis": "X"
+      },
+      "STICK": {
+        "node_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK",
+        "parent_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER",
+        "local_position": [
+          -1.4901161193847656e-08,
+          5.960464477539063e-08,
+          -3.1000001430511475
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "runtime_axis": "X"
+      },
+      "BUCKET_JOINT": {
+        "node_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/BUCKET_JOINT",
+        "parent_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK",
+        "local_position": [
+          -1.4901161193847656e-08,
+          -8.940696716308594e-08,
+          -2.500000238418579
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "runtime_axis": "X"
+      }
+    }
+  },
+  "frame_map": {
+    "base_link": {
+      "node_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS",
+      "pivot_axis": "none",
+      "visual_nodes": [
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Axle tube",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Axle tube_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Blade cylinder base ear",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Blade cylinder base ear_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Blade cylinder base pin",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Blade cylinder base pin_collar",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Blade cylinder base pin_collar_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Blade cylinder base pin_retainer",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Blade cylinder base pin_retainer_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Blade pivot cross pin",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Blade pivot cross pin_collar",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Blade pivot cross pin_collar_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Blade pivot cross pin_retainer",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Blade pivot cross pin_retainer_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Blade pivot lug",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Blade pivot lug_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Differential housing",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Differential housing_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Drive shaft",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Fender bracket",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Fender bracket_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Fender bracket_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Fender bracket_003",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Fender bracket_004",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Fender bracket_005",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Fender bracket_006",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Fender bracket_007",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Fender rib",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Fender rib_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Fender rib_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Fender rib_003",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Fender rib_004",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Fender rib_005",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Fender rib_006",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Fender rib_007",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Longitudinal frame rail",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Longitudinal frame rail_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Perforated access step",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Perforated access step_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Perforated access step_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Perforated access step_003",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Pressed fender",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Pressed fender_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Pressed fender_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Pressed fender_003",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew bearing",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew bearing_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew bearing_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_003",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_004",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_005",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_006",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_007",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_008",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_009",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_010",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_011",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_012",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_013",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_014",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_015",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_016",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_017",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_018",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_019",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_020",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_021",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_022",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_023",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_024",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_025",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_026",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_027",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_028",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_029",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_030",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_031",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_032",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_033",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_034",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_035",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_036",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_037",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_038",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Slew race fastener_039",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step bracket",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step bracket_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step bracket_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step bracket_003",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_003",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_004",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_005",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_006",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_007",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_008",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_009",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_010",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_011",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_012",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_013",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_014",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_015",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_016",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_017",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_018",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_019",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_020",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_021",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_022",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_023",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_024",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_025",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_026",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_027",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_028",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_029",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_030",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_031",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_032",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_033",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_034",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Step slot_035",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Underbody tool box",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Underbody tool box_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/Welded lower frame"
+      ]
+    },
+    "upper_structure_link": {
+      "node_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW",
+      "pivot_axis": "Y",
+      "visual_nodes": [
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Amber beacon",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Arm console",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Arm console_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Beacon pedestal",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Boom saddle cheek",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Boom saddle cheek_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Boom saddle support",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Boom saddle support_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Cab entry grab",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Cab floor",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Cab front kick panel",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Cab grab foot",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Cab grab lower mount",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Cab grab upper mount",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Cab lower side panel",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Cab lower side panel_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Cab perimeter repaired",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Cab perimeter repaired_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Cab rear closure",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Cab roof",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Cab roof front crossbeam",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Cab roof rear crossbeam",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Cast counterweight repaired",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Deck lens",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Deck lens_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Deck work light",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Deck work light_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Display",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Display housing",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Door divider",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Door divider_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Door handle",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Door handle_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Door hinge",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Door hinge_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Door hinge_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Door hinge_003",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Engine body repaired",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Engine intake plinth",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Engine rear bridge",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Engine service insert",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Engine top intake",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Exhaust",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Exhaust base collar",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Foot pedal",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Foot pedal_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Front windscreen",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille inset",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille inset_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_003",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_004",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_005",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_006",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_007",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_008",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_009",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_010",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_011",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_012",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_013",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_014",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_015",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_016",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_017",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_018",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_019",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_020",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_021",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_022",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_023",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_024",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_025",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_026",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_027",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_028",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_029",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_030",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_031",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_032",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_033",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_034",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_035",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_036",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_037",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_038",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_039",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_040",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_041",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_042",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_043",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_044",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_045",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_046",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_047",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_048",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_049",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_050",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_051",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_052",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_053",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_054",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_055",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_056",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Grille vertical fin_057",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Handrail foot strut",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Handrail foot strut_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Handrail front foot",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Handrail front foot_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Handrail midbar",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Handrail midbar_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Handrail rear foot",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Handrail rear foot_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Headrest",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/HOSE_J0_0",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/HOSE_J0_1",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/HOSE_J0_2",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/HOSE_J0_3",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Intake slots",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Intake slots_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Intake slots_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Intake slots_003",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Intake slots_004",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Intake slots_005",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Intake slots_006",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Intake slots_007",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Intake slots_008",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Intake slots_009",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Intake slots_010",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Intake slots_011",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Intake slots_012",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Joystick",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Joystick grip",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Joystick grip_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Joystick_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/LED optic",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/LED optic_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/LED optic_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/LED optic_003",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/LED optic_004",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/LED optic_005",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/License recess",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Lift base pin",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Lift base pin_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Lift base pin_collar",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Lift base pin_collar_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Lift base pin_collar_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Lift base pin_collar_003",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Lift base pin_retainer",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Lift base pin_retainer_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Lift base pin_retainer_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Lift base pin_retainer_003",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Lift cylinder base ear",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Lift cylinder base ear_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Lift cylinder base ear_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Lift cylinder base ear_003",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Main boom support pin",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Main boom support pin_collar",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Main boom support pin_collar_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Main boom support pin_retainer",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Main boom support pin_retainer_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Mirror case",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Mirror case_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Mirror glass",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Mirror glass_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Mirror support",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Mirror support_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Model badge",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Model badge left",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear bumper reflector",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear bumper reflector_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear cross handrail",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear lamp bezel",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear lamp bezel_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear lamp bezel_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear lamp bezel_003",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear lamp bezel_004",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear lamp bezel_005",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear lamp lens",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear lamp lens_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear lamp lens_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear lamp lens_003",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear lamp lens_004",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear lamp lens_005",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear left service cover",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear logo A face",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear logo A rim",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear logo N face",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear logo N rim",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear logo raised panel",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear logo S face",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear logo S rim",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear logo Y face",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear logo Y rim",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear service handrail",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear service handrail_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Rear windscreen",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Recessed latch",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Recessed latch_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Recessed latch_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Roof LED body",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Roof LED body_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Roof LED lens",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Roof LED lens_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Roof LED mount",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Roof LED mount_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Seat back",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Seat cushion",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Seat plinth",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Service seam",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Service seam_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Service seam_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Side safety glass",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Side safety glass_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Slew feed line",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Slew feed line_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Slew feed line_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Slew feed line_003",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Slew manifold",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Slew manifold plinth",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Steering column",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Steering wheel",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Upper deck",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Wheel spoke",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Wheel spoke_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Wheel spoke_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Window lower frame",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Window lower frame_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Window waist rail",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Window waist rail_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Windshield crossbar",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Windshield crossbar_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/Windshield crossbar_002"
+      ]
+    },
+    "boom_link": {
+      "node_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE",
+      "pivot_axis": "X",
+      "visual_nodes": [
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Articulation base ear",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Articulation base ear_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Articulation base pin",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Articulation base pin_collar",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Articulation base pin_collar_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Articulation base pin_retainer",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Articulation base pin_retainer_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/HOSE_J1_0",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/HOSE_J1_1",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/HOSE_J1_2",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/HOSE_J1_3",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lift rod gusset",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lift rod gusset_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lift rod gusset_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lift rod gusset_003",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lift rod pin",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lift rod pin_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lift rod pin_collar",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lift rod pin_collar_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lift rod pin_collar_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lift rod pin_collar_003",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lift rod pin_retainer",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lift rod pin_retainer_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lift rod pin_retainer_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lift rod pin_retainer_003",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lift rod support",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lift rod support_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Line clamp block",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Line clamp block_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Line clamp block_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Line clamp standoff",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Line clamp standoff_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Line clamp standoff_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Line fitting",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Line fitting_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Line fitting_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Line fitting_003",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Line fitting_004",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Line fitting_005",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Line fitting_006",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Line fitting_007",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lower articulated boom",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lower articulated boom_distal_pin",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lower articulated boom_distal_pin_collar",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lower articulated boom_distal_pin_collar_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lower articulated boom_distal_pin_retainer",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lower articulated boom_distal_pin_retainer_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lower articulated boom_proximal_pin",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lower articulated boom_proximal_pin_collar",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lower articulated boom_proximal_pin_collar_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lower articulated boom_proximal_pin_retainer",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lower articulated boom_proximal_pin_retainer_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lower articulated boom_side reinforcement",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lower articulated boom_side reinforcement_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lower articulated boom_weld",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Lower articulated boom_weld_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Rigid hydraulic line",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Rigid hydraulic line_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Rigid hydraulic line_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Rigid hydraulic line_003",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Service fastener",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Service fastener_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Service fastener_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/Service fastener_003"
+      ]
+    },
+    "arm_link": {
+      "node_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK",
+      "pivot_axis": "X",
+      "visual_nodes": [
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Bucket cylinder base ear",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Bucket cylinder base ear_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Bucket cylinder base pin",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Bucket cylinder base pin_collar",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Bucket cylinder base pin_collar_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Bucket cylinder base pin_retainer",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Bucket cylinder base pin_retainer_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_distal_pin",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_distal_pin_collar",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_distal_pin_collar_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_distal_pin_retainer",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_distal_pin_retainer_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_proximal_pin",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_proximal_pin_collar",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_proximal_pin_collar_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_proximal_pin_retainer",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_proximal_pin_retainer_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_side reinforcement",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_side reinforcement_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_weld",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_weld_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Fourbar fixed spacer",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Fourbar fixed spacer_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Fourbar saddle pad",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Line clamp block_006",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Line clamp block_007",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Line clamp block_008",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Line clamp standoff_006",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Line clamp standoff_007",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Line clamp standoff_008",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Line fitting_016",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Line fitting_017",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Line fitting_018",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Line fitting_019",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Line fitting_020",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Line fitting_021",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Line fitting_022",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Line fitting_023",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Rigid hydraulic line_008",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Rigid hydraulic line_009",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Rigid hydraulic line_010",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Rigid hydraulic line_011",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Rocker fixed mount",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Rocker fixed mount_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Service fastener_008",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Service fastener_009",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Service fastener_010",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Service fastener_011",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Stick cylinder rod ear",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Stick cylinder rod ear_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Stick cylinder rod pin",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Stick cylinder rod pin_collar",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Stick cylinder rod pin_collar_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Stick cylinder rod pin_retainer",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Stick cylinder rod pin_retainer_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Stick end coupling",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Stick end coupling_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Stick end coupling_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Stick end coupling_003",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Stick line elbow",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Stick line elbow_001",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Stick line elbow_002",
+        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Stick line elbow_003"
+      ]
+    },
+    "bucket_link": {
+      "node_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/BUCKET_JOINT",
+      "pivot_axis": "X",
+      "visual_nodes": []
+    }
+  },
+  "passive_linkage": {
+    "mode": "none"
+  },
+  "excavation_contact": {
+    "mode": "node",
+    "frame": "bucket_link",
+    "node_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/BUCKET_JOINT/TOOL_SOCKET"
+  },
+  "calibration": {
+    "status": "source_equations_cross_checked",
+    "rest_transforms_godot": {
+      "base_link": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "upper_structure_link": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          1.200000048
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "boom_link": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.230000004
+        ],
+        [
+          0.0,
+          0.52991907,
+          -0.848048217,
+          1.590000033
+        ],
+        [
+          0.0,
+          0.848048217,
+          0.52991907,
+          -0.649999976
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "arm_link": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.229999989
+        ],
+        [
+          0.0,
+          0.034899827,
+          0.999390756,
+          3.818242255
+        ],
+        [
+          0.0,
+          -0.999390756,
+          0.034899827,
+          -4.715787956
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "bucket_link": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.229999974
+        ],
+        [
+          0.0,
+          0.987688207,
+          -0.156434929,
+          1.319765124
+        ],
+        [
+          0.0,
+          0.156434929,
+          0.987688207,
+          -4.803037441
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    "authority_fixture": "godot/client/tests/fixtures/sy155w_frame_parity_cases.json",
+    "authority_fixture_sha256": "d953cfcd0cb56e01573751b105a3e884b49d5af499fccae1a1c6f0670d21e5eb"
+  },
+  "runtime_policy": {
+    "motion_authority": "selected_runtime_profile",
+    "local_articulation": "godot_presentation_axes",
+    "native_tool": "none",
+    "locomotion": "existing_chassis_approximation",
+    "blade": "parked_source_pose"
+  },
+  "local_articulation": {
+    "mode": "godot_presentation_axes",
+    "axes": [
+      {
+        "axis_id": "boom_fold",
+        "node_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER",
+        "parent_frame": "boom_link",
+        "runtime_axis": "X",
+        "local_position": [
+          0,
+          0,
+          -1.93
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "min_degrees": -10.0,
+        "max_degrees": 10.0,
+        "max_rate_degrees_per_second": 12.0,
+        "positive_semantic": "unfold",
+        "negative_semantic": "fold",
+        "input": {
+          "positive_action": "operator_boom_swing_right",
+          "negative_action": "operator_boom_swing_left"
+        },
+        "evidence": "Source Work_Cycle -57..-37 deg; conservative demonstrated range, not factory limits"
+      }
+    ]
+  },
+  "passive_hydraulics": {
+    "cylinders": [
+      {
+        "id": "BOOM_LIFT_L",
+        "barrel": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_LIFT_L_BARREL",
+        "rod": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_LIFT_L_ROD",
+        "a_node": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW",
+        "a_point": [
+          -0.09,
+          0.3,
+          -1.02
+        ],
+        "b_node": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE",
+        "b_point": [
+          -0.32,
+          -0.17,
+          -1.4
+        ]
+      },
+      {
+        "id": "BOOM_LIFT_R",
+        "barrel": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_LIFT_R_BARREL",
+        "rod": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_LIFT_R_ROD",
+        "a_node": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW",
+        "a_point": [
+          0.55,
+          0.3,
+          -1.02
+        ],
+        "b_node": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE",
+        "b_point": [
+          0.32,
+          -0.17,
+          -1.4
+        ]
+      },
+      {
+        "id": "BOOM_ARTICULATION",
+        "barrel": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_ARTICULATION_BARREL",
+        "rod": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_ARTICULATION_ROD",
+        "a_node": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE",
+        "a_point": [
+          0.0,
+          -0.36,
+          -0.5
+        ],
+        "b_node": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER",
+        "b_point": [
+          0.0,
+          -0.43,
+          -0.78
+        ]
+      },
+      {
+        "id": "STICK_CYLINDER",
+        "barrel": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/STICK_CYLINDER_BARREL",
+        "rod": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/STICK_CYLINDER_ROD",
+        "a_node": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER",
+        "a_point": [
+          0.0,
+          0.54,
+          -0.59
+        ],
+        "b_node": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK",
+        "b_point": [
+          0.0,
+          0.18,
+          0.6
+        ]
+      },
+      {
+        "id": "BUCKET_CYLINDER",
+        "barrel": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BUCKET_CYLINDER_BARREL",
+        "rod": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BUCKET_CYLINDER_ROD",
+        "a_node": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK",
+        "a_point": [
+          0.0,
+          0.4,
+          -0.26
+        ],
+        "b_node": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/BUCKET_ROCKER",
+        "b_point": [
+          0.32,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "id": "BLADE_CYLINDER",
+        "barrel": "SY155W_Runtime/SY155W_ROOT/CHASSIS/BLADE_CYLINDER_BARREL",
+        "rod": "SY155W_Runtime/SY155W_ROOT/CHASSIS/BLADE_CYLINDER_ROD",
+        "a_node": "SY155W_Runtime/SY155W_ROOT/CHASSIS",
+        "a_point": [
+          0.0,
+          0.86,
+          1.8
+        ],
+        "b_node": "SY155W_Runtime/SY155W_ROOT/CHASSIS/BLADE_PIVOT",
+        "b_point": [
+          -0.4235,
+          -0.02,
+          0.0
+        ]
+      }
+    ],
+    "hoses": [
+      {
+        "mesh": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/HOSE_J0_0",
+        "joint": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE",
+        "rest_degrees": 58,
+        "min_degrees": 45,
+        "max_degrees": 70,
+        "target_count": 41
+      },
+      {
+        "mesh": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/HOSE_J0_1",
+        "joint": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE",
+        "rest_degrees": 58,
+        "min_degrees": 45,
+        "max_degrees": 70,
+        "target_count": 41
+      },
+      {
+        "mesh": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/HOSE_J0_2",
+        "joint": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE",
+        "rest_degrees": 58,
+        "min_degrees": 45,
+        "max_degrees": 70,
+        "target_count": 41
+      },
+      {
+        "mesh": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/HOSE_J0_3",
+        "joint": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE",
+        "rest_degrees": 58,
+        "min_degrees": 45,
+        "max_degrees": 70,
+        "target_count": 41
+      },
+      {
+        "mesh": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/HOSE_J1_0",
+        "joint": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER",
+        "rest_degrees": -47,
+        "min_degrees": -62,
+        "max_degrees": -32,
+        "target_count": 41
+      },
+      {
+        "mesh": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/HOSE_J1_1",
+        "joint": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER",
+        "rest_degrees": -47,
+        "min_degrees": -62,
+        "max_degrees": -32,
+        "target_count": 41
+      },
+      {
+        "mesh": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/HOSE_J1_2",
+        "joint": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER",
+        "rest_degrees": -47,
+        "min_degrees": -62,
+        "max_degrees": -32,
+        "target_count": 41
+      },
+      {
+        "mesh": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/HOSE_J1_3",
+        "joint": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER",
+        "rest_degrees": -47,
+        "min_degrees": -62,
+        "max_degrees": -32,
+        "target_count": 41
+      },
+      {
+        "mesh": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/HOSE_J2_0",
+        "joint": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK",
+        "rest_degrees": -99,
+        "min_degrees": -112,
+        "max_degrees": -85,
+        "target_count": 41
+      },
+      {
+        "mesh": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/HOSE_J2_1",
+        "joint": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK",
+        "rest_degrees": -99,
+        "min_degrees": -112,
+        "max_degrees": -85,
+        "target_count": 41
+      },
+      {
+        "mesh": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/HOSE_J2_2",
+        "joint": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK",
+        "rest_degrees": -99,
+        "min_degrees": -112,
+        "max_degrees": -85,
+        "target_count": 41
+      },
+      {
+        "mesh": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/HOSE_J2_3",
+        "joint": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK",
+        "rest_degrees": -99,
+        "min_degrees": -112,
+        "max_degrees": -85,
+        "target_count": 41
+      }
+    ],
+    "four_bar": {
+      "arm": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK",
+      "bucket": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/BUCKET_JOINT",
+      "rocker": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/BUCKET_ROCKER",
+      "coupler": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/BUCKET_COUPLER",
+      "bucket_pin": [
+        0.0,
+        0.26,
+        -0.22
+      ],
+      "rocker_tip": [
+        0.32,
+        0,
+        0
+      ],
+      "rocker_length_m": 0.32,
+      "coupler_length_m": 0.48
+    },
+    "policy": "visual only; solve after active pivots; atomic retain on invalid or unreachable pins"
+  }
+}

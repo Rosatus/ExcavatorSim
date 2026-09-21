@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<robot name="sy155w">
+<link name="base_link"/>
+<link name="upper_structure_link"/>
+<joint name="swing_joint" type="revolute">
+<parent link="base_link"/><child link="upper_structure_link"/>
+<origin xyz="0.0000000000 0.0000000000 1.2000000000" rpy="0.0000000000 0.0000000000 0.0000000000"/>
+<axis xyz="0 0 1"/><limit lower="-3.141592653589793" upper="3.141592653589793" effort="1000000" velocity="1"/>
+</joint>
+<link name="boom_link"/>
+<joint name="boom_joint" type="revolute">
+<parent link="upper_structure_link"/><child link="boom_link"/>
+<origin xyz="0.2300000000 0.6500000000 0.3900000000" rpy="1.0122909661 0.0000000000 0.0000000000"/>
+<axis xyz="1 0 0"/><limit lower="-0.12217304763960307" upper="0.12217304763960307" effort="1000000" velocity="1"/>
+</joint>
+<link name="arm_link"/>
+<joint name="arm_joint" type="revolute">
+<parent link="boom_link"/><child link="arm_link"/>
+<origin xyz="0.0000000000 4.0441949160 -2.2671964750" rpy="-2.5481807085 0.0000000000 0.0000000000"/>
+<axis xyz="1 0 0"/><limit lower="-0.15707963267948966" upper="0.15707963267948966" effort="1000000" velocity="1"/>
+</joint>
+<link name="bucket_link"/>
+<joint name="bucket_joint" type="revolute">
+<parent link="arm_link"/><child link="bucket_link"/>
+<origin xyz="0.0000000000 2.5000000000 0.0000000000" rpy="1.6929693737 0.0000000000 0.0000000000"/>
+<axis xyz="1 0 0"/><limit lower="-0.2617993877991494" upper="0.2617993877991494" effort="1000000" velocity="1"/>
+</joint>
+<link name="tooth_center"/>
+<joint name="tooth_center_fixed" type="fixed"><parent link="bucket_link"/>
+<child link="tooth_center"/><origin xyz="0.0000000000 -0.6680000000 -1.2760000310" rpy="0 0 0"/></joint>
+<link name="tooth_left"/>
+<joint name="tooth_left_fixed" type="fixed"><parent link="bucket_link"/>
+<child link="tooth_left"/><origin xyz="-0.7000000000 -0.6680000000 -1.2760000310" rpy="0 0 0"/></joint>
+<link name="tooth_right"/>
+<joint name="tooth_right_fixed" type="fixed"><parent link="bucket_link"/>
+<child link="tooth_right"/><origin xyz="0.7000000000 -0.6680000000 -1.2760000310" rpy="0 0 0"/></joint>
+<link name="gnss_link"/>
+<joint name="gnss_link_fixed" type="fixed"><parent link="upper_structure_link"/>
+<child link="gnss_link"/><origin xyz="-0.7800000000 -0.1000000000 1.8000000000" rpy="0 0 0"/></joint>
+<link name="swing_imu_link"/>
+<joint name="swing_imu_link_fixed" type="fixed"><parent link="upper_structure_link"/>
+<child link="swing_imu_link"/><origin xyz="0.0000000000 0.0000000000 0.3000000000" rpy="0 0 0"/></joint>
+<link name="boom_imu_link"/>
+<joint name="boom_imu_link_fixed" type="fixed"><parent link="boom_link"/>
+<child link="boom_imu_link"/><origin xyz="0.0000000000 0.9650000000 0.0000000000" rpy="0 0 0"/></joint>
+<link name="arm_imu_link"/>
+<joint name="arm_imu_link_fixed" type="fixed"><parent link="arm_link"/>
+<child link="arm_imu_link"/><origin xyz="0.0000000000 1.2500000000 0.0000000000" rpy="0 0 0"/></joint>
+<link name="bucket_imu_link"/>
+<joint name="bucket_imu_link_fixed" type="fixed"><parent link="bucket_link"/>
+<child link="bucket_imu_link"/><origin xyz="0.0000000000 0.0000000000 0.0000000000" rpy="0 0 0"/></joint>
+</robot>
