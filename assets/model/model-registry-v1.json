@@ -1,88 +1,140 @@
 {
- "schema_version": "excavator-model-registry-v1",
- "default_model_id": "sy205",
- "models": [
-  {
-   "model_id": "sy205",
-   "display_name": "SANY SY205",
-   "model_version": "sy205-glb-urdf-v4",
-   "visual_model_version": "original-skin-v1",
-   "urdf_path": "assets/model/kinematic_excavator.urdf",
-   "urdf_sha256": "5707f454624fadd5630fcbfd66893b4edf7e8c5b97c84e65e06bf9f8fa46c02c",
-   "calibration_path": "assets/calibration/m1_provisional_calibration.json",
-   "calibration_sha256": "95eeda252a8de83a8bbd8f8af30b11e0c9937d6c933306b479846e72a0325f98",
-   "calibration_version": "machine-calibration-v2",
-   "godot_glb_path": "godot/client/assets/visual/SY205_excavator_godot.glb",
-   "godot_glb_resource": "res://assets/visual/SY205_excavator_godot.glb",
-   "godot_glb_sha256": "cf95534b31bcc156980afefef0a9f273e5c6f727547b3db1e9062ca5619b495a",
-   "visual_manifest_path": "godot/client/resources/visual/sy205_visual_manifest.json",
-   "visual_manifest_resource": "res://resources/visual/sy205_visual_manifest.json",
-   "visual_manifest_sha256": "3a12f793416f0f22dfb4662f65634ce797f0ccdcacbaad1a0eea1d481b3c48a0",
-   "parity_fixture_path": "godot/client/tests/fixtures/sy205_frame_parity_cases.json",
-   "parity_fixture_resource": "res://tests/fixtures/sy205_frame_parity_cases.json",
-   "parity_fixture_sha256": "aa5e8e75d5e74c6693dfeb258b77ce6341b064fce1eefc7c82b4c2ad848851c6",
-   "passive_linkage_mode": "godot_visual_four_bar",
-   "excavation_contact": {
-    "mode": "frame_offset",
-    "frame": "bucket_link",
-    "offset_godot": [
-     0.0,
-     -0.55,
-     0.0
-    ]
-   }
-  },
-  {
-   "model_id": "sy135",
-   "display_name": "SANY SY135",
-   "model_version": "sy135-reference-urdf-v1",
-   "visual_model_version": "sy135-combined-glb-v1",
-   "urdf_path": "assets/model/library/sy135_reference.urdf",
-   "urdf_sha256": "2f32a9f635f6fb1b43da9fb624612ade5b7a7b7d2d84f5eed401ffb414afc485",
-   "calibration_path": "assets/calibration/m1_provisional_calibration.json",
-   "calibration_sha256": "95eeda252a8de83a8bbd8f8af30b11e0c9937d6c933306b479846e72a0325f98",
-   "calibration_version": "machine-calibration-v2",
-   "godot_glb_path": "godot/client/assets/visual/SY135_excavator_godot.glb",
-   "godot_glb_resource": "res://assets/visual/SY135_excavator_godot.glb",
-   "godot_glb_sha256": "8e0f478b265bb0f32f7736a0e388f5bb812b7f36c143edeb1553ff86d2d960c9",
-   "visual_manifest_path": "godot/client/resources/visual/sy135_visual_manifest.json",
-   "visual_manifest_resource": "res://resources/visual/sy135_visual_manifest.json",
-   "visual_manifest_sha256": "e9fef23aaea3d1482697e5f11f8b01e967772a6a7d716233f544281bb457db6d",
-   "parity_fixture_path": "godot/client/tests/fixtures/sy135_frame_parity_cases.json",
-   "parity_fixture_resource": "res://tests/fixtures/sy135_frame_parity_cases.json",
-   "parity_fixture_sha256": "bb034a1540a68e892cd016f3b60e13729de1c66c0373cecf2a22f49915d20005",
-   "passive_linkage_mode": "none",
-   "excavation_contact": {
-    "mode": "node",
-    "frame": "bucket_link",
-    "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT/REF_BUCKET_TIP"
-   }
-  },
-  {
-   "model_id": "sy135neo",
-   "display_name": "SANY SY135 NEO",
-   "model_version": "sy135-reference-urdf-v1",
-   "visual_model_version": "sy135neo-combined-glb-v1",
-   "urdf_path": "assets/model/library/sy135_reference.urdf",
-   "urdf_sha256": "2f32a9f635f6fb1b43da9fb624612ade5b7a7b7d2d84f5eed401ffb414afc485",
-   "calibration_path": "assets/calibration/m1_provisional_calibration.json",
-   "calibration_sha256": "95eeda252a8de83a8bbd8f8af30b11e0c9937d6c933306b479846e72a0325f98",
-   "calibration_version": "machine-calibration-v2",
-   "godot_glb_path": "godot/client/assets/visual/SY135-NEO_excavator_godot.glb",
-   "godot_glb_resource": "res://assets/visual/SY135-NEO_excavator_godot.glb",
-   "godot_glb_sha256": "0918b2206a41f1bf7823a4bf2a6e7e1a3b8b5808e71ccb75d4fb9ec7b0c7e041",
-   "visual_manifest_path": "godot/client/resources/visual/sy135neo_visual_manifest.json",
-   "visual_manifest_resource": "res://resources/visual/sy135neo_visual_manifest.json",
-   "visual_manifest_sha256": "3e0c00ee4a820a503e828045847c87baa7492d2e62be61cc70bcf0cd897f075e",
-   "parity_fixture_path": "godot/client/tests/fixtures/sy135neo_frame_parity_cases.json",
-   "parity_fixture_resource": "res://tests/fixtures/sy135neo_frame_parity_cases.json",
-   "parity_fixture_sha256": "e96fb9dd342fb0d88577f8fc05a68694c6c3900164b715feda13f8405afb94db",
-   "passive_linkage_mode": "none",
-   "excavation_contact": {
-    "mode": "node",
-    "frame": "bucket_link",
-    "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT/REF_BUCKET_TIP"
-   }
-  }
- ]
+  "schema_version": "excavator-model-registry-v1",
+  "default_model_id": "sy205",
+  "models": [
+    {
+      "model_id": "sy205",
+      "display_name": "SANY SY205",
+      "model_version": "sy205-glb-urdf-v4",
+      "visual_model_version": "original-skin-v1",
+      "urdf_path": "assets/model/kinematic_excavator.urdf",
+      "urdf_sha256": "5707f454624fadd5630fcbfd66893b4edf7e8c5b97c84e65e06bf9f8fa46c02c",
+      "calibration_path": "assets/calibration/m1_provisional_calibration.json",
+      "calibration_sha256": "95eeda252a8de83a8bbd8f8af30b11e0c9937d6c933306b479846e72a0325f98",
+      "calibration_version": "machine-calibration-v2",
+      "godot_glb_path": "godot/client/assets/visual/SY205_excavator_godot.glb",
+      "godot_glb_resource": "res://assets/visual/SY205_excavator_godot.glb",
+      "godot_glb_sha256": "cf95534b31bcc156980afefef0a9f273e5c6f727547b3db1e9062ca5619b495a",
+      "visual_manifest_path": "godot/client/resources/visual/sy205_visual_manifest.json",
+      "visual_manifest_resource": "res://resources/visual/sy205_visual_manifest.json",
+      "visual_manifest_sha256": "3a12f793416f0f22dfb4662f65634ce797f0ccdcacbaad1a0eea1d481b3c48a0",
+      "parity_fixture_path": "godot/client/tests/fixtures/sy205_frame_parity_cases.json",
+      "parity_fixture_resource": "res://tests/fixtures/sy205_frame_parity_cases.json",
+      "parity_fixture_sha256": "aa5e8e75d5e74c6693dfeb258b77ce6341b064fce1eefc7c82b4c2ad848851c6",
+      "passive_linkage_mode": "godot_visual_four_bar",
+      "excavation_contact": {
+        "mode": "frame_offset",
+        "frame": "bucket_link",
+        "offset_godot": [
+          0.0,
+          -0.55,
+          0.0
+        ]
+      }
+    },
+    {
+      "model_id": "sy135",
+      "display_name": "SANY SY135",
+      "model_version": "sy135-reference-urdf-v1",
+      "visual_model_version": "sy135-combined-glb-v1",
+      "urdf_path": "assets/model/library/sy135_reference.urdf",
+      "urdf_sha256": "2f32a9f635f6fb1b43da9fb624612ade5b7a7b7d2d84f5eed401ffb414afc485",
+      "calibration_path": "assets/calibration/m1_provisional_calibration.json",
+      "calibration_sha256": "95eeda252a8de83a8bbd8f8af30b11e0c9937d6c933306b479846e72a0325f98",
+      "calibration_version": "machine-calibration-v2",
+      "godot_glb_path": "godot/client/assets/visual/SY135_excavator_godot.glb",
+      "godot_glb_resource": "res://assets/visual/SY135_excavator_godot.glb",
+      "godot_glb_sha256": "8e0f478b265bb0f32f7736a0e388f5bb812b7f36c143edeb1553ff86d2d960c9",
+      "visual_manifest_path": "godot/client/resources/visual/sy135_visual_manifest.json",
+      "visual_manifest_resource": "res://resources/visual/sy135_visual_manifest.json",
+      "visual_manifest_sha256": "e9fef23aaea3d1482697e5f11f8b01e967772a6a7d716233f544281bb457db6d",
+      "parity_fixture_path": "godot/client/tests/fixtures/sy135_frame_parity_cases.json",
+      "parity_fixture_resource": "res://tests/fixtures/sy135_frame_parity_cases.json",
+      "parity_fixture_sha256": "bb034a1540a68e892cd016f3b60e13729de1c66c0373cecf2a22f49915d20005",
+      "passive_linkage_mode": "none",
+      "excavation_contact": {
+        "mode": "node",
+        "frame": "bucket_link",
+        "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT/REF_BUCKET_TIP"
+      }
+    },
+    {
+      "model_id": "sy135neo",
+      "display_name": "SANY SY135 NEO",
+      "model_version": "sy135-reference-urdf-v1",
+      "visual_model_version": "sy135neo-combined-glb-v1",
+      "urdf_path": "assets/model/library/sy135_reference.urdf",
+      "urdf_sha256": "2f32a9f635f6fb1b43da9fb624612ade5b7a7b7d2d84f5eed401ffb414afc485",
+      "calibration_path": "assets/calibration/m1_provisional_calibration.json",
+      "calibration_sha256": "95eeda252a8de83a8bbd8f8af30b11e0c9937d6c933306b479846e72a0325f98",
+      "calibration_version": "machine-calibration-v2",
+      "godot_glb_path": "godot/client/assets/visual/SY135-NEO_excavator_godot.glb",
+      "godot_glb_resource": "res://assets/visual/SY135-NEO_excavator_godot.glb",
+      "godot_glb_sha256": "0918b2206a41f1bf7823a4bf2a6e7e1a3b8b5808e71ccb75d4fb9ec7b0c7e041",
+      "visual_manifest_path": "godot/client/resources/visual/sy135neo_visual_manifest.json",
+      "visual_manifest_resource": "res://resources/visual/sy135neo_visual_manifest.json",
+      "visual_manifest_sha256": "3e0c00ee4a820a503e828045847c87baa7492d2e62be61cc70bcf0cd897f075e",
+      "parity_fixture_path": "godot/client/tests/fixtures/sy135neo_frame_parity_cases.json",
+      "parity_fixture_resource": "res://tests/fixtures/sy135neo_frame_parity_cases.json",
+      "parity_fixture_sha256": "e96fb9dd342fb0d88577f8fc05a68694c6c3900164b715feda13f8405afb94db",
+      "passive_linkage_mode": "none",
+      "excavation_contact": {
+        "mode": "node",
+        "frame": "bucket_link",
+        "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT/REF_BUCKET_TIP"
+      }
+    },
+    {
+      "model_id": "sy80u",
+      "display_name": "SANY SY80U",
+      "model_version": "sy80u-reference-urdf-v1",
+      "visual_model_version": "sy80u-combined-glb-v1",
+      "urdf_path": "assets/model/library/sy80u_reference.urdf",
+      "urdf_sha256": "b887eb3b17d346b9d6c308d2790267ca62285ad71f01ee1733b348fd72171cba",
+      "calibration_path": "assets/calibration/m1_provisional_calibration.json",
+      "calibration_sha256": "95eeda252a8de83a8bbd8f8af30b11e0c9937d6c933306b479846e72a0325f98",
+      "calibration_version": "machine-calibration-v2",
+      "godot_glb_path": "godot/client/assets/visual/SY80U_excavator_godot.glb",
+      "godot_glb_resource": "res://assets/visual/SY80U_excavator_godot.glb",
+      "godot_glb_sha256": "a91cd60b6673eb3511296fabe582ff408c1605e4e849c5bd8325706825f22101",
+      "visual_manifest_path": "godot/client/resources/visual/sy80u_visual_manifest.json",
+      "visual_manifest_resource": "res://resources/visual/sy80u_visual_manifest.json",
+      "visual_manifest_sha256": "ba7df9885106f4852156c9f82c596a6bec408bad396ea972d1e55b97a1644242",
+      "parity_fixture_path": "godot/client/tests/fixtures/sy80u_frame_parity_cases.json",
+      "parity_fixture_resource": "res://tests/fixtures/sy80u_frame_parity_cases.json",
+      "parity_fixture_sha256": "22e57e4a88096cabd6ee2fc9fec21e93d0003c5c18fd0e68d27c17f6fd2d0efa",
+      "passive_linkage_mode": "none",
+      "excavation_contact": {
+        "mode": "node",
+        "frame": "bucket_link",
+        "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_SWING/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT/REF_BUCKET_TIP"
+      }
+    },
+    {
+      "model_id": "sy155w",
+      "display_name": "SANY SY155W",
+      "model_version": "sy155w-source-urdf-v1",
+      "visual_model_version": "sy155w-passive-hydraulics-v1",
+      "urdf_path": "assets/model/library/sy155w_reference.urdf",
+      "urdf_sha256": "9fb05bd71fe7011ebe5b12b79ad36fc60820757a0bc41f0d0a0c5d4cfa77a25b",
+      "calibration_path": "assets/calibration/m1_provisional_calibration.json",
+      "calibration_sha256": "95eeda252a8de83a8bbd8f8af30b11e0c9937d6c933306b479846e72a0325f98",
+      "calibration_version": "machine-calibration-v2",
+      "godot_glb_path": "godot/client/assets/visual/SY155W_excavator_godot.glb",
+      "godot_glb_resource": "res://assets/visual/SY155W_excavator_godot.glb",
+      "godot_glb_sha256": "de2d015f0d63cbfa9dd453cc30f7b57806f44a033ff1d9ea099198ef77fc4344",
+      "visual_manifest_path": "godot/client/resources/visual/sy155w_visual_manifest.json",
+      "visual_manifest_resource": "res://resources/visual/sy155w_visual_manifest.json",
+      "visual_manifest_sha256": "72b32c740153f4b17bf5acd0bc08296c29202c278a3533b6b106e99e73b8d3cd",
+      "parity_fixture_path": "godot/client/tests/fixtures/sy155w_frame_parity_cases.json",
+      "parity_fixture_resource": "res://tests/fixtures/sy155w_frame_parity_cases.json",
+      "parity_fixture_sha256": "d953cfcd0cb56e01573751b105a3e884b49d5af499fccae1a1c6f0670d21e5eb",
+      "passive_linkage_mode": "none",
+      "excavation_contact": {
+        "mode": "node",
+        "frame": "bucket_link",
+        "node_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/BUCKET_JOINT/TOOL_SOCKET"
+      }
+    }
+  ]
 }

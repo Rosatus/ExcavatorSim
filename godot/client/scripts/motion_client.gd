@@ -375,6 +375,14 @@ func get_attachment_input_axes() -> Vector2:
 	return _attachment_input_mapper.read_attachment_axes()
 
 
+## Model-local presentation axis input in [-1, 1] (e.g. SY80U boom offset).
+## Zero while unfocused; the presentation layer owns activation per model.
+func get_local_axis_input(negative_action: String, positive_action: String) -> float:
+	if not _focused:
+		return 0.0
+	return Input.get_axis(negative_action, positive_action)
+
+
 func get_status_snapshot() -> Dictionary:
 	return {
 		"connection_state": connection_state,
@@ -995,6 +1003,15 @@ func _ensure_input_actions() -> void:
 			int(definition["joy_axis"]),
 			float(definition["joy_sign"]),
 		)
+	for action in EquipmentCommandMapper.LOCAL_INPUT_ACTIONS:
+		if not InputMap.has_action(action):
+			InputMap.add_action(action, 0.08)
+		var definition: Dictionary = EquipmentCommandMapper.LOCAL_INPUT_ACTIONS[action]
+		for existing in InputMap.action_get_events(action):
+			if existing is InputEventKey or existing is InputEventJoypadMotion:
+				InputMap.action_erase_event(action, existing)
+		for keycode in definition["keys"]:
+			_add_key_event(action, int(keycode))
 	for action in COMMAND_ACTIONS:
 		if not InputMap.has_action(action):
 			InputMap.add_action(action)

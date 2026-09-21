@@ -7,6 +7,7 @@ const SlopeProfileScript := preload("res://scripts/slope_profile.gd")
 const SlopeCutPreviewScript := preload("res://scripts/slope_cut_preview.gd")
 
 signal post_step_snapshot_captured(snapshot: Dictionary)
+signal performance_step_sampled(chassis_usec: int, tracks_usec: int)
 
 ## Owns one dynamic Jolt chassis plus a bounded kinematic work-equipment chain.
 ## Consumers read copied snapshots; queries and presentation never drive bodies.
@@ -150,10 +151,25 @@ var _peak_pitch_angle_rad := 0.0
 var _peak_pitch_rate_rad_s := 0.0
 var _last_fixed_delta_s := 1.0 / 60.0
 var _track_support_source_counts: Dictionary = {}
+var attachment_bucket_limit_offsets_deg: Dictionary = {}
 
 
 func _ready() -> void:
 	process_physics_priority = 0
+	add_to_group("chassis_performance_sources")
+
+
+func set_attachment_bucket_limits(attachment_id: String) -> void:
+	if _articulation == null:
+		return
+	# L/dump increases the canonical bucket coordinate on both host models.
+	var coupler := attachment_id.get_slice("+", 0)
+	# Articulated machines retain their validated cylinder/four-bar range.
+	var default_offset := 130.0 if coupler == "xtr13" else 0.0
+	var offset := deg_to_rad(float(attachment_bucket_limit_offsets_deg.get(coupler, default_offset)))
+	if not is_equal_approx(_articulation.bucket_limit_offset_rad, offset):
+		_articulation.bucket_limit_offset_rad = offset
+		_level_band_valid = false
 
 
 func _physics_process(delta: float) -> void:
@@ -167,8 +183,11 @@ func _physics_process(delta: float) -> void:
 	_apply_pending_payload()
 	_apply_queued_support_wrench()
 	_update_joint_actuators(delta)
+	var tracks_usec := 0
 	if enabled and _terrain_identity_valid:
+		var tracks_started := Time.get_ticks_usec()
 		_apply_track_forces()
+		tracks_usec = Time.get_ticks_usec() - tracks_started
 	elif enabled:
 		_quality_flags.append("terrain_collider_unavailable")
 	_clamp_body_velocities()
@@ -180,6 +199,8 @@ func _physics_process(delta: float) -> void:
 	_peak_step_usec = maxi(_peak_step_usec, _last_step_usec)
 	_capture_post_step_snapshot()
 	post_step_snapshot_captured.emit(get_post_step_snapshot())
+	if performance_step_sampled.has_connections():
+		performance_step_sampled.emit(Time.get_ticks_usec() - started_usec, tracks_usec)
 
 
 func configure(
@@ -586,6 +607,7 @@ func _view_snapshot(
 	for joint_name in ["swing_joint", "boom_joint", "arm_joint", "bucket_joint"]:
 		joints[joint_name] = ctx.joint_pivot_world.get(joint_name, Vector3.ZERO)
 	var tooth: Vector3 = ctx.bucket_ref_world
+	var machine_s: float = profile.along(joints.get("swing_joint", tooth))
 	return {
 		"mode": mode,
 		"origin_xz": profile.origin_xz,
@@ -602,7 +624,9 @@ func _view_snapshot(
 		"joints": joints,
 		"tooth": tooth,
 		"tooth_err": tooth.y - profile.height_at(profile.along(tooth)),
-		"terrain": _sample_profile_centerline(profile, minf(s_min - 1.0, -6.0), s_max + 1.0),
+		"terrain": _sample_profile_centerline(
+			profile, minf(minf(s_min - 1.0, -6.0), machine_s - 2.0), maxf(s_max + 1.0, machine_s + 2.0)
+		),
 	}
 
 

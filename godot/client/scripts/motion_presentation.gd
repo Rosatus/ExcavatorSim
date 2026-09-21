@@ -12,11 +12,13 @@ const JOINT_ORIGIN_TOLERANCE_M := 0.002
 const JOINT_AXIS_RESIDUAL_TOLERANCE := 0.001
 
 @export var motion_client_path := NodePath("../MotionClient")
+@export var product_session_path := NodePath("../ProductSession")
 @export var presentation_root_path := NodePath("../PresentationRoot")
 @export_enum("python_kinematic", "jolt_shadow", "jolt_authoritative") var authority_profile := AuthorityProfile.JOLT_AUTHORITATIVE
 @export var use_project_authority_profile := true
 
 var _motion_client: MotionClient
+var _product_session: ProductSession
 var _presentation_root: Node3D
 var _asset_root: Node3D
 var _manifest: Dictionary = {}
@@ -49,6 +51,14 @@ var _last_soil_tool_snapshot: Dictionary = {}
 var _soil_tool := BucketSoilTool.new()
 var _soil_debug_root: Node3D
 var _semantic_debug_root: Node3D
+# Manifest-declared presentation-local axes (e.g. SY80U boom offset). These
+# joints sit inside the imported GLB hierarchy between two authority frames
+# and never enter the Python Vector4 protocol.
+var _local_axis_defs: Array[Dictionary] = []
+var _local_axis_nodes: Dictionary = {}
+var _use_test_local_input := false
+var _test_local_input := 0.0
+var _hydraulics := PassiveHydraulics.new()
 
 # The imported GLB intentionally contains no Blender drivers or animation
 # tracks. These nodes are the Godot-only passive four-bar presentation seam
@@ -85,6 +95,7 @@ func _ready() -> void:
 	if use_project_authority_profile:
 		authority_profile = String(ProjectSettings.get_setting("simulation/authority_profile", authority_profile))
 	_motion_client = get_node_or_null(motion_client_path) as MotionClient
+	_product_session = get_node_or_null(product_session_path) as ProductSession
 	_presentation_root = get_node_or_null(presentation_root_path) as Node3D
 	if _presentation_root == null:
 		_contract_error = "MotionPresentation requires PresentationRoot"
@@ -113,6 +124,77 @@ func _process(_delta: float) -> void:
 		_last_render_revision = revision
 
 
+func _physics_process(delta: float) -> void:
+	for axis in _local_axis_defs:
+		var input := 0.0
+		if _use_test_local_input:
+			input = _test_local_input
+		elif _product_session != null:
+			input = _product_session.get_local_axis_input(
+				String(axis["negative_action"]), String(axis["positive_action"])
+			)
+		_integrate_local_axis(axis, clampf(input, -1.0, 1.0), delta)
+	_hydraulics.update()
+
+
+func _integrate_local_axis(axis: Dictionary, input: float, delta: float) -> void:
+	var angle := float(axis["angle_rad"]) + input * float(axis["rate_rad"]) * delta
+	angle = clampf(angle, float(axis["min_rad"]), float(axis["max_rad"]))
+	if is_equal_approx(angle, float(axis["angle_rad"])):
+		return
+	axis["angle_rad"] = angle
+	_apply_local_axis(axis)
+
+
+func _apply_local_axis(axis: Dictionary) -> void:
+	var node := axis["node"] as Node3D
+	var rest := axis["rest_transform"] as Transform3D
+	if node == null or not is_instance_valid(node) or not rest is Transform3D:
+		return
+	var target := rest as Transform3D
+	target.basis = target.basis * Basis(axis["axis_vector"] as Vector3, float(axis["angle_rad"]))
+	node.transform = target
+
+
+## Deterministic input override for headless tests; bypasses session gating.
+func set_local_axis_input_for_test(value: float) -> void:
+	_use_test_local_input = true
+	_test_local_input = clampf(value, -1.0, 1.0)
+
+
+func clear_local_axis_input_for_test() -> void:
+	_use_test_local_input = false
+	_test_local_input = 0.0
+
+
+func set_local_axis_angle_for_test(axis_id: String, angle_deg: float) -> bool:
+	for axis in _local_axis_defs:
+		if String(axis["axis_id"]) != axis_id:
+			continue
+		axis["angle_rad"] = clampf(
+			deg_to_rad(angle_deg), float(axis["min_rad"]), float(axis["max_rad"])
+		)
+		_apply_local_axis(axis)
+		_hydraulics.update()
+		return true
+	return false
+
+
+func get_local_axis_state_for_test() -> Dictionary:
+	var state := {}
+	for axis in _local_axis_defs:
+		state[String(axis["axis_id"])] = {
+			"angle_deg": rad_to_deg(float(axis["angle_rad"])),
+			"min_deg": rad_to_deg(float(axis["min_rad"])),
+			"max_deg": rad_to_deg(float(axis["max_rad"])),
+		}
+	return state
+
+
+func get_hydraulics_snapshot_for_test() -> Dictionary:
+	return _hydraulics.snapshot()
+
+
 func get_contract_error() -> String:
 	return _contract_error
 
@@ -136,6 +218,10 @@ func get_frame_visual_nodes(frame_name: String) -> Array[Node3D]:
 
 func get_active_model_id() -> String:
 	return _active_model_id
+
+
+func native_tool_available() -> bool:
+	return String(_manifest.get("runtime_policy", {}).get("native_tool", "")) != "none"
 
 
 func get_soil_contract() -> Dictionary:
@@ -254,6 +340,8 @@ func sample_bucket_pose_fixed(world_generation: int, authority_generation: int) 
 		clear_bucket_pose_history()
 		return {"valid": false, "reason": "opening_frame_unavailable"}
 	var opening_normal_world := opening_frame.global_transform.basis * _vector3_from_array(opening_contract.get("normal_godot", []))
+	if get_soil_contract().has("soil_geometry"):
+		opening_normal_world = (current["opening"] as Transform3D).basis.y
 	var snapshot := {
 		"valid": valid,
 		"reason": reason,
@@ -410,6 +498,7 @@ func _activate_model(model_id: String) -> bool:
 			sibling.visible = false
 	_clear_contract_state()
 	if not _load_mapping_contract(model_id):
+		_hydraulics = PassiveHydraulics.new()
 		_asset_root.visible = false
 		# A failed candidate must not leave the old model visible as an implicit
 		# cross-model fallback.  Keep the presentation owner empty until a
@@ -447,6 +536,9 @@ func _clear_contract_state() -> void:
 	_rest_presentation_locals.clear()
 	_soil_contract.clear()
 	_soil_tool.reset()
+	_hydraulics = PassiveHydraulics.new()
+	_local_axis_defs.clear()
+	_local_axis_nodes.clear()
 	clear_bucket_pose_history()
 	_pivot_reasons.clear()
 	_pivot_last_warning_reasons.clear()
@@ -490,6 +582,8 @@ func _load_mapping_contract(model_id: String) -> bool:
 	for body_value in physics_descriptor.bodies():
 		var body := body_value as Dictionary
 		_physics_rest_globals[String(body["frame"])] = _rows_to_transform(body["rest_transform_godot"])
+	if not _load_local_axis_contract(manifest, model_id):
+		return false
 	for frame_name in MotionProtocol.FRAME_NAMES:
 		var mapping: Dictionary = frame_map.get(frame_name, {})
 		var frame_contract: Dictionary = frame_contracts.get(frame_name, {})
@@ -545,16 +639,138 @@ func _load_mapping_contract(model_id: String) -> bool:
 				_contract_error = "%s local kinematics contract is invalid for %s" % [model_id, frame_name]
 				push_error(_contract_error)
 				return false
-			if frame_node.get_parent() != _frame_nodes.get(parent_frame):
+			# A manifest-declared local axis may sit between this frame and its
+			# authority parent (e.g. SY80U boom swing between upper and boom).
+			var expected_parent := _frame_nodes.get(parent_frame) as Node3D
+			var via_axis_id := String(frame_contract.get("via_local_axis", ""))
+			if not via_axis_id.is_empty():
+				var via_node := _local_axis_nodes.get(via_axis_id) as Node3D
+				var via_axis: Variant = null
+				for candidate_axis in _local_axis_defs:
+					if String(candidate_axis["axis_id"]) == via_axis_id:
+						via_axis = candidate_axis
+						break
+				if (
+					via_node == null or not via_axis is Dictionary
+					or String((via_axis as Dictionary)["parent_frame"]) != parent_frame
+				):
+					_contract_error = "%s local kinematics contract is invalid for %s" % [model_id, frame_name]
+					push_error(_contract_error)
+					return false
+				expected_parent = via_node
+			if frame_node.get_parent() != expected_parent:
 				_contract_error = "%s imported pivot parent drifted for %s" % [model_id, frame_name]
 				push_error(_contract_error)
 				return false
 		_frame_parent_names[frame_name] = parent_frame
 		_frame_runtime_axes[frame_name] = runtime_axis
+	if not _validate_local_axis_parents(model_id):
+		return false
 	var passive_linkage: Dictionary = manifest.get("passive_linkage", {})
 	if not _load_passive_linkage_contract(passive_linkage, model_id):
 		return false
+	if not _hydraulics.configure(_asset_root, manifest.get("passive_hydraulics", {})):
+		_contract_error = "%s passive hydraulics: %s" % [model_id, _hydraulics.error]
+		push_error(_contract_error)
+		return false
 	return _load_soil_contract(model_id)
+
+
+## Presentation-local axes declared by the manifest (e.g. SY80U boom offset
+## between upper_structure_link and boom_link). Each axis inserts an imported
+## GLB node between an authority parent frame and its child frame; the joint
+## is driven only by local operator input and never enters the Python
+## Vector4 authority vector.
+func _load_local_axis_contract(manifest: Dictionary, model_id: String) -> bool:
+	var articulation: Variant = manifest.get("local_articulation", {})
+	if not articulation is Dictionary:
+		_contract_error = "%s local articulation contract is invalid" % model_id
+		push_error(_contract_error)
+		return false
+	var axes: Variant = (articulation as Dictionary).get("axes", [])
+	if not axes is Array:
+		_contract_error = "%s local articulation contract is invalid" % model_id
+		push_error(_contract_error)
+		return false
+	for axis_value in axes as Array:
+		if not axis_value is Dictionary:
+			_contract_error = "%s local articulation axis is invalid" % model_id
+			push_error(_contract_error)
+			return false
+		var spec := axis_value as Dictionary
+		var axis_id := String(spec.get("axis_id", ""))
+		var node_path := String(spec.get("node_path", ""))
+		var parent_frame := String(spec.get("parent_frame", ""))
+		var runtime_axis := String(spec.get("runtime_axis", ""))
+		var input: Variant = spec.get("input", {})
+		var positive_action := ""
+		var negative_action := ""
+		if input is Dictionary:
+			positive_action = String((input as Dictionary).get("positive_action", ""))
+			negative_action = String((input as Dictionary).get("negative_action", ""))
+		var node := _asset_root.get_node_or_null(NodePath(node_path)) as Node3D
+		var limits_valid := (
+			spec.get("min_degrees") is float or spec.get("min_degrees") is int
+		) and (
+			spec.get("max_degrees") is float or spec.get("max_degrees") is int
+		) and (
+			spec.get("max_rate_degrees_per_second") is float
+			or spec.get("max_rate_degrees_per_second") is int
+		)
+		if (
+			axis_id.is_empty() or node == null
+			or not MotionProtocol.FRAME_NAMES.has(parent_frame)
+			or not ["X", "Y"].has(runtime_axis)
+			or positive_action.is_empty() or negative_action.is_empty()
+			or not limits_valid
+			or _local_axis_nodes.has(axis_id)
+		):
+			_contract_error = "%s local articulation contract is invalid for %s" % [model_id, axis_id]
+			push_error(_contract_error)
+			return false
+		var min_rad := deg_to_rad(float(spec["min_degrees"]))
+		var max_rad := deg_to_rad(float(spec["max_degrees"]))
+		if not min_rad < max_rad:
+			_contract_error = "%s local articulation limits are invalid for %s" % [model_id, axis_id]
+			push_error(_contract_error)
+			return false
+		var expected_position: Variant = spec.get("local_position", [])
+		if (
+			expected_position is Array and (expected_position as Array).size() == 3
+			and node.position.distance_to(_vector3_from_array(expected_position)) > JOINT_ORIGIN_TOLERANCE_M
+		):
+			_contract_error = "%s local articulation pivot origin drifted for %s" % [model_id, axis_id]
+			push_error(_contract_error)
+			return false
+		_local_axis_defs.append({
+			"axis_id": axis_id,
+			"node": node,
+			"parent_frame": parent_frame,
+			"axis_vector": _axis_vector(runtime_axis),
+			"positive_action": positive_action,
+			"negative_action": negative_action,
+			"min_rad": min_rad,
+			"max_rad": max_rad,
+			"rate_rad": deg_to_rad(float(spec["max_rate_degrees_per_second"])),
+			"angle_rad": 0.0,
+			"rest_transform": node.transform,
+		})
+		_local_axis_nodes[axis_id] = node
+	return true
+
+
+func _validate_local_axis_parents(model_id: String) -> bool:
+	for axis in _local_axis_defs:
+		var node := axis["node"] as Node3D
+		var parent := _frame_nodes.get(String(axis["parent_frame"])) as Node3D
+		if node == null or parent == null or node.get_parent() != parent:
+			_contract_error = (
+				"%s local articulation pivot parent drifted for %s"
+				% [model_id, String(axis["axis_id"])]
+			)
+			push_error(_contract_error)
+			return false
+	return true
 
 
 func _on_pose_accepted(_pose: Dictionary) -> void:
@@ -609,7 +825,14 @@ func _soil_proxy_transform(proxy_name: String) -> Variant:
 func get_soil_proxy_local_transform(proxy_name: String) -> Transform3D:
 	# Shared by world sampling and rigid visual attachments; never sampled from
 	# an old world pose to reconstruct a local offset on a moving frame.
-	var proxies: Dictionary = get_soil_contract().get("proxies", {})
+	var contract := get_soil_contract()
+	if contract.has("soil_geometry") and proxy_name in ["opening", "cavity"]:
+		var geometry: Dictionary = contract.soil_geometry
+		var geometry_script = preload("res://scripts/bucket_soil_geometry.gd")
+		if proxy_name == "cavity":
+			return geometry_script.cavity(geometry)
+		return geometry_script.mouth(geometry.mouth_polygon_godot).transform
+	var proxies: Dictionary = contract.get("proxies", {})
 	var proxy: Dictionary = proxies.get(proxy_name, {})
 	var center := _vector3_from_array(proxy.get("center_godot", []))
 	var local_basis := Basis.IDENTITY
@@ -750,6 +973,7 @@ func _apply_render_pose(pose: Dictionary) -> void:
 	for frame_index in range(1, MotionProtocol.FRAME_NAMES.size()):
 		_apply_local_joint_transform(MotionProtocol.FRAME_NAMES[frame_index], transforms)
 	_apply_passive_linkage()
+	_hydraulics.update()
 
 
 func apply_physics_snapshot(snapshot: Dictionary) -> bool:
@@ -800,6 +1024,7 @@ func apply_physics_snapshot(snapshot: Dictionary) -> bool:
 	if not _pivot_reasons.is_empty():
 		return false
 	_apply_passive_linkage()
+	_hydraulics.update()
 	_has_pose = true
 	_last_render_revision = int(snapshot.get("physics_tick", _last_render_revision + 1))
 	return true
@@ -860,6 +1085,9 @@ func _restore_rest_pose() -> void:
 		var rest_local: Variant = _rest_locals.get(frame_name)
 		if frame_node != null and rest_local is Transform3D:
 			frame_node.transform = rest_local as Transform3D
+	for axis in _local_axis_defs:
+		axis["angle_rad"] = 0.0
+		_apply_local_axis(axis)
 	_pivot_reasons.clear()
 	_pivot_last_warning_reasons.clear()
 	if _linkage_initialized:
@@ -870,10 +1098,12 @@ func _restore_rest_pose() -> void:
 		_linkage_reachable = true
 		_linkage_reason = "restored"
 		_linkage_last_warning_reason = ""
+	_hydraulics.restore()
 
 
 func recompute_passive_linkage_for_test() -> void:
 	_apply_passive_linkage()
+	_hydraulics.update()
 
 
 func get_passive_linkage_snapshot_for_test() -> Dictionary:

@@ -297,6 +297,7 @@ lifecycle_input_enabled = false
 
 [node name="MotionPresentation" type="Node3D" parent="." unique_id=2082115328]
 script = ExtResource("3_motion_presentation")
+product_session_path = NodePath("../ProductSession")
 presentation_root_path = NodePath("../ChassisMotionRoot/PresentationRoot")
 
 [node name="AttachmentRig" type="Node3D" parent="." unique_id=1753407237]

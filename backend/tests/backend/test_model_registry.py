@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 
+import numpy as np
 import pytest
 
+from babylon_sim.model import ExcavatorModel
 from babylon_sim.model_registry import ModelRegistryError, load_model_registry
 from babylon_sim.session_manager import ModelSelectionError, RuntimeSessionManager
 
@@ -11,13 +13,25 @@ from babylon_sim.session_manager import ModelSelectionError, RuntimeSessionManag
 def test_registry_resolves_two_reviewed_models_with_sy205_default() -> None:
     registry = load_model_registry()
     assert registry.default_model_id == "sy205"
-    assert registry.model_ids == ("sy205", "sy135", "sy135neo")
+    assert registry.model_ids == ("sy205", "sy135", "sy135neo", "sy80u", "sy155w")
     assert registry.resolve().model_version == "sy205-glb-urdf-v4"
     assert registry.resolve("sy135").model_version == "sy135-reference-urdf-v1"
     assert registry.resolve("sy135neo").model_version == "sy135-reference-urdf-v1"
+    assert registry.resolve("sy80u").model_version == "sy80u-reference-urdf-v1"
+    assert registry.resolve("sy155w").model_version == "sy155w-source-urdf-v1"
     with pytest.raises(ModelRegistryError) as error:
         registry.resolve("unknown")
     assert error.value.code == "unknown_model"
+
+
+def test_sy155w_source_authority_matches_visual_fixture() -> None:
+    descriptor = load_model_registry().resolve("sy155w")
+    model = ExcavatorModel.from_urdf(descriptor.urdf_path, model_version=descriptor.model_version)
+    fixture = json.loads(descriptor.parity_fixture_path.read_text(encoding="utf-8"))
+    for pose in fixture["poses"].values():
+        frames = model.frame_transforms(pose["joint_angles"])
+        for frame, expected in pose["frame_transforms"].items():
+            np.testing.assert_allclose(frames[frame], expected, atol=1e-7)
 
 
 def test_backend_registry_and_godot_catalog_agree() -> None:

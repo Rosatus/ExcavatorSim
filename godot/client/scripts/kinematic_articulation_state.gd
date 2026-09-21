@@ -18,6 +18,7 @@ var payload_mass_kg := 0.0
 var payload_center_of_mass_local := Vector3.ZERO
 var motion_load_factor := 1.0
 var cut_engagement := 0.0
+var bucket_limit_offset_rad := 0.0
 
 var _commands := Vector4.ZERO
 var _body_descriptors: Dictionary = {}
@@ -53,6 +54,7 @@ func configure(descriptor: Dictionary, chassis_transform: Transform3D) -> bool:
 
 
 func reset() -> void:
+	bucket_limit_offset_rad = 0.0
 	configured = false
 	neutral_armed = false
 	command_identity = -1
@@ -148,7 +150,7 @@ func propose_step(delta: float, chassis_transform: Transform3D, enabled: bool) -
 		if joint_name != "swing_joint" and cut_engagement > 0.0 and desired_velocity < 0.0:
 			desired_velocity *= lerpf(1.0, MIN_CUT_SPEED_SCALE, cut_engagement)
 		var position := float(_positions[joint_name])
-		var limits := joint["limit_rad"] as Array
+		var limits := effective_joint_limits(joint_name)
 		if String(joint["type"]) != "continuous_hinge":
 			var lower := float(limits[0])
 			var upper := float(limits[1])
@@ -209,6 +211,14 @@ func accept_step(proposal: Dictionary, accepted_fraction: float) -> bool:
 		var chassis_transform := proposed_frames.get("base_link", Transform3D.IDENTITY) as Transform3D
 		_accepted_frames = _compute_frames(chassis_transform, _positions)
 	return true
+
+
+func effective_joint_limits(joint_name: String) -> Array:
+	var limits: Array = (_joint_descriptors[joint_name]["limit_rad"] as Array).duplicate()
+	if joint_name == "bucket_joint":
+		limits[0] = float(limits[0]) + bucket_limit_offset_rad
+		limits[1] = float(limits[1]) + bucket_limit_offset_rad
+	return limits
 
 
 func accepted_frames() -> Dictionary:

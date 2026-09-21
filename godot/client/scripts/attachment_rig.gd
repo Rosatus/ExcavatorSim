@@ -67,6 +67,8 @@ func _ready() -> void:
 	if _presentation != null:
 		_presentation.model_replacing.connect(_on_model_replacing)
 		_presentation.model_activated.connect(_on_model_activated)
+		if not _presentation.get_active_model_id().is_empty():
+			_on_model_activated(_presentation.get_active_model_id(), null)
 
 
 func _physics_process(delta: float) -> void:
@@ -125,11 +127,17 @@ func is_tiltrotator_active() -> bool:
 
 
 func coupler_ids() -> Array[String]:
-	return _ids_from(_catalog.get("couplers", []), "coupler_id")
+	var ids := _ids_from(_catalog.get("couplers", []), "coupler_id")
+	if _presentation != null and not _presentation.native_tool_available():
+		ids.erase(DIRECT_PIN_COUPLER_ID)
+	return ids
 
 
 func tool_ids() -> Array[String]:
-	return _ids_from(_catalog.get("tools", []), "tool_id")
+	var ids := _ids_from(_catalog.get("tools", []), "tool_id")
+	if _presentation != null and not _presentation.native_tool_available():
+		ids.erase(NATIVE_TOOL_ID)
+	return ids
 
 
 func coupler_display_name(coupler_id: String) -> String:
@@ -260,6 +268,8 @@ func _resolve_tool_for(coupler_id: String) -> String:
 
 
 func _apply_combination(coupler_id: String, tool_id: String) -> bool:
+	if tool_id == NATIVE_TOOL_ID and _presentation != null and not _presentation.native_tool_available():
+		return _fail(_descriptor(coupler_id, tool_id), "native_tool_unavailable")
 	if coupler_id == _active_coupler_id and tool_id == _active_tool_id and _mount_state_consistent():
 		return true
 	var coupler := _couplers.get(coupler_id, {}) as Dictionary
@@ -503,6 +513,11 @@ func _load_attachment_contract(tool: Dictionary) -> Dictionary:
 	if not parsed is Dictionary:
 		return {}
 	var contract := (parsed as Dictionary).duplicate(true)
+	if contract.has("soil_geometry"):
+		var geometry: Variant = contract.soil_geometry
+		if not geometry is Dictionary or geometry.get("source_glb_path") != tool.get("tool_glb_path") \
+				or geometry.get("source_glb_sha256") != tool.get("tool_glb_sha256"):
+			return {}
 	var host_model := _presentation.get_active_model_id() if _presentation != null else ""
 	if host_model.is_empty():
 		return {}
@@ -676,6 +691,18 @@ func _on_model_replacing() -> void:
 
 
 func _on_model_activated(_model_id: String, _asset_root: Node3D) -> void:
+	var models: Variant = JSON.parse_string(FileAccess.get_file_as_string(MotionPresentation.MODEL_CATALOG_PATH))
+	if models is Dictionary:
+		for entry: Dictionary in models.get("models", []):
+			if String(entry.get("model_id", "")) != _model_id:
+				continue
+			var defaults: Dictionary = entry.get("default_attachment", {})
+			if not defaults.is_empty():
+				_remount_pending = false
+				_remount_coupler_id = ""
+				_remount_tool_id = ""
+				_apply_combination(String(defaults.get("coupler_id", "")), String(defaults.get("tool_id", "")))
+				return
 	if not _remount_pending:
 		return
 	_remount_pending = false

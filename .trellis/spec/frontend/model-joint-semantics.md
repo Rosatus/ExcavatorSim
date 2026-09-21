@@ -162,8 +162,47 @@ pixi run python backend/scripts/sync_sy205_joint_contract.py [--check]
   asset-space evidence, not logical runtime fixtures.
 - The sync tool updates only SY205 fields, shared profile output/hash and
   associated provenance. SY135 entries in shared catalogs/profiles are immutable.
+- SY80U adds a fifth mechanical DOF — the offset-boom yaw (偏摆) on
+  `PIVOT_BOOM_SWING` between `PIVOT_SLEW` and `PIVOT_BOOM_BASE`. It is a
+  Godot-presentation-local axis, not an authority joint: the Python `Vector4`
+  stays swing/boom/arm/bucket, the URDF and parity fixture fold the swing
+  bracket offset into a fixed `boom_swing_link`, and `MotionPresentation`
+  owns the angle. The manifest declares it under `local_articulation.axes`
+  (`axis_id`, `node_path`, `parent_frame`, `runtime_axis`, `local_position`,
+  `min_degrees`/`max_degrees`, `max_rate_degrees_per_second`,
+  `input.positive_action`/`negative_action`); the affected frame contract
+  sets `via_local_axis` to the axis id while keeping `parent_frame` as the
+  authority parent so the kinematic delta math is unchanged. Keys are
+  `operator_boom_swing_left` (E → +Y, tip moves machine left) and
+  `operator_boom_swing_right` (U → −Y), limits +65°/−51°, rate 45°/s. Local
+  axes are declared in `EquipmentCommandMapper.LOCAL_INPUT_ACTIONS` (keys
+  only — no gamepad row, the binding test requires one joy event per
+  `INPUT_ACTIONS` entry), registered by `MotionClient`, gated through
+  `ProductSession.get_local_axis_input`, and integrated in
+  `MotionPresentation._physics_process` with reset on rest-pose restore,
+  pose clear, and model switch. Soil cutting and bucket fill follow the
+  visual node transforms, so the offset is already reflected in digging.
 
 ## 4. Validation / Error Matrix
+
+SY155W is a wheeled two-piece boom, with a source-specific authority neutral
+`[58, -47, -99, 97]` degrees (source `Work_Cycle` frame 91). Do not apply the
+single-boom SY135 zero convention to its hydraulic geometry. `tools/import_sy155w.py`
+cross-checks independent source equations, then builds its own rig/URDF/fixture.
+The outer-boom fold sits between boom and arm as a local +X axis (`boom_fold`):
+E folds, U unfolds, relative limits [-10,+10] degrees. Source demonstration ranges
+are provisional, not manufacturer hard stops. `PassiveHydraulics` updates six
+cylinder pairs and twelve multi-target hoses after driven poses; it never accepts
+operator commands or writes authority frames. Its source four-bar is solved before
+cylinder endpoints, with atomic passive-pose retention on invalid/unreachable pins.
+
+The model catalog may declare `default_attachment` and
+`attachment_bucket_limit_offsets_deg`. SY155W defaults to XTR13+GB12 and sets
+`xtr13: 0`, because the older +130-degree XTR13 offset makes its four-bar unreachable.
+Other models keep that legacy offset. Do not enlarge the SY155W authority bucket
+limits to compensate for attachment orientation. Its absent native bucket is omitted
+from selection. Host physics soil proxies include the neutral XTR13 socket offset;
+active fill/cutting use the existing mounted GB12 frame and contract.
 
 | Case | Result |
 |---|---|

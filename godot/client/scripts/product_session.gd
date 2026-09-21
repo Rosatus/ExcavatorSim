@@ -15,7 +15,7 @@ const LOCAL_SESSION_ID := "godot-local-authority"
 const LIFECYCLE_STOPPED := "stopped"
 const LIFECYCLE_RUNNING := "running"
 const LIFECYCLE_PAUSED := "paused"
-const MODEL_IDS := ["sy205", "sy135", "sy135neo"]
+const MODEL_IDS := ["sy205", "sy135", "sy135neo", "sy80u", "sy155w"]
 
 @export var motion_presentation_path := NodePath("../MotionPresentation")
 @export var motion_client_path := NodePath("../MotionClient")
@@ -164,6 +164,14 @@ func get_attachment_input_axes() -> Vector2:
 	if lifecycle != LIFECYCLE_RUNNING or not focused or _motion_client == null:
 		return Vector2.ZERO
 	return _motion_client.get_attachment_input_axes()
+
+
+## Model-local presentation axis input in [-1, 1] (e.g. SY80U boom offset).
+## Gated on lifecycle/focus like the authoritative equipment axes.
+func get_local_axis_input(negative_action: String, positive_action: String) -> float:
+	if lifecycle != LIFECYCLE_RUNNING or not focused or _motion_client == null:
+		return 0.0
+	return _motion_client.get_local_axis_input(negative_action, positive_action)
 
 
 func request_coupler_switch(coupler_id: String) -> bool:

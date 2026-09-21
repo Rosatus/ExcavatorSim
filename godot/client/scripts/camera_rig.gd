@@ -25,6 +25,13 @@ const CAMERA_ACTIONS := {
 }
 const RESET_ACTION := "camera_reset_view"
 const PRESETS := {
+	"sy155w": {
+		MODE_OPERATOR: {"anchor": "upper_structure_link", "reference": "upper_structure_link", "yaw": 2.18, "pitch": 0.30, "distance": 5.5, "focus_height": 0.95, "minimum": 3.0},
+		MODE_CHASE: {"anchor": "base_link", "reference": "base_link", "yaw": 0.0, "pitch": 0.31, "distance": 12.0, "focus_height": 1.8, "minimum": 5.0},
+		MODE_WORK_TOOL: {"anchor": "bucket_link", "reference": "base_link", "yaw": 0.76, "pitch": 0.36, "distance": 6.8, "focus_height": 0.12, "minimum": 3.5},
+		MODE_INSPECTION: {"anchor": "base_link", "reference": "base_link", "yaw": 0.68, "pitch": 0.35, "distance": 12.0, "focus_height": 2.0, "minimum": 3.8},
+		MODE_CAB: {"anchor": "upper_structure_link", "reference": "upper_structure_link", "cab_position": Vector3(-0.78, 1.5, -0.15), "cab_rotation": Vector3(-0.04, 0.0, 0.0)},
+	},
 	"sy205": {
 		MODE_OPERATOR: {"anchor": "upper_structure_link", "reference": "upper_structure_link", "yaw": 2.25, "pitch": 0.28, "distance": 5.8, "focus_height": 1.15, "minimum": 3.2},
 		MODE_CHASE: {"anchor": "base_link", "reference": "base_link", "yaw": 0.0, "pitch": 0.30, "distance": 12.0, "focus_height": 1.85, "minimum": 5.5},
@@ -45,6 +52,13 @@ const PRESETS := {
 		MODE_WORK_TOOL: {"anchor": "bucket_link", "reference": "base_link", "yaw": 0.76, "pitch": 0.36, "distance": 6.8, "focus_height": 0.12, "minimum": 3.5},
 		MODE_INSPECTION: {"anchor": "base_link", "reference": "base_link", "yaw": 0.68, "pitch": 0.35, "distance": 11.5, "focus_height": 1.85, "minimum": 3.8},
 		MODE_CAB: {"anchor": "upper_structure_link", "reference": "upper_structure_link", "cab_position": Vector3(-0.64, 1.58, -0.28), "cab_rotation": Vector3(-0.04, 0.0, 0.0)},
+	},
+	"sy80u": {
+		MODE_OPERATOR: {"anchor": "upper_structure_link", "reference": "upper_structure_link", "yaw": 2.18, "pitch": 0.30, "distance": 4.6, "focus_height": 0.9, "minimum": 2.6},
+		MODE_CHASE: {"anchor": "base_link", "reference": "base_link", "yaw": 0.0, "pitch": 0.31, "distance": 9.5, "focus_height": 1.4, "minimum": 4.5},
+		MODE_WORK_TOOL: {"anchor": "bucket_link", "reference": "base_link", "yaw": 0.76, "pitch": 0.36, "distance": 5.8, "focus_height": 0.12, "minimum": 3.0},
+		MODE_INSPECTION: {"anchor": "base_link", "reference": "base_link", "yaw": 0.68, "pitch": 0.35, "distance": 10.0, "focus_height": 1.7, "minimum": 3.4},
+		MODE_CAB: {"anchor": "upper_structure_link", "reference": "upper_structure_link", "cab_position": Vector3(-0.6, 1.45, -0.25), "cab_rotation": Vector3(-0.04, 0.0, 0.0)},
 	},
 }
 

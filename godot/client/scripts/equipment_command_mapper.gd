@@ -18,6 +18,13 @@ const INPUT_ACTIONS := {
 	"operator_bucket_curl": {"keys": [KEY_J], "joy_axis": JOY_AXIS_RIGHT_X, "joy_sign": -1.0},
 	"operator_bucket_dump": {"keys": [KEY_L], "joy_axis": JOY_AXIS_RIGHT_X, "joy_sign": 1.0},
 }
+# Model-local presentation axes (e.g. SY80U boom offset), read through
+# MotionClient.get_local_axis_input(). They stay outside the four-axis
+# authority vector, so they are deliberately not part of INPUT_ACTIONS.
+const LOCAL_INPUT_ACTIONS := {
+	"operator_boom_swing_left": {"keys": [KEY_E]},
+	"operator_boom_swing_right": {"keys": [KEY_U]},
+}
 
 var _models: Dictionary = {}
 var _model_id := ""
@@ -30,10 +37,10 @@ func _init(profile_path: String = PROFILE_PATH) -> void:
 
 
 func configure_model(model_id: String) -> bool:
-	# SY135-NEO shares the SY135 kinematic semantics; alias it to the same
-	# command profile instead of duplicating the hash-pinned protocol entry.
+	# SY135-NEO and SY80U share the SY135 kinematic semantics; alias them to
+	# the same command profile instead of duplicating hash-pinned entries.
 	var profile_id := model_id
-	if profile_id == "sy135neo":
+	if profile_id == "sy135neo" or profile_id == "sy80u" or profile_id == "sy155w":
 		profile_id = "sy135"
 	if not _models.has(profile_id):
 		if _models.is_empty() and not _last_error.is_empty():

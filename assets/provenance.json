@@ -212,6 +212,447 @@
       "license": "AGPL-3.0-only",
       "generated_at": "2026-09-09",
       "relationship": "generated-godot-operator-command-profile-hash"
+    },
+    {
+      "destination_path": "godot/client/assets/visual/SY155W_excavator_godot.glb",
+      "destination_sha256": "28fcd72bfb608ee91b13ffd040677342eadba86051ab98fad37a3d4da9058c79",
+      "raw_sha256": "de2d015f0d63cbfa9dd453cc30f7b57806f44a033ff1d9ea099198ef77fc4344",
+      "generator": {
+        "path": "tools/import_sy155w.py",
+        "sha256": "1e2ee3f7e951d2b6ab7a89f88a637347c214937c7baea731a6dde9300751ecd1"
+      },
+      "inputs": [
+        {
+          "path": "assets/model/sy155w_source_evidence.json",
+          "sha256": "e80d1ba559b874c9d31fdbca149b306af821d4901ccf281584424e39ea8c724c"
+        },
+        {
+          "path": "godot/client/resources/visual/sy135_visual_manifest.json",
+          "sha256": "e9fef23aaea3d1482697e5f11f8b01e967772a6a7d716233f544281bb457db6d"
+        },
+        {
+          "path": "godot/client/resources/physics/sy135_physics_rig.json",
+          "sha256": "a5d96b65f9e4c802327d1fa1506121491a3871d0f92c3e3a9afe03051aded031"
+        },
+        {
+          "path": "godot/client/resources/attachments/gb12_s50_soil_contract.json",
+          "sha256": "7f4157a5e1fc0f78ea93fc674d2c973c4862db641a4a73404cace5f7ea9c19e5"
+        },
+        {
+          "path": "backend/src/babylon_sim/model.py",
+          "sha256": "e6b71dd96e60c1deda7d78e4a126123cfec236e259dc6cf505ab7fa50940b911"
+        },
+        {
+          "path": "pixi.lock",
+          "sha256": "d4c4083ca6143dcd9acd40666bca117ed0790e8a8685ec2be0c7ebb32e6a7775"
+        },
+        {
+          "path": "godot/client/assets/visual/XTR13_Tiltrotator_Animated.glb",
+          "sha256": "61386e5c1658770083b26f5aff213c570c23225b16c31e6390ad200b4a0f68cc",
+          "hash_mode": "raw"
+        }
+      ],
+      "external_inputs": [
+        {
+          "path": "C:\\code\\blender\\Excavator\\SY155W\\SANY_SY155W_Animated.glb",
+          "sha256": "c7eea3e28a976765502ee0b886af41ff4df8280c1f7f6c5fb40b099a0bc0f3a4",
+          "byte_size": 25250448,
+          "hash_mode": "raw"
+        },
+        {
+          "path": "C:\\code\\blender\\Excavator\\SY155W\\scripts\\build_sy155w.py",
+          "sha256": "9cb63ace46d05cbfcb305ca505e0c89efdc7e89840279e0e0d94fe157ea7bcbc",
+          "byte_size": 34018,
+          "hash_mode": "raw"
+        },
+        {
+          "path": "C:\\code\\blender\\Excavator\\SY155W\\reports\\source_samples.json",
+          "sha256": "dda88b63ab71d87d462a8a7bb0c3bb55050f8b99c6e20ee39b543b6041f03d80",
+          "byte_size": 9336038,
+          "hash_mode": "raw"
+        }
+      ],
+      "license": "user-supplied-source-assets",
+      "generated_at": "2026-09-21",
+      "relationship": "sy155w-runtime-adaptation"
+    },
+    {
+      "destination_path": "godot/client/resources/visual/sy155w_visual_manifest.json",
+      "destination_sha256": "51e269b0d58d9d87e0007c9e3fba16881d44d6126d25f1bcfc365a8a7946c1f9",
+      "raw_sha256": "72b32c740153f4b17bf5acd0bc08296c29202c278a3533b6b106e99e73b8d3cd",
+      "generator": {
+        "path": "tools/import_sy155w.py",
+        "sha256": "1e2ee3f7e951d2b6ab7a89f88a637347c214937c7baea731a6dde9300751ecd1"
+      },
+      "inputs": [
+        {
+          "path": "assets/model/sy155w_source_evidence.json",
+          "sha256": "e80d1ba559b874c9d31fdbca149b306af821d4901ccf281584424e39ea8c724c"
+        },
+        {
+          "path": "godot/client/resources/visual/sy135_visual_manifest.json",
+          "sha256": "e9fef23aaea3d1482697e5f11f8b01e967772a6a7d716233f544281bb457db6d"
+        },
+        {
+          "path": "godot/client/resources/physics/sy135_physics_rig.json",
+          "sha256": "a5d96b65f9e4c802327d1fa1506121491a3871d0f92c3e3a9afe03051aded031"
+        },
+        {
+          "path": "godot/client/resources/attachments/gb12_s50_soil_contract.json",
+          "sha256": "7f4157a5e1fc0f78ea93fc674d2c973c4862db641a4a73404cace5f7ea9c19e5"
+        },
+        {
+          "path": "backend/src/babylon_sim/model.py",
+          "sha256": "e6b71dd96e60c1deda7d78e4a126123cfec236e259dc6cf505ab7fa50940b911"
+        },
+        {
+          "path": "pixi.lock",
+          "sha256": "d4c4083ca6143dcd9acd40666bca117ed0790e8a8685ec2be0c7ebb32e6a7775"
+        },
+        {
+          "path": "godot/client/assets/visual/XTR13_Tiltrotator_Animated.glb",
+          "sha256": "61386e5c1658770083b26f5aff213c570c23225b16c31e6390ad200b4a0f68cc",
+          "hash_mode": "raw"
+        }
+      ],
+      "external_inputs": [
+        {
+          "path": "C:\\code\\blender\\Excavator\\SY155W\\SANY_SY155W_Animated.glb",
+          "sha256": "c7eea3e28a976765502ee0b886af41ff4df8280c1f7f6c5fb40b099a0bc0f3a4",
+          "byte_size": 25250448,
+          "hash_mode": "raw"
+        },
+        {
+          "path": "C:\\code\\blender\\Excavator\\SY155W\\scripts\\build_sy155w.py",
+          "sha256": "9cb63ace46d05cbfcb305ca505e0c89efdc7e89840279e0e0d94fe157ea7bcbc",
+          "byte_size": 34018,
+          "hash_mode": "raw"
+        },
+        {
+          "path": "C:\\code\\blender\\Excavator\\SY155W\\reports\\source_samples.json",
+          "sha256": "dda88b63ab71d87d462a8a7bb0c3bb55050f8b99c6e20ee39b543b6041f03d80",
+          "byte_size": 9336038,
+          "hash_mode": "raw"
+        }
+      ],
+      "license": "user-supplied-source-assets",
+      "generated_at": "2026-09-21",
+      "relationship": "sy155w-runtime-adaptation"
+    },
+    {
+      "destination_path": "godot/client/resources/physics/sy155w_physics_rig.json",
+      "destination_sha256": "a90cdefe9a0f01bd4890ad8ccb756fee35f3e66c347a2b4091d115b70b6d07de",
+      "raw_sha256": "0eea9d97dd8e6db7ceab3941ffbb94d613532be36d688915d2cefb4d3acb8a11",
+      "generator": {
+        "path": "tools/import_sy155w.py",
+        "sha256": "1e2ee3f7e951d2b6ab7a89f88a637347c214937c7baea731a6dde9300751ecd1"
+      },
+      "inputs": [
+        {
+          "path": "assets/model/sy155w_source_evidence.json",
+          "sha256": "e80d1ba559b874c9d31fdbca149b306af821d4901ccf281584424e39ea8c724c"
+        },
+        {
+          "path": "godot/client/resources/visual/sy135_visual_manifest.json",
+          "sha256": "e9fef23aaea3d1482697e5f11f8b01e967772a6a7d716233f544281bb457db6d"
+        },
+        {
+          "path": "godot/client/resources/physics/sy135_physics_rig.json",
+          "sha256": "a5d96b65f9e4c802327d1fa1506121491a3871d0f92c3e3a9afe03051aded031"
+        },
+        {
+          "path": "godot/client/resources/attachments/gb12_s50_soil_contract.json",
+          "sha256": "7f4157a5e1fc0f78ea93fc674d2c973c4862db641a4a73404cace5f7ea9c19e5"
+        },
+        {
+          "path": "backend/src/babylon_sim/model.py",
+          "sha256": "e6b71dd96e60c1deda7d78e4a126123cfec236e259dc6cf505ab7fa50940b911"
+        },
+        {
+          "path": "pixi.lock",
+          "sha256": "d4c4083ca6143dcd9acd40666bca117ed0790e8a8685ec2be0c7ebb32e6a7775"
+        },
+        {
+          "path": "godot/client/assets/visual/XTR13_Tiltrotator_Animated.glb",
+          "sha256": "61386e5c1658770083b26f5aff213c570c23225b16c31e6390ad200b4a0f68cc",
+          "hash_mode": "raw"
+        }
+      ],
+      "external_inputs": [
+        {
+          "path": "C:\\code\\blender\\Excavator\\SY155W\\SANY_SY155W_Animated.glb",
+          "sha256": "c7eea3e28a976765502ee0b886af41ff4df8280c1f7f6c5fb40b099a0bc0f3a4",
+          "byte_size": 25250448,
+          "hash_mode": "raw"
+        },
+        {
+          "path": "C:\\code\\blender\\Excavator\\SY155W\\scripts\\build_sy155w.py",
+          "sha256": "9cb63ace46d05cbfcb305ca505e0c89efdc7e89840279e0e0d94fe157ea7bcbc",
+          "byte_size": 34018,
+          "hash_mode": "raw"
+        },
+        {
+          "path": "C:\\code\\blender\\Excavator\\SY155W\\reports\\source_samples.json",
+          "sha256": "dda88b63ab71d87d462a8a7bb0c3bb55050f8b99c6e20ee39b543b6041f03d80",
+          "byte_size": 9336038,
+          "hash_mode": "raw"
+        }
+      ],
+      "license": "user-supplied-source-assets",
+      "generated_at": "2026-09-21",
+      "relationship": "sy155w-runtime-adaptation"
+    },
+    {
+      "destination_path": "godot/client/resources/models/sy155w_soil_contract.json",
+      "destination_sha256": "aa6976a4a79fd48c170463fe2945036dcb4897bd617acca4d4ee6edc98b0fa8d",
+      "raw_sha256": "417f8f68e49793a43310aaa851815ed8030b6cc204daa6972a09c793a6c3650e",
+      "generator": {
+        "path": "tools/import_sy155w.py",
+        "sha256": "1e2ee3f7e951d2b6ab7a89f88a637347c214937c7baea731a6dde9300751ecd1"
+      },
+      "inputs": [
+        {
+          "path": "assets/model/sy155w_source_evidence.json",
+          "sha256": "e80d1ba559b874c9d31fdbca149b306af821d4901ccf281584424e39ea8c724c"
+        },
+        {
+          "path": "godot/client/resources/visual/sy135_visual_manifest.json",
+          "sha256": "e9fef23aaea3d1482697e5f11f8b01e967772a6a7d716233f544281bb457db6d"
+        },
+        {
+          "path": "godot/client/resources/physics/sy135_physics_rig.json",
+          "sha256": "a5d96b65f9e4c802327d1fa1506121491a3871d0f92c3e3a9afe03051aded031"
+        },
+        {
+          "path": "godot/client/resources/attachments/gb12_s50_soil_contract.json",
+          "sha256": "7f4157a5e1fc0f78ea93fc674d2c973c4862db641a4a73404cace5f7ea9c19e5"
+        },
+        {
+          "path": "backend/src/babylon_sim/model.py",
+          "sha256": "e6b71dd96e60c1deda7d78e4a126123cfec236e259dc6cf505ab7fa50940b911"
+        },
+        {
+          "path": "pixi.lock",
+          "sha256": "d4c4083ca6143dcd9acd40666bca117ed0790e8a8685ec2be0c7ebb32e6a7775"
+        },
+        {
+          "path": "godot/client/assets/visual/XTR13_Tiltrotator_Animated.glb",
+          "sha256": "61386e5c1658770083b26f5aff213c570c23225b16c31e6390ad200b4a0f68cc",
+          "hash_mode": "raw"
+        }
+      ],
+      "external_inputs": [
+        {
+          "path": "C:\\code\\blender\\Excavator\\SY155W\\SANY_SY155W_Animated.glb",
+          "sha256": "c7eea3e28a976765502ee0b886af41ff4df8280c1f7f6c5fb40b099a0bc0f3a4",
+          "byte_size": 25250448,
+          "hash_mode": "raw"
+        },
+        {
+          "path": "C:\\code\\blender\\Excavator\\SY155W\\scripts\\build_sy155w.py",
+          "sha256": "9cb63ace46d05cbfcb305ca505e0c89efdc7e89840279e0e0d94fe157ea7bcbc",
+          "byte_size": 34018,
+          "hash_mode": "raw"
+        },
+        {
+          "path": "C:\\code\\blender\\Excavator\\SY155W\\reports\\source_samples.json",
+          "sha256": "dda88b63ab71d87d462a8a7bb0c3bb55050f8b99c6e20ee39b543b6041f03d80",
+          "byte_size": 9336038,
+          "hash_mode": "raw"
+        }
+      ],
+      "license": "user-supplied-source-assets",
+      "generated_at": "2026-09-21",
+      "relationship": "sy155w-runtime-adaptation"
+    },
+    {
+      "destination_path": "assets/model/library/sy155w_reference.urdf",
+      "destination_sha256": "e36fa4e9f5e28cec1ee4bdf957c3a0e6efab491c67a327bcc4c1471cb7403feb",
+      "raw_sha256": "9fb05bd71fe7011ebe5b12b79ad36fc60820757a0bc41f0d0a0c5d4cfa77a25b",
+      "generator": {
+        "path": "tools/import_sy155w.py",
+        "sha256": "1e2ee3f7e951d2b6ab7a89f88a637347c214937c7baea731a6dde9300751ecd1"
+      },
+      "inputs": [
+        {
+          "path": "assets/model/sy155w_source_evidence.json",
+          "sha256": "e80d1ba559b874c9d31fdbca149b306af821d4901ccf281584424e39ea8c724c"
+        },
+        {
+          "path": "godot/client/resources/visual/sy135_visual_manifest.json",
+          "sha256": "e9fef23aaea3d1482697e5f11f8b01e967772a6a7d716233f544281bb457db6d"
+        },
+        {
+          "path": "godot/client/resources/physics/sy135_physics_rig.json",
+          "sha256": "a5d96b65f9e4c802327d1fa1506121491a3871d0f92c3e3a9afe03051aded031"
+        },
+        {
+          "path": "godot/client/resources/attachments/gb12_s50_soil_contract.json",
+          "sha256": "7f4157a5e1fc0f78ea93fc674d2c973c4862db641a4a73404cace5f7ea9c19e5"
+        },
+        {
+          "path": "backend/src/babylon_sim/model.py",
+          "sha256": "e6b71dd96e60c1deda7d78e4a126123cfec236e259dc6cf505ab7fa50940b911"
+        },
+        {
+          "path": "pixi.lock",
+          "sha256": "d4c4083ca6143dcd9acd40666bca117ed0790e8a8685ec2be0c7ebb32e6a7775"
+        },
+        {
+          "path": "godot/client/assets/visual/XTR13_Tiltrotator_Animated.glb",
+          "sha256": "61386e5c1658770083b26f5aff213c570c23225b16c31e6390ad200b4a0f68cc",
+          "hash_mode": "raw"
+        }
+      ],
+      "external_inputs": [
+        {
+          "path": "C:\\code\\blender\\Excavator\\SY155W\\SANY_SY155W_Animated.glb",
+          "sha256": "c7eea3e28a976765502ee0b886af41ff4df8280c1f7f6c5fb40b099a0bc0f3a4",
+          "byte_size": 25250448,
+          "hash_mode": "raw"
+        },
+        {
+          "path": "C:\\code\\blender\\Excavator\\SY155W\\scripts\\build_sy155w.py",
+          "sha256": "9cb63ace46d05cbfcb305ca505e0c89efdc7e89840279e0e0d94fe157ea7bcbc",
+          "byte_size": 34018,
+          "hash_mode": "raw"
+        },
+        {
+          "path": "C:\\code\\blender\\Excavator\\SY155W\\reports\\source_samples.json",
+          "sha256": "dda88b63ab71d87d462a8a7bb0c3bb55050f8b99c6e20ee39b543b6041f03d80",
+          "byte_size": 9336038,
+          "hash_mode": "raw"
+        }
+      ],
+      "license": "user-supplied-source-assets",
+      "generated_at": "2026-09-21",
+      "relationship": "sy155w-runtime-adaptation"
+    },
+    {
+      "destination_path": "godot/client/tests/fixtures/sy155w_frame_parity_cases.json",
+      "destination_sha256": "2b4caf6080baa5d05b8f140f73c852a1a8f395d0bd8268fa39134376dc9d83bc",
+      "raw_sha256": "d953cfcd0cb56e01573751b105a3e884b49d5af499fccae1a1c6f0670d21e5eb",
+      "generator": {
+        "path": "tools/import_sy155w.py",
+        "sha256": "1e2ee3f7e951d2b6ab7a89f88a637347c214937c7baea731a6dde9300751ecd1"
+      },
+      "inputs": [
+        {
+          "path": "assets/model/sy155w_source_evidence.json",
+          "sha256": "e80d1ba559b874c9d31fdbca149b306af821d4901ccf281584424e39ea8c724c"
+        },
+        {
+          "path": "godot/client/resources/visual/sy135_visual_manifest.json",
+          "sha256": "e9fef23aaea3d1482697e5f11f8b01e967772a6a7d716233f544281bb457db6d"
+        },
+        {
+          "path": "godot/client/resources/physics/sy135_physics_rig.json",
+          "sha256": "a5d96b65f9e4c802327d1fa1506121491a3871d0f92c3e3a9afe03051aded031"
+        },
+        {
+          "path": "godot/client/resources/attachments/gb12_s50_soil_contract.json",
+          "sha256": "7f4157a5e1fc0f78ea93fc674d2c973c4862db641a4a73404cace5f7ea9c19e5"
+        },
+        {
+          "path": "backend/src/babylon_sim/model.py",
+          "sha256": "e6b71dd96e60c1deda7d78e4a126123cfec236e259dc6cf505ab7fa50940b911"
+        },
+        {
+          "path": "pixi.lock",
+          "sha256": "d4c4083ca6143dcd9acd40666bca117ed0790e8a8685ec2be0c7ebb32e6a7775"
+        },
+        {
+          "path": "godot/client/assets/visual/XTR13_Tiltrotator_Animated.glb",
+          "sha256": "61386e5c1658770083b26f5aff213c570c23225b16c31e6390ad200b4a0f68cc",
+          "hash_mode": "raw"
+        }
+      ],
+      "external_inputs": [
+        {
+          "path": "C:\\code\\blender\\Excavator\\SY155W\\SANY_SY155W_Animated.glb",
+          "sha256": "c7eea3e28a976765502ee0b886af41ff4df8280c1f7f6c5fb40b099a0bc0f3a4",
+          "byte_size": 25250448,
+          "hash_mode": "raw"
+        },
+        {
+          "path": "C:\\code\\blender\\Excavator\\SY155W\\scripts\\build_sy155w.py",
+          "sha256": "9cb63ace46d05cbfcb305ca505e0c89efdc7e89840279e0e0d94fe157ea7bcbc",
+          "byte_size": 34018,
+          "hash_mode": "raw"
+        },
+        {
+          "path": "C:\\code\\blender\\Excavator\\SY155W\\reports\\source_samples.json",
+          "sha256": "dda88b63ab71d87d462a8a7bb0c3bb55050f8b99c6e20ee39b543b6041f03d80",
+          "byte_size": 9336038,
+          "hash_mode": "raw"
+        }
+      ],
+      "license": "user-supplied-source-assets",
+      "generated_at": "2026-09-21",
+      "relationship": "sy155w-runtime-adaptation"
+    },
+    {
+      "destination_path": "godot/client/tests/fixtures/sy155w_source_poses.json",
+      "destination_sha256": "ae70ef0cfca7e054a653a5e56905849f310b1d6f5d0beacd3f26163409409b6d",
+      "raw_sha256": "78417ace763c01fbdce0ba06f9b0bd5a24926e0829e0ab3da5c07756eda114f3",
+      "generator": {
+        "path": "tools/import_sy155w.py",
+        "sha256": "1e2ee3f7e951d2b6ab7a89f88a637347c214937c7baea731a6dde9300751ecd1"
+      },
+      "inputs": [
+        {
+          "path": "assets/model/sy155w_source_evidence.json",
+          "sha256": "e80d1ba559b874c9d31fdbca149b306af821d4901ccf281584424e39ea8c724c"
+        },
+        {
+          "path": "godot/client/resources/visual/sy135_visual_manifest.json",
+          "sha256": "e9fef23aaea3d1482697e5f11f8b01e967772a6a7d716233f544281bb457db6d"
+        },
+        {
+          "path": "godot/client/resources/physics/sy135_physics_rig.json",
+          "sha256": "a5d96b65f9e4c802327d1fa1506121491a3871d0f92c3e3a9afe03051aded031"
+        },
+        {
+          "path": "godot/client/resources/attachments/gb12_s50_soil_contract.json",
+          "sha256": "7f4157a5e1fc0f78ea93fc674d2c973c4862db641a4a73404cace5f7ea9c19e5"
+        },
+        {
+          "path": "backend/src/babylon_sim/model.py",
+          "sha256": "e6b71dd96e60c1deda7d78e4a126123cfec236e259dc6cf505ab7fa50940b911"
+        },
+        {
+          "path": "pixi.lock",
+          "sha256": "d4c4083ca6143dcd9acd40666bca117ed0790e8a8685ec2be0c7ebb32e6a7775"
+        },
+        {
+          "path": "godot/client/assets/visual/XTR13_Tiltrotator_Animated.glb",
+          "sha256": "61386e5c1658770083b26f5aff213c570c23225b16c31e6390ad200b4a0f68cc",
+          "hash_mode": "raw"
+        }
+      ],
+      "external_inputs": [
+        {
+          "path": "C:\\code\\blender\\Excavator\\SY155W\\SANY_SY155W_Animated.glb",
+          "sha256": "c7eea3e28a976765502ee0b886af41ff4df8280c1f7f6c5fb40b099a0bc0f3a4",
+          "byte_size": 25250448,
+          "hash_mode": "raw"
+        },
+        {
+          "path": "C:\\code\\blender\\Excavator\\SY155W\\scripts\\build_sy155w.py",
+          "sha256": "9cb63ace46d05cbfcb305ca505e0c89efdc7e89840279e0e0d94fe157ea7bcbc",
+          "byte_size": 34018,
+          "hash_mode": "raw"
+        },
+        {
+          "path": "C:\\code\\blender\\Excavator\\SY155W\\reports\\source_samples.json",
+          "sha256": "dda88b63ab71d87d462a8a7bb0c3bb55050f8b99c6e20ee39b543b6041f03d80",
+          "byte_size": 9336038,
+          "hash_mode": "raw"
+        }
+      ],
+      "license": "user-supplied-source-assets",
+      "generated_at": "2026-09-21",
+      "relationship": "sy155w-runtime-adaptation"
     }
   ],
   "conceptual_derivations": [

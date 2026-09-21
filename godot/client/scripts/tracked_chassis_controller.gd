@@ -18,7 +18,7 @@ enum {
 	SLOPE_MODE_PREVIEW,
 	SLOPE_MODE_ACTIVE,
 }
-const SLOPE_DISTANCE_MIN_M := 0.5
+const SLOPE_DISTANCE_MIN_M := -20.0
 const SLOPE_DISTANCE_MAX_M := 20.0
 const SLOPE_ANGLE_MIN_DEG := -60.0
 const SLOPE_ANGLE_MAX_DEG := 60.0
@@ -854,6 +854,9 @@ func _step_authoritative_chassis(delta: float) -> void:
 	elif _assist_menu_open:
 		_navigate_assist_menu(equipment_axes.z)
 		equipment_axes = Vector4.ZERO
+	_jolt_runtime.set_attachment_bucket_limits(
+		_motion_presentation.get_active_attachment_id() if _motion_presentation != null else ""
+	)
 	_refresh_slope_preview(delta)
 	var scaled_axes := equipment_axes
 	if _bucket_ground_bypassed():
@@ -889,6 +892,7 @@ func _configure_jolt_runtime(catalog_entry: Dictionary) -> bool:
 		contract_error = "jolt_authoritative terrain collider identity is unavailable"
 		return false
 	_jolt_runtime = JoltChassisTrackRuntime.new()
+	_jolt_runtime.attachment_bucket_limit_offsets_deg = catalog_entry.get("attachment_bucket_limit_offsets_deg", {}).duplicate()
 	_jolt_runtime.name = "JoltChassisTrackRuntime"
 	var parent := get_parent()
 	if parent == null:
@@ -904,7 +908,7 @@ func _configure_jolt_runtime(catalog_entry: Dictionary) -> bool:
 		null if static_map_driving else _terrain_world,
 		_terrain_collider,
 		_authoritative_spawn_transform(descriptor),
-		get_node_or_null("../ConstructionMap") as Node3D if static_map_driving else null
+		get_node_or_null("../StaticMap") as Node3D if static_map_driving else null
 	):
 		contract_error = _jolt_runtime.contract_error
 		_destroy_jolt_runtime()
@@ -939,7 +943,7 @@ func _destroy_jolt_runtime() -> void:
 
 func _ensure_authoritative_terrain_collider() -> bool:
 	if static_map_driving:
-		return get_node_or_null("../ConstructionMap") != null
+		return get_node_or_null("../StaticMap") != null
 	if _terrain_world == null or _terrain_world.terrain_state == null or _terrain_collider == null:
 		return false
 	_terrain_collider.enabled = true

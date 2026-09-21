@@ -202,7 +202,7 @@ func build_context(
 			float(actuator.get("max_jerk_rad_s3", 0.0)) * load_factor
 		)
 		if String(joint.get("type", "")) != "continuous_hinge":
-			var limits := joint.get("limit_rad", []) as Array
+			var limits := articulation.effective_joint_limits(joint_name)
 			if limits.size() == 2:
 				ctx.joint_limits[joint_name] = Vector2(float(limits[0]), float(limits[1]))
 	ctx.bucket_link = frames.get("bucket_link", Transform3D.IDENTITY) as Transform3D
