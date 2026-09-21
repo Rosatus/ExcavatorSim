@@ -1,0 +1,125 @@
+<?xml version="1.0" ?>
+<!-- SANY SY80U four-axis authority reference.
+
+     Authority chain matches the exported Godot pivot chain at semantic zero:
+       base_link -> swing_joint -> upper_structure_link
+       upper_structure_link -> boom_swing_joint (FIXED offset bracket) -> boom_swing_link
+       boom_swing_link -> boom_joint -> boom_link
+       boom_link -> arm_joint -> arm_link
+       arm_link -> bucket_joint -> bucket_link
+
+     The real SY80U has an additional independent boom-swing (offset) DOF about
+     the vertical pin between the upper structure and the boom bracket. That
+     axis is Godot-presentation-local by contract and never enters this
+     four-joint authority model; here it is a fixed joint at zero offset so the
+     boom pin keeps its true asymmetric location (0.37 m right of the slew
+     axis, 1.02 m forward, 0.35 m above the upper frame origin).
+
+     Joint origins encode the rest pose: at q = 0 the named links sit at the
+     exported GLB rest placement. Frame convention is the canonical Python
+     right-handed Z-up basis; Godot conversion is adapter-owned. -->
+<robot name="sy80u_reference">
+  <link name="base_link"/>
+  <link name="upper_structure_link"/>
+  <!-- Fixed offset bracket carrying the boom pin (presentation swing axis). -->
+  <link name="boom_swing_link"/>
+  <link name="boom_link"/>
+  <link name="arm_link"/>
+  <link name="bucket_link"/>
+  <link name="tooth_center"/>
+  <link name="tooth_left"/>
+  <link name="tooth_right"/>
+  <link name="gnss_link"/>
+  <link name="swing_imu_link"/>
+  <link name="boom_imu_link"/>
+  <link name="arm_imu_link"/>
+  <link name="bucket_imu_link"/>
+
+  <!-- Slew: vertical pin at the upper-structure origin, 0.75 m above base. -->
+  <joint name="swing_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="upper_structure_link"/>
+    <origin rpy="0 0 0" xyz="0 0 0.75"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+
+  <!-- Boom-offset bracket: fixed vertical pin (P5) right/forward of the slew
+       axis. The live DOF is presentation-local in the Godot client. -->
+  <joint name="boom_swing_joint" type="fixed">
+    <parent link="upper_structure_link"/>
+    <child link="boom_swing_link"/>
+    <origin rpy="0 0 0" xyz="0.37 1.02 0.35"/>
+  </joint>
+
+  <!-- Boom pitch pin (P6): horizontal pin on the offset bracket. The boom link
+       rests pitched +35 deg (RotX) about the machine lateral axis. -->
+  <joint name="boom_joint" type="continuous">
+    <parent link="boom_swing_link"/>
+    <child link="boom_link"/>
+    <origin rpy="0.6108652381980153 0 0" xyz="0 0.4165 0.425"/>
+    <axis xyz="1 0 0"/>
+  </joint>
+
+  <!-- Arm pitch: 3.52 m along the boom rest axis, resting at -90 deg local. -->
+  <joint name="arm_joint" type="continuous">
+    <parent link="boom_link"/>
+    <child link="arm_link"/>
+    <origin rpy="-1.5707963267948966 0 0" xyz="0 3.52 0"/>
+    <axis xyz="1 0 0"/>
+  </joint>
+
+  <!-- Bucket pitch: 2.05 m along the arm rest axis, resting at -50 deg local. -->
+  <joint name="bucket_joint" type="continuous">
+    <parent link="arm_link"/>
+    <child link="bucket_link"/>
+    <origin rpy="-0.8726646259971648 0 0" xyz="0 2.05 0"/>
+    <axis xyz="1 0 0"/>
+  </joint>
+
+  <!-- Tooth references on the five-tooth lip, 0.972 m out on the bucket frame
+       forward axis; outer tooth centers sit at +-0.375 m. -->
+  <joint name="tooth_center_joint" type="fixed">
+    <parent link="bucket_link"/>
+    <child link="tooth_center"/>
+    <origin rpy="0 0 0" xyz="0 0.972 0"/>
+  </joint>
+  <joint name="tooth_left_joint" type="fixed">
+    <parent link="bucket_link"/>
+    <child link="tooth_left"/>
+    <origin rpy="0 0 0" xyz="-0.375 0.972 0"/>
+  </joint>
+  <joint name="tooth_right_joint" type="fixed">
+    <parent link="bucket_link"/>
+    <child link="tooth_right"/>
+    <origin rpy="0 0 0" xyz="0.375 0.972 0"/>
+  </joint>
+
+  <!-- Schematic cab-roof GNSS mount on the upper structure (no antenna modeled
+       in the visual source). -->
+  <joint name="gnss_joint" type="fixed">
+    <parent link="upper_structure_link"/>
+    <child link="gnss_link"/>
+    <origin rpy="0 0 0" xyz="-0.45 0.15 1.05"/>
+  </joint>
+
+  <joint name="swing_imu_joint" type="fixed">
+    <parent link="upper_structure_link"/>
+    <child link="swing_imu_link"/>
+    <origin rpy="0 0 0" xyz="0 0 0.3"/>
+  </joint>
+  <joint name="boom_imu_joint" type="fixed">
+    <parent link="boom_link"/>
+    <child link="boom_imu_link"/>
+    <origin rpy="0 0 0" xyz="0 1.76 0"/>
+  </joint>
+  <joint name="arm_imu_joint" type="fixed">
+    <parent link="arm_link"/>
+    <child link="arm_imu_link"/>
+    <origin rpy="0 0 0" xyz="0 1.025 0"/>
+  </joint>
+  <joint name="bucket_imu_joint" type="fixed">
+    <parent link="bucket_link"/>
+    <child link="bucket_imu_link"/>
+    <origin rpy="0 0 0" xyz="0 0.486 0"/>
+  </joint>
+</robot>

@@ -1,0 +1,507 @@
+{
+  "schema_version": "sy80u-visual-v1",
+  "asset_id": "sy80u-excavator",
+  "asset_path": "res://assets/visual/SY80U_excavator_godot.glb",
+  "source": {
+    "path": "E:/projects/blender/Excavator/SY80U/80u_bucket_corrected.blend",
+    "filename": "SY80U_excavator_godot.glb",
+    "copied_on": "2026-09-20",
+    "byte_size": 3817544,
+    "sha256": "a91cd60b6673eb3511296fabe582ff408c1605e4e849c5bd8325706825f22101",
+    "format": "glTF 2.0 binary",
+    "generator": "Khronos glTF Blender I/O v5.2.39 (assembled-pivots placement)"
+  },
+  "inspection": {
+    "scene_count": 1,
+    "gltf_node_count": 15,
+    "godot_node_count": 16,
+    "mesh_count": 8,
+    "surface_count": 24,
+    "material_count": 8,
+    "embedded_images": [],
+    "imported_bounds_godot": {
+      "min": [
+        -1.2,
+        0.0,
+        -6.109891
+      ],
+      "max": [
+        1.1,
+        4.085527,
+        1.478
+      ],
+      "size": [
+        2.3,
+        4.085527,
+        7.587891
+      ]
+    },
+    "skin_count": 0,
+    "animation_count": 0,
+    "collision_resource_count": 0,
+    "script_resource_count": 0
+  },
+  "coordinate_system": {
+    "source_authoring": "right_handed_blender_z_up",
+    "godot_runtime": "right_handed_gltf_y_up",
+    "python_to_godot_position": "(x, y, z) -> (x, z, -y)",
+    "python_to_godot_transform": "C * T_python * inverse(C)",
+    "runtime_axes": {
+      "base_link": "none",
+      "upper_structure_link": "Y",
+      "boom_link": "X",
+      "arm_link": "X",
+      "bucket_link": "X",
+      "boom_swing_link": "Y"
+    }
+  },
+  "local_kinematics": {
+    "mode": "adjacent_frame_local_rotation_delta",
+    "base_frame": "base_link",
+    "origin_policy": "preserve_imported_parent_local_position",
+    "rotation_policy": "clean_single_runtime_axis",
+    "invalid_policy": "retain_last_valid_local_pose",
+    "frame_contracts": {
+      "base_link": {
+        "parent_frame": "",
+        "runtime_axis": "none",
+        "parent_local_position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "upper_structure_link": {
+        "parent_frame": "base_link",
+        "runtime_axis": "Y",
+        "parent_local_position": [
+          0.0,
+          0.75,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "boom_link": {
+        "parent_frame": "upper_structure_link",
+        "runtime_axis": "X",
+        "parent_local_position": [
+          0.0,
+          0.425,
+          -0.4165
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "via_local_axis": "boom_swing"
+      },
+      "arm_link": {
+        "parent_frame": "boom_link",
+        "runtime_axis": "X",
+        "parent_local_position": [
+          0.0,
+          -2e-06,
+          -3.52
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "bucket_link": {
+        "parent_frame": "arm_link",
+        "runtime_axis": "X",
+        "parent_local_position": [
+          0.0,
+          0.0,
+          -2.05
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      }
+    }
+  },
+  "pivot_contract": {
+    "tolerance_m": 0.002,
+    "nodes": {
+      "root": {
+        "node_path": "CTRL_EXCAVATOR_ROOT",
+        "parent_path": "",
+        "local_position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "runtime_axis": "none"
+      },
+      "slew": {
+        "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW",
+        "parent_path": "CTRL_EXCAVATOR_ROOT",
+        "local_position": [
+          0.0,
+          0.921546,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "runtime_axis": "Y"
+      },
+      "boom_swing": {
+        "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_SWING",
+        "parent_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW",
+        "local_position": [
+          0.37,
+          0.35,
+          -1.02
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "runtime_axis": "Y",
+        "local_axis": "godot_presentation"
+      },
+      "boom": {
+        "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_SWING/PIVOT_BOOM_BASE",
+        "parent_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_SWING",
+        "local_position": [
+          0.0,
+          0.425,
+          -0.4165
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "runtime_axis": "X"
+      },
+      "arm": {
+        "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_SWING/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT",
+        "parent_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_SWING/PIVOT_BOOM_BASE",
+        "local_position": [
+          0.0,
+          -2e-06,
+          -3.52
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "runtime_axis": "X"
+      },
+      "bucket": {
+        "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_SWING/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT",
+        "parent_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_SWING/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT",
+        "local_position": [
+          0.0,
+          0.0,
+          -2.05
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "runtime_axis": "X"
+      },
+      "bucket_tip": {
+        "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_SWING/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT/REF_BUCKET_TIP",
+        "parent_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_SWING/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT",
+        "local_position": [
+          -0.0,
+          -1e-06,
+          -0.972
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "runtime_axis": "inherited_X"
+      }
+    }
+  },
+  "frame_map": {
+    "base_link": {
+      "node_path": "CTRL_EXCAVATOR_ROOT",
+      "pivot_axis": "none",
+      "visual_nodes": [
+        "CTRL_EXCAVATOR_ROOT/undercarriage"
+      ]
+    },
+    "upper_structure_link": {
+      "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW",
+      "pivot_axis": "Z",
+      "visual_nodes": [
+        "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/upper_structure",
+        "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/swing_pedestal"
+      ]
+    },
+    "boom_link": {
+      "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_SWING/PIVOT_BOOM_BASE",
+      "pivot_axis": "X",
+      "visual_nodes": [
+        "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_SWING/PIVOT_BOOM_BASE/boom"
+      ]
+    },
+    "arm_link": {
+      "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_SWING/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT",
+      "pivot_axis": "X",
+      "visual_nodes": [
+        "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_SWING/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/arm"
+      ]
+    },
+    "bucket_link": {
+      "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_SWING/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT",
+      "pivot_axis": "X",
+      "visual_nodes": [
+        "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_SWING/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT/bucket"
+      ]
+    }
+  },
+  "passive_linkage": {
+    "mode": "none"
+  },
+  "excavation_contact": {
+    "mode": "node",
+    "frame": "bucket_link",
+    "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_SWING/PIVOT_BOOM_BASE/PIVOT_ARM_JOINT/PIVOT_BUCKET_JOINT/REF_BUCKET_TIP"
+  },
+  "calibration": {
+    "status": "godot_import_and_controlled_poses_validated",
+    "authority_fixture": "godot/client/tests/fixtures/sy80u_frame_parity_cases.json",
+    "authority_fixture_sha256": "22e57e4a88096cabd6ee2fc9fec21e93d0003c5c18fd0e68d27c17f6fd2d0efa",
+    "matrix_semantics": "Python row arrays encode right-handed T_world_frame; Godot conversion is adapter-owned",
+    "asset_root_scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "rest_transforms_godot": {
+      "base_link": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "upper_structure_link": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.75
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "boom_swing_link": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.37000009417533875
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          1.100000023841858
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          -1.0199999809265137
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "boom_link": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.37000012397766113
+        ],
+        [
+          0.0,
+          0.8191519975662231,
+          -0.5735765099525452,
+          1.524999976158142
+        ],
+        [
+          0.0,
+          0.5735765099525452,
+          0.8191519975662231,
+          -1.4364999532699585
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "arm_link": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.3700003921985626
+        ],
+        [
+          0.0,
+          0.5735765695571899,
+          0.8191519379615784,
+          3.54398775100708
+        ],
+        [
+          0.0,
+          -0.8191519379615784,
+          0.5735765695571899,
+          -4.319916248321533
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "bucket_link": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.3700004816055298
+        ],
+        [
+          0.0,
+          -0.25881898403167725,
+          0.9659258127212524,
+          1.8647265434265137
+        ],
+        [
+          0.0,
+          -0.9659258127212524,
+          -0.25881898403167725,
+          -5.495748043060303
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    }
+  },
+  "runtime_policy": {
+    "motion_authority": "python_motion_service",
+    "linkage_mode": "none",
+    "local_colliders": "disabled_until_separate_contract",
+    "fallback": "none_on_selected_model_contract_failure",
+    "local_articulation": "godot_presentation_axes"
+  },
+  "local_articulation": {
+    "mode": "godot_presentation_axes",
+    "notes": "Axes here are presentation-local DOFs owned by MotionPresentation; they never enter the four-axis authority Vector4 or the parity fixture.",
+    "axes": [
+      {
+        "axis_id": "boom_swing",
+        "node_path": "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_SWING",
+        "parent_frame": "upper_structure_link",
+        "runtime_axis": "Y",
+        "local_position": [
+          0.37,
+          0.35,
+          -1.02
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "positive_semantic": "boom_swing_left",
+        "negative_semantic": "boom_swing_right",
+        "min_degrees": -51.0,
+        "max_degrees": 65.0,
+        "max_rate_degrees_per_second": 45.0,
+        "input": {
+          "positive_action": "operator_boom_swing_left",
+          "negative_action": "operator_boom_swing_right"
+        },
+        "visual_nodes": [
+          "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_SWING/swing_bracket",
+          "CTRL_EXCAVATOR_ROOT/PIVOT_SLEW/PIVOT_BOOM_SWING/swing_pins"
+        ],
+        "evidence": "SY80U offset-boom spec: swing left 65 deg, right 51 deg; bracket and pin hardware ride the axis, the pedestal stays on the upper."
+      }
+    ]
+  }
+}

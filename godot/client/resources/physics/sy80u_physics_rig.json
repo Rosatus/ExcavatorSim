@@ -1,0 +1,692 @@
+{
+  "schema_version": "physics-rig-v1",
+  "rig_id": "sy80u-jolt-rig",
+  "rig_version": "sy80u-jolt-rig-v1",
+  "model_id": "sy80u",
+  "model_version": "sy80u-reference-urdf-v1",
+  "coordinate_basis": "godot-y-up-right-handed-meters",
+  "provenance": {
+    "status": "provisional",
+    "source_paths": [
+      "assets/model/library/sy80u_reference.urdf",
+      "godot/client/assets/visual/SY80U_excavator_godot.glb",
+      "godot/client/resources/visual/sy80u_visual_manifest.json"
+    ],
+    "notes": "Rest transforms and anchors derive from the validated imported GLB rest hierarchy; the source model has no physical properties, so mass, inertia and collision values remain explicit tuning placeholders."
+  },
+  "collision_layers": {
+    "machine": 2,
+    "terrain": 1,
+    "payload": 3
+  },
+  "self_collision_mode": "disabled_provisional",
+  "bodies": [
+    {
+      "name": "chassis",
+      "frame": "base_link",
+      "rest_transform_godot": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "mass_kg": 4300.0,
+      "center_of_mass_m": [
+        0.0,
+        0.379,
+        0.0
+      ],
+      "inertia_diagonal_kg_m2": [
+        5200.0,
+        7200.0,
+        3000.0
+      ],
+      "shape": {
+        "kind": "box",
+        "center_m": [
+          0.0,
+          0.379,
+          0.0
+        ],
+        "size_m": [
+          2.2,
+          0.758,
+          2.915
+        ]
+      }
+    },
+    {
+      "name": "upper",
+      "frame": "upper_structure_link",
+      "rest_transform_godot": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.75
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "mass_kg": 2900.0,
+      "center_of_mass_m": [
+        -0.0515,
+        0.97,
+        0.1865
+      ],
+      "inertia_diagonal_kg_m2": [
+        5400.0,
+        6200.0,
+        3600.0
+      ],
+      "shape": {
+        "kind": "box",
+        "center_m": [
+          -0.0515,
+          0.97,
+          0.1865
+        ],
+        "size_m": [
+          2.297,
+          1.94,
+          2.583
+        ]
+      }
+    },
+    {
+      "name": "boom",
+      "frame": "boom_link",
+      "rest_transform_godot": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.37000012397766113
+        ],
+        [
+          0.0,
+          0.8191519975662231,
+          -0.5735765099525452,
+          1.524999976158142
+        ],
+        [
+          0.0,
+          0.5735765099525452,
+          0.8191519975662231,
+          -1.4364999532699585
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "mass_kg": 720.0,
+      "center_of_mass_m": [
+        -0.1765,
+        -0.1545,
+        -1.3868
+      ],
+      "inertia_diagonal_kg_m2": [
+        1800.0,
+        950.0,
+        1100.0
+      ],
+      "shape": {
+        "kind": "box",
+        "center_m": [
+          -0.1765,
+          -0.1545,
+          -1.3868
+        ],
+        "size_m": [
+          0.817,
+          4.3013,
+          4.4532
+        ]
+      }
+    },
+    {
+      "name": "arm",
+      "frame": "arm_link",
+      "rest_transform_godot": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.3700003921985626
+        ],
+        [
+          0.0,
+          0.5735765695571899,
+          0.8191519379615784,
+          3.54398775100708
+        ],
+        [
+          0.0,
+          -0.8191519379615784,
+          0.5735765695571899,
+          -4.319916248321533
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "mass_kg": 460.0,
+      "center_of_mass_m": [
+        0.0,
+        0.119,
+        -0.8151
+      ],
+      "inertia_diagonal_kg_m2": [
+        480.0,
+        60.0,
+        460.0
+      ],
+      "shape": {
+        "kind": "box",
+        "center_m": [
+          0.0,
+          0.119,
+          -0.8151
+        ],
+        "size_m": [
+          0.3078,
+          2.4105,
+          2.6407
+        ]
+      }
+    },
+    {
+      "name": "bucket",
+      "frame": "bucket_link",
+      "rest_transform_godot": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.3700004816055298
+        ],
+        [
+          0.0,
+          -0.25881898403167725,
+          0.9659258127212524,
+          1.8647265434265137
+        ],
+        [
+          0.0,
+          -0.9659258127212524,
+          -0.25881898403167725,
+          -5.495748043060303
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "mass_kg": 300.0,
+      "center_of_mass_m": [
+        0.0,
+        0.2792,
+        -0.3416
+      ],
+      "inertia_diagonal_kg_m2": [
+        80.0,
+        65.0,
+        85.0
+      ],
+      "shape": {
+        "kind": "convex_proxy",
+        "center_m": [
+          0.0,
+          0.2792,
+          -0.3416
+        ],
+        "size_m": [
+          0.887,
+          1.114,
+          1.2607
+        ]
+      }
+    }
+  ],
+  "joints": [
+    {
+      "name": "swing_joint",
+      "type": "continuous_hinge",
+      "parent_body": "chassis",
+      "child_body": "upper",
+      "frame": "upper_structure_link",
+      "parent_anchor_godot": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.75
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "child_anchor_godot": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "axis": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "axis_frame": "child_anchor_local",
+      "limit_rad": [
+        -3.141592653589793,
+        3.141592653589793
+      ],
+      "collide_connected": false,
+      "actuator": {
+        "mode": "velocity_motor",
+        "max_torque_nm": 320000.0,
+        "max_velocity_rad_s": 0.75,
+        "max_acceleration_rad_s2": 1.1,
+        "max_jerk_rad_s3": 4.4,
+        "damping": 32000.0
+      }
+    },
+    {
+      "name": "boom_joint",
+      "type": "hinge",
+      "parent_body": "upper",
+      "child_body": "boom",
+      "frame": "boom_link",
+      "parent_anchor_godot": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.37
+        ],
+        [
+          0.0,
+          0.819152,
+          -0.573577,
+          0.775
+        ],
+        [
+          0.0,
+          0.573577,
+          0.819152,
+          -1.4365
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "child_anchor_godot": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "axis": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "axis_frame": "child_anchor_local",
+      "limit_rad": [
+        -0.9599310885968813,
+        0.7853981633974483
+      ],
+      "collide_connected": false,
+      "actuator": {
+        "mode": "velocity_motor",
+        "max_torque_nm": 420000.0,
+        "max_velocity_rad_s": 0.45,
+        "max_acceleration_rad_s2": 0.8,
+        "max_jerk_rad_s3": 3.2,
+        "damping": 34000.0
+      }
+    },
+    {
+      "name": "arm_joint",
+      "type": "hinge",
+      "parent_body": "boom",
+      "child_body": "arm",
+      "frame": "arm_link",
+      "parent_anchor_godot": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          -2e-06
+        ],
+        [
+          0.0,
+          -1.0,
+          0.0,
+          -3.52
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "child_anchor_godot": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "axis": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "axis_frame": "child_anchor_local",
+      "limit_rad": [
+        -1.0471975511965976,
+        0.7853981633974483
+      ],
+      "collide_connected": false,
+      "actuator": {
+        "mode": "velocity_motor",
+        "max_torque_nm": 320000.0,
+        "max_velocity_rad_s": 0.55,
+        "max_acceleration_rad_s2": 1.0,
+        "max_jerk_rad_s3": 4.0,
+        "damping": 26000.0
+      }
+    },
+    {
+      "name": "bucket_joint",
+      "type": "hinge",
+      "parent_body": "arm",
+      "child_body": "bucket",
+      "frame": "bucket_link",
+      "parent_anchor_godot": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.642787,
+          0.766044,
+          0.0
+        ],
+        [
+          0.0,
+          -0.766044,
+          0.642787,
+          -2.05
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "child_anchor_godot": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "axis": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "axis_frame": "child_anchor_local",
+      "limit_rad": [
+        -1.5707963267948966,
+        0.7853981633974483
+      ],
+      "collide_connected": false,
+      "actuator": {
+        "mode": "velocity_motor",
+        "max_torque_nm": 220000.0,
+        "max_velocity_rad_s": 0.7,
+        "max_acceleration_rad_s2": 1.2,
+        "max_jerk_rad_s3": 4.8,
+        "damping": 18000.0
+      }
+    }
+  ],
+  "chassis_dynamics": {
+    "mass_kg": 14470.0,
+    "center_of_mass_m": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "inertia_diagonal_kg_m2": [
+      30000.0,
+      28000.0,
+      16000.0
+    ],
+    "linear_damp": 0.14,
+    "angular_damp": 1.9,
+    "max_linear_speed_m_s": 2.4,
+    "max_angular_speed_rad_s": 1.3,
+    "attitude_stiffness_nm_per_rad": 350000.0,
+    "attitude_damping_nm_s_per_rad": 180000.0,
+    "max_attitude_torque_nm": 220000.0,
+    "ground_clearance_m": 0.06,
+    "can_sleep": false,
+    "continuous_collision_detection": true,
+    "compound_shapes": [
+      {
+        "kind": "box",
+        "center_m": [
+          0.0,
+          0.45,
+          0.0
+        ],
+        "size_m": [
+          2.7,
+          0.9,
+          3.7
+        ]
+      },
+      {
+        "kind": "box",
+        "center_m": [
+          0.0,
+          1.48,
+          -0.55
+        ],
+        "size_m": [
+          2.8,
+          1.85,
+          3.25
+        ]
+      }
+    ]
+  },
+  "tracks": {
+    "gauge_m": 1.96,
+    "contact_length_m": 2.9,
+    "contact_width_m": 2.5,
+    "traction_points_per_side": 4,
+    "friction": 1.1,
+    "minimum_traction_ratio": 0.2,
+    "recovery_speed_m_s": 0.22,
+    "max_drive_force_n": 135000.0,
+    "max_belt_speed_m_s": 1.55,
+    "brake_force_n": 165000.0,
+    "traction_response_n_per_m_s": 155000.0,
+    "lateral_resistance_n_per_m_s": 115000.0,
+    "probe_height_m": 0.42,
+    "probe_depth_m": 0.75,
+    "support_rest_length_m": 0.55,
+    "support_stiffness_n_per_m": 280000.0,
+    "support_damping_n_s_per_m": 50000.0,
+    "max_support_force_n": 30000.0,
+    "pivot_lateral_resistance_scale": 0.24,
+    "yaw_assist_scale": 0.12,
+    "drive_effort_slew_n_per_tick": 9000.0,
+    "brake_effort_slew_n_per_tick": 11000.0,
+    "acceleration_window_s": 2.6,
+    "brake_stop_window_s": 2.2
+  },
+  "quality_flags": [
+    "validated_visual_rest_anchors",
+    "unverified_mass_properties",
+    "provisional_collision_proxies",
+    "phase1_tuned_track_forces"
+  ]
+}
