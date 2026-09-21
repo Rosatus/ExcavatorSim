@@ -5,7 +5,7 @@ extends Control
 ## plane seen from the side — chassis silhouette, boom/arm/bucket link figure,
 ## sampled terrain line, target profile line, cut-region fill and the tooth's
 ## live offset from the target. Fed by the session status snapshot
-## (slope_assist.view); the owner toggles visibility, drawing is stateless.
+## (slope_assist.view); the owner toggles visibility; the viewport is latched per operation.
 
 const GameSkin := preload("res://scripts/game_ui_theme.gd")
 
@@ -19,9 +19,14 @@ const TOOTH_COLOR := Color(1.0, 0.8, 0.2)
 const TEXT_COLOR := Color(0.9, 0.92, 0.95)
 const MARGIN := 14.0
 const FONT_SIZE := 13
+const TRACK_BOTTOM_OFFSET_M := 1.05
 
 var _view: Dictionary = {}
 var _font: Font
+var _camera_world := Vector3.ZERO
+var _camera_valid := false
+var _camera_mode := ""
+
 var _variant := GameSkin.VARIANT_DEBUG
 
 
@@ -30,6 +35,10 @@ func _ready() -> void:
 	_font = get_theme_default_font()
 	mouse_filter = MOUSE_FILTER_IGNORE
 	clip_contents = true
+	visibility_changed.connect(func() -> void:
+		if not is_visible_in_tree():
+			_camera_valid = false
+	)
 
 
 ## Theme hook: console variants reframe the panel as a chamfered instrument
@@ -43,6 +52,13 @@ func set_theme_variant(variant: String) -> void:
 
 func set_view(view: Dictionary) -> void:
 	_view = view
+	var mode := String(view.get("mode", ""))
+	if view.is_empty():
+		_camera_valid = false
+	elif not _camera_valid or mode != _camera_mode:
+		_camera_world = (view.get("joints", {}) as Dictionary).get("swing_joint", Vector3.ZERO)
+		_camera_valid = true
+	_camera_mode = mode
 	queue_redraw()
 
 
@@ -86,39 +102,15 @@ func _draw() -> void:
 	for name in names:
 		link_pts.append(pivots[name])
 	link_pts.append(tooth_pt)
-	# Content bounds over machine + terrain + target extents.
-	var lo := Vector2(-4.5, -2.0)
-	var hi := Vector2(4.5, 2.0)
-	for pt in link_pts:
-		lo = lo.min(pt)
-		hi = hi.max(pt)
-	for pt in terrain:
-		lo = lo.min(pt)
-		hi = hi.max(pt)
-	lo = lo.min(Vector2(s_min, target_h.call(s_min)))
-	hi = hi.max(Vector2(s_max, target_h.call(s_max)))
-	# The chassis figure hangs behind the swing pivot and reaches forward to
-	# the upper↔boom pin — outside the link/terrain extents — so it must join
-	# the content bounds or it draws past the panel's left edge. Its ground
-	# line is the sampled terrain under the track mid, so the tracks stand
-	# on the drawn ground instead of a fixed pivot offset.
+	# Fixed world reference cancels the tooth-relative snapshot origin.
+	# Joint motion and terrain changes must never pan or zoom the viewport.
+	var bounds := view_bounds()
+	var lo := bounds.position
+	var hi := bounds.end
 	var sp: Vector2 = pivots["swing_joint"]
-	var boom_sp: Vector2 = pivots["boom_joint"]
-	var box_top := maxf(sp.y + 0.75, boom_sp.y + 0.2)
-	var ground_y := sp.y - 1.2
-	if terrain.size() >= 2:
-		var track_mid := sp.x - 1.8
-		var gi := 0
-		while gi < terrain.size() - 2 and terrain[gi + 1].x < track_mid:
-			gi += 1
-		var ga := terrain[gi]
-		var gb := terrain[gi + 1]
-		var gw := gb.x - ga.x
-		ground_y = ga.y if absf(gw) < 0.001 else lerpf(ga.y, gb.y, clampf((track_mid - ga.x) / gw, 0.0, 1.0))
-	lo = lo.min(Vector2(sp.x - 3.6, ground_y - 0.1))
-	hi = hi.max(Vector2(maxf(boom_sp.x, sp.x) + 0.4, box_top + 0.4))
 	var span := (hi - lo).max(Vector2(1.0, 1.0))
-	var draw_area := size - Vector2(MARGIN, MARGIN) * 2.0
+	# Leave a dedicated header strip; tall work equipment never crosses text.
+	var draw_area := size - Vector2(MARGIN * 2.0, MARGIN + 36.0)
 	var scale := minf(draw_area.x / span.x, draw_area.y / span.y)
 	var to_px := func(p: Vector2) -> Vector2:
 		return Vector2(
@@ -190,7 +182,7 @@ func _draw() -> void:
 	# off the bench — both need on-canvas marks or they float free of the
 	# drawing.
 	var knee_px: Vector2 = to_px.call(Vector2(knee, target_h.call(knee)))
-	if toe_s > 0.05:
+	if absf(toe_s) > 0.05:
 		var anchor_px: Vector2 = to_px.call(Vector2(0.0, target_h.call(0.0)))
 		# The knee's smoothed-relax height differs slightly from the anchor's,
 		# so a point-to-point dimension line would lean with the profile. Keep
@@ -210,58 +202,8 @@ func _draw() -> void:
 			arc_pts.append(knee_px + Vector2(cos(a), sin(a)) * 22.0)
 		draw_polyline(arc_pts, TARGET_COLOR, 1.5)
 	draw_circle(knee_px, 3.0, TOOTH_COLOR)
-	# Chassis figure standing on the sampled ground: the undercarriage band
-	# runs from the terrain line up to the swing pivot (the slew ring doubles
-	# as the divider), a capsule track with two wheels fills it, and a
-	# chamfered upper-structure polygon reaches forward to the boom pin.
-	var under_h := maxf(sp.y - ground_y, 0.3)
-	var wheel_r := clampf(under_h * 0.4, 0.12, 0.65)
-	var body_right := maxf(boom_sp.x + 0.3, sp.x - 0.2)
-	var rear_x := sp.x - 3.4
-	var rear_px: Vector2 = to_px.call(Vector2(sp.x - 2.9, ground_y + wheel_r))
-	var front_px: Vector2 = to_px.call(Vector2(sp.x - 0.7, ground_y + wheel_r))
-	var r_px := wheel_r * scale
-	draw_line(rear_px + Vector2(0, r_px), front_px + Vector2(0, r_px), CHASSIS_COLOR, 2.0)
-	draw_line(rear_px + Vector2(0, -r_px), front_px + Vector2(0, -r_px), CHASSIS_COLOR, 2.0)
-	draw_arc(front_px, r_px, -PI / 2.0, PI / 2.0, 12, CHASSIS_COLOR, 2.0)
-	draw_arc(rear_px, r_px, PI / 2.0, PI * 1.5, 12, CHASSIS_COLOR, 2.0)
-	for c_px in [rear_px, front_px]:
-		draw_circle(c_px, r_px * 0.78, CHASSIS_COLOR, false, 1.5)
-		draw_circle(c_px, 2.0, CHASSIS_COLOR)
-	# Divider: the turntable deck edge at the slew ring, overhanging the body
-	# a hair on both ends so the upper/under split reads explicitly.
-	var deck_a: Vector2 = to_px.call(Vector2(rear_x - 0.1, sp.y))
-	var deck_b: Vector2 = to_px.call(Vector2(body_right + 0.08, sp.y))
-	draw_line(deck_a, deck_b, CHASSIS_COLOR, 2.0)
-	# Upper structure: one flat-decked polygon with a chamfered front-top
-	# corner (cab nose facing the work) — minimal but no longer a plain box.
-	var cham_w := minf(0.5, (body_right - rear_x) * 0.25)
-	var cham_h := minf(0.35, (box_top - sp.y) * 0.4)
-	var body_pts := PackedVector2Array([
-		to_px.call(Vector2(rear_x, sp.y)),
-		to_px.call(Vector2(rear_x, box_top)),
-		to_px.call(Vector2(body_right - cham_w, box_top)),
-		to_px.call(Vector2(body_right, box_top - cham_h)),
-		to_px.call(Vector2(body_right, sp.y)),
-	])
-	draw_colored_polygon(body_pts, Color(CHASSIS_COLOR, 0.14))
-	body_pts.append(body_pts[0])
-	draw_polyline(body_pts, CHASSIS_COLOR, 2.0)
-	var chassis := PackedVector2Array()
-	var arrow_base: Vector2 = to_px.call(Vector2(sp.x - 0.9, box_top + 0.25))
-	chassis.append(arrow_base + Vector2(14, 0))
-	chassis.append(arrow_base + Vector2(-5, -7))
-	chassis.append(arrow_base + Vector2(-5, 7))
-	draw_colored_polygon(chassis, CHASSIS_COLOR)
-	# Link figure and tooth marker.
-	var link_px := PackedVector2Array()
-	for pt in link_pts:
-		link_px.append(to_px.call(pt))
-	draw_polyline(link_px, LINK_COLOR, 3.0)
-	for pt in link_pts:
-		draw_circle(to_px.call(pt), 3.0, LINK_COLOR)
+	_draw_machine(to_px, machine_symbol_pivot(sp, terrain), link_pts, scale)
 	var tooth_px: Vector2 = to_px.call(tooth_pt)
-	draw_circle(tooth_px, 5.0, TOOTH_COLOR)
 	# Tooth offset from the target surface, the number the operator steers by
 	# — a dimension stub from the tooth down to the design line; the value
 	# itself rides the title line as a labeled field, not floating text.
@@ -282,6 +224,86 @@ func _draw() -> void:
 				err_cm,
 			]
 	_draw_text(Vector2(MARGIN, MARGIN + 4), title, accent if console else TEXT_COLOR)
+
+
+func view_bounds() -> Rect2:
+	var anchor := project_to_plane(
+		_view.get("origin_xz", Vector2.ZERO), _view.get("axis", Vector2.RIGHT), _camera_world
+	)
+	return Rect2(anchor + Vector2(-5.0, -5.0), Vector2(17.0, 12.0))
+
+
+static func machine_symbol_pivot(pivot: Vector2, terrain: PackedVector2Array) -> Vector2:
+	# Place the schematic's tread on the actual ground below the machine,
+	# not a fixed distance below its (model-dependent) slew-joint height.
+	# The target grade can intentionally differ from the supporting ground.
+	for index in range(terrain.size() - 1):
+		var a := terrain[index]
+		var b := terrain[index + 1]
+		if b.x <= a.x or pivot.x < a.x or pivot.x > b.x:
+			continue
+		var ground := lerpf(a.y, b.y, (pivot.x - a.x) / (b.x - a.x))
+		return Vector2(pivot.x, ground + TRACK_BOTTOM_OFFSET_M)
+	return pivot
+
+
+func _draw_machine(to_px: Callable, pivot: Vector2, links: PackedVector2Array, pixels_per_m: float) -> void:
+	# Rigid side elevation: centered tracks, separate counterweight and cab.
+	var track_a: Vector2 = to_px.call(pivot + Vector2(-1.8, -0.45))
+	var track_b: Vector2 = to_px.call(pivot + Vector2(1.8, -TRACK_BOTTOM_OFFSET_M))
+	var track := _rounded_poly(Rect2(track_a, track_b - track_a), 0.3 * pixels_per_m)
+	draw_colored_polygon(track, Color(LINK_COLOR, 0.06))
+	track.append(track[0])
+	draw_polyline(track, CHASSIS_COLOR, 1.5, true)
+	draw_line(to_px.call(pivot + Vector2(-1.35, -0.75)), to_px.call(pivot + Vector2(1.35, -0.75)), Color(CHASSIS_COLOR, 0.45), 1.0, true)
+	var shapes := [
+		PackedVector2Array([Vector2(-1.65, -0.25), Vector2(-1.65, 0.35), Vector2(-1.4, 0.55), Vector2(-0.4, 0.55), Vector2(-0.4, -0.25)]),
+		PackedVector2Array([Vector2(-0.3, -0.25), Vector2(-0.3, 1.35), Vector2(0.55, 1.35), Vector2(0.9, 0.85), Vector2(0.9, -0.25)]),
+	]
+	for shape: PackedVector2Array in shapes:
+		var outline := PackedVector2Array()
+		for point in shape:
+			outline.append(to_px.call(pivot + point))
+		draw_colored_polygon(outline, Color(LINK_COLOR, 0.07))
+		outline.append(outline[0])
+		draw_polyline(outline, LINK_COLOR, 1.5, true)
+	draw_line(to_px.call(pivot + Vector2(-1.75, -0.3)), to_px.call(pivot + Vector2(1.05, -0.3)), CHASSIS_COLOR, 1.5, true)
+	var work := PackedVector2Array()
+	for index in range(1, links.size()):
+		work.append(to_px.call(links[index]))
+	if work.size() >= 2:
+		draw_polyline(work, LINK_COLOR, 2.5, true)
+		for index in range(work.size() - 1):
+			draw_circle(work[index], 2.5, PANEL_BG)
+			draw_circle(work[index], 2.5, LINK_COLOR, false, 1.0, true)
+		var pin := work[-2]
+		var tip := work[-1]
+		var bucket := bucket_outline(pin, tip, to_px.call(pivot))
+		if bucket.size() >= 3:
+			draw_colored_polygon(bucket, Color(LINK_COLOR, 0.12))
+			draw_polyline(bucket, LINK_COLOR, 1.5, true)
+		draw_circle(work[-1], 5.0, Color(TOOTH_COLOR, 0.15))
+		draw_circle(work[-1], 3.0, TOOTH_COLOR)
+
+
+static func bucket_outline(pin: Vector2, tip: Vector2, machine: Vector2) -> PackedVector2Array:
+	var axis := tip - pin
+	if axis.length_squared() < 0.0001:
+		return PackedVector2Array()
+	var outward := Vector2(-axis.y, axis.x).normalized()
+	var away := pin.lerp(tip, 0.5) - machine
+	if outward.dot(away) < 0.0:
+		outward = -outward
+	# A smooth bowl on the far side of the pin-to-tooth chord. Endpoints
+	# remain the measured joint and tooth; only the schematic back is curved.
+	var depth := minf(axis.length() * 0.55, 10.0)
+	var outline := PackedVector2Array()
+	for index in range(17):
+		var t := float(index) / 16.0
+		outline.append(pin.lerp(tip, t) + outward * depth * sin(PI * t))
+	outline[0] = pin
+	outline[-1] = tip
+	return outline
 
 
 func _draw_text(pos: Vector2, text: String, color: Color = TEXT_COLOR) -> void:

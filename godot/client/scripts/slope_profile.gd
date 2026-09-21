@@ -35,7 +35,8 @@ var _anchor_captured := false
 
 ## tooth_world: bucket reference point at anchor time. axis_world: cabin
 ## facing direction (projected to horizontal here). distance_m: horizontal
-## offset of the slope toe ahead of the tooth. angle_deg: signed slope
+## signed offset of the slope toe from the tooth (negative toward the machine).
+## angle_deg: signed slope
 ## angle — positive rises away from the machine, negative descends.
 ## toe_height_m: terrain height sampled at the toe point.
 static func create(
@@ -49,7 +50,7 @@ static func create(
 	profile.origin_xz = Vector2(tooth_world.x, tooth_world.z)
 	var flat := Vector2(axis_world.x, axis_world.z)
 	profile.axis = flat.normalized() if flat.length() > 0.001 else Vector2.RIGHT
-	profile.toe_s = maxf(distance_m, 0.0)
+	profile.toe_s = distance_m
 	profile.toe_height = toe_height_m
 	profile.grade = tan(deg_to_rad(angle_deg))
 	profile.angle_deg = angle_deg
