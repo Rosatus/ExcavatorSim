@@ -1588,6 +1588,7 @@ func _on_product_status_changed(_status: Dictionary) -> void:
 
 func _on_product_model_changed(_model_id: String) -> void:
 	_refresh()
+	_refresh_prompt_copy()
 
 
 func _on_gateway_model_changed(_model_id: String) -> void:
@@ -1941,13 +1942,22 @@ func _operation_color(value: String) -> Color:
 
 
 func _refresh_prompt_copy() -> void:
+	var wheeled := _chassis != null and String(_chassis.peek_runtime_snapshot().get("locomotion_mode", "")) == "wheeled"
 	if _hud != null:
+		_hud.set_wheeled_mode(wheeled)
 		_hud.set_prompt_mode(_prompt_mode)
 	var tiltrotator_active := _attachment_rig != null and _attachment_rig.is_tiltrotator_active()
 	var keyboard_hint := UIStrings.CONTROL_HINT_ATTACHMENT_KEYBOARD if tiltrotator_active else UIStrings.CONTROL_HINT_KEYBOARD
 	_control_hint.text = UIStrings.CONTROL_HINT_GAMEPAD if _prompt_mode == "gamepad" else keyboard_hint
 	_guide_device_label.text = "当前输入：手柄" if _prompt_mode == "gamepad" else "当前输入：键盘与鼠标"
 	_guide_controls_label.text = UIStrings.GUIDE_GAMEPAD if _prompt_mode == "gamepad" else UIStrings.GUIDE_KEYBOARD
+	if wheeled:
+		if _prompt_mode == "keyboard":
+			_control_hint.text = keyboard_hint.replace("R/F、Y/H  履带", "G 前 · V 左 · B 后 · N 右 · 空格刹车")
+			_guide_controls_label.text = UIStrings.GUIDE_KEYBOARD.replace("R / F   左履带前进 / 后退     Y / H   右履带前进 / 后退", "G   前进     V   左转     B   后退     N   右转     空格   刹车\n松开行驶键自动驻车；转向需要车辆移动。")
+		else:
+			_control_hint.text = UIStrings.CONTROL_HINT_GAMEPAD.replace("扳机与肩键  履带", "LT/LB 前后行驶 · RT/RB 右/左转")
+			_guide_controls_label.text = UIStrings.GUIDE_GAMEPAD.replace("LT / LB   左履带前进 / 后退\nRT / RB   右履带前进 / 后退", "LT / LB   前进 / 后退\nRT / RB   右转 / 左转\n松开行驶输入自动驻车。")
 
 
 func set_prompt_mode_for_test(value: String) -> void:

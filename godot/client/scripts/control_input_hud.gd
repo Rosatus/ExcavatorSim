@@ -15,6 +15,12 @@ const ACTIONS := [
 	"track_left_forward", "track_left_reverse", "track_right_forward", "track_right_reverse",
 ]
 var _prompt_mode := "keyboard"
+const WHEEL_ACTIONS := {
+	"track_left_forward": "wheel_forward", "track_left_reverse": "wheel_reverse",
+	"track_right_forward": "wheel_right", "track_right_reverse": "wheel_left",
+}
+var _wheeled := false
+var _travel_captions: Array[Label] = []
 var _theme_variant := GameSkin.VARIANT_DEBUG
 var _keys: Dictionary = {}
 var _tiles: Dictionary = {}
@@ -178,7 +184,9 @@ func _tile(index: int, caption: String = "") -> PanelContainer:
 	key.add_theme_color_override("font_color", GameSkin.accent_for(_theme_variant))
 	content.add_child(key)
 	if not caption.is_empty():
-		content.add_child(_label(caption, 11))
+		var caption_label := _label(caption, 11)
+		content.add_child(caption_label)
+		_travel_captions.append(caption_label)
 	_keys[ACTIONS[index]] = key
 	_tiles[ACTIONS[index]] = tile
 	return tile
@@ -195,17 +203,23 @@ func set_prompt_mode(mode: String) -> void:
 	_prompt_mode = mode
 	if _keys.is_empty():
 		return
-	var copy := KEY_COPY if mode == "keyboard" else PAD_COPY
+	var copy: Array = (KEY_COPY if mode == "keyboard" else PAD_COPY).duplicate()
+	if _wheeled and mode == "keyboard":
+		for index in 4:
+			copy[index + 8] = ["G", "B", "N", "V"][index]
 	for index in range(ACTIONS.size()):
 		(_keys[ACTIONS[index]] as Label).text = copy[index]
 	_footer.text = "1–5 切换视角 · C 复位" if mode == "keyboard" else "十字键 切换视角 · R3 复位"
+	if _wheeled and mode == "keyboard":
+		_footer.text += " · 空格刹车"
 
 func _process(_delta: float) -> void:
 	refresh_input_state_for_test()
 
 func refresh_input_state_for_test() -> void:
 	for action in _tiles:
-		var active := InputMap.has_action(action) and Input.is_action_pressed(action)
+		var input_action: String = WHEEL_ACTIONS.get(action, action) if _wheeled else action
+		var active := InputMap.has_action(input_action) and Input.is_action_pressed(input_action)
 		var tile := _tiles[action] as PanelContainer
 		if bool(tile.get_meta("active", not active)) != active:
 			tile.set_meta("active", active)
@@ -247,3 +261,11 @@ class _Brackets:
 		draw_rect(Rect2(0, s.y - TICK, THICK, TICK), color)
 		draw_rect(Rect2(s.x - TICK, s.y - THICK, TICK, THICK), color)
 		draw_rect(Rect2(s.x - THICK, s.y - TICK, THICK, TICK), color)
+
+func set_wheeled_mode(value: bool) -> void:
+	_wheeled = value
+	var copy := ["前进", "后退", "右转", "左转"] if value else ["左前进", "左后退", "右前进", "右后退"]
+	for index in _travel_captions.size():
+		_travel_captions[index].text = copy[index]
+	if _footer != null:
+		set_prompt_mode(_prompt_mode)

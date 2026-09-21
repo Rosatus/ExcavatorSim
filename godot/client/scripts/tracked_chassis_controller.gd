@@ -65,6 +65,8 @@ var _base_local_transform := Transform3D.IDENTITY
 var _jolt_runtime: JoltChassisTrackRuntime
 var _use_test_commands := false
 var _test_commands := Vector2.ZERO
+var _test_wheel_commands := Vector3.ZERO
+var _use_test_wheel_commands := false
 var _use_test_equipment_commands := false
 var _test_equipment_commands := Vector4.ZERO
 var _test_input_focus_bypass := false
@@ -193,7 +195,14 @@ func set_commands_for_test(left: float, right: float) -> void:
 		_jolt_runtime.set_commands(_test_commands.x, _test_commands.y)
 
 
+func set_wheeled_commands_for_test(throttle: float, brake: float, steer: float) -> void:
+	_use_test_wheel_commands = true
+	_test_wheel_commands = Vector3(throttle, brake, steer)
+
+
 func clear_commands_for_test() -> void:
+	_use_test_wheel_commands = false
+	_test_wheel_commands = Vector3.ZERO
 	_use_test_commands = false
 	_test_commands = Vector2.ZERO
 	locomotion_state.set_commands(0.0, 0.0)
@@ -834,7 +843,14 @@ func _step_authoritative_chassis(delta: float) -> void:
 		left = 0.0
 		right = 0.0
 	_jolt_runtime.set_enabled(controller_enabled)
-	_jolt_runtime.set_commands(left, right)
+	if _jolt_runtime.uses_wheels():
+		if not controller_enabled or not _input_focused or _slope_mode == SLOPE_MODE_PREVIEW or _assist_menu_open:
+			_jolt_runtime.stop_motion()
+		else:
+			var command := _test_wheel_commands if _use_test_wheel_commands else WheeledVehicleController.read_machine_input()
+			_jolt_runtime.set_wheeled_commands(command.x, command.y, command.z)
+	else:
+		_jolt_runtime.set_commands(left, right)
 	var equipment_axes := Vector4.ZERO
 	if controller_enabled and (
 		_input_focused or (_test_input_focus_bypass and _use_test_equipment_commands)
@@ -983,6 +999,21 @@ func _authoritative_spawn_transform(descriptor: PhysicsRigDescriptor) -> Transfo
 		if is_finite(sampled):
 			surface_y = sampled
 	var data := descriptor.to_dictionary()
+	var wheel_profile := WheeledMachineProfile.load_for_model(active_model_id)
+	if wheel_profile.enabled:
+		var params: Dictionary = wheel_profile.data.parameters
+		var sag := float(dynamics.mass_kg) * 9.80665 / (float(params.spring_n_m) * wheel_profile.stations.size())
+		var origin_y := -INF
+		for wheel: Dictionary in wheel_profile.stations:
+			var offset: Vector3 = spawn.basis * (wheel.mount - Vector3.UP * (float(params.suspension_travel_m) - sag + float(wheel.radius_m)))
+			var ground_y := surface_y
+			if terrain_state != null:
+				var sampled := terrain_state.sample_surface_bilinear_at(Vector2(spawn.origin.x + offset.x, spawn.origin.z + offset.z))
+				if is_finite(sampled):
+					ground_y = sampled
+			origin_y = maxf(origin_y, ground_y - offset.y)
+		spawn.origin.y = origin_y + 0.01
+		return spawn
 	var ground_clearance := float(dynamics.get("ground_clearance_m", 0.05))
 	var tracks := data.get("tracks", {}) as Dictionary
 	var stiffness := float(tracks.get("support_stiffness_n_per_m", 0.0))
@@ -1098,6 +1129,7 @@ func _vector3(value: Variant) -> Vector3:
 
 
 func _ensure_input_actions() -> void:
+	WheeledVehicleController.ensure_input_actions()
 	for action in INPUT_ACTIONS:
 		if not InputMap.has_action(action):
 			InputMap.add_action(action, 0.08)

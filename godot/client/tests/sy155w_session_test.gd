@@ -27,6 +27,22 @@ func _run() -> void:
 	_check(presentation.get_active_model_id() == "sy155w", "active SY155W")
 	_check(presentation.get_contract_error().is_empty(), "presentation: " + presentation.get_contract_error())
 	_check(bool(chassis.get_status_snapshot().get("configured", false)), "chassis configured")
+	_check(chassis.get_status_snapshot().get("locomotion_mode") == "wheeled", "main scene selects wheeled locomotion")
+	chassis.set_wheeled_commands_for_test(0, 0, 0)
+	for tick in 120:
+		await physics_frame
+	chassis.set_wheeled_commands_for_test(0.5, 0, 0.4)
+	for tick in 120:
+		await physics_frame
+	var wheel_status: Dictionary = chassis.get_status_snapshot().get("wheeled_locomotion", {})
+	_check(not wheel_status.is_empty(), "main scene wheel state published")
+	if not wheel_status.is_empty():
+		_check(absf(float(wheel_status.speed_mps)) > 0.1, "main scene wheel input moves actual machine")
+		var profile := WheeledMachineProfile.load_for_model("sy155w")
+		var asset := presentation.get_frame_node("base_link").get_parent().get_parent().get_parent()
+		var wheel_node := asset.get_node_or_null(profile.data.wheels[0].roll_path) as Node3D
+		_check(wheel_node != null and not wheel_node.basis.is_equal_approx(Basis.IDENTITY), "main presentation animates imported wheel")
+	chassis.clear_commands_for_test()
 	_check(attachments.active_attachment_id() == "xtr13+gb12", "default XTR13 + GB12")
 	_check(attachments.active_tool_node() != null, "default GB12 mounted")
 	_check(not attachments.tool_ids().has("standard_bucket"), "source bucket is not selectable")

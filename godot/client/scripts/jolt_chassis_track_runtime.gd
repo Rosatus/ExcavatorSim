@@ -50,6 +50,12 @@ var _descriptor: Dictionary = {}
 var _dynamics: Dictionary = {}
 var _tracks: Dictionary = {}
 var _track_solver := preload("res://scripts/track_contact_solver.gd").new()
+var _wheel_profile: WheeledMachineProfile
+var _wheel_solver := WheeledLocomotionState.new()
+var _wheel_snapshot: Dictionary = {}
+var _wheel_command := Vector3.ZERO
+var _wheel_neutral_armed := false
+var _wheel_colliders: Array[CollisionShape3D] = []
 var _track_probes: Array = []
 var _track_rejections: Dictionary = {}
 var _spawn_global_transform := Transform3D.IDENTITY
@@ -184,7 +190,7 @@ func _physics_process(delta: float) -> void:
 	_apply_queued_support_wrench()
 	_update_joint_actuators(delta)
 	var tracks_usec := 0
-	if enabled and _terrain_identity_valid:
+	if (enabled or uses_wheels()) and _terrain_identity_valid:
 		var tracks_started := Time.get_ticks_usec()
 		_apply_track_forces()
 		tracks_usec = Time.get_ticks_usec() - tracks_started
@@ -194,7 +200,7 @@ func _physics_process(delta: float) -> void:
 	_update_response_telemetry(delta)
 	_collect_bucket_query_contacts()
 	if _left_contact_count + _right_contact_count == 0:
-		_quality_flags.append("no_track_contact")
+		_quality_flags.append("no_wheel_contact" if uses_wheels() else "no_track_contact")
 	_last_step_usec = Time.get_ticks_usec() - started_usec
 	_peak_step_usec = maxi(_peak_step_usec, _last_step_usec)
 	_capture_post_step_snapshot()
@@ -219,7 +225,17 @@ func configure(
 	rig_version = String(_descriptor.get("rig_version", ""))
 	_dynamics = (_descriptor.get("chassis_dynamics", {}) as Dictionary).duplicate(true)
 	_tracks = (_descriptor.get("tracks", {}) as Dictionary).duplicate(true)
-	_track_solver.configure(_tracks, _dynamics)
+	_wheel_profile = WheeledMachineProfile.load_for_model(model_id)
+	if not _wheel_profile.error.is_empty():
+		return _reject(_wheel_profile.error)
+	if uses_wheels():
+		if not _wheel_solver.configure(_wheel_profile.data.parameters, _wheel_profile.stations):
+			return _reject(_wheel_solver.last_error)
+		_dynamics["linear_damp"] = _wheel_profile.data.linear_damp
+		_dynamics["angular_damp"] = _wheel_profile.data.angular_damp
+		_dynamics["max_linear_speed_m_s"] = maxf(float(_dynamics["max_linear_speed_m_s"]), float(_wheel_solver.parameters.max_speed_mps) * 1.5)
+	else:
+		_track_solver.configure(_tracks, _dynamics)
 	_terrain_world = terrain_world
 	_terrain_collider = terrain_collider
 	_static_map_root = static_map_root
@@ -250,6 +266,10 @@ func teardown() -> void:
 	_descriptor.clear()
 	_dynamics.clear()
 	_tracks.clear()
+	_wheel_profile = null
+	_wheel_snapshot.clear()
+	_wheel_solver.reset()
+	_wheel_neutral_armed = false
 	_body_descriptors.clear()
 	_joint_descriptors.clear()
 	_contacts.clear()
@@ -298,6 +318,23 @@ func set_enabled(value: bool) -> void:
 		_track_solver.reset()
 		_left_effort_n = 0.0
 		_right_effort_n = 0.0
+
+
+func uses_wheels() -> bool:
+	return _wheel_profile != null and _wheel_profile.enabled
+
+
+func set_wheeled_commands(throttle: float, brake: float, steer: float) -> void:
+	var command := Vector3(throttle, brake, steer)
+	if not command.is_finite():
+		command = Vector3(0, 1, 0)
+		_wheel_neutral_armed = false
+	if enabled and command.is_zero_approx():
+		_wheel_neutral_armed = true
+	_wheel_command = command if enabled and _wheel_neutral_armed else Vector3(0, 1, 0)
+	# Existing feedback/diagnostics retain common signed travel channels.
+	_left_command = _wheel_command.x
+	_right_command = _wheel_command.x
 
 
 func set_commands(left: float, right: float) -> void:
@@ -719,6 +756,8 @@ func _payload_center_in_bucket(center: Vector3) -> bool:
 
 
 func stop_motion() -> void:
+	_wheel_command = Vector3(0, 1, 0)
+	_wheel_neutral_armed = false
 	set_commands(0.0, 0.0)
 	set_equipment_commands(Vector4.ZERO)
 	_assist_pipeline.reset("stop_motion")
@@ -878,7 +917,10 @@ func _build_body() -> RigidBody3D:
 	body.collision_layer = _layer_mask(int(_descriptor["collision_layers"]["machine"]))
 	# Obstacle/bottoming collision remains enabled throughout support changes.
 	body.collision_mask = _layer_mask(int(_descriptor["collision_layers"]["terrain"]))
-	_track_solver.add_collision_shapes(body)
+	if uses_wheels():
+		_add_wheel_collision_shapes(body)
+	else:
+		_track_solver.add_collision_shapes(body)
 	return body
 
 
@@ -1058,14 +1100,16 @@ func _capture_post_step_snapshot() -> void:
 		"support_wrench_apply_count": _support_wrench_apply_count,
 		"bucket_ground_interaction": _bucket_ground_interaction_status(),
 		"left_command": _left_command, "right_command": _right_command,
-		"track_neutral_armed": _track_neutral_armed,
+		"track_neutral_armed": _wheel_neutral_armed if uses_wheels() else _track_neutral_armed,
 		"left_effort_n": _left_effort_n, "right_effort_n": _right_effort_n,
 		"left_speed_mps": _left_speed_m_s, "right_speed_mps": _right_speed_m_s,
 		"left_slip_ratio": _left_slip_ratio, "right_slip_ratio": _right_slip_ratio,
 		"left_support_load_n": _left_support_load_n, "right_support_load_n": _right_support_load_n,
 		"hull_terrain_collision_released": false,
 		"hull_collision_switch_count": 0,
-		"track_contact_model": "swept_stations_v1",
+		"track_contact_model": "wheel_suspension_v1" if uses_wheels() else "swept_stations_v1",
+		"locomotion_mode": "wheeled" if uses_wheels() else "tracked",
+		"wheeled_locomotion": _wheel_snapshot.duplicate(true),
 		"track_probes": _track_probes.duplicate(true),
 		"track_rejections": _track_rejections.duplicate(true),
 		"left_contact_count": _left_contact_count, "right_contact_count": _right_contact_count,
@@ -1109,6 +1153,7 @@ func _collect_bucket_query_contacts() -> void:
 
 
 func _destroy_rig() -> void:
+	_wheel_colliders.clear()
 	_joints.clear()
 	for body_value in _bodies.values():
 		var body := body_value as RigidBody3D
@@ -1315,6 +1360,9 @@ func _reset_support_response(clear_request_identity := false) -> void:
 
 
 func _apply_track_forces() -> void:
+	if uses_wheels():
+		_apply_wheel_forces()
+		return
 	if not is_inside_tree() or get_world_3d() == null:
 		_quality_flags.append("physics_space_unavailable")
 		return
@@ -1433,6 +1481,9 @@ func _clamp_body_velocity() -> void:
 
 
 func _clear_tick_telemetry() -> void:
+	if uses_wheels():
+		_left_effort_n = 0.0
+		_right_effort_n = 0.0
 	_left_contact_count = 0
 	_right_contact_count = 0
 	_left_speed_m_s = 0.0
@@ -1455,6 +1506,10 @@ func _clear_tick_telemetry() -> void:
 
 
 func _reset_response_telemetry() -> void:
+	_wheel_neutral_armed = false
+	_wheel_command = Vector3.ZERO
+	_wheel_solver.reset()
+	_wheel_snapshot.clear()
 	_track_neutral_armed = false
 	_track_solver.reset()
 	_left_effort_n = 0.0
@@ -1679,3 +1734,66 @@ func _finite_vector4(value: Vector4) -> bool:
 
 func _layer_mask(layer_number: int) -> int:
 	return 1 << (layer_number - 1)
+
+
+func _add_wheel_collision_shapes(body: RigidBody3D) -> void:
+	for hull: Dictionary in _wheel_profile.data.hulls:
+		var node := CollisionShape3D.new()
+		var shape := BoxShape3D.new()
+		shape.size = WheeledMachineProfile.vec(hull.size_m)
+		node.shape = shape
+		node.position = WheeledMachineProfile.vec(hull.center_m)
+		body.add_child(node)
+	for station: Dictionary in _wheel_profile.stations:
+		var node := CollisionShape3D.new()
+		var shape := CylinderShape3D.new()
+		# A small tire skin keeps the constraint hull from double-supporting a
+		# ray-loaded tire on flat ground; the hull still blocks walls/large curbs.
+		shape.radius = float(station.radius_m) - 0.025
+		shape.height = float(_wheel_profile.data.collision_wheel_width_m)
+		shape.margin = 0.005
+		node.shape = shape
+		node.position = station.mount - Vector3.UP * float(station.rest_suspension_length_m)
+		node.basis = Basis(Vector3.BACK, PI * 0.5)
+		body.add_child(node)
+		_wheel_colliders.append(node)
+
+
+func _apply_wheel_forces() -> void:
+	var command := _wheel_command if enabled else Vector3(0, 1, 0)
+	# Neutral holds a work machine through bounded service braking. Suspension
+	# remains live while paused, so disabling input does not drop the chassis.
+	var brake := maxf(command.y, 1.0 if absf(command.x) < 0.001 else 0.0)
+	_wheel_solver.set_commands(command.x, brake, command.z)
+	_wheel_snapshot = _wheel_solver.step(_body, _last_fixed_delta_s,
+		_layer_mask(int(_descriptor["collision_layers"]["terrain"])), Callable(self, "_accept_track_support_hit"))
+	var samples: Array = _wheel_snapshot.get("wheels", [])
+	for index in samples.size():
+		var sample: Dictionary = samples[index]
+		if index < _wheel_colliders.size():
+			_wheel_colliders[index].position = sample.center_local
+			_wheel_colliders[index].basis = Basis(Vector3.UP, -float(sample.steer_angle_rad)) * Basis(Vector3.BACK, PI * 0.5)
+		if not sample.grounded:
+			continue
+		var left := (_wheel_profile.stations[index].mount as Vector3).x < 0.0
+		var speed: float = _wheel_snapshot.get("speed_mps", 0.0)
+		if left:
+			_left_contact_count += 1
+			_left_speed_m_s = speed
+			_left_support_load_n += float(sample.load_n)
+			_left_slip_ratio += float(sample.slip_ratio)
+			_left_effort_n += float(sample.tire_force_n.x)
+		else:
+			_right_contact_count += 1
+			_right_speed_m_s = speed
+			_right_support_load_n += float(sample.load_n)
+			_right_slip_ratio += float(sample.slip_ratio)
+			_right_effort_n += float(sample.tire_force_n.x)
+		var source := String(sample.support_source)
+		_track_support_source_counts[source] = int(_track_support_source_counts.get(source, 0)) + 1
+		_contacts.append({"body": "chassis", "other": sample.collider_name,
+			"point": sample.point_world, "normal": sample.normal_world,
+			"impulse_n_s": float(sample.load_n) * _last_fixed_delta_s, "penetration_m": 0.0,
+			"wheel_index": index, "support_source": source})
+	_left_slip_ratio /= maxi(_left_contact_count, 1)
+	_right_slip_ratio /= maxi(_right_contact_count, 1)

@@ -59,6 +59,7 @@ var _local_axis_nodes: Dictionary = {}
 var _use_test_local_input := false
 var _test_local_input := 0.0
 var _hydraulics := PassiveHydraulics.new()
+var _wheel_animator: WheelVisualAnimator
 
 # The imported GLB intentionally contains no Blender drivers or animation
 # tracks. These nodes are the Godot-only passive four-bar presentation seam
@@ -523,6 +524,10 @@ func _activate_model(model_id: String) -> bool:
 
 
 func _clear_contract_state() -> void:
+	if is_instance_valid(_wheel_animator):
+		_wheel_animator.reset_animation()
+		_wheel_animator.queue_free()
+	_wheel_animator = null
 	_attachment_tool_node = null
 	_attachment_contract = {}
 	_attachment_id = ""
@@ -673,6 +678,19 @@ func _load_mapping_contract(model_id: String) -> bool:
 		_contract_error = "%s passive hydraulics: %s" % [model_id, _hydraulics.error]
 		push_error(_contract_error)
 		return false
+	var wheel_profile := WheeledMachineProfile.load_for_model(model_id)
+	if not wheel_profile.error.is_empty():
+		_contract_error = wheel_profile.error
+		return false
+	if wheel_profile.enabled:
+		_wheel_animator = WheelVisualAnimator.new()
+		_wheel_animator.name = "WheelVisualAnimator"
+		_asset_root.add_child(_wheel_animator)
+		if not _wheel_animator.configure_imported(_asset_root, wheel_profile):
+			_contract_error = "wheel pivot contract mismatch for " + model_id
+			_wheel_animator.queue_free()
+			_wheel_animator = null
+			return false
 	return _load_soil_contract(model_id)
 
 
@@ -1025,6 +1043,8 @@ func apply_physics_snapshot(snapshot: Dictionary) -> bool:
 		return false
 	_apply_passive_linkage()
 	_hydraulics.update()
+	if is_instance_valid(_wheel_animator):
+		_wheel_animator.apply_physics_snapshot(snapshot.get("wheeled_locomotion", {}))
 	_has_pose = true
 	_last_render_revision = int(snapshot.get("physics_tick", _last_render_revision + 1))
 	return true
@@ -1080,6 +1100,8 @@ func _rows_to_transform(value: Variant) -> Transform3D:
 
 
 func _restore_rest_pose() -> void:
+	if is_instance_valid(_wheel_animator):
+		_wheel_animator.reset_animation()
 	for frame_name in MotionProtocol.FRAME_NAMES:
 		var frame_node := _frame_nodes.get(frame_name) as Node3D
 		var rest_local: Variant = _rest_locals.get(frame_name)
