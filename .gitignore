@@ -52,3 +52,6 @@ godot/worldbuilding/**/*.zip
 
 # Editor-generated runnable preset for the local map-authoring project.
 /godot/worldbuilding/construction/export_presets.cfg
+
+# Preview renders and one-off visual audit output (local-only)
+/reports/
