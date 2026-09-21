@@ -1,0 +1,35 @@
+[gd_resource type = "ShaderMaterial" load_steps=10 format=3 uid="uid://cy3ufx3t68cq3"]
+
+[ext_resource type="Shader" uid="uid://dwrpyxcl6tjn0" path="res://maps/urban/Shaders/sidewalk_Inst.tres" id="10_bjfja"]
+[ext_resource type="Texture2D" uid="uid://d3andav8tx0pc" path="res://maps/urban/UrbanCity/Textures/Tileable/blank_normal.png" id="1_d37l1"]
+[ext_resource type="Texture2D" uid="uid://b670ygexfu20v" path="res://maps/urban/UrbanCity/Textures/Tileable/sidewalk_n.png" id="2_dpun6"]
+[ext_resource type="Texture2D" uid="uid://bwup8of10h573" path="res://maps/urban/UrbanCity/Textures/Tileable/Asphalt_Detail_n.png" id="3_bm3wm"]
+[ext_resource type="Texture2D" uid="uid://d3andav8tx0pc" path="res://maps/urban/UrbanCity/Textures/Tileable/blank_normal.png" id="4_d37l1"]
+[ext_resource type="Texture2D" uid="uid://dwgxqq8vejpaa" path="res://maps/urban/UrbanCity/Textures/Tileable/blank.png" id="5_drkql"]
+[ext_resource type="Texture2D" uid="uid://ddr6rhdjvlt3c" path="res://maps/urban/UrbanCity/Textures/Tileable/clouds.png" id="6_blh7j"]
+[ext_resource type="Texture2D" uid="uid://iu86kqa5y3iv" path="res://maps/urban/UrbanCity/Textures/Tileable/sidewalk_h.png" id="7_d14wn"]
+[ext_resource type="Texture2D" uid="uid://mqn60qot1yjp" path="res://maps/urban/UrbanCity/Textures/Tileable/sidewalk_d.png" id="8_c0ap3"]
+[ext_resource type="Texture2D" uid="uid://b3ahatmag45jf" path="res://maps/urban/UrbanCity/Textures/Tileable/sidewalk_r.png" id="9_dhlq2"]
+
+[resource]
+resource_name = "sidewalk_Inst"
+render_priority = 0
+shader = ExtResource("10_bjfja")
+shader_parameter/PuddleColour = Vector4(0.238, 0.243, 0.285, 1.000)
+shader_parameter/Diffuse = ExtResource("8_c0ap3")
+shader_parameter/UTG_2nd_UV_set_Texture = ExtResource("5_drkql")
+shader_parameter/PuddleTiling = 2.019
+shader_parameter/PuddleSize = 1.982
+shader_parameter/Rain_Amount_Overide = 0.0
+shader_parameter/PuddleFallOff = 9.198
+shader_parameter/Height = ExtResource("7_d14wn")
+shader_parameter/Generated_blank_normal = ExtResource("1_d37l1")
+shader_parameter/Normal = ExtResource("2_dpun6")
+shader_parameter/Generated_Asphalt_Detail_n = ExtResource("3_bm3wm")
+shader_parameter/DetailScale = 14.432
+shader_parameter/DetailNormalStrength = 1.000
+shader_parameter/UTG_2nd_Uv_Set_Normal = ExtResource("1_d37l1")
+shader_parameter/Puddle_Roughness = 0.000
+shader_parameter/Roughness = ExtResource("9_dhlq2")
+shader_parameter/Roughness_Float = -0.051
+shader_parameter/Puddle_Spec = 0.500

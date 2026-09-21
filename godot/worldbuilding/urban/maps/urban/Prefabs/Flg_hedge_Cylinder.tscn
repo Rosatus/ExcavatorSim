@@ -1,0 +1,24 @@
+[gd_scene load_steps=4 format=3 uid="uid://bgpdpfw4jvet0"]
+
+[ext_resource type="PackedScene" uid="uid://ckrke4f7eb4v" path="res://maps/urban/UrbanCity/Models/Foliage/Flg_hedge_Cylinder.glb" id="1_bxgvs"]
+[ext_resource type="Material" uid="uid://3o526krv4kaf" path="res://maps/urban/UrbanCity/Materials/Foliage/foliage_hedge_d_Mat.tres" id="2_bjg7i"]
+[ext_resource type="Material" uid="uid://dp37a0jgqak38" path="res://maps/urban/UrbanCity/Materials/Foliage/foliage_hedgeLeaves_d_Mat.tres" id="3_cqkuf"]
+
+[sub_resource type="CapsuleShape3D" id="0_c31wo"]
+radius = 0.528723
+height = 3.547065
+
+[node name = "Flg_hedge_Cylinder" instance = ExtResource("1_bxgvs")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_bjg7i")
+surface_material_override/1 = ExtResource("3_cqkuf")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Flg_hedge_Cylinder" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+shape = SubResource("0_c31wo")
+debug_fill = false
+

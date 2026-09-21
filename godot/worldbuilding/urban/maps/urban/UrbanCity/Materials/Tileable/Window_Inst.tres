@@ -1,0 +1,18 @@
+[gd_resource type = "ShaderMaterial" load_steps=3 format=3 uid="uid://f2fcmuqbmm4y"]
+
+[ext_resource type="Shader" uid="uid://d04akrvh1hvlx" path="res://maps/urban/Shaders/Window_Inst.tres" id="3_cdy2v"]
+[ext_resource type="Texture2D" uid="uid://ddr6rhdjvlt3c" path="res://maps/urban/UrbanCity/Textures/Tileable/clouds.png" id="1_blh7j"]
+[ext_resource type="Texture2D" uid="uid://cj6w2fo6aieoq" path="res://maps/urban/UrbanCity/Textures/Tileable/mask_grunge_tileable.png" id="2_dd3ep"]
+
+[resource]
+resource_name = "Window_Inst"
+render_priority = 0
+shader = ExtResource("3_cdy2v")
+shader_parameter/Param = Vector4(0.019, 0.023, 0.025, 0.000)
+shader_parameter/Emissive_Colour = Vector4(0.990, 0.980, 1.000, 1.000)
+shader_parameter/EmissiveAmount = 0.000
+shader_parameter/Clouds_Mask_Tiling = 0.200
+shader_parameter/Window_Emissive_Count = 1.000
+shader_parameter/Contrast = 0.016
+shader_parameter/Greunge_Amount = 1.0
+shader_parameter/Roughness = 5.0

@@ -1,0 +1,14 @@
+[gd_resource type = "ShaderMaterial" load_steps=6 format=3 uid="uid://c84ouim6hbs4c"]
+
+[ext_resource type="Shader" uid="uid://c2kijlah37al" path="res://maps/urban/Shaders/prp_patioFurniture_Mat.tres" id="6_cyvr8"]
+[ext_resource type="Texture2D" uid="uid://b5lyy4m77w658" path="res://maps/urban/UrbanCity/Textures/Props/prp_patioFurniture_n.png" id="1_0uvm5"]
+[ext_resource type="Texture2D" uid="uid://1ee37o7s5kdw" path="res://maps/urban/UrbanCity/Textures/Props/prp_patioFurniture_a.png" id="2_co6tu"]
+[ext_resource type="Texture2D" uid="uid://dxgt1q5frgm77" path="res://maps/urban/UrbanCity/Textures/Props/prp_patioFurniture_m.png" id="3_clca7"]
+[ext_resource type="Texture2D" uid="uid://b1qkyomtjvb5f" path="res://maps/urban/UrbanCity/Textures/Props/prp_patioFurniture_r.png" id="4_shkiy"]
+[ext_resource type="Texture2D" uid="uid://cyajjxdimxajb" path="res://maps/urban/UrbanCity/Textures/Props/prp_patioFurniture_ao.png" id="5_dyxed"]
+
+[resource]
+resource_name = "prp_patioFurniture_Mat"
+render_priority = 0
+shader = ExtResource("6_cyvr8")
+shader_parameter/Generated_prp_patioFurniture_n = ExtResource("1_0uvm5")

@@ -1,0 +1,9 @@
+[gd_scene load_steps=3 format=3 uid="uid://dwfle5q2qel8e"]
+
+[ext_resource type="PackedScene" uid="uid://hiah2gx6h101" path="res://maps/urban/UrbanCity/Models/Foliage/flg_groundLeaves.glb" id="1_buisf"]
+[ext_resource type="Material" uid="uid://253qhcbg2502" path="res://maps/urban/UrbanCity/Materials/Foliage/foliage_02_Mat.tres" id="2_u8jpi"]
+
+[node name = "flg_groundLeaves" instance = ExtResource("1_buisf")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_u8jpi")

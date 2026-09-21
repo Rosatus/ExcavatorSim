@@ -1,0 +1,35 @@
+[gd_scene load_steps=3 format=3 uid="uid://b2a177u8qho7d"]
+
+[ext_resource type="PackedScene" uid="uid://dfe1daijq7rq3" path="res://maps/urban/UrbanCity/Models/props/prp_cementBarrier.glb" id="1_sgc6l"]
+[ext_resource type="Material" uid="uid://d3qhehttbcud3" path="res://maps/urban/UrbanCity/Materials/Props/prp_cementBarrier_mat.tres" id="2_bax3c"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(0.255645, 3.000000, 1.138437)
+[sub_resource type="BoxShape3D" id="1_c31wp"]
+size = Vector3(0.255645, 3.000000, 0.718437)
+[sub_resource type="BoxShape3D" id="2_c31wn"]
+size = Vector3(0.255645, 3.000000, 0.718437)
+
+[node name = "prp_cementBarrier" instance = ExtResource("1_sgc6l")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_bax3c")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.000000, 0.569218, -1.500000)
+shape = SubResource("0_c31wo")
+debug_fill = false
+
+[node name="Box1" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(0.939693, -0.000000, 0.342020, 0.342020, 0.000000, -0.939693, 0.000000, 1.000000, 0.000000, 0.116269, 0.294342, -1.500000)
+shape = SubResource("1_c31wp")
+debug_fill = false
+
+[node name="Box2" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(0.939693, 0.000000, -0.342020, -0.342020, 0.000000, -0.939693, 0.000000, 1.000000, 0.000000, -0.118521, 0.251158, -1.500000)
+shape = SubResource("2_c31wn")
+debug_fill = false
+

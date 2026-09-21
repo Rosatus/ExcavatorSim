@@ -7,7 +7,10 @@ param(
     [string]$ToolchainRoot = "",
 
     [Parameter()]
-    [switch]$IncludeConstructionMap
+    [switch]$IncludeConstructionMap,
+
+    [Parameter()]
+    [switch]$IncludeUrbanMap
 )
 
 $ErrorActionPreference = "Stop"
@@ -261,6 +264,9 @@ try {
     if ($IncludeConstructionMap) {
         & (Join-Path $PSScriptRoot 'build_construction_pack.ps1') -GodotExe $GodotExe
     }
+    if ($IncludeUrbanMap) {
+        & (Join-Path $PSScriptRoot 'build_urban_pack.ps1') -GodotExe $GodotExe
+    }
     $toolchainEvidence = Join-Path $stagingRoot "build-toolchain.json"
     [IO.File]::WriteAllText(
         $toolchainEvidence,
@@ -394,6 +400,15 @@ cd '$wslRepoRoot/tools/can_gateway' && ./dist_linux.sh
             $mapDirectory = Join-Path $targetRelease 'maps'
             New-Item -ItemType Directory -Path $mapDirectory -Force | Out-Null
             Copy-Item -LiteralPath $constructionPack -Destination (Join-Path $mapDirectory 'construction.pck')
+        }
+    }
+    if ($IncludeUrbanMap) {
+        $urbanPack = Join-Path $godotDist 'maps/urban.pck'
+        Assert-ReleaseFile -Path $urbanPack
+        foreach ($targetRelease in @($stagedWindows, $stagedLinux)) {
+            $mapDirectory = Join-Path $targetRelease 'maps'
+            New-Item -ItemType Directory -Path $mapDirectory -Force | Out-Null
+            Copy-Item -LiteralPath $urbanPack -Destination (Join-Path $mapDirectory 'urban.pck')
         }
     }
 

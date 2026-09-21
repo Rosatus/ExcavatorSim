@@ -1,0 +1,23 @@
+[gd_scene load_steps=4 format=3 uid="uid://dewxg3x2xyy4c"]
+
+[ext_resource type="PackedScene" uid="uid://bqiy7iyvj0bmn" path="res://maps/urban/UrbanCity/Models/props/prp_chainlinkFence.glb" id="1_bigug"]
+[ext_resource type="Material" uid="uid://cvueetu6s5xlo" path="res://maps/urban/UrbanCity/Materials/Tileable/metal_02_Inst.tres" id="2_dubni"]
+[ext_resource type="Material" uid="uid://sgyegn55fmjm" path="res://maps/urban/UrbanCity/Materials/Tileable/prp_chainlink_Mat.tres" id="3_ddaou"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(0.097553, 3.313777, 2.337443)
+
+[node name = "prp_chainlinkFence" instance = ExtResource("1_bigug")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_dubni")
+surface_material_override/1 = ExtResource("3_ddaou")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.000000, 1.161598, 1.593112)
+shape = SubResource("0_c31wo")
+debug_fill = false
+

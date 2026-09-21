@@ -1,0 +1,21 @@
+[gd_scene load_steps=3 format=3 uid="uid://ymope7c86lfe"]
+
+[ext_resource type="PackedScene" uid="uid://02h4b7bfskfs" path="res://maps/urban/UrbanCity/Models/ModularBuildings/B4_L_02_straight.glb" id="1_5r18m"]
+[ext_resource type="Material" uid="uid://bpuidxeuvi2sa" path="res://maps/urban/UrbanCity/Materials/Buildings/building_04_Inst.tres" id="2_6ruyl"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(4.000000, 0.228230, 0.500046)
+
+[node name = "B4_L_02_straight" instance = ExtResource("1_5r18m")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_6ruyl")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, -2.000000, 0.250023, -0.114115)
+shape = SubResource("0_c31wo")
+debug_fill = false
+

@@ -1,0 +1,14 @@
+[gd_resource type = "ShaderMaterial" load_steps=6 format=3 uid="uid://yv4kvt05pp3"]
+
+[ext_resource type="Shader" uid="uid://ca1i6h7oucxhl" path="res://maps/urban/Shaders/prp_garbageCan_Mat.tres" id="6_bnuq0"]
+[ext_resource type="Texture2D" uid="uid://ch54owdqrp03h" path="res://maps/urban/UrbanCity/Textures/Props/prp_garbageCan_n.png" id="1_fovqb"]
+[ext_resource type="Texture2D" uid="uid://cpo7yawpprcas" path="res://maps/urban/UrbanCity/Textures/Props/prp_garbageCan_a.png" id="2_odjsc"]
+[ext_resource type="Texture2D" uid="uid://cqtr1rsxvc01g" path="res://maps/urban/UrbanCity/Textures/Props/prp_garbageCan_m.png" id="3_cvauk"]
+[ext_resource type="Texture2D" uid="uid://bgykpdhk3g2wh" path="res://maps/urban/UrbanCity/Textures/Props/prp_garbageCan_r.png" id="4_dquqi"]
+[ext_resource type="Texture2D" uid="uid://drys1rpxuxlft" path="res://maps/urban/UrbanCity/Textures/Props/prp_garbageCan_ao.png" id="5_bp1f5"]
+
+[resource]
+resource_name = "prp_garbageCan_Mat"
+render_priority = 0
+shader = ExtResource("6_bnuq0")
+shader_parameter/Generated_prp_garbageCan_n = ExtResource("1_fovqb")

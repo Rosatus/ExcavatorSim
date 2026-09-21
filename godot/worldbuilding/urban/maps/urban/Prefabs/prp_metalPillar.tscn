@@ -1,0 +1,21 @@
+[gd_scene load_steps=3 format=3 uid="uid://b5fd5agfwvcy2"]
+
+[ext_resource type="PackedScene" uid="uid://boydej1er8xcm" path="res://maps/urban/UrbanCity/Models/props/prp_metalPillar.glb" id="1_bw2pc"]
+[ext_resource type="Material" uid="uid://de64cy7cu8yra" path="res://maps/urban/UrbanCity/Materials/Props/prp_metalPillar_Mat.tres" id="2_ef4jg"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(0.241012, 0.241012, 1.130349)
+
+[node name = "prp_metalPillar" instance = ExtResource("1_bw2pc")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_ef4jg")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.000000, 0.565175, 0.000000)
+shape = SubResource("0_c31wo")
+debug_fill = false
+

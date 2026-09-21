@@ -1,0 +1,35 @@
+[gd_scene load_steps=3 format=3 uid="uid://hwprwv5stves"]
+
+[ext_resource type="PackedScene" uid="uid://dn4olv0n382dn" path="res://maps/urban/UrbanCity/Models/props/prp_table.glb" id="1_dr0qm"]
+[ext_resource type="Material" uid="uid://c84ouim6hbs4c" path="res://maps/urban/UrbanCity/Materials/Props/prp_patioFurniture_Mat.tres" id="2_daaes"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(1.500000, 1.500000, 0.066868)
+[sub_resource type="BoxShape3D" id="1_c31wp"]
+size = Vector3(1.140000, 0.190000, 0.056868)
+[sub_resource type="BoxShape3D" id="2_c31wn"]
+size = Vector3(0.080000, 0.080000, 0.756868)
+
+[node name = "prp_table" instance = ExtResource("1_dr0qm")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_daaes")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.000000, 0.920794, 0.000000)
+shape = SubResource("0_c31wo")
+debug_fill = false
+
+[node name="Box1" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(-0.006986, 0.999976, -0.000005, 0.000000, -0.000005, -1.000000, -0.999976, -0.006986, 0.000000, 0.000000, 0.047566, 0.000000)
+shape = SubResource("1_c31wp")
+debug_fill = false
+
+[node name="Box2" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, -0.000001, 0.474197, 0.000000)
+shape = SubResource("2_c31wn")
+debug_fill = false
+

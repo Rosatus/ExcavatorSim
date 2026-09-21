@@ -1,0 +1,11 @@
+[gd_scene load_steps=4 format=3 uid="uid://dp57c8c1ydm45"]
+
+[ext_resource type="PackedScene" uid="uid://b2u3xgx1o0kid" path="res://maps/urban/sidewalk_Straight_Splines_0.glb" id="1_c2o5y"]
+[ext_resource type="Material" uid="uid://cy3ufx3t68cq3" path="res://maps/urban/UrbanCity/Materials/Tileable/sidewalk_Inst.tres" id="2_owxfd"]
+[ext_resource type="Material" uid="uid://b7ufx0ps65lku" path="res://maps/urban/UrbanCity/Materials/Tileable/Road_01_Inst.tres" id="3_bj4ex"]
+
+[node name = "sidewalk_Straight_Splines_0" instance = ExtResource("1_c2o5y")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_owxfd")
+surface_material_override/1 = ExtResource("3_bj4ex")

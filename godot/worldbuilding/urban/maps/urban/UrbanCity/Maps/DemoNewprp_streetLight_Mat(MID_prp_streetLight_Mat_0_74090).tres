@@ -1,0 +1,19 @@
+[gd_resource type = "ShaderMaterial" load_steps=7 format=3 uid="uid://c40o63n8xu5ue"]
+
+[ext_resource type="Shader" uid="uid://cjblfisb5rk3g" path="res://maps/urban/Shaders/prp_streetLight_Mat(MID_prp_streetLight_Mat_0_74090).tres" id="7_yg7b5"]
+[ext_resource type="Texture2D" uid="uid://bek2yfo2tta86" path="res://maps/urban/UrbanCity/Textures/Props/prp_streetLight_n.png" id="1_ca4la"]
+[ext_resource type="Texture2D" uid="uid://dqpm5bhew1wu2" path="res://maps/urban/UrbanCity/Textures/Props/prp_streetLights_e.png" id="2_c0gnl"]
+[ext_resource type="Texture2D" uid="uid://bfgmd4180q7kq" path="res://maps/urban/UrbanCity/Textures/Props/prp_streetLight_a.png" id="3_dg06e"]
+[ext_resource type="Texture2D" uid="uid://c5obe4j7yofam" path="res://maps/urban/UrbanCity/Textures/Props/prp_streetLight_m.png" id="4_83umr"]
+[ext_resource type="Texture2D" uid="uid://bdgivwstn8lij" path="res://maps/urban/UrbanCity/Textures/Props/prp_streetLight_r.png" id="5_csoyi"]
+[ext_resource type="Texture2D" uid="uid://dvxxvgo44ivrf" path="res://maps/urban/UrbanCity/Textures/Props/prp_streetLight_ao.png" id="6_wy8du"]
+
+[resource]
+resource_name = "prp_streetLight_Mat(MID_prp_streetLight_Mat_0_74090)"
+render_priority = 0
+shader = ExtResource("7_yg7b5")
+shader_parameter/Redlight = 0.000
+shader_parameter/Greenlight = 0.000
+shader_parameter/Yellowlight = 0.000
+shader_parameter/streetlight = 0.000
+shader_parameter/Generated_prp_streetLight_n = ExtResource("1_ca4la")

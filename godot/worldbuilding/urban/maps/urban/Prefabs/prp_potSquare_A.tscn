@@ -1,0 +1,25 @@
+[gd_scene load_steps=5 format=3 uid="uid://byt8nay1lug4q"]
+
+[ext_resource type="PackedScene" uid="uid://blbsj0qm1kpfr" path="res://maps/urban/UrbanCity/Models/props/prp_potSquare_A.glb" id="1_cvnxv"]
+[ext_resource type="Material" uid="uid://c2mjhldxxpcbw" path="res://maps/urban/UrbanCity/Materials/Tileable/cobbleStone_01_Mat.tres" id="2_cunyx"]
+[ext_resource type="Material" uid="uid://b2v2rxpeasdd2" path="res://maps/urban/UrbanCity/Materials/Tileable/soil_Mat.tres" id="3_k4q7f"]
+[ext_resource type="Material" uid="uid://ck5cnl8hqxd8y" path="res://maps/urban/UrbanCity/Materials/Tileable/Tilable_concreteWall03_Inst.tres" id="4_832i3"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(1.625500, 1.625500, 0.986887)
+
+[node name = "prp_potSquare_A" instance = ExtResource("1_cvnxv")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_cunyx")
+surface_material_override/1 = ExtResource("3_k4q7f")
+surface_material_override/2 = ExtResource("4_832i3")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.000000, 0.499595, 0.000000)
+shape = SubResource("0_c31wo")
+debug_fill = false
+

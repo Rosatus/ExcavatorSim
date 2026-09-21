@@ -1,0 +1,21 @@
+[gd_scene load_steps=3 format=3 uid="uid://dglpb3of7qtng"]
+
+[ext_resource type="PackedScene" uid="uid://rh1ao0dsmm0p" path="res://maps/urban/UrbanCity/Models/props/Door1_mdl.glb" id="1_doe44"]
+[ext_resource type="Material" uid="uid://coohx45g3bk74" path="res://maps/urban/UrbanCity/Materials/Props/Door1_mat.tres" id="2_c024w"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(1.525166, 0.080149, 2.500000)
+
+[node name = "Door1_mdl" instance = ExtResource("1_doe44")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_c024w")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.762475, 1.250000, 0.009209)
+shape = SubResource("0_c31wo")
+debug_fill = false
+

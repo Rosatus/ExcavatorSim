@@ -1,0 +1,13 @@
+[gd_resource type = "ShaderMaterial" load_steps=2 format=3 uid="uid://cwh7k8g742rq1"]
+
+[ext_resource type="Shader" uid="uid://bwejct4j3skh0" path="res://maps/urban/Shaders/Flag_Inst.tres" id="2_b88hr"]
+[ext_resource type="Texture2D" uid="uid://rub5e1i23c06" path="res://maps/urban/UrbanCity/Textures/Props/usaflag.png" id="1_hgaxy"]
+
+[resource]
+resource_name = "Flag_Inst"
+render_priority = 0
+shader = ExtResource("2_b88hr")
+shader_parameter/SubsurfaceScatterAmount = 3.968
+shader_parameter/Intensity = 0.500
+shader_parameter/Weight = 1.000
+shader_parameter/Speed = 0.200

@@ -16,19 +16,23 @@ func _enter_tree() -> void:
 	var catalog := get_node("/root/MapCatalog")
 	if not catalog.retained_model_id.is_empty():
 		$MotionClient.desired_model_id = catalog.retained_model_id
-	if catalog.active_map_id != "construction":
+	var scene_path: String = catalog.MAP_SCENES.get(catalog.active_map_id, "")
+	if scene_path.is_empty():
 		return
-	var packed := load(catalog.CONSTRUCTION_SCENE) as PackedScene
+	var packed := load(scene_path) as PackedScene
 	if packed == null:
 		catalog.active_map_id = "training"
-		catalog.last_error = "施工大地图资源无法读取，已返回训练场"
+		catalog.last_error = "地图资源无法读取，已返回训练场"
 		return
 	var map := packed.instantiate()
-	map.name = "ConstructionMap"
+	map.name = "StaticMap"
 	# Product Sky3D remains the single lighting owner; the workbench sky is preview-only.
 	var preview_sky := map.get_node_or_null("WorldEnvironment")
 	if preview_sky != null:
 		preview_sky.free()
+	# Map-baked directional lights would double the client Sky3D sun.
+	for light in map.find_children("*", "DirectionalLight3D"):
+		light.visible = false
 	$TerrainRoot.visible = false
 	$TerrainRoot/Terrain3DAdapter.enabled = false
 	$TerrainRoot/TerrainCollider.enabled = false

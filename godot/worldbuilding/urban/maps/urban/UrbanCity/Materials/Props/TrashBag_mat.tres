@@ -1,0 +1,12 @@
+[gd_resource type = "ShaderMaterial" load_steps=4 format=3 uid="uid://centvqv686leo"]
+
+[ext_resource type="Shader" uid="uid://unwa8hyjuq5f" path="res://maps/urban/Shaders/TrashBag_mat.tres" id="4_d1cvv"]
+[ext_resource type="Texture2D" uid="uid://bfyjri7j7wwkd" path="res://maps/urban/UrbanCity/Textures/Props/TrashBag_N.png" id="1_f0fx2"]
+[ext_resource type="Texture2D" uid="uid://btaeeedpyukhi" path="res://maps/urban/UrbanCity/Textures/Props/TrashBag_A.png" id="2_brnt7"]
+[ext_resource type="Texture2D" uid="uid://bxy7sm5kogs0o" path="res://maps/urban/UrbanCity/Textures/Props/TrashBag_C.png" id="3_bo0ds"]
+
+[resource]
+resource_name = "TrashBag_mat"
+render_priority = 0
+shader = ExtResource("4_d1cvv")
+shader_parameter/Generated_TrashBag_N = ExtResource("1_f0fx2")

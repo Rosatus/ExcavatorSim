@@ -1,0 +1,28 @@
+[gd_scene load_steps=3 format=3 uid="uid://cdqxdii0sd8q8"]
+
+[ext_resource type="PackedScene" uid="uid://dg1630mo347wg" path="res://maps/urban/UrbanCity/Models/props/prp_parkingMeter.glb" id="1_ds54g"]
+[ext_resource type="Material" uid="uid://bfci3ri1wmi4r" path="res://maps/urban/UrbanCity/Materials/Props/prp_parkingMeter.tres" id="2_bv2b0"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(0.270403, 0.065806, 0.293896)
+[sub_resource type="BoxShape3D" id="1_c31wp"]
+size = Vector3(0.050403, 0.045806, 0.773896)
+
+[node name = "prp_parkingMeter" instance = ExtResource("1_ds54g")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_bv2b0")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.000000, 0.829395, 0.000000)
+shape = SubResource("0_c31wo")
+debug_fill = false
+
+[node name="Box1" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.000000, 0.379414, 0.000000)
+shape = SubResource("1_c31wp")
+debug_fill = false
+

@@ -1,0 +1,32 @@
+[gd_scene load_steps=4 format=3 uid="uid://ceyyb45we42oe"]
+
+[ext_resource type="PackedScene" uid="uid://cbnj3efg65yfs" path="res://maps/urban/UrbanCity/Models/Foliage/flg_tree_02.glb" id="1_c652s"]
+[ext_resource type="Material" uid="uid://bybakv005lmxo" path="res://maps/urban/UrbanCity/Materials/Foliage/Foliage_01_Inst.tres" id="2_w2vl8"]
+[ext_resource type="Material" uid="uid://dxf8l651juihc" path="res://maps/urban/UrbanCity/Materials/Foliage/Bark_01.tres" id="3_dtycw"]
+
+[sub_resource type="CapsuleShape3D" id="0_c31wo"]
+radius = 1.557843
+height = 6.793563
+[sub_resource type="CapsuleShape3D" id="1_c31wp"]
+radius = 1.168143
+height = 4.956263
+
+[node name = "flg_tree_02" instance = ExtResource("1_c652s")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_w2vl8")
+surface_material_override/1 = ExtResource("3_dtycw")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Capsule0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, -0.999994, 0.003509, 0.000000, -0.003509, -0.999994, -0.179363, 3.192320, -0.283688)
+shape = SubResource("0_c31wo")
+debug_fill = false
+
+[node name="Capsule1" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(0.953641, 0.289499, -0.082216, -0.106824, 0.581029, 0.806842, 0.281350, -0.760655, 0.585018, 1.226784, 2.038747, -1.508607)
+shape = SubResource("1_c31wp")
+debug_fill = false
+

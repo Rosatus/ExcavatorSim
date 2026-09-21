@@ -1,0 +1,14 @@
+[gd_resource type = "ShaderMaterial" load_steps=6 format=3 uid="uid://cnkp73etjdbxm"]
+
+[ext_resource type="Shader" uid="uid://bjwog4dc2vbwx" path="res://maps/urban/Shaders/prp_electricalBox_Mat.tres" id="6_v7naw"]
+[ext_resource type="Texture2D" uid="uid://bon2liqwntblj" path="res://maps/urban/UrbanCity/Textures/Props/prp_electricalBox_n.png" id="1_0m0rw"]
+[ext_resource type="Texture2D" uid="uid://bspjoeh534nkc" path="res://maps/urban/UrbanCity/Textures/Props/prp_electricalBox_a.png" id="2_cqu8j"]
+[ext_resource type="Texture2D" uid="uid://bxcpxd64rgbji" path="res://maps/urban/UrbanCity/Textures/Props/prp_electricalBox_m.png" id="3_d3a66"]
+[ext_resource type="Texture2D" uid="uid://bv2epo06mmbnr" path="res://maps/urban/UrbanCity/Textures/Props/prp_electricalBox_r.png" id="4_bev1l"]
+[ext_resource type="Texture2D" uid="uid://bb7vrsuququ6t" path="res://maps/urban/UrbanCity/Textures/Props/prp_electricalBox_ao.png" id="5_cu4ao"]
+
+[resource]
+resource_name = "prp_electricalBox_Mat"
+render_priority = 0
+shader = ExtResource("6_v7naw")
+shader_parameter/Generated_prp_electricalBox_n = ExtResource("1_0m0rw")

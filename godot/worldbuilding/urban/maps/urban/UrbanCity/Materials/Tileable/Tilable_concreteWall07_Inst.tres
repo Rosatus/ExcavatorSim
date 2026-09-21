@@ -1,0 +1,35 @@
+[gd_resource type = "ShaderMaterial" load_steps=6 format=3 uid="uid://cdh5ow7v8bd6y"]
+
+[ext_resource type="Shader" uid="uid://dottddxdh40cv" path="res://maps/urban/Shaders/Tilable_concreteWall07_Inst.tres" id="6_bumqp"]
+[ext_resource type="Texture2D" uid="uid://fdtawgcybo24" path="res://maps/urban/UrbanCity/Textures/Tileable/wall_concrete_07_n.png" id="1_q2l81"]
+[ext_resource type="Texture2D" uid="uid://d3andav8tx0pc" path="res://maps/urban/UrbanCity/Textures/Tileable/blank_normal.png" id="2_d37l1"]
+[ext_resource type="Texture2D" uid="uid://cj6w2fo6aieoq" path="res://maps/urban/UrbanCity/Textures/Tileable/mask_grunge_tileable.png" id="3_dd3ep"]
+[ext_resource type="Texture2D" uid="uid://biqun5hwyhcsn" path="res://maps/urban/UrbanCity/Textures/Tileable/wall_concrete_07_d.png" id="4_bdaj1"]
+[ext_resource type="Texture2D" uid="uid://brfi00w423cqm" path="res://maps/urban/UrbanCity/Textures/Tileable/wall_concrete_07_c.png" id="5_dsuiv"]
+
+[resource]
+resource_name = "Tilable_concreteWall07_Inst"
+render_priority = 0
+shader = ExtResource("6_bumqp")
+shader_parameter/Grunge_1_Colour = Vector4(0.000, 0.000, 0.000, 1.000)
+shader_parameter/Grunge_1_Scale = 1.000
+shader_parameter/Grunge_1_Opacity = 0.574
+shader_parameter/Grunge_2_Colour = Vector4(1.000, 1.000, 1.000, 1.000)
+shader_parameter/Grunge_2_Scale = 0.221
+shader_parameter/Grunge_2_Opacity = 2.194
+shader_parameter/Grunge_3_Colour = Vector4(0.260, 0.000, 0.000, 1.000)
+shader_parameter/Grunge_3_Scale = 1.818
+shader_parameter/Grunge_3_Opacity = 0.172
+shader_parameter/Grunge_4_Colour = Vector4(0.187, 0.186, 0.780, 1.000)
+shader_parameter/Grunge_4_Scale = 0.486
+shader_parameter/Diffuse = ExtResource("4_bdaj1")
+shader_parameter/TextureScale = 1.000
+shader_parameter/Tint_Colour = Vector4(1.000, 1.000, 1.000, 1.000)
+shader_parameter/Tint_Opacity = 0.000
+shader_parameter/Normal = ExtResource("1_q2l81")
+shader_parameter/Normal_Strength = 1.000
+shader_parameter/Detail_Normal = ExtResource("2_d37l1")
+shader_parameter/Detail_Normal_Scale = 4.000
+shader_parameter/Detail_Normal_Strength = 1.000
+shader_parameter/Compact = ExtResource("5_dsuiv")
+shader_parameter/Roughness = 1.000

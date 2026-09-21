@@ -1,0 +1,21 @@
+[gd_scene load_steps=3 format=3 uid="uid://brnshjcwk02wx"]
+
+[ext_resource type="PackedScene" uid="uid://d3rhvtn4d22cu" path="res://maps/urban/UrbanCity/Models/props/prp_chainlinkPost.glb" id="1_cqy8l"]
+[ext_resource type="Material" uid="uid://cvueetu6s5xlo" path="res://maps/urban/UrbanCity/Materials/Tileable/metal_02_Inst.tres" id="2_dubni"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(0.127553, 0.127553, 2.397443)
+
+[node name = "prp_chainlinkPost" instance = ExtResource("1_cqy8l")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_dubni")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.000000, 1.198721, 0.000000)
+shape = SubResource("0_c31wo")
+debug_fill = false
+

@@ -1,0 +1,28 @@
+[gd_scene load_steps=3 format=3 uid="uid://c3k17nbdb47dd"]
+
+[ext_resource type="PackedScene" uid="uid://nyu416k6sc7o" path="res://maps/urban/UrbanCity/Models/props/Sign_4_mdl.glb" id="1_caq72"]
+[ext_resource type="Material" uid="uid://dvb1fj0sbtcak" path="res://maps/urban/UrbanCity/Materials/Props/Signs_mat.tres" id="2_cifmo"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(0.091919, 0.096222, 3.530097)
+[sub_resource type="BoxShape3D" id="1_c31wp"]
+size = Vector3(0.954928, 0.096222, 0.886123)
+
+[node name = "Sign_4_mdl" instance = ExtResource("1_caq72")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_cifmo")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.000000, 1.765048, 0.003318)
+shape = SubResource("0_c31wo")
+debug_fill = false
+
+[node name="Box1" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.027448, 2.890047, 0.103318)
+shape = SubResource("1_c31wp")
+debug_fill = false
+

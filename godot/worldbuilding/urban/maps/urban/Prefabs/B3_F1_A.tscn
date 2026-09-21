@@ -1,0 +1,69 @@
+[gd_scene load_steps=6 format=3 uid="uid://cj6dwm1m4wj6y"]
+
+[ext_resource type="PackedScene" uid="uid://dvanwk5im0juw" path="res://maps/urban/UrbanCity/Models/ModularBuildings/B3_F1_A.glb" id="1_b0ugo"]
+[ext_resource type="Material" uid="uid://bct21hd7j717n" path="res://maps/urban/UrbanCity/Materials/Buildings/building_03_Inst.tres" id="2_cp4c8"]
+[ext_resource type="Material" uid="uid://b42bfo1786mcf" path="res://maps/urban/UrbanCity/Materials/Tileable/Tilable_ConcreteWall02_Inst.tres" id="3_c0t1m"]
+[ext_resource type="Material" uid="uid://0mos6uputoj2" path="res://maps/urban/UrbanCity/Materials/Tileable/Tilable_stuccoWall_TintWhite.tres" id="4_b4bdg"]
+[ext_resource type="Material" uid="uid://tfqejht1x7pf" path="res://maps/urban/UrbanCity/Materials/Tileable/metal_02_TintA_Inst.tres" id="5_cetqf"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(0.719861, 2.658711, 5.500000)
+[sub_resource type="BoxShape3D" id="1_c31wp"]
+size = Vector3(0.790842, 6.000000, 0.595696)
+[sub_resource type="BoxShape3D" id="2_c31wn"]
+size = Vector3(0.719861, 0.951739, 5.500000)
+[sub_resource type="BoxShape3D" id="3_c31wo"]
+size = Vector3(0.719861, 2.843262, 2.451896)
+[sub_resource type="BoxShape3D" id="4_c31wm"]
+size = Vector3(0.240967, 1.012299, 2.871163)
+[sub_resource type="BoxShape3D" id="5_c31wm"]
+size = Vector3(0.240967, 1.012299, 2.871163)
+[sub_resource type="BoxShape3D" id="6_c31wl"]
+size = Vector3(0.240967, 1.995621, 0.971650)
+
+[node name = "B3_F1_A" instance = ExtResource("1_b0ugo")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_cp4c8")
+surface_material_override/1 = ExtResource("3_c0t1m")
+surface_material_override/2 = ExtResource("4_b4bdg")
+surface_material_override/3 = ExtResource("5_cetqf")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.359975, 2.750000, 4.663627)
+shape = SubResource("0_c31wo")
+debug_fill = false
+
+[node name="Box1" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.222879, 5.167219, 3.000000)
+shape = SubResource("1_c31wp")
+debug_fill = false
+
+[node name="Box2" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.359976, 2.750000, 0.432332)
+shape = SubResource("2_c31wn")
+debug_fill = false
+
+[node name="Box3" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.359976, 4.025365, 2.153753)
+shape = SubResource("3_c31wo")
+debug_fill = false
+
+[node name="Box4" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.593985, 1.427967, 3.377547)
+shape = SubResource("4_c31wm")
+debug_fill = false
+
+[node name="Box5" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.593985, 1.427967, 0.879044)
+shape = SubResource("5_c31wm")
+debug_fill = false
+
+[node name="Box6" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.593985, 3.040983, 2.145089)
+shape = SubResource("6_c31wl")
+debug_fill = false
+

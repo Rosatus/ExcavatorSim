@@ -1,0 +1,15 @@
+[gd_resource type = "ShaderMaterial" load_steps=6 format=3 uid="uid://c2iktnijdwsj6"]
+
+[ext_resource type="Shader" uid="uid://efx8tioonf0c" path="res://maps/urban/Shaders/prp_bench_Mat.tres" id="6_8kjsg"]
+[ext_resource type="Texture2D" uid="uid://8squ4ehl3qv3" path="res://maps/urban/UrbanCity/Textures/Props/prp_bench_n.png" id="1_p7rfi"]
+[ext_resource type="Texture2D" uid="uid://7yaxv2u6ahr0" path="res://maps/urban/UrbanCity/Textures/Props/prp_bench_a.png" id="2_dvhgb"]
+[ext_resource type="Texture2D" uid="uid://cathitvcj35gp" path="res://maps/urban/UrbanCity/Textures/Props/prp_bench_m.png" id="3_cda8b"]
+[ext_resource type="Texture2D" uid="uid://bskdnbwxromq1" path="res://maps/urban/UrbanCity/Textures/Props/prp_bench_r.png" id="4_dfj6e"]
+[ext_resource type="Texture2D" uid="uid://drsqsa41iiaja" path="res://maps/urban/UrbanCity/Textures/Props/prp_bench_ao.png" id="5_twowr"]
+
+[resource]
+resource_name = "prp_bench_Mat"
+render_priority = 0
+shader = ExtResource("6_8kjsg")
+shader_parameter/Generated_prp_bench_n = ExtResource("1_p7rfi")
+shader_parameter/Param = 1.372

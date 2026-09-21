@@ -1,0 +1,23 @@
+[gd_scene load_steps=4 format=3 uid="uid://cncdu0va7a4iq"]
+
+[ext_resource type="PackedScene" uid="uid://dupc6f6e2tap7" path="res://maps/urban/UrbanCity/Models/Foliage/Flg_hedge_Tall.glb" id="1_dfx6x"]
+[ext_resource type="Material" uid="uid://3o526krv4kaf" path="res://maps/urban/UrbanCity/Materials/Foliage/foliage_hedge_d_Mat.tres" id="2_bjg7i"]
+[ext_resource type="Material" uid="uid://dp37a0jgqak38" path="res://maps/urban/UrbanCity/Materials/Foliage/foliage_hedgeLeaves_d_Mat.tres" id="3_cqkuf"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(0.899032, 2.803326, 1.789514)
+
+[node name = "Flg_hedge_Tall" instance = ExtResource("1_dfx6x")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_bjg7i")
+surface_material_override/1 = ExtResource("3_cqkuf")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.017962, 1.065960, 0.005537)
+shape = SubResource("0_c31wo")
+debug_fill = false
+

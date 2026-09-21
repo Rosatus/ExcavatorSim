@@ -1,0 +1,33 @@
+[gd_scene load_steps=9 format=3 uid="uid://dyb85ek8iufhp"]
+
+[ext_resource type="PackedScene" uid="uid://c3jrqi5bh23ko" path="res://maps/urban/UrbanCity/Models/CompletedBuildings/Building_2_02.glb" id="1_do8wq"]
+[ext_resource type="Material" uid="uid://3ubrhyyyenw1" path="res://maps/urban/UrbanCity/Materials/Tileable/brick_02_TintB_Inst2.tres" id="2_n3omn"]
+[ext_resource type="Material" uid="uid://b4cn5s3hvh3wo" path="res://maps/urban/UrbanCity/Materials/Buildings/building_02_Inst.tres" id="3_cj5vq"]
+[ext_resource type="Material" uid="uid://b22rnatu2liyv" path="res://maps/urban/UrbanCity/Materials/Tileable/brick_02_TintA_Inst.tres" id="4_bx4lu"]
+[ext_resource type="Material" uid="uid://p84n4e437fnu" path="res://maps/urban/UrbanCity/Materials/-Window_mat.tres" id="5_dk17j"]
+[ext_resource type="Material" uid="uid://ciklw4sfcddi6" path="res://maps/urban/UrbanCity/Materials/Tileable/Tilable_metal_TintB_Inst.tres" id="6_bl7mw"]
+[ext_resource type="Material" uid="uid://b22rnatu2liyv" path="res://maps/urban/UrbanCity/Materials/Tileable/brick_02_TintA_Inst.tres" id="7_bx4lu"]
+[ext_resource type="Material" uid="uid://c3gh64dxa3m7r" path="res://maps/urban/UrbanCity/Materials/Tileable/rooftop_Mat.tres" id="8_dn13m"]
+
+[sub_resource type="ConcavePolygonShape3D" id="0_c31wo"]
+data = PackedVector3Array(0.302187, 38.699226, -0.242024, 0.302187, 0.300774, -0.242021, 0.302063, 38.699087, 37.362187, -44.302066, 38.699092, 37.362186, 0.302063, 38.699087, 37.362187, -44.302066, 0.300916, 37.362186, 0.302063, 0.300914, 37.362188, -44.302066, 0.300916, 37.362186, 0.302063, 38.699087, 37.362187, 0.000410, -0.001001, 0.059753, -44.000245, -0.001000, 37.060272, 0.000248, -0.001001, 37.060271, 0.302187, 38.699226, -0.242024, -44.301973, 38.699043, -0.242206, 0.302187, 0.300774, -0.242021, -0.499589, 39.501001, 0.559751, -44.301973, 38.699043, -0.242206, 0.302187, 38.699226, -0.242024, -0.499589, 39.501001, 0.559751, -43.500420, 39.501001, 0.559752, -44.301973, 38.699043, -0.242206, -0.499752, 39.501001, 36.560273, 0.302063, 38.699087, 37.362187, -44.302066, 38.699092, 37.362186, -44.302066, 38.699092, 37.362186, -44.301973, 38.699043, -0.242206, -43.500420, 39.501001, 0.559752, -44.302065, 0.300650, -0.242203, 0.000410, -0.001001, 0.059753, 0.302187, 0.300774, -0.242021, 0.301249, 38.700000, 37.361250, -0.499589, 39.501001, 0.559751, 0.302187, 38.699226, -0.242024, 0.301249, 38.700000, 37.361250, -0.499752, 39.501001, 36.560273, -0.499589, 39.501001, 0.559751, 0.000248, -0.001001, 37.060271, -44.000245, -0.001000, 37.060272, 0.302063, 0.300914, 37.362188, 0.302063, 0.300914, 37.362188, 0.302063, 38.699087, 37.362187, 0.302187, 0.300774, -0.242021, -44.000245, -0.001000, 37.060272, -44.302066, 0.300916, 37.362186, 0.302063, 0.300914, 37.362188, -44.000415, -0.001000, 0.059749, -44.302065, 0.300650, -0.242203, -44.000245, -0.001000, 37.060272, 0.000410, -0.001001, 0.059753, 0.000248, -0.001001, 37.060271, 0.302187, 0.300774, -0.242021, 0.000248, -0.001001, 37.060271, 0.302063, 0.300914, 37.362188, 0.302187, 0.300774, -0.242021, -44.302065, 0.300650, -0.242203, 0.302187, 0.300774, -0.242021, -44.301973, 38.699043, -0.242206, -44.302065, 0.300650, -0.242203, -44.301973, 38.699043, -0.242206, -44.302066, 38.699092, 37.362186, -44.302065, 0.300650, -0.242203, -44.302066, 0.300916, 37.362186, -44.000245, -0.001000, 37.060272, -44.302065, 0.300650, -0.242203, -44.302066, 38.699092, 37.362186, -44.302066, 0.300916, 37.362186, -44.000415, -0.001000, 0.059749, 0.000410, -0.001001, 0.059753, -44.302065, 0.300650, -0.242203, -44.000415, -0.001000, 0.059749, -44.000245, -0.001000, 37.060272, 0.000410, -0.001001, 0.059753, -0.499752, 39.501001, 36.560273, -43.500420, 39.501001, 0.559752, -0.499589, 39.501001, 0.559751, -43.500250, 39.501001, 36.560272, -0.499752, 39.501001, 36.560273, -44.302066, 38.699092, 37.362186, 0.301249, 38.700000, 37.361250, 0.302063, 38.699087, 37.362187, -0.499752, 39.501001, 36.560273, 0.301249, 38.700000, 37.361250, 0.302187, 38.699226, -0.242024, 0.302063, 38.699087, 37.362187, -43.500250, 39.501001, 36.560272, -43.500420, 39.501001, 0.559752, -0.499752, 39.501001, 36.560273, -43.500250, 39.501001, 36.560272, -44.302066, 38.699092, 37.362186, -43.500420, 39.501001, 0.559752)
+ 
+[node name = "Building_2_02" instance = ExtResource("1_do8wq")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_n3omn")
+surface_material_override/1 = ExtResource("3_cj5vq")
+surface_material_override/2 = ExtResource("4_bx4lu")
+surface_material_override/3 = ExtResource("5_dk17j")
+surface_material_override/4 = ExtResource("6_bl7mw")
+surface_material_override/5 = ExtResource("7_bx4lu")
+surface_material_override/6 = ExtResource("8_dn13m")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Building_2_02" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+shape = SubResource("0_c31wo")
+debug_fill = false
+

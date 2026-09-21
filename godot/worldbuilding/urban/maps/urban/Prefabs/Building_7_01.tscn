@@ -1,0 +1,31 @@
+[gd_scene load_steps=8 format=3 uid="uid://c38j75pwfn54h"]
+
+[ext_resource type="PackedScene" uid="uid://dvvlalky3b0fy" path="res://maps/urban/UrbanCity/Models/CompletedBuildings/Building_7_01.glb" id="1_b8g8f"]
+[ext_resource type="Material" uid="uid://b0kev6ouaewp" path="res://maps/urban/UrbanCity/Materials/Tileable/brick_05_Inst.tres" id="2_b84mn"]
+[ext_resource type="Material" uid="uid://b7qk6q2ylcgd2" path="res://maps/urban/UrbanCity/Materials/Buildings/building_07_Inst.tres" id="3_bl0vp"]
+[ext_resource type="Material" uid="uid://4ei1l4jrww21" path="res://maps/urban/UrbanCity/Materials/Tileable/Tilable_metal_TintC_Inst.tres" id="4_dg4nd"]
+[ext_resource type="Material" uid="uid://bdhppg7alu45n" path="res://maps/urban/UrbanCity/Materials/Tileable/Tilable_concreteWall06_Inst.tres" id="5_qwmnd"]
+[ext_resource type="Material" uid="uid://4ei1l4jrww21" path="res://maps/urban/UrbanCity/Materials/Tileable/Tilable_metal_TintC_Inst.tres" id="6_dg4nd"]
+[ext_resource type="Material" uid="uid://c3gh64dxa3m7r" path="res://maps/urban/UrbanCity/Materials/Tileable/rooftop_Mat.tres" id="7_dn13m"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(23.143711, 39.588722, 26.500000)
+
+[node name = "Building_7_01" instance = ExtResource("1_b8g8f")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_b84mn")
+surface_material_override/1 = ExtResource("3_bl0vp")
+surface_material_override/2 = ExtResource("4_dg4nd")
+surface_material_override/3 = ExtResource("5_qwmnd")
+surface_material_override/4 = ExtResource("6_dg4nd")
+surface_material_override/5 = ExtResource("7_dn13m")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, -11.500000, 13.250000, 19.750002)
+shape = SubResource("0_c31wo")
+debug_fill = false
+

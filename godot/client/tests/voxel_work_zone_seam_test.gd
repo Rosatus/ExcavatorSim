@@ -97,7 +97,7 @@ func _check_runtime_perimeters() -> String:
 		if zone.terrain.material_override.get_shader_parameter("soil_bounds") != expected:
 			return "%s presentation uses semantic boundary" % map_id
 		# Dummy rendering has no native Terrain3D shader uniforms to read back.
-		if map_id == "construction" and DisplayServer.get_name() != "headless" and not scene.get_node("ConstructionMap/Ground").material.get_shader_param("voxel_seam_rect").is_equal_approx(expected):
+		if map_id == "construction" and DisplayServer.get_name() != "headless" and not scene.get_node("StaticMap/Ground").material.get_shader_param("voxel_seam_rect").is_equal_approx(expected):
 			return "construction native presentation and voxel boundary agree"
 		for step in range(1, 16):
 			var x := lerpf(lo.x, hi.x, float(step) / 16.0)

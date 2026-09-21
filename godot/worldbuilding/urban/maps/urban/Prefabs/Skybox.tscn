@@ -1,0 +1,9 @@
+[gd_scene load_steps=3 format=3 uid="uid://ci33gwlxdpnan"]
+
+[ext_resource type="PackedScene" uid="uid://dyp6xqoiqrnd3" path="res://maps/urban/UrbanCity/StarterContent/Blueprints/Assets/Skybox.glb" id="1_bhd1k"]
+[ext_resource type="Material" uid="uid://dwlnq8f3bx3ij" path="res://maps/urban/UrbanCity/Maps/DemoNewM_LightStage_Skybox_HDRI(MID_M_LightStage_Skybox_HDRI_0_75379).tres" id="2_ik62b"]
+
+[node name = "Skybox" instance = ExtResource("1_bhd1k")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_ik62b")

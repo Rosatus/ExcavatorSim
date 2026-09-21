@@ -1,0 +1,27 @@
+[gd_scene load_steps=6 format=3 uid="uid://banxmtgv3gr3v"]
+
+[ext_resource type="PackedScene" uid="uid://blderx71pmwdv" path="res://maps/urban/UrbanCity/Models/ModularBuildings/B9_F2_C.glb" id="1_c0lq4"]
+[ext_resource type="Material" uid="uid://ccddsb85fsyoq" path="res://maps/urban/UrbanCity/Materials/Buildings/building_09_Glass_Inst.tres" id="2_kee1u"]
+[ext_resource type="Material" uid="uid://rtka4gjt5ak2" path="res://maps/urban/UrbanCity/Materials/Buildings/building_09_Inst.tres" id="3_dgve1"]
+[ext_resource type="Material" uid="uid://cdh5ow7v8bd6y" path="res://maps/urban/UrbanCity/Materials/Tileable/Tilable_concreteWall07_Inst.tres" id="4_df4y0"]
+[ext_resource type="Material" uid="uid://0mos6uputoj2" path="res://maps/urban/UrbanCity/Materials/Tileable/Tilable_stuccoWall_TintWhite.tres" id="5_b4bdg"]
+
+[sub_resource type="ConcavePolygonShape3D" id="0_c31wo"]
+data = PackedVector3Array(0.001000, 5.501250, 0.251250, 0.001000, 5.501250, -0.126385, 0.001250, -0.001000, 0.251250, -4.000999, -0.001000, 0.251250, -4.000999, -0.001166, -0.000248, -4.000999, 5.501250, 0.251250, 0.001000, -0.001083, -0.000331, 0.001000, 0.124971, -0.126385, -4.000999, -0.001166, -0.000248, -4.000999, 5.501250, -0.126385, -4.000999, 0.124971, -0.126385, 0.001000, 5.501250, -0.126385, 0.001000, 5.501250, 0.251250, -4.000999, 5.501250, 0.251250, 0.001000, 5.501250, -0.126385, 0.001000, 5.501250, 0.251250, 0.001250, -0.001000, 0.251250, -4.000999, 5.501250, 0.251250, -4.000999, -0.001000, 0.251250, 0.001250, -0.001000, 0.251250, -4.000999, -0.001166, -0.000248, -4.000999, -0.001000, 0.251250, -4.000999, 5.501250, 0.251250, 0.001250, -0.001000, 0.251250, -4.000999, 0.124971, -0.126385, 0.001000, 0.124971, -0.126385, 0.001000, 5.501250, -0.126385, 0.001000, 0.124971, -0.126385, 0.001250, -0.001000, 0.251250, 0.001000, 5.501250, -0.126385, 0.001000, -0.001083, -0.000331, 0.001250, -0.001000, 0.251250, 0.001000, 0.124971, -0.126385, 0.001000, -0.001083, -0.000331, -4.000999, -0.001166, -0.000248, 0.001250, -0.001000, 0.251250, -4.000999, 0.124971, -0.126385, -4.000999, -0.001166, -0.000248, 0.001000, 0.124971, -0.126385, -4.000999, 0.124971, -0.126385, -4.000999, 5.501250, 0.251250, -4.000999, -0.001166, -0.000248, -4.000999, 5.501250, -0.126385, -4.000999, 5.501250, 0.251250, -4.000999, 0.124971, -0.126385, -4.000999, 5.501250, -0.126385, 0.001000, 5.501250, -0.126385, -4.000999, 5.501250, 0.251250)
+ 
+[node name = "B9_F2_C" instance = ExtResource("1_c0lq4")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_kee1u")
+surface_material_override/1 = ExtResource("3_dgve1")
+surface_material_override/2 = ExtResource("4_df4y0")
+surface_material_override/3 = ExtResource("5_b4bdg")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Building9_Example2_5194_B9_F2_C_9_1037" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+shape = SubResource("0_c31wo")
+debug_fill = false
+

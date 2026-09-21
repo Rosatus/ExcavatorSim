@@ -1,0 +1,19 @@
+[gd_resource type = "ShaderMaterial" load_steps=4 format=3 uid="uid://bybakv005lmxo"]
+
+[ext_resource type="Shader" uid="uid://bsx7xku4je0fq" path="res://maps/urban/Shaders/Foliage_01_Inst.tres" id="4_bwhbc"]
+[ext_resource type="Texture2D" uid="uid://bli8mdh0dc2d0" path="res://maps/urban/UrbanCity/Textures/Foliage/foliage_01_n.png" id="1_bjyeg"]
+[ext_resource type="Texture2D" uid="uid://ddryc65f8byn" path="res://maps/urban/UrbanCity/Textures/Foliage/foliage_01_d.png" id="2_37ih5"]
+[ext_resource type="Texture2D" uid="uid://bswkqjrab42f8" path="res://maps/urban/UrbanCity/Textures/Foliage/foliage_01_r.png" id="3_di2lb"]
+
+[resource]
+resource_name = "Foliage_01_Inst"
+render_priority = 0
+shader = ExtResource("4_bwhbc")
+shader_parameter/Occlusion = 1.000
+shader_parameter/Generated_foliage_01_n = ExtResource("1_bjyeg")
+shader_parameter/Roughness = 0.896
+shader_parameter/Specular = 0.088
+shader_parameter/Sub_Surface_Strength = 1.618
+shader_parameter/Intensity = 0.500
+shader_parameter/Weight = 1.537
+shader_parameter/Speed = 0.205

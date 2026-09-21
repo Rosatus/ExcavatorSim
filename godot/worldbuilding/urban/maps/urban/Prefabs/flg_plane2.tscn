@@ -1,0 +1,9 @@
+[gd_scene load_steps=3 format=3 uid="uid://bf3wd2myudtcl"]
+
+[ext_resource type="PackedScene" uid="uid://bcemoc3yrqqlr" path="res://maps/urban/UrbanCity/Models/Foliage/flg_plane2.glb" id="1_bruuf"]
+[ext_resource type="Material" uid="uid://xvngs6toq7gp" path="res://maps/urban/UrbanCity/Materials/Foliage/decal_DeadLeaves_Inst.tres" id="2_ch0e8"]
+
+[node name = "flg_plane2" instance = ExtResource("1_bruuf")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_ch0e8")

@@ -1,0 +1,28 @@
+[gd_scene load_steps=3 format=3 uid="uid://dtesctbkfbopr"]
+
+[ext_resource type="PackedScene" uid="uid://bplf2juhtks6s" path="res://maps/urban/UrbanCity/Models/props/prp_electricalBox.glb" id="1_snuf3"]
+[ext_resource type="Material" uid="uid://cnkp73etjdbxm" path="res://maps/urban/UrbanCity/Materials/Props/prp_electricalBox_Mat.tres" id="2_iis63"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(0.519130, 0.736450, 1.060533)
+[sub_resource type="BoxShape3D" id="1_c31wp"]
+size = Vector3(0.809130, 0.876450, 0.140533)
+
+[node name = "prp_electricalBox" instance = ExtResource("1_snuf3")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_iis63")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.205519, 0.530266, 0.070860)
+shape = SubResource("0_c31wo")
+debug_fill = false
+
+[node name="Box1" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.205519, 0.075476, 0.070860)
+shape = SubResource("1_c31wp")
+debug_fill = false
+

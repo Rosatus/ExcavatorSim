@@ -1,0 +1,9 @@
+[gd_resource type = "ShaderMaterial" load_steps=1 format=3 uid="uid://chcf6s1b7x117"]
+
+[ext_resource type="Shader" uid="uid://78dikfcyi307" path="res://maps/urban/Shaders/M_LightStage_Arrows(MID_M_LightStage_Arrows_0_75376).tres" id="1_dnfb2"]
+
+[resource]
+resource_name = "M_LightStage_Arrows(MID_M_LightStage_Arrows_0_75376)"
+render_priority = 0
+shader = ExtResource("1_dnfb2")
+shader_parameter/SunColor = Vector4(0.000, 0.000, 0.000, 0.000)

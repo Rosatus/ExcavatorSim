@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[node name="WorkArea" type="Node3D"]
+
+[node name="SpawnPoint" type="Node3D" parent="."]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -15, 1.14, 20)

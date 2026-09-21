@@ -1,0 +1,28 @@
+[gd_scene load_steps=3 format=3 uid="uid://dsshg85ijcsh0"]
+
+[ext_resource type="PackedScene" uid="uid://dkjjclilfo73h" path="res://maps/urban/UrbanCity/Models/ModularBuildings/B4_L_02_corner.glb" id="1_beygu"]
+[ext_resource type="Material" uid="uid://bpuidxeuvi2sa" path="res://maps/urban/UrbanCity/Materials/Buildings/building_04_Inst.tres" id="2_6ruyl"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(4.728230, 0.424068, 0.500001)
+[sub_resource type="BoxShape3D" id="1_c31wp"]
+size = Vector3(4.728230, 0.424068, 0.500001)
+
+[node name = "B4_L_02_corner" instance = ExtResource("1_beygu")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_6ruyl")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, -2.135885, 0.250000, -0.034877)
+shape = SubResource("0_c31wo")
+debug_fill = false
+
+[node name="Box1" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(-0.000000, -1.000000, -0.000000, 0.000000, -0.000000, -1.000000, 1.000000, 0.000000, -0.000000, 0.032629, 0.250000, 2.147997)
+shape = SubResource("1_c31wp")
+debug_fill = false
+

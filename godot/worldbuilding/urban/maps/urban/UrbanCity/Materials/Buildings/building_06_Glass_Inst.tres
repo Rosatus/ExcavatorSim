@@ -1,0 +1,24 @@
+[gd_resource type = "ShaderMaterial" load_steps=5 format=3 uid="uid://bfrb3mpfkpuqb"]
+
+[ext_resource type="Shader" uid="uid://dax2c8367mekr" path="res://maps/urban/Shaders/building_06_Glass_Inst.tres" id="5_ush55"]
+[ext_resource type="Texture2D" uid="uid://bxvgbmpowbh5y" path="res://maps/urban/UrbanCity/Textures/Buildings/building_01_n.png" id="1_dwqae"]
+[ext_resource type="Texture2D" uid="uid://ddr6rhdjvlt3c" path="res://maps/urban/UrbanCity/Textures/Tileable/clouds.png" id="2_blh7j"]
+[ext_resource type="Texture2D" uid="uid://vtpe0kryveat" path="res://maps/urban/UrbanCity/Textures/Buildings/building_06_d.png" id="3_82rqr"]
+[ext_resource type="Texture2D" uid="uid://bjywh6a8jlta0" path="res://maps/urban/UrbanCity/Textures/Buildings/building_06_r.png" id="4_pe6t3"]
+
+[resource]
+resource_name = "building_06_Glass_Inst"
+render_priority = 0
+shader = ExtResource("5_ush55")
+shader_parameter/Diffuse = ExtResource("3_82rqr")
+shader_parameter/Opacity = 0.824
+shader_parameter/Emissive_Colour = Vector4(0.395, 0.313, 0.099, 1.000)
+shader_parameter/EmissiveAmount = 0.000
+shader_parameter/Clouds_Mask_Tiling = 0.542
+shader_parameter/Window_Emissive_Count = 0.255
+shader_parameter/Contrast = 0.070
+shader_parameter/Normal = ExtResource("1_dwqae")
+shader_parameter/Normal_Strength = 1.000
+shader_parameter/Roughness = ExtResource("4_pe6t3")
+shader_parameter/Roughness_Float = 1.000
+shader_parameter/Specular = 0.500

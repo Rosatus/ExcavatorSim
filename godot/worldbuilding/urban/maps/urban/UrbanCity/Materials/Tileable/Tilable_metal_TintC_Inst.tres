@@ -1,0 +1,35 @@
+[gd_resource type = "ShaderMaterial" load_steps=6 format=3 uid="uid://4ei1l4jrww21"]
+
+[ext_resource type="Shader" uid="uid://ch0ccwtlm2siv" path="res://maps/urban/Shaders/Tilable_metal_TintC_Inst.tres" id="6_ortrh"]
+[ext_resource type="Texture2D" uid="uid://8l85fbtuv5qo" path="res://maps/urban/UrbanCity/Textures/Tileable/metal_01_n.png" id="1_dfxn8"]
+[ext_resource type="Texture2D" uid="uid://bvhfynme78iou" path="res://maps/urban/UrbanCity/Textures/Tileable/Detail_Metal_A_N.png" id="2_c3arp"]
+[ext_resource type="Texture2D" uid="uid://cj6w2fo6aieoq" path="res://maps/urban/UrbanCity/Textures/Tileable/mask_grunge_tileable.png" id="3_dd3ep"]
+[ext_resource type="Texture2D" uid="uid://d34pjpy7woc0g" path="res://maps/urban/UrbanCity/Textures/Tileable/metal_01_d.png" id="4_b6r7l"]
+[ext_resource type="Texture2D" uid="uid://nji8gmam4h1o" path="res://maps/urban/UrbanCity/Textures/Tileable/Blank_Compact.png" id="5_ybw4f"]
+
+[resource]
+resource_name = "Tilable_metal_TintC_Inst"
+render_priority = 0
+shader = ExtResource("6_ortrh")
+shader_parameter/Grunge_1_Colour = Vector4(0.000, 0.000, 0.000, 1.000)
+shader_parameter/Grunge_1_Scale = 1.000
+shader_parameter/Grunge_1_Opacity = 0.300
+shader_parameter/Grunge_2_Colour = Vector4(0.000, 0.000, 0.000, 1.000)
+shader_parameter/Grunge_2_Scale = 1.000
+shader_parameter/Grunge_2_Opacity = 0.300
+shader_parameter/Grunge_3_Colour = Vector4(0.000, 0.000, 0.000, 1.000)
+shader_parameter/Grunge_3_Scale = 1.000
+shader_parameter/Grunge_3_Opacity = 0.300
+shader_parameter/Grunge_4_Colour = Vector4(0.000, 0.000, 0.000, 1.000)
+shader_parameter/Grunge_4_Scale = 1.000
+shader_parameter/Diffuse = ExtResource("4_b6r7l")
+shader_parameter/TextureScale = 1.000
+shader_parameter/Tint_Colour = Vector4(0.014, 0.017, 0.045, 1.000)
+shader_parameter/Tint_Opacity = 0.898
+shader_parameter/Normal = ExtResource("1_dfxn8")
+shader_parameter/Normal_Strength = 1.000
+shader_parameter/Detail_Normal = ExtResource("2_c3arp")
+shader_parameter/Detail_Normal_Scale = 0.599
+shader_parameter/Detail_Normal_Strength = 2.381
+shader_parameter/Compact = ExtResource("5_ybw4f")
+shader_parameter/Roughness = 1.849

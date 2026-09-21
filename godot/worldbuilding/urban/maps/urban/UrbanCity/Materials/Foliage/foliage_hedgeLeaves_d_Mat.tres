@@ -1,0 +1,11 @@
+[gd_resource type = "ShaderMaterial" load_steps=3 format=3 uid="uid://dp37a0jgqak38"]
+
+[ext_resource type="Shader" uid="uid://dgc1ier4osl3h" path="res://maps/urban/Shaders/foliage_hedgeLeaves_d_Mat.tres" id="3_ygwpl"]
+[ext_resource type="Texture2D" uid="uid://u7pf4w6uekgb" path="res://maps/urban/UrbanCity/Textures/Foliage/foliage_hedgeLeaves_n.png" id="1_0d0la"]
+[ext_resource type="Texture2D" uid="uid://d4i85ej7nksr4" path="res://maps/urban/UrbanCity/Textures/Foliage/foliage_hedgeLeaves_d.png" id="2_dv01c"]
+
+[resource]
+resource_name = "foliage_hedgeLeaves_d_Mat"
+render_priority = 0
+shader = ExtResource("3_ygwpl")
+shader_parameter/Generated_foliage_hedgeLeaves_n = ExtResource("1_0d0la")

@@ -1,0 +1,12 @@
+[gd_resource type = "ShaderMaterial" load_steps=4 format=3 uid="uid://bwsnokp2m2s30"]
+
+[ext_resource type="Shader" uid="uid://br5qqexmptxti" path="res://maps/urban/Shaders/M_Rock_Marble_Polished.tres" id="4_23gob"]
+[ext_resource type="Texture2D" uid="uid://2824uenix61s" path="res://maps/urban/UrbanCity/StarterContent/Textures/T_Metal_Gold_N.png" id="1_blkng"]
+[ext_resource type="Texture2D" uid="uid://dn2gjyefugyji" path="res://maps/urban/UrbanCity/StarterContent/Textures/T_Perlin_Noise_M.png" id="2_cgdiy"]
+[ext_resource type="Texture2D" uid="uid://b0rva0gcakn11" path="res://maps/urban/UrbanCity/StarterContent/Textures/T_Rock_Marble_Polished_D.png" id="3_d21mi"]
+
+[resource]
+resource_name = "M_Rock_Marble_Polished"
+render_priority = 0
+shader = ExtResource("4_23gob")
+shader_parameter/Generated_T_Metal_Gold_N = ExtResource("1_blkng")

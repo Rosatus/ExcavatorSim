@@ -1,0 +1,13 @@
+[gd_resource type = "ShaderMaterial" load_steps=5 format=3 uid="uid://bjw7h1wj1dbk6"]
+
+[ext_resource type="Shader" uid="uid://3ah8daxwojkm" path="res://maps/urban/Shaders/prp_powerlines_Mat.tres" id="5_c2b5s"]
+[ext_resource type="Texture2D" uid="uid://sucw2744jtya" path="res://maps/urban/UrbanCity/Textures/Props/prp_powerlines_n.png" id="1_hite8"]
+[ext_resource type="Texture2D" uid="uid://bw2wsy55jchrl" path="res://maps/urban/UrbanCity/Textures/Props/prp_powerlines_a.png" id="2_cv3c1"]
+[ext_resource type="Texture2D" uid="uid://dg84sl53xcckr" path="res://maps/urban/UrbanCity/Textures/Props/prp_powerlines_m.png" id="3_cuxry"]
+[ext_resource type="Texture2D" uid="uid://ddwahgo4gqar5" path="res://maps/urban/UrbanCity/Textures/Props/prp_powerlines_r.png" id="4_cv736"]
+
+[resource]
+resource_name = "prp_powerlines_Mat"
+render_priority = 0
+shader = ExtResource("5_c2b5s")
+shader_parameter/Generated_prp_powerlines_n = ExtResource("1_hite8")

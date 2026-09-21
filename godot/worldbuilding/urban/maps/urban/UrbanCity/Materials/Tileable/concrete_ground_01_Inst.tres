@@ -1,0 +1,35 @@
+[gd_resource type = "ShaderMaterial" load_steps=8 format=3 uid="uid://cke4xha2id866"]
+
+[ext_resource type="Shader" uid="uid://bhjn6th61x0a1" path="res://maps/urban/Shaders/concrete_ground_01_Inst.tres" id="8_d1aih"]
+[ext_resource type="Texture2D" uid="uid://d3andav8tx0pc" path="res://maps/urban/UrbanCity/Textures/Tileable/blank_normal.png" id="1_d37l1"]
+[ext_resource type="Texture2D" uid="uid://c0bpkubspvgew" path="res://maps/urban/UrbanCity/Textures/Tileable/concrete_ground_01_n.png" id="2_dsl2p"]
+[ext_resource type="Texture2D" uid="uid://cwbubp6q7w7us" path="res://maps/urban/UrbanCity/Textures/Tileable/Detail_Concrete_N.png" id="3_bkog2"]
+[ext_resource type="Texture2D" uid="uid://ddr6rhdjvlt3c" path="res://maps/urban/UrbanCity/Textures/Tileable/clouds.png" id="4_blh7j"]
+[ext_resource type="Texture2D" uid="uid://criymxi2nxjh1" path="res://maps/urban/UrbanCity/Textures/Tileable/concrete_ground_01_h.png" id="5_vx6u6"]
+[ext_resource type="Texture2D" uid="uid://ncr2u3r2nuf5" path="res://maps/urban/UrbanCity/Textures/Tileable/concrete_ground_01_d.png" id="6_w3mb2"]
+[ext_resource type="Texture2D" uid="uid://dt7je10dbcb5s" path="res://maps/urban/UrbanCity/Textures/Tileable/concrete_ground_01_r.png" id="7_kosg2"]
+
+[resource]
+resource_name = "concrete_ground_01_Inst"
+render_priority = 0
+shader = ExtResource("8_d1aih")
+shader_parameter/PuddleColour = Vector4(0.180, 0.183, 0.205, 1.000)
+shader_parameter/Diffuse = ExtResource("6_w3mb2")
+shader_parameter/Texture_Scale = 1.000
+shader_parameter/Parallax_Mapping_Toggle = false
+shader_parameter/Tint = Vector4(1.000, 1.000, 1.000, 1.000)
+shader_parameter/PuddleTiling = 3.000
+shader_parameter/PuddleSize = 2.400
+shader_parameter/Rain_Amount_Overide = 0.0
+shader_parameter/PuddleFallOff = 6.000
+shader_parameter/Height = ExtResource("5_vx6u6")
+shader_parameter/Generated_blank_normal = ExtResource("1_d37l1")
+shader_parameter/Normal = ExtResource("2_dsl2p")
+shader_parameter/Normal_Strength = 1.458
+shader_parameter/DetailMap = ExtResource("3_bkog2")
+shader_parameter/DetailScale = 4.930
+shader_parameter/DetailNormalStrength = 0.289
+shader_parameter/Compact = ExtResource("7_kosg2")
+shader_parameter/Puddle_Roughness = 0.000
+shader_parameter/Roughness = 0.100
+shader_parameter/Puddle_Spec = 0.500

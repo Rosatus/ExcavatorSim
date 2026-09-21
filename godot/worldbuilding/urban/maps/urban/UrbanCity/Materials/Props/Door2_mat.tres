@@ -1,0 +1,12 @@
+[gd_resource type = "ShaderMaterial" load_steps=4 format=3 uid="uid://bgbr62orlrrbi"]
+
+[ext_resource type="Shader" uid="uid://lhp3q05dc3e2" path="res://maps/urban/Shaders/Door2_mat.tres" id="4_ccrmn"]
+[ext_resource type="Texture2D" uid="uid://jqnf8r3bi2eh" path="res://maps/urban/UrbanCity/Textures/Props/Door2_N.png" id="1_b2gl8"]
+[ext_resource type="Texture2D" uid="uid://ojq416d5hqes" path="res://maps/urban/UrbanCity/Textures/Props/Door2_A.png" id="2_w71ea"]
+[ext_resource type="Texture2D" uid="uid://df3k1mp1q7wgi" path="res://maps/urban/UrbanCity/Textures/Props/Door2_C.png" id="3_dbkx4"]
+
+[resource]
+resource_name = "Door2_mat"
+render_priority = 0
+shader = ExtResource("4_ccrmn")
+shader_parameter/Generated_Door2_N = ExtResource("1_b2gl8")

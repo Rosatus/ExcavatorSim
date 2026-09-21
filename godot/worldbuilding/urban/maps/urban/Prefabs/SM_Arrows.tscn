@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3 uid="uid://cifpigkmssrgq"]
+
+[ext_resource type="PackedScene" uid="uid://bppdv5hfqd7af" path="res://maps/urban/UrbanCity/StarterContent/Blueprints/Assets/SM_Arrows.glb" id="1_drmbg"]
+[ext_resource type="Material" uid="uid://chcf6s1b7x117" path="res://maps/urban/UrbanCity/Maps/DemoNewM_LightStage_Arrows(MID_M_LightStage_Arrows_0_75376).tres" id="2_g6v8h"]
+
+[node name = "SM_Arrows" instance = ExtResource("1_drmbg")]
+
+[node name="Mesh" parent="." index="0"]
+cast_shadow = 0
+surface_material_override/0 = ExtResource("2_g6v8h")

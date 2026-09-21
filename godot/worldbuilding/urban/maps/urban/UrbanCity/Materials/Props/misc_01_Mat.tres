@@ -1,0 +1,13 @@
+[gd_resource type = "ShaderMaterial" load_steps=5 format=3 uid="uid://dkcqpgmvdyecs"]
+
+[ext_resource type="Shader" uid="uid://c3g7qovkfs76f" path="res://maps/urban/Shaders/misc_01_Mat.tres" id="5_cvd7u"]
+[ext_resource type="Texture2D" uid="uid://cetuwsqcymw0b" path="res://maps/urban/UrbanCity/Textures/Props/misc_01_n.png" id="1_c2tg3"]
+[ext_resource type="Texture2D" uid="uid://5ojwfh0m4mir" path="res://maps/urban/UrbanCity/Textures/Props/misc_01_d.png" id="2_dt8u1"]
+[ext_resource type="Texture2D" uid="uid://bewm5w04f6yo1" path="res://maps/urban/UrbanCity/Textures/Props/misc_01_m.png" id="3_1hq6a"]
+[ext_resource type="Texture2D" uid="uid://bdnbw8t6bdytb" path="res://maps/urban/UrbanCity/Textures/Props/misc_01_r.png" id="4_dkk34"]
+
+[resource]
+resource_name = "misc_01_Mat"
+render_priority = 0
+shader = ExtResource("5_cvd7u")
+shader_parameter/Generated_misc_01_n = ExtResource("1_c2tg3")

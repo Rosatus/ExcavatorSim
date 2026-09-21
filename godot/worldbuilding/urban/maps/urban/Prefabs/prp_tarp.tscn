@@ -1,0 +1,21 @@
+[gd_scene load_steps=3 format=3 uid="uid://drv62eo6rfsjh"]
+
+[ext_resource type="PackedScene" uid="uid://cpr0cupme8j2m" path="res://maps/urban/UrbanCity/Models/props/prp_tarp.glb" id="1_bwk5c"]
+[ext_resource type="Material" uid="uid://l8tess3rvf1y" path="res://maps/urban/UrbanCity/Materials/Props/prp_tarp_mat.tres" id="2_kbfyw"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(0.074644, 3.161624, 2.169806)
+
+[node name = "prp_tarp" instance = ExtResource("1_bwk5c")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_kbfyw")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.053682, 1.139987, 1.625000)
+shape = SubResource("0_c31wo")
+debug_fill = false
+

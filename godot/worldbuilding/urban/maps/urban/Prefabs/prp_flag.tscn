@@ -1,0 +1,25 @@
+[gd_scene load_steps=5 format=3 uid="uid://dldh2ikkj3ik3"]
+
+[ext_resource type="PackedScene" uid="uid://382578tlapft" path="res://maps/urban/UrbanCity/Models/props/prp_flag.glb" id="1_ofqey"]
+[ext_resource type="Material" uid="uid://cwh7k8g742rq1" path="res://maps/urban/UrbanCity/Materials/Props/Flag_Inst.tres" id="2_cemcr"]
+[ext_resource type="Material" uid="uid://dtapf0h6ppcdf" path="res://maps/urban/UrbanCity/Materials/Tileable/metal_03_Inst.tres" id="3_cs8fg"]
+[ext_resource type="Material" uid="uid://dtapf0h6ppcdf" path="res://maps/urban/UrbanCity/Materials/Tileable/metal_03_Inst.tres" id="4_cs8fg"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(0.097146, 0.131492, 2.466828)
+
+[node name = "prp_flag" instance = ExtResource("1_ofqey")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_cemcr")
+surface_material_override/1 = ExtResource("3_cs8fg")
+surface_material_override/2 = ExtResource("4_cs8fg")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(0.704634, -0.000000, -0.709571, -0.709571, -0.000000, -0.704634, -0.000000, 1.000000, -0.000000, 0.795392, 0.782925, 0.038195)
+shape = SubResource("0_c31wo")
+debug_fill = false
+

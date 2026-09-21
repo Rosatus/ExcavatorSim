@@ -1,0 +1,39 @@
+[gd_scene load_steps=5 format=3 uid="uid://b5bgn235m35e1"]
+
+[ext_resource type="PackedScene" uid="uid://ckxpfucb6hpqd" path="res://maps/urban/UrbanCity/Models/props/prp_crosswalkSign.glb" id="1_dji67"]
+[ext_resource type="Material" uid="uid://bdhppg7alu45n" path="res://maps/urban/UrbanCity/Materials/Tileable/Tilable_concreteWall06_Inst.tres" id="2_qwmnd"]
+[ext_resource type="Material" uid="uid://cvueetu6s5xlo" path="res://maps/urban/UrbanCity/Materials/Tileable/metal_02_Inst.tres" id="3_dubni"]
+[ext_resource type="Material" uid="uid://bukhsp0pdtmq" path="res://maps/urban/UrbanCity/Materials/Props/prp_streetLight_Mat.tres" id="4_cojkg"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(0.209075, 0.182104, 5.286082)
+[sub_resource type="BoxShape3D" id="1_c31wp"]
+size = Vector3(0.209075, 0.442104, 0.406082)
+[sub_resource type="BoxShape3D" id="2_c31wn"]
+size = Vector3(0.059075, 1.072104, 0.386082)
+
+[node name = "prp_crosswalkSign" instance = ExtResource("1_dji67")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_qwmnd")
+surface_material_override/1 = ExtResource("3_dubni")
+surface_material_override/2 = ExtResource("4_cojkg")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.023937, 2.643041, 0.007175)
+shape = SubResource("0_c31wo")
+debug_fill = false
+
+[node name="Box1" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.023937, 2.944572, -0.349749)
+shape = SubResource("1_c31wp")
+debug_fill = false
+
+[node name="Box2" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.126615, 3.712123, -0.216680)
+shape = SubResource("2_c31wn")
+debug_fill = false
+

@@ -1,0 +1,32 @@
+[gd_scene load_steps=5 format=3 uid="uid://6iel16a265rb"]
+
+[ext_resource type="PackedScene" uid="uid://blhnwhand58r6" path="res://maps/urban/UrbanCity/Models/ModularBuildings/B5_F2_A.glb" id="1_cdwo3"]
+[ext_resource type="Material" uid="uid://dq25fuj5tuuud" path="res://maps/urban/UrbanCity/Materials/Buildings/building_05_Inst.tres" id="2_c6ero"]
+[ext_resource type="Material" uid="uid://c4w4kaas3k8lv" path="res://maps/urban/UrbanCity/Materials/Tileable/Tilable_concreteWall04_Inst.tres" id="3_bb7u3"]
+[ext_resource type="Material" uid="uid://0mos6uputoj2" path="res://maps/urban/UrbanCity/Materials/Tileable/Tilable_stuccoWall_TintWhite.tres" id="4_b4bdg"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(3.000000, 2.990468, 0.940212)
+[sub_resource type="BoxShape3D" id="1_c31wp"]
+size = Vector3(1.776053, 1.761039, 7.000000)
+
+[node name = "B5_F2_A" instance = ExtResource("1_cdwo3")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_c6ero")
+surface_material_override/1 = ExtResource("3_bb7u3")
+surface_material_override/2 = ExtResource("4_b4bdg")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, -0.500000, 6.466350, 0.504767)
+shape = SubResource("0_c31wo")
+debug_fill = false
+
+[node name="Box1" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, -0.963640, 3.500000, 0.967511)
+shape = SubResource("1_c31wp")
+debug_fill = false
+

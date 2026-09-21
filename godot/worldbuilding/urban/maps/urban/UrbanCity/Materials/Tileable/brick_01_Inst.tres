@@ -1,0 +1,35 @@
+[gd_resource type = "ShaderMaterial" load_steps=6 format=3 uid="uid://dc5ydgfwh04lv"]
+
+[ext_resource type="Shader" uid="uid://c0y17fnku7qfs" path="res://maps/urban/Shaders/brick_01_Inst.tres" id="6_uocs7"]
+[ext_resource type="Texture2D" uid="uid://c18rdwnan6wjw" path="res://maps/urban/UrbanCity/Textures/Tileable/brick_01_n.png" id="1_lmnkg"]
+[ext_resource type="Texture2D" uid="uid://cwbubp6q7w7us" path="res://maps/urban/UrbanCity/Textures/Tileable/Detail_Concrete_N.png" id="2_bkog2"]
+[ext_resource type="Texture2D" uid="uid://cj6w2fo6aieoq" path="res://maps/urban/UrbanCity/Textures/Tileable/mask_grunge_tileable.png" id="3_dd3ep"]
+[ext_resource type="Texture2D" uid="uid://c3jwgk8js4kv3" path="res://maps/urban/UrbanCity/Textures/Tileable/brick_01_d.png" id="4_btr37"]
+[ext_resource type="Texture2D" uid="uid://bosq548fm2j16" path="res://maps/urban/UrbanCity/Textures/Tileable/Brick_01_C.png" id="5_cpa4r"]
+
+[resource]
+resource_name = "brick_01_Inst"
+render_priority = 0
+shader = ExtResource("6_uocs7")
+shader_parameter/Grunge_1_Colour = Vector4(0.000, 0.000, 0.000, 1.000)
+shader_parameter/Grunge_1_Scale = 1.000
+shader_parameter/Grunge_1_Opacity = 0.300
+shader_parameter/Grunge_2_Colour = Vector4(0.000, 0.000, 0.000, 1.000)
+shader_parameter/Grunge_2_Scale = 1.000
+shader_parameter/Grunge_2_Opacity = 0.300
+shader_parameter/Grunge_3_Colour = Vector4(0.000, 0.000, 0.000, 1.000)
+shader_parameter/Grunge_3_Scale = 1.000
+shader_parameter/Grunge_3_Opacity = 0.300
+shader_parameter/Grunge_4_Colour = Vector4(0.000, 0.000, 0.000, 1.000)
+shader_parameter/Grunge_4_Scale = 1.000
+shader_parameter/Diffuse = ExtResource("4_btr37")
+shader_parameter/TextureScale = 1.000
+shader_parameter/Tint_Colour = Vector4(1.000, 1.000, 1.000, 1.000)
+shader_parameter/Tint_Opacity = 0.000
+shader_parameter/Normal = ExtResource("1_lmnkg")
+shader_parameter/Normal_Strength = 0.784
+shader_parameter/Detail_Normal = ExtResource("2_bkog2")
+shader_parameter/Detail_Normal_Scale = 5.819
+shader_parameter/Detail_Normal_Strength = 0.367
+shader_parameter/Compact = ExtResource("5_cpa4r")
+shader_parameter/Roughness = 1.079

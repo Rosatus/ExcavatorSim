@@ -1,0 +1,11 @@
+[gd_resource type = "ShaderMaterial" load_steps=3 format=3 uid="uid://b2v2rxpeasdd2"]
+
+[ext_resource type="Shader" uid="uid://ccgwd6wanxdxk" path="res://maps/urban/Shaders/soil_Mat.tres" id="3_dnv01"]
+[ext_resource type="Texture2D" uid="uid://28j7vhcqvq4y" path="res://maps/urban/UrbanCity/Textures/Tileable/soil_n.png" id="1_b4hfi"]
+[ext_resource type="Texture2D" uid="uid://cj8astbutywem" path="res://maps/urban/UrbanCity/Textures/Tileable/soil_d.png" id="2_nhowc"]
+
+[resource]
+resource_name = "soil_Mat"
+render_priority = 0
+shader = ExtResource("3_dnv01")
+shader_parameter/Generated_soil_n = ExtResource("1_b4hfi")

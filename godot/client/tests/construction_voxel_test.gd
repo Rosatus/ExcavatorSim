@@ -20,7 +20,7 @@ func _run() -> void:
 	var hit: Dictionary = space.intersect_ray(ray)
 	_expect(not hit.is_empty() and absf(hit.position.y - center.y) < 0.1, "level soil replaces hard map ground", failures)
 	var editable: AABB = zone.layout.editable_world_bounds(zone.voxel_scale_m)
-	var map_rid: RID = scene.get_node("ConstructionMap/Ground").collision.get_rid()
+	var map_rid: RID = scene.get_node("StaticMap/Ground").collision.get_rid()
 	var hard_remnants := 0
 	var uneven_samples := 0
 	for z in range(ceili(editable.position.z), floori(editable.end.z)):
@@ -34,7 +34,7 @@ func _run() -> void:
 	_expect(hard_remnants == 0, "editable interior has no missing soil or retained Terrain3D collision", failures)
 	_expect(uneven_samples == 0, "initial soil is level across the editable interior", failures)
 	_expect(zone.layout.owns_world_position(center) and not zone.layout.owns_world_position(Vector3(0, 0, 24)), "map owns only translated zone", failures)
-	_expect(scene.get_node("ConstructionMap/WorkArea/ExcavationArea").get_child_count() == 4, "only ground warning lines remain", failures)
+	_expect(scene.get_node("StaticMap/WorkArea/ExcavationArea").get_child_count() == 4, "only ground warning lines remain", failures)
 	var excavation = scene.get_node("TerrainRoot/ExcavationWorld")
 	_expect(excavation.is_soil_runtime_ready(), "product excavation authority is enabled", failures)
 	var contract := SoilContractDescriptor.load_for_model("sy135").to_dictionary()

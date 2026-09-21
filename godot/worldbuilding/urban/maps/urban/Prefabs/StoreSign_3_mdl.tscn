@@ -1,0 +1,9 @@
+[gd_scene load_steps=3 format=3 uid="uid://d4nkuk4c0miln"]
+
+[ext_resource type="PackedScene" uid="uid://di5aqd3i6xkjs" path="res://maps/urban/UrbanCity/Models/props/StoreSign_3_mdl.glb" id="1_dw30s"]
+[ext_resource type="Material" uid="uid://d2x6iqw15qnr2" path="res://maps/urban/UrbanCity/Materials/Props/StoreSigns_mat.tres" id="2_cj6x4"]
+
+[node name = "StoreSign_3_mdl" instance = ExtResource("1_dw30s")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_cj6x4")

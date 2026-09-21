@@ -1,0 +1,34 @@
+[gd_scene load_steps=6 format=3 uid="uid://b3i01pic3di0g"]
+
+[ext_resource type="PackedScene" uid="uid://cf4yhgpf67cm7" path="res://maps/urban/UrbanCity/Models/ModularBuildings/B7_F1_C.glb" id="1_gojln"]
+[ext_resource type="Material" uid="uid://b42bfo1786mcf" path="res://maps/urban/UrbanCity/Materials/Tileable/Tilable_ConcreteWall02_Inst.tres" id="2_c0t1m"]
+[ext_resource type="Material" uid="uid://b0kev6ouaewp" path="res://maps/urban/UrbanCity/Materials/Tileable/brick_05_Inst.tres" id="3_b84mn"]
+[ext_resource type="Material" uid="uid://b7qk6q2ylcgd2" path="res://maps/urban/UrbanCity/Materials/Buildings/building_07_Inst.tres" id="4_bl0vp"]
+[ext_resource type="Material" uid="uid://0mos6uputoj2" path="res://maps/urban/UrbanCity/Materials/Tileable/Tilable_stuccoWall_TintWhite.tres" id="5_b4bdg"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(3.999999, 0.386604, 4.939077)
+[sub_resource type="BoxShape3D" id="1_c31wp"]
+size = Vector3(3.999999, 0.970244, 0.652666)
+
+[node name = "B7_F1_C" instance = ExtResource("1_gojln")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_c0t1m")
+surface_material_override/1 = ExtResource("3_b84mn")
+surface_material_override/2 = ExtResource("4_bl0vp")
+surface_material_override/3 = ExtResource("5_b4bdg")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, -2.000000, 2.438570, 0.171795)
+shape = SubResource("0_c31wo")
+debug_fill = false
+
+[node name="Box1" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, -2.000000, 4.681126, -0.039122)
+shape = SubResource("1_c31wp")
+debug_fill = false
+

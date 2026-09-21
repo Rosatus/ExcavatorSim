@@ -1,0 +1,11 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://d2x6iqw15qnr2"]
+
+[ext_resource type="Texture2D" uid="uid://0j1a57s4o6a" path="res://maps/urban/UrbanCity/Textures/Props/StoreSigns_N.png" id="1_dj3we"]
+[ext_resource type="Shader" uid="uid://dfjvhgstdle" path="res://maps/urban/Shaders/StoreSigns_mat.tres" id="5_bkyrs"]
+
+[resource]
+resource_name = "StoreSigns_mat"
+render_priority = 0
+shader = ExtResource("5_bkyrs")
+shader_parameter/Param = 0.0
+shader_parameter/Generated_StoreSigns_N = ExtResource("1_dj3we")

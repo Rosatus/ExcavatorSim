@@ -1,0 +1,22 @@
+[gd_scene load_steps=3 format=3 uid="uid://dmkpfjy241mhw"]
+
+[ext_resource type="PackedScene" uid="uid://cllrltqgjdwyb" path="res://maps/urban/UrbanCity/Models/props/prp_pylong_Sml.glb" id="1_dlaco"]
+[ext_resource type="Material" uid="uid://bdo1egps2xjlk" path="res://maps/urban/UrbanCity/Materials/Props/prp_pylons_Mat.tres" id="2_nptyi"]
+
+[sub_resource type="CapsuleShape3D" id="0_c31wo"]
+radius = 0.128779
+height = 0.413061
+
+[node name = "prp_pylong_Sml" instance = ExtResource("1_dlaco")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_nptyi")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="prp_pylong_Sml" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+shape = SubResource("0_c31wo")
+debug_fill = false
+

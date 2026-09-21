@@ -1,0 +1,15 @@
+[gd_resource type = "ShaderMaterial" load_steps=4 format=3 uid="uid://beml2lsvkl6cy"]
+
+[ext_resource type="Shader" uid="uid://bb1f5vqwvqhj2" path="res://maps/urban/Shaders/doors.tres" id="4_daxeb"]
+[ext_resource type="Texture2D" uid="uid://bk51h23b4i7i7" path="res://maps/urban/UrbanCity/Textures/Props/doors_n.png" id="1_bwvx1"]
+[ext_resource type="Texture2D" uid="uid://ba1c2xa150s8m" path="res://maps/urban/UrbanCity/Textures/Props/doors_d.png" id="2_b71ng"]
+[ext_resource type="Texture2D" uid="uid://cviyjrjldjng3" path="res://maps/urban/UrbanCity/Textures/Props/doors_r.png" id="3_djs0y"]
+
+[resource]
+resource_name = "doors"
+render_priority = 0
+shader = ExtResource("4_daxeb")
+shader_parameter/LightsOn_Off = false
+shader_parameter/Emissive_Colour = Vector4(0.170, 0.208, 0.099, 1.000)
+shader_parameter/EmissiveAmount = 0.000
+shader_parameter/Generated_doors_n = ExtResource("1_bwvx1")

@@ -1,0 +1,11 @@
+[gd_resource type = "ShaderMaterial" load_steps=3 format=3 uid="uid://dxf8l651juihc"]
+
+[ext_resource type="Shader" uid="uid://c84pff8tyr62e" path="res://maps/urban/Shaders/Bark_01.tres" id="3_dtaf3"]
+[ext_resource type="Texture2D" uid="uid://bl8lk3mp0htim" path="res://maps/urban/UrbanCity/Textures/Foliage/bark_01_n.png" id="1_catm8"]
+[ext_resource type="Texture2D" uid="uid://cl40rtuliwi0m" path="res://maps/urban/UrbanCity/Textures/Foliage/bark_01_d.png" id="2_baw72"]
+
+[resource]
+resource_name = "Bark_01"
+render_priority = 0
+shader = ExtResource("3_dtaf3")
+shader_parameter/Generated_bark_01_n = ExtResource("1_catm8")

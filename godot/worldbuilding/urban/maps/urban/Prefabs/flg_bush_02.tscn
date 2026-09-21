@@ -1,0 +1,9 @@
+[gd_scene load_steps=3 format=3 uid="uid://71iltje1r6jq"]
+
+[ext_resource type="PackedScene" uid="uid://d1c4fd4e60qp3" path="res://maps/urban/UrbanCity/Models/Foliage/flg_bush_02.glb" id="1_badje"]
+[ext_resource type="Material" uid="uid://bybakv005lmxo" path="res://maps/urban/UrbanCity/Materials/Foliage/Foliage_01_Inst.tres" id="2_w2vl8"]
+
+[node name = "flg_bush_02" instance = ExtResource("1_badje")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_w2vl8")

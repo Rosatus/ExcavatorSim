@@ -32,7 +32,7 @@ func run() -> void:
 		"video_memory_bytes": Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED)}))
 	for frame in 5:
 		await physics_frame
-	var map := scene.get_node("ConstructionMap") as Node3D
+	var map := scene.get_node("StaticMap") as Node3D
 	var spawn_point := map.get_node("WorkArea/SpawnPoint") as Node3D
 	var excavation_area := map.get_node("WorkArea/ExcavationArea") as Node3D
 	check(spawn_point.position.is_equal_approx(Vector3(38.301582, -0.02, 31.119902)), "Saved construction spawn changed")

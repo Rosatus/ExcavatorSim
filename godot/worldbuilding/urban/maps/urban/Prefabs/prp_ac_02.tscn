@@ -1,0 +1,21 @@
+[gd_scene load_steps=3 format=3 uid="uid://bjeij237ag6nb"]
+
+[ext_resource type="PackedScene" uid="uid://c6xga47ds0w7a" path="res://maps/urban/UrbanCity/Models/props/prp_ac_02.glb" id="1_3nw1h"]
+[ext_resource type="Material" uid="uid://dkcqpgmvdyecs" path="res://maps/urban/UrbanCity/Materials/Props/misc_01_Mat.tres" id="2_dw82f"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(0.559420, 0.307918, 0.450545)
+
+[node name = "prp_ac_02" instance = ExtResource("1_3nw1h")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_dw82f")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.000000, 0.000000, 0.153959)
+shape = SubResource("0_c31wo")
+debug_fill = false
+

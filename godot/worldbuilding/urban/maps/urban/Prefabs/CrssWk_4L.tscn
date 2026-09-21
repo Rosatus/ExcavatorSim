@@ -1,0 +1,21 @@
+[gd_scene load_steps=3 format=3 uid="uid://ckmahyr5i068b"]
+
+[ext_resource type="PackedScene" uid="uid://damwpptnphsdj" path="res://maps/urban/UrbanCity/Models/ModularRoads/CrssWk_4L.glb" id="1_bkush"]
+[ext_resource type="Material" uid="uid://b7ufx0ps65lku" path="res://maps/urban/UrbanCity/Materials/Tileable/Road_01_Inst.tres" id="2_bj4ex"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(3.000000, 27.500000, 0.000000)
+
+[node name = "CrssWk_4L" instance = ExtResource("1_bkush")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_bj4ex")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 1.500000, 0.000000, 0.000000)
+shape = SubResource("0_c31wo")
+debug_fill = false
+

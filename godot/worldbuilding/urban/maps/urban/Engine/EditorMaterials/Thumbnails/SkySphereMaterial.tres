@@ -1,0 +1,8 @@
+[gd_resource type = "ShaderMaterial" load_steps=1 format=3 uid="uid://bwxd33wtre5ac"]
+
+[ext_resource type="Shader" uid="uid://0etyor3e13hx" path="res://maps/urban/Shaders/SkySphereMaterial.tres" id="1_6ddnd"]
+
+[resource]
+resource_name = "SkySphereMaterial"
+render_priority = 0
+shader = ExtResource("1_6ddnd")

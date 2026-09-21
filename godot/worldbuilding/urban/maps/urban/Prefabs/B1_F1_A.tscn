@@ -1,0 +1,36 @@
+[gd_scene load_steps=7 format=3 uid="uid://ckupbt5sqlq6o"]
+
+[ext_resource type="PackedScene" uid="uid://1qqr3vwxq5f5" path="res://maps/urban/UrbanCity/Models/ModularBuildings/B1_F1_A.glb" id="1_q6u13"]
+[ext_resource type="Material" uid="uid://0mos6uputoj2" path="res://maps/urban/UrbanCity/Materials/Tileable/Tilable_stuccoWall_TintWhite.tres" id="2_b4bdg"]
+[ext_resource type="Material" uid="uid://f2fcmuqbmm4y" path="res://maps/urban/UrbanCity/Materials/Tileable/Window_Inst.tres" id="3_s0yby"]
+[ext_resource type="Material" uid="uid://bipodsahwdsce" path="res://maps/urban/UrbanCity/Materials/Tileable/Tilable_ConcreteWall01_Inst.tres" id="4_1n7mc"]
+[ext_resource type="Material" uid="uid://cwtoscu4wfprr" path="res://maps/urban/UrbanCity/Materials/Buildings/building_01_Inst.tres" id="5_c2et6"]
+[ext_resource type="Material" uid="uid://b7dnq83k8w75" path="res://maps/urban/UrbanCity/Materials/Tileable/metal_01_Tint_Black.tres" id="6_d0b4r"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(3.862725, 1.758061, 1.512772)
+[sub_resource type="BoxShape3D" id="1_c31wp"]
+size = Vector3(3.862725, 1.131850, 8.500443)
+
+[node name = "B1_F1_A" instance = ExtResource("1_q6u13")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_b4bdg")
+surface_material_override/1 = ExtResource("3_s0yby")
+surface_material_override/2 = ExtResource("4_1n7mc")
+surface_material_override/3 = ExtResource("5_c2et6")
+surface_material_override/4 = ExtResource("6_d0b4r")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, -1.934525, 9.282134, 0.278053)
+shape = SubResource("0_c31wo")
+debug_fill = false
+
+[node name="Box1" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, -1.934524, 4.250222, 0.584999)
+shape = SubResource("1_c31wp")
+debug_fill = false
+

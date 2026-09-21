@@ -1,0 +1,9 @@
+[gd_scene load_steps=3 format=3 uid="uid://dywmlpgn32y5y"]
+
+[ext_resource type="PackedScene" uid="uid://dgrcnqyf2qq0u" path="res://maps/urban/UrbanCity/Models/Foliage/flg_fern.glb" id="1_gc6wy"]
+[ext_resource type="Material" uid="uid://253qhcbg2502" path="res://maps/urban/UrbanCity/Materials/Foliage/foliage_02_Mat.tres" id="2_u8jpi"]
+
+[node name = "flg_fern" instance = ExtResource("1_gc6wy")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_u8jpi")

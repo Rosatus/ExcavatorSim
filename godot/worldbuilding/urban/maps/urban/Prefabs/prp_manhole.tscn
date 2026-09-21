@@ -1,0 +1,9 @@
+[gd_scene load_steps=3 format=3 uid="uid://c4yrrnhd2f5s7"]
+
+[ext_resource type="PackedScene" uid="uid://e5c515vnnltx" path="res://maps/urban/UrbanCity/Models/props/prp_manhole.glb" id="1_de1tr"]
+[ext_resource type="Material" uid="uid://dkcqpgmvdyecs" path="res://maps/urban/UrbanCity/Materials/Props/misc_01_Mat.tres" id="2_dw82f"]
+
+[node name = "prp_manhole" instance = ExtResource("1_de1tr")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_dw82f")

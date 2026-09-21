@@ -1,0 +1,34 @@
+[gd_scene load_steps=6 format=3 uid="uid://bsf0nhgxw0qnv"]
+
+[ext_resource type="PackedScene" uid="uid://cp6nkwvlor8ii" path="res://maps/urban/UrbanCity/Models/props/gardenPlanter_D.glb" id="1_l0dg3"]
+[ext_resource type="Material" uid="uid://b2v2rxpeasdd2" path="res://maps/urban/UrbanCity/Materials/Tileable/soil_Mat.tres" id="2_k4q7f"]
+[ext_resource type="Material" uid="uid://c2mjhldxxpcbw" path="res://maps/urban/UrbanCity/Materials/Tileable/cobbleStone_01_Mat.tres" id="3_cunyx"]
+[ext_resource type="Material" uid="uid://ck5cnl8hqxd8y" path="res://maps/urban/UrbanCity/Materials/Tileable/Tilable_concreteWall03_Inst.tres" id="4_832i3"]
+[ext_resource type="Material" uid="uid://bipodsahwdsce" path="res://maps/urban/UrbanCity/Materials/Tileable/Tilable_ConcreteWall01_Inst.tres" id="5_1n7mc"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(10.849968, 2.335272, 1.138640)
+[sub_resource type="BoxShape3D" id="1_c31wp"]
+size = Vector3(4.059968, 4.305272, 1.138640)
+
+[node name = "gardenPlanter_D" instance = ExtResource("1_l0dg3")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_k4q7f")
+surface_material_override/1 = ExtResource("3_cunyx")
+surface_material_override/2 = ExtResource("4_832i3")
+surface_material_override/3 = ExtResource("5_1n7mc")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, -5.373121, 0.569320, -1.106583)
+shape = SubResource("0_c31wo")
+debug_fill = false
+
+[node name="Box1" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, -1.993447, 0.569320, -4.419196)
+shape = SubResource("1_c31wp")
+debug_fill = false
+

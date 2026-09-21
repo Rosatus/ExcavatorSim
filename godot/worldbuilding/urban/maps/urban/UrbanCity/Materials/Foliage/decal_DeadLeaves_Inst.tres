@@ -1,0 +1,14 @@
+[gd_resource type = "ShaderMaterial" load_steps=4 format=3 uid="uid://xvngs6toq7gp"]
+
+[ext_resource type="Shader" uid="uid://cv4f6hx8peic8" path="res://maps/urban/Shaders/decal_DeadLeaves_Inst.tres" id="4_cdri1"]
+[ext_resource type="Texture2D" uid="uid://d0b1ruc8q1n6s" path="res://maps/urban/UrbanCity/Textures/Foliage/decal_DeadLeaves_n.png" id="1_5pgho"]
+[ext_resource type="Texture2D" uid="uid://cq5k4t2etwwsg" path="res://maps/urban/UrbanCity/Textures/Foliage/decal_DeadLeaves_d.png" id="2_4fbe0"]
+[ext_resource type="Texture2D" uid="uid://bjutswkado777" path="res://maps/urban/UrbanCity/Textures/Foliage/decal_DeadLeaves_r.png" id="3_f4ji6"]
+
+[resource]
+resource_name = "decal_DeadLeaves_Inst"
+render_priority = 0
+shader = ExtResource("4_cdri1")
+shader_parameter/Tint = true
+shader_parameter/Tint_Vector = Vector4(0.740, 0.930, 0.585, 1.000)
+shader_parameter/Generated_decal_DeadLeaves_n = ExtResource("1_5pgho")

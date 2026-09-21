@@ -1,0 +1,10 @@
+[gd_resource type = "ShaderMaterial" load_steps=1 format=3 uid="uid://npbal46345e5"]
+
+[ext_resource type="Shader" uid="uid://dfagi1xd3wqc6" path="res://maps/urban/Shaders/M_Basic_Floor.tres" id="1_dr865"]
+
+[resource]
+resource_name = "M_Basic_Floor"
+render_priority = 0
+shader = ExtResource("1_dr865")
+shader_parameter/Color = Vector4(0.259, 0.320, 0.384, 1.000)
+shader_parameter/Roughness = 0.500

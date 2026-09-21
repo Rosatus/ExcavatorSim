@@ -35,7 +35,7 @@ func run() -> void:
 	var session := scene.get_node("ProductSession") as ProductSession
 	check(session.bucket_ground_mode == BucketGroundInteractionMode.NORMAL, "Construction did not default to normal bucket mode")
 	var chassis := scene.get_node("ChassisMotionRoot") as TrackedChassisController
-	var spawn_point := scene.get_node("ConstructionMap/WorkArea/SpawnPoint") as Node3D
+	var spawn_point := scene.get_node("StaticMap/WorkArea/SpawnPoint") as Node3D
 	check(chassis.map_spawn_position.is_equal_approx(spawn_point.global_position), "Map spawn marker was not applied")
 	var ui := scene.get_node("OperatorUI") as MotionOperatorUI
 	var selector := ui.get_control_for_test("map_selector") as OptionButton
@@ -82,7 +82,7 @@ func run() -> void:
 	await process_frame
 	await physics_frame
 	check(current_scene != scene, "Map did not reload scene")
-	check(current_scene.get_node_or_null("ConstructionMap") == null, "Construction instance leaked into training")
+	check(current_scene.get_node_or_null("StaticMap") == null, "Construction instance leaked into training")
 	check(current_scene.get_node("ProductSession").active_model_id == "sy135", "Return to training lost model")
 	check(current_scene.get_node("TerrainRoot/VoxelWorkZone").terrain != null, "Training voxel terrain not restored")
 	await physics_frame

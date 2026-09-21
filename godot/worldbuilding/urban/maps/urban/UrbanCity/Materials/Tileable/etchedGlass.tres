@@ -1,0 +1,10 @@
+[gd_resource type = "ShaderMaterial" load_steps=1 format=3 uid="uid://cser45m4ts01w"]
+
+[ext_resource type="Shader" uid="uid://idmbd3m7fr8l" path="res://maps/urban/Shaders/etchedGlass.tres" id="1_bv05u"]
+
+[resource]
+resource_name = "etchedGlass"
+render_priority = 0
+shader = ExtResource("1_bv05u")
+shader_parameter/EmissiveStrength = 0.000
+shader_parameter/Param = 0.725

@@ -1,0 +1,22 @@
+[gd_resource type = "ShaderMaterial" load_steps=4 format=3 uid="uid://cvueetu6s5xlo"]
+
+[ext_resource type="Shader" uid="uid://dibqu2h4e0ex0" path="res://maps/urban/Shaders/metal_02_Inst.tres" id="4_c5d0r"]
+[ext_resource type="Texture2D" uid="uid://8l85fbtuv5qo" path="res://maps/urban/UrbanCity/Textures/Tileable/metal_01_n.png" id="1_dfxn8"]
+[ext_resource type="Texture2D" uid="uid://liwqbvy5wx78" path="res://maps/urban/UrbanCity/Textures/Tileable/metal_02_d.png" id="2_d316a"]
+[ext_resource type="Texture2D" uid="uid://d34pjpy7woc0g" path="res://maps/urban/UrbanCity/Textures/Tileable/metal_01_d.png" id="3_b6r7l"]
+
+[resource]
+resource_name = "metal_02_Inst"
+render_priority = 0
+shader = ExtResource("4_c5d0r")
+shader_parameter/Diffuse = ExtResource("2_d316a")
+shader_parameter/Texture_Scale = 1.000
+shader_parameter/Tint_Colour = Vector4(1.000, 1.000, 1.000, 1.000)
+shader_parameter/Tint_Mask_Contrast = 0.000
+shader_parameter/Tint_Mask_Strength = -1.372
+shader_parameter/Normal = ExtResource("1_dfxn8")
+shader_parameter/Normal_Strength = 0.305
+shader_parameter/Metallic = 0.000
+shader_parameter/Compact = ExtResource("3_b6r7l")
+shader_parameter/Roughness = 1.156
+shader_parameter/Specular = 0.500

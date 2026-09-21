@@ -1,0 +1,13 @@
+[gd_resource type = "ShaderMaterial" load_steps=5 format=3 uid="uid://d3qhehttbcud3"]
+
+[ext_resource type="Shader" uid="uid://cs2j7u6gsyq48" path="res://maps/urban/Shaders/prp_cementBarrier_mat.tres" id="5_cf0at"]
+[ext_resource type="Texture2D" uid="uid://cvfr1uwrqnl6v" path="res://maps/urban/UrbanCity/Textures/Props/prp_cementBarrier_n.png" id="1_c2lm6"]
+[ext_resource type="Texture2D" uid="uid://cv88x28d6hvby" path="res://maps/urban/UrbanCity/Textures/Props/prp_cementBarrier_a.png" id="2_dcaa8"]
+[ext_resource type="Texture2D" uid="uid://bg2cvsqt3n8o4" path="res://maps/urban/UrbanCity/Textures/Props/prp_cementBarrier_ao.png" id="3_dgheo"]
+[ext_resource type="Texture2D" uid="uid://cadmysy6mg3jb" path="res://maps/urban/UrbanCity/Textures/Props/prp_cementBarrier_r.png" id="4_6aygl"]
+
+[resource]
+resource_name = "prp_cementBarrier_mat"
+render_priority = 0
+shader = ExtResource("5_cf0at")
+shader_parameter/Generated_prp_cementBarrier_n = ExtResource("1_c2lm6")

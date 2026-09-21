@@ -1,0 +1,9 @@
+[gd_scene load_steps=3 format=3 uid="uid://dxdaomf4dd5wi"]
+
+[ext_resource type="PackedScene" uid="uid://c8jy0q0thld2p" path="res://maps/urban/UrbanCity/Models/props/prp_vent_02.glb" id="1_diml6"]
+[ext_resource type="Material" uid="uid://dkcqpgmvdyecs" path="res://maps/urban/UrbanCity/Materials/Props/misc_01_Mat.tres" id="2_dw82f"]
+
+[node name = "prp_vent_02" instance = ExtResource("1_diml6")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_dw82f")

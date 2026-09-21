@@ -1,0 +1,15 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://dwlnq8f3bx3ij"]
+
+[ext_resource type="Texture2D" uid="uid://bvvt7fji2rqx2" path="res://maps/urban/UrbanCity/Textures/Tileable/Sky01.hdr" id="1_6amjs"]
+[ext_resource type="Shader" uid="uid://cegqpkrj5ykrb" path="res://maps/urban/Shaders/M_LightStage_Skybox_HDRI(MID_M_LightStage_Skybox_HDRI_0_75379).tres" id="2_co37f"]
+
+[resource]
+resource_name = "M_LightStage_Skybox_HDRI(MID_M_LightStage_Skybox_HDRI_0_75379)"
+render_priority = 0
+shader = ExtResource("2_co37f")
+shader_parameter/HDRI = true
+shader_parameter/CubemapRotation = -0.111
+shader_parameter/HDRI_Cubemap = ExtResource("1_6amjs")
+shader_parameter/HDRI_Contrast = 1.0
+shader_parameter/HDRI_Brightness = 1.0
+shader_parameter/HDRI_Tint = Vector4(1, 1, 1, 1)

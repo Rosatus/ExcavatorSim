@@ -1,0 +1,19 @@
+[gd_resource type = "ShaderMaterial" load_steps=4 format=3 uid="uid://l8tess3rvf1y"]
+
+[ext_resource type="Shader" uid="uid://y3sht3in1vhn" path="res://maps/urban/Shaders/prp_tarp_mat.tres" id="4_b1ils"]
+[ext_resource type="Texture2D" uid="uid://djujy20vvjr5n" path="res://maps/urban/UrbanCity/Textures/Props/prp_tarp_n.png" id="1_c8gej"]
+[ext_resource type="Texture2D" uid="uid://cuyfgomxlurf1" path="res://maps/urban/UrbanCity/Textures/Props/prp_tarp_a.png" id="2_jw33g"]
+[ext_resource type="Texture2D" uid="uid://bkij4nvj7j2b0" path="res://maps/urban/UrbanCity/Textures/Props/prp_tarp_ao.png" id="3_dgn5q"]
+
+[resource]
+resource_name = "prp_tarp_mat"
+render_priority = 0
+shader = ExtResource("4_b1ils")
+shader_parameter/Tarp_Colour = Vector4(0.102, 0.208, 0.510, 1.000)
+shader_parameter/Generated_prp_tarp_n = ExtResource("1_c8gej")
+shader_parameter/NormalStrength = 0.640
+shader_parameter/Roughness = 1.820
+shader_parameter/sub_surface_strength = 1.000
+shader_parameter/Intensity = 0.500
+shader_parameter/Weight = 1.000
+shader_parameter/Speed = 0.200

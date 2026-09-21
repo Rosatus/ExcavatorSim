@@ -1,0 +1,12 @@
+[gd_resource type = "ShaderMaterial" load_steps=4 format=3 uid="uid://f818qh0v24o7"]
+
+[ext_resource type="Shader" uid="uid://dgyg74okiuepv" path="res://maps/urban/Shaders/Tree_Fence_mat.tres" id="4_tv3n6"]
+[ext_resource type="Texture2D" uid="uid://cuu0id7kf6d7b" path="res://maps/urban/UrbanCity/Textures/Props/Tree_Fence_N.png" id="1_b6t4u"]
+[ext_resource type="Texture2D" uid="uid://u2v3j1aoyeay" path="res://maps/urban/UrbanCity/Textures/Props/Tree_Fence_A.png" id="2_r80nb"]
+[ext_resource type="Texture2D" uid="uid://qc2oa8f0d4qs" path="res://maps/urban/UrbanCity/Textures/Props/Tree_Fence_C.png" id="3_dge7e"]
+
+[resource]
+resource_name = "Tree_Fence_mat"
+render_priority = 0
+shader = ExtResource("4_tv3n6")
+shader_parameter/Generated_Tree_Fence_N = ExtResource("1_b6t4u")

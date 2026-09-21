@@ -1,0 +1,9 @@
+[gd_scene load_steps=3 format=3 uid="uid://b04i3v4x3pkvf"]
+
+[ext_resource type="PackedScene" uid="uid://77hnsk62lwms" path="res://maps/urban/prp_powerlines_Splines_3.glb" id="1_dsv7m"]
+[ext_resource type="Material" uid="uid://bjw7h1wj1dbk6" path="res://maps/urban/UrbanCity/Materials/Props/prp_powerlines_Mat.tres" id="2_5ko5y"]
+
+[node name = "prp_powerlines_Splines_3" instance = ExtResource("1_dsv7m")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_5ko5y")

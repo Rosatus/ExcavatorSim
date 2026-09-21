@@ -1,0 +1,33 @@
+[gd_scene load_steps=9 format=3 uid="uid://n6ao6ptax3w5"]
+
+[ext_resource type="PackedScene" uid="uid://c11ujqdfchj00" path="res://maps/urban/UrbanCity/Models/CompletedBuildings/Building_6_01.glb" id="1_d1824"]
+[ext_resource type="Material" uid="uid://bdhppg7alu45n" path="res://maps/urban/UrbanCity/Materials/Tileable/Tilable_concreteWall06_Inst.tres" id="2_qwmnd"]
+[ext_resource type="Material" uid="uid://dcgl08iuwcq3m" path="res://maps/urban/UrbanCity/Materials/Tileable/Tilable_concreteWall05_Inst.tres" id="3_dqvpf"]
+[ext_resource type="Material" uid="uid://c4qegh1utgdnm" path="res://maps/urban/UrbanCity/Materials/Tileable/Tilable_marble01_Inst.tres" id="4_gdts8"]
+[ext_resource type="Material" uid="uid://khfm2skija5s" path="res://maps/urban/UrbanCity/Materials/Buildings/building_06_Inst.tres" id="5_dlphk"]
+[ext_resource type="Material" uid="uid://b46rw1xng4hme" path="res://maps/urban/UrbanCity/Materials/Tileable/brick_04_Inst.tres" id="6_ccuhk"]
+[ext_resource type="Material" uid="uid://ciklw4sfcddi6" path="res://maps/urban/UrbanCity/Materials/Tileable/Tilable_metal_TintB_Inst.tres" id="7_bl7mw"]
+[ext_resource type="Material" uid="uid://c3gh64dxa3m7r" path="res://maps/urban/UrbanCity/Materials/Tileable/rooftop_Mat.tres" id="8_dn13m"]
+
+[sub_resource type="BoxShape3D" id="0_c31wo"]
+size = Vector3(25.182711, 21.404321, 50.000000)
+
+[node name = "Building_6_01" instance = ExtResource("1_d1824")]
+
+[node name="Mesh" parent="." index="0"]
+surface_material_override/0 = ExtResource("2_qwmnd")
+surface_material_override/1 = ExtResource("3_dqvpf")
+surface_material_override/2 = ExtResource("4_gdts8")
+surface_material_override/3 = ExtResource("5_dlphk")
+surface_material_override/4 = ExtResource("6_ccuhk")
+surface_material_override/5 = ExtResource("7_bl7mw")
+surface_material_override/6 = ExtResource("8_dn13m")
+
+[node name="StaticBody" type="StaticBody3D" parent="." ]
+
+
+[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
+transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, -12.500000, 25.000000, 10.500000)
+shape = SubResource("0_c31wo")
+debug_fill = false
+
