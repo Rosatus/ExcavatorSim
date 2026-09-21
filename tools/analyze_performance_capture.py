@@ -206,6 +206,14 @@ def render_markdown(result: dict[str, Any]) -> str:
         "digest_ms": "诊断摘要",
         "readiness_issue_ms": "碰撞就绪登记",
         "recorder_ms": "录制器自身",
+        "chassis_ms": "底盘回调（每帧累计）",
+        "tracks_ms": "履带查询与施力（底盘内）",
+        "cutter_admission_ms": "切割前缘采样",
+        "cutter_contact_ms": "抬斗接触检测",
+        "cutter_capsules_ms": "切割包络生成",
+        "cutter_paths_ms": "切割路径生成",
+        "cutter_proposal_ms": "切割提案构建与哈希",
+        "support_cleanup_ms": "悬空土清理（提交内）",
     }
     for key, label in labels.items():
         metric = result["metrics_ms"].get(key, {})

@@ -51,3 +51,39 @@ See [capture schema and usage](../../../docs/performance-capture.md).
 
 Focused checks: `performance_capture_test.gd`, recording assertions in
 `operator_ui_test.gd`, and `tools/tests/test_analyze_performance_capture.py`.
+
+The optional performance overlay is owned by OperatorUI, persisted under
+ui.performance_overlay and rebuilt independently of theme menus. It ignores mouse
+input; recording badge occupies the row above it. A 40-bin ring holds FPS and
+peak frame intervals, redrawn at 4 Hz. Off disables processing; PerformanceCapture
+arbitrates viewport timing between recording and overlay, so stopping either
+consumer cannot disable the other. Native Jolt integration is not included in
+chassis/track script clocks; never label wall frame interval as GPU latency.
+
+Assist side-view viewport (2026-09-18): latch a world-space swing-pivot anchor
+on entry/mode change; clear it when hidden or empty. Project this same anchor
+through the snapshot origin so the tooth-relative level origin cannot pan the
+HUD. Keep a fixed 17 x 12 m view; terrain edits and joint motion never auto-fit
+the camera. Actual vehicle translation remains visible. The machine symbol follows the live swing pin horizontally; its tread bottom
+rests on interpolated terrain beneath the machine center in both assist modes.
+The terrain sample interval includes the chassis. Its schematic height is
+independent of the model-specific slew-pivot height; real equipment joints and
+the tooth keep their measured positions. The silhouette uses a
+centered capsule track, separate counterweight/cab outlines and real work-joint
+links with a bucket outline. Reserve the header above the drawing.
+Focused regression: `slope_preview_v2_test.gd` checks stationary pose under
+origin/tooth/terrain changes, real travel and relatching. Human review: enable
+level assist, extend/retract with tracks stopped, then travel and re-enter;
+inspect the outline and tooth/target readability at 1280x720 and 1920x1080.
+
+
+Performance overlay readability (2026-09-18): 360 x 372 px top-right panel.
+Current FPS/mean frame interval lead; ten-second minimum bin-average FPS and
+maximum single-frame interval are separate prominent fields (never label the
+minimum as 1% low). Timestamped 40-bin history expires at ten seconds. Reference
+lines are 60 FPS/33.3 ms, labelled outside the plots. CPU frame/physics single
+tick/GPU are secondary non-additive timings. Pause/background clears history
+and suspends sampling; resume begins fresh. Headless overlay tests cover window
+expiry, focus exclusion, bounded storage, 720p/1080p bounds and capture ownership.
+Human review: toggle Advanced performance panel and inspect labels/graphs over
+actual gameplay at those resolutions; subjective readability remains unverified.

@@ -37,6 +37,7 @@ var _capture_marker_button: Button
 var _capture_folder_button: Button
 var _capture_status: Label
 var _capture_badge: Label
+var _performance_overlay: Control
 var _prompt_mode := "keyboard"
 var _ignore_model_selection := false
 var _pending_action := ""
@@ -781,6 +782,27 @@ func _sync_cutting_diagnostics_toggle() -> void:
 func _build_capture_controls() -> void:
 	var group := VBoxContainer.new()
 	_advanced_panel.add_child(group)
+	if not is_instance_valid(_performance_overlay):
+		_performance_overlay = preload("res://scripts/performance_overlay.gd").new()
+		_performance_overlay.capture = _performance_capture
+		add_child(_performance_overlay)
+	var display_toggle := CheckButton.new()
+	display_toggle.name = "PerformanceOverlayToggle"
+	display_toggle.text = "显示帧率与性能曲线"
+	display_toggle.tooltip_text = "右上角显示 FPS、帧时间与 CPU / GPU 耗时。关闭后停止采样；不影响性能录制。"
+	group.add_child(display_toggle)
+	var config := ConfigFile.new()
+	config.load(CONFIG_PATH)
+	var enabled := bool(config.get_value(CONFIG_SECTION_UI, "performance_overlay", false))
+	display_toggle.set_pressed_no_signal(enabled)
+	_performance_overlay.set_enabled(enabled)
+	display_toggle.toggled.connect(func(value: bool):
+		_performance_overlay.set_enabled(value)
+		var saved := ConfigFile.new()
+		saved.load(CONFIG_PATH)
+		saved.set_value(CONFIG_SECTION_UI, "performance_overlay", value)
+		saved.save(CONFIG_PATH)
+	)
 	_capture_button = Button.new()
 	_capture_button.text = "开始性能录制 · F12"
 	group.add_child(_capture_button)
@@ -889,6 +911,10 @@ func _configure_model_selector() -> void:
 	_model_selector.set_item_metadata(1, "sy135")
 	_model_selector.add_item(UIStrings.model_name("sy135neo"))
 	_model_selector.set_item_metadata(2, "sy135neo")
+	_model_selector.add_item(UIStrings.model_name("sy80u"))
+	_model_selector.set_item_metadata(3, "sy80u")
+	_model_selector.add_item(UIStrings.model_name("sy155w"))
+	_model_selector.set_item_metadata(4, "sy155w")
 	_model_selector.tooltip_text = "Choose an excavator model. Switching starts a fresh work session."
 	_model_selector.item_selected.connect(_on_model_selected)
 
@@ -1072,6 +1098,11 @@ func _refresh_attachment_selector() -> void:
 	_ignore_attachment_selection = true
 	var coupler_id := _active_coupler_id()
 	var tool_id := _active_tool_id()
+	if _coupler_selector != null and _attachment_rig != null:
+		_coupler_selector.clear()
+		for id in _attachment_rig.coupler_ids():
+			_coupler_selector.add_item("快换：%s" % _attachment_rig.coupler_display_name(id))
+			_coupler_selector.set_item_metadata(_coupler_selector.item_count - 1, id)
 	_populate_tool_selector()
 	if _coupler_selector != null:
 		for index in range(_coupler_selector.item_count):
@@ -1136,10 +1167,15 @@ func _configure_map_selector() -> void:
 	var catalog := get_node_or_null("/root/MapCatalog")
 	selector.add_item("地图：训练场")
 	selector.set_item_metadata(0, "training")
-	var available: bool = catalog != null and catalog.construction_available()
-	selector.add_item("地图：施工大地图" if available else "地图：施工大地图（未安装）")
-	selector.set_item_metadata(1, "construction")
-	selector.set_item_disabled(1, not available or not _is_local_authority())
+	var labels := {"construction": "施工大地图", "urban": "城市场景"}
+	var index := 1
+	for map_id in ["construction", "urban"]:
+		var available: bool = catalog != null and catalog.map_available(map_id)
+		var label: String = labels[map_id]
+		selector.add_item("地图：%s" % label if available else "地图：%s（未安装）" % label)
+		selector.set_item_metadata(index, map_id)
+		selector.set_item_disabled(index, not available or not _is_local_authority())
+		index += 1
 	selector.tooltip_text = "切换地图将重新开始作业。施工大地图的警戒线内为挖掘土区。"
 	selector.item_selected.connect(_on_map_selected)
 	_refresh_map_selector()
@@ -1148,7 +1184,12 @@ func _configure_map_selector() -> void:
 func _refresh_map_selector() -> void:
 	var catalog := get_node_or_null("/root/MapCatalog")
 	if catalog != null and _menu.has("map_selector"):
-		(_menu["map_selector"] as OptionButton).select(1 if catalog.active_map_id == "construction" else 0)
+		var selector := _menu["map_selector"] as OptionButton
+		for index in selector.item_count:
+			if String(selector.get_item_metadata(index)) == catalog.active_map_id:
+				selector.select(index)
+				return
+		selector.select(0)
 
 
 func _on_map_selected(index: int) -> void:

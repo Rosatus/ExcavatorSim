@@ -47,7 +47,7 @@ const DEPOSIT_MAX_HEIGHT_VOXELS := 8.0
 const DUMP_BATCH_PERIOD_S := 0.1
 const MIN_DUMP_VOLUME_VOXELS := 0.01
 const DUMP_GATE_CONFIRMATION_S := 0.12
-const DUMP_RELEASE_DOWN_DOT := 0.5
+const Release = preload("res://scripts/bucket_soil_release.gd")
 const DUMP_LANDING_NEIGHBORHOOD_VOXELS := 4.0
 const READINESS_WORK_TIMEOUT_FRAMES := 600
 const NATIVE_COVERAGE_OFFSETS: Array[Vector3i] = [
@@ -269,6 +269,8 @@ func clear() -> void:
 
 
 func submit_pose(pose_snapshot: Dictionary, identity: Dictionary, delta_s: float = 1.0 / 60.0) -> Dictionary:
+	cutter.performance_timing_enabled = performance_timing_enabled
+	cutter.performance_sample.clear()
 	_submitted_count += 1
 	if not configured:
 		return _reject_submission("authority_unavailable")
@@ -1193,9 +1195,8 @@ func _update_dump_gate_diagnostics(pose_snapshot: Dictionary, delta_s: float) ->
 		"dump_opening_down_dot",
 		SoilContractDescriptor.MIN_DUMP_OPENING_DOWN_DOT,
 	))
-	_effective_dump_threshold = maxf(DUMP_RELEASE_DOWN_DOT,
-		SoilContractDescriptor.effective_dump_opening_down_dot(interaction))
-	var opening_normal := pose_snapshot.get("opening_normal_world", Vector3.UP) as Vector3
+	_effective_dump_threshold = Release.threshold(interaction)
+	var opening_normal := Release.opening_normal(pose_snapshot)
 	if not _dump_pose_valid or not opening_normal.is_finite() or opening_normal.length_squared() < 0.99:
 		_opening_down_dot = -1.0
 		_dump_gate_raw_active = false
@@ -1243,7 +1244,7 @@ func _build_dump_proposal(pose_snapshot: Dictionary, identity: Dictionary, delta
 	if material_field.bucket_mass_q < _minimum_dump_mass_q() or not bool(pose_snapshot.get("valid", false)):
 		return {"attempted": false}
 	var contract := pose_snapshot.get("contract", {}) as Dictionary
-	var opening_normal := pose_snapshot.get("opening_normal_world", Vector3.UP) as Vector3
+	var opening_normal := Release.opening_normal(pose_snapshot)
 	if not opening_normal.is_finite() or opening_normal.length_squared() < 0.99:
 		return {"attempted": false}
 	opening_normal = opening_normal.normalized()
@@ -1483,6 +1484,89 @@ func _commit_soil_proposal(proposal: VoxelSoilOperationProposal) -> VoxelCutTran
 	return transaction
 
 
+func _sample_deposit_surface_domain(center: Vector2i, radius: int, previous: Dictionary) -> Dictionary:
+	var scale_m := _work_zone.voxel_scale_m
+	var bounds := layout.voxel_bounds(scale_m)
+	var top := floori(bounds.end.y) - WorkZoneConfig.PROTECTED_SHELL_VOXELS - 1
+	var bottom := ceili(bounds.position.y) + WorkZoneConfig.PROTECTED_SHELL_VOXELS
+	var side := radius * 2 + 1
+	var origin := Vector3i(center.x - radius, bottom, center.y - radius)
+	var sy := top - bottom + 1
+	var buffer := VoxelBuffer.new()
+	buffer.set_channel_depth(VoxelBuffer.CHANNEL_SDF, VoxelBuffer.DEPTH_16_BIT)
+	buffer.create(side, sy, side)
+	# One native read per domain. Scanning scalar terrain queries would lock/
+	# look up a block for every air voxel above every receiving column.
+	_tool.copy(origin, buffer, SDF_CHANNEL_MASK, false)
+	var raw := buffer.get_channel_as_byte_array(VoxelBuffer.CHANNEL_SDF)
+	var heights := PackedFloat64Array()
+	var gradients := PackedFloat32Array()
+	heights.resize(side * side)
+	gradients.resize(side * side)
+	var previous_side := int(previous.get("side", 0))
+	var inset := (side - previous_side) / 2
+	var previous_heights := previous.get("heights", PackedFloat64Array()) as PackedFloat64Array
+	var previous_gradients := previous.get("gradients", PackedFloat32Array()) as PackedFloat32Array
+	var editable := layout.editable_world_bounds(scale_m)
+	for z in side:
+		for x in side:
+			var i := z * side + x
+			if previous_side > 0 and x >= inset and z >= inset and x < inset + previous_side and z < inset + previous_side:
+				var old_i := (z - inset) * previous_side + x - inset
+				heights[i] = previous_heights[old_i]
+				gradients[i] = previous_gradients[old_i]
+				continue
+			var world := layout.voxel_to_world(Vector3(origin.x + x, top, origin.z + z), scale_m)
+			if not editable.has_point(world):
+				heights[i] = INF
+				continue
+			var column_offset := (z * side + x) * sy * 2
+			var hit_y := -1
+			# Same [z][x][y], signed-16 SDF layout as native coverage. Read only
+			# signs during the scan, then decode the two actual surface samples.
+			for y in range(sy - 1, -1, -1):
+				var byte_index := column_offset + y * 2
+				var hi := raw[byte_index + 1]
+				if hi >= 0x80 or (hi == 0 and raw[byte_index] == 0):
+					hit_y = y
+					break
+			if hit_y < 0 or hit_y == sy - 1:
+				return {"valid": false, "reason": "dump_surface_support_unavailable"}
+			var sdf := buffer.get_voxel_f(x, hit_y, z, VoxelBuffer.CHANNEL_SDF)
+			var prior := buffer.get_voxel_f(x, hit_y + 1, z, VoxelBuffer.CHANNEL_SDF)
+			var gradient := maxf(0.0001, prior - sdf)
+			heights[i] = float(bottom + hit_y) - sdf / gradient
+			gradients[i] = gradient
+	return {"valid": true, "origin": Vector3i(origin.x, 0, origin.z), "side": side,
+		"heights": heights, "gradients": gradients}
+
+
+func _plan_surface_deposit(release_world: Vector3, volume_voxels: float) -> Dictionary:
+	var scale_m := _work_zone.voxel_scale_m
+	var landing := layout.world_to_voxel(release_world, scale_m)
+	var center := Vector2i(roundi(landing.x), roundi(landing.z))
+	var radius := DepositSurface.INITIAL_RADIUS
+	# Reuse samples only within this transaction. Later cuts/deposits must be
+	# reflected by fresh SDF reads; this is not another persistent heightfield.
+	var sampled := {}
+	while radius <= DepositSurface.MAX_RADIUS:
+		sampled = _sample_deposit_surface_domain(center, radius, sampled)
+		if not bool(sampled.get("valid", false)):
+			return sampled
+		var origin := sampled["origin"] as Vector3i
+		var planned := DepositSurface.plan(sampled["heights"], int(sampled["side"]),
+			Vector2(landing.x - origin.x, landing.z - origin.z), volume_voxels,
+			tan(deg_to_rad(REPOSE_ANGLE_DEG)))
+		if planned.is_empty():
+			return {"valid": false, "reason": "dump_surface_support_unavailable"}
+		if not bool(planned["boundary_active"]):
+			planned.merge(sampled)
+			return planned
+		radius *= 2
+	# This is a computational bound, not a claim that the receiving soil is full.
+	return {"valid": false, "reason": "dump_surface_domain_budget"}
+
+
 func _commit_surface_deposit_proposal(
 	proposal: VoxelSoilOperationProposal,
 	transaction: VoxelCutTransaction,
@@ -1491,59 +1575,42 @@ func _commit_surface_deposit_proposal(
 	var scale_m := _work_zone.voxel_scale_m
 	var voxel_volume := pow(scale_m, 3.0)
 	var target_mass := mini(proposal.requested_mass_q, material_field.bucket_mass_q)
-	var radius := DepositSurface.GRID_RADIUS * DepositSurface.GRID_STEP
-	var landing := layout.world_to_voxel(proposal.release_world, scale_m)
-	var scan_top := layout.world_to_voxel(layout.MAX_WORLD, scale_m).y \
-		- WorkZoneConfig.PROTECTED_SHELL_VOXELS - 1.0
-	var patch_origin := Vector3i(roundi(landing.x) - radius, 0, roundi(landing.z) - radius)
-	var heights := PackedFloat32Array()
-	# One coarse 2D support scan per committed batch, not per input tick.
-	for z in DepositSurface.GRID_SIZE:
-		for x in DepositSurface.GRID_SIZE:
-			var sample_world := layout.voxel_to_world(Vector3(
-				patch_origin.x + x * DepositSurface.GRID_STEP, scan_top,
-				patch_origin.z + z * DepositSurface.GRID_STEP), scale_m)
-			if not layout.is_world_position_editable(sample_world, scale_m):
-				heights.append(layout.world_to_voxel(layout.MAX_WORLD, scale_m).y)
-				continue
-			var support := _find_sdf_support_world(sample_world)
-			if not bool(support.get("valid", false)):
-				return _reject_transaction(transaction, "dump_surface_support_unavailable", started_usec)
-			heights.append(layout.world_to_voxel(support["position"], scale_m).y)
-	var planned := DepositSurface.plan(heights,
-		material_field.volume_for_mass_q(target_mass) / voxel_volume,
-		tan(deg_to_rad(REPOSE_ANGLE_DEG)))
-	if planned.is_empty():
-		return _reject_transaction(transaction, "dump_surface_patch_full", started_usec)
-	var additions := planned["additions"] as PackedFloat32Array
+	var planned := _plan_surface_deposit(proposal.release_world,
+		material_field.volume_for_mass_q(target_mass) / voxel_volume)
+	if not bool(planned.get("valid", false)):
+		return _reject_transaction(transaction, String(planned.get("reason", "dump_surface_support_unavailable")), started_usec)
+	var additions := planned["additions"] as PackedFloat64Array
+	var heights := planned["heights"] as PackedFloat64Array
+	var gradients := planned["gradients"] as PackedFloat32Array
+	var side := int(planned["side"])
+	var patch_origin := planned["origin"] as Vector3i
 	var columns: Array[Dictionary] = []
 	var area := AABB()
 	var represented_volume := 0.0
 	var highest_addition := 0.0
 	var probe_world := proposal.release_world
-	for z in range(1, radius * 2):
-		for x in range(1, radius * 2):
-			var added := DepositSurface.interpolate(additions, x, z)
-			if added <= 0.0001:
+	for z in range(1, side - 1):
+		for x in range(1, side - 1):
+			var i := z * side + x
+			var added := additions[i]
+			if added <= 0.000001:
 				continue
 			var coordinate := Vector3i(patch_origin.x + x, 0, patch_origin.z + z)
-			var sample_world := layout.voxel_to_world(Vector3(coordinate.x, scan_top, coordinate.z), scale_m)
-			var support := _find_sdf_support_world(sample_world)
-			if not bool(support.get("valid", false)):
-				return _reject_transaction(transaction, "dump_surface_support_unavailable", started_usec)
-			var base := layout.world_to_voxel(support["position"], scale_m).y
+			# The solver and writer share the exact same sampled support. Never
+			# interpolate a low column's thickness onto a higher neighbouring rim.
+			var base := heights[i]
 			var top := base + added
 			var column_area := AABB(Vector3(coordinate.x - 1, floorf(base) - 2, coordinate.z - 1),
 				Vector3(3, ceilf(top) - floorf(base) + 5, 3))
 			area = column_area if columns.is_empty() else area.merge(column_area)
 			columns.append({"coordinate": coordinate, "base": base, "top": top,
-				"gradient": float(support.get("gradient", 1.0))})
+				"gradient": gradients[i]})
 			represented_volume += added * voxel_volume
 			if added > highest_addition:
 				highest_addition = added
 				probe_world = layout.voxel_to_world(Vector3(coordinate.x, top + 2.0, coordinate.z), scale_m)
 	if columns.is_empty():
-		return _reject_transaction(transaction, "dump_surface_patch_full", started_usec)
+		return _reject_transaction(transaction, "dump_sub_quantum", started_usec)
 	var window := _integer_window_without_halo(area)
 	var origin := window["origin"] as Vector3i
 	var size := window["size"] as Vector3i
@@ -2281,19 +2348,23 @@ func _apply_support_cleanup(edit_area: AABB) -> Dictionary:
 	buffer.set_channel_depth(VoxelBuffer.CHANNEL_SDF, VoxelBuffer.DEPTH_16_BIT)
 	buffer.create(size.x, size.y, size.z)
 	_tool.copy(origin, buffer, SDF_CHANNEL_MASK, false)
-	var values := _buffer_values(buffer, size)
+	# Only signs are needed. Read the native signed-16 channel once instead of
+	# calling get_voxel_f for every sample, then write only deleted samples.
+	# Untouched SDF bytes (including the support row) stay exactly unchanged.
+	var raw := buffer.get_channel_as_byte_array(VoxelBuffer.CHANNEL_SDF)
 	var deleted := 0
 	var columns := 0
 	for lx in size.x:
 		for lz in size.z:
 			columns += 1
-			var below_solid := values[_index(lx, 0, lz, size)] <= 0.0
+			var column_start := (lz * size.x + lx) * size.y * 2
+			var below_solid := raw[column_start + 1] >= 0x80 or (raw[column_start + 1] == 0 and raw[column_start] == 0)
 			var deleting := false
 			for ly in range(1, size.y):
-				var index := _index(lx, ly, lz, size)
-				if values[index] <= 0.0:
+				var index := column_start + ly * 2
+				if raw[index + 1] >= 0x80 or (raw[index + 1] == 0 and raw[index] == 0):
 					if deleting or not below_solid:
-						values[index] = 1.0
+						buffer.set_voxel_f(1.0, lx, ly, lz, VoxelBuffer.CHANNEL_SDF)
 						deleted += 1
 						deleting = true
 						below_solid = false
@@ -2306,7 +2377,6 @@ func _apply_support_cleanup(edit_area: AABB) -> Dictionary:
 	result["deleted_samples"] = deleted
 	result["columns"] = columns
 	if deleted > 0:
-		_write_values(buffer, size, values)
 		_tool.paste(origin, buffer, SDF_CHANNEL_MASK)
 		result["area"] = AABB(Vector3(origin), Vector3(size))
 	result["usec"] = _diagnostic_clock_usec() - started

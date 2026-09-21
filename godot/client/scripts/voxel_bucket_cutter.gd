@@ -25,6 +25,16 @@ var configured := false
 var model_id := ""
 var voxel_scale_m := WorkZoneConfig.DEFAULT_VOXEL_SCALE_M
 var tool_hash := ""
+var performance_timing_enabled := false
+var performance_sample: Dictionary = {}
+
+
+func _probe_phase(name: String, started: int) -> int:
+	if not performance_timing_enabled:
+		return 0
+	var now := Time.get_ticks_usec()
+	performance_sample[name] = now - started
+	return now
 var validation_error := ""
 var _contract: Dictionary = {}
 
@@ -60,6 +70,8 @@ func build_proposal(
 	contact_sampler: Callable = Callable(),
 	batch_contact_sampler: Callable = Callable()
 ) -> Dictionary:
+	performance_sample.clear()
+	var phase_started := Time.get_ticks_usec() if performance_timing_enabled else 0
 	var rejected := {
 		"accepted": false,
 		"engaged": false,
@@ -115,6 +127,7 @@ func build_proposal(
 			if gradient.is_finite() and gradient.length_squared() > 0.25:
 				maximum_into = maxf(maximum_into, -motion.dot(gradient.normalized()))
 	rejected["minimum_sdf"] = minimum_sdf
+	phase_started = _probe_phase("cutter_admission_usec", phase_started)
 	rejected["into_material_m"] = maximum_into if is_finite(maximum_into) else 0.0
 	if maximum_motion < MIN_MOTION_M:
 		rejected["reason"] = "stationary"
@@ -143,6 +156,7 @@ func build_proposal(
 	# when the episode ends. Clearing one frame must not disable later contact.
 	var retain_lift := was_engaged and (model_id == "sy135" or model_id == "sy135neo") \
 		and _has_upward_motion(tool_snapshot) and _within_lift_exit_envelope(tool_snapshot)
+	phase_started = _probe_phase("cutter_contact_usec", phase_started)
 	if minimum_sdf > air_limit and not finishing_lift:
 		rejected["reason"] = "above_ground"
 		rejected["engaged"] = retain_lift
@@ -168,12 +182,14 @@ func build_proposal(
 		if not region.is_empty():
 			clearance.append_array(_clearance_capsules(region, leading_center, leading_normal))
 	var native_paths: Array[Dictionary] = []
+	phase_started = _probe_phase("cutter_capsules_usec", phase_started)
 	if model_id == "sy135" or model_id == "sy135neo":
 		native_paths = _build_sy135_native_paths(tool_snapshot, finishing_lift)
 		if native_paths.is_empty():
 			rejected["reason"] = "empty_native_sweep"
 			return rejected
 	var all_capsules := capsules + clearance
+	phase_started = _probe_phase("cutter_paths_usec", phase_started)
 	var area := _capsule_bounds(all_capsules)
 	var native_area := _native_path_bounds(native_paths)
 	if native_area.size != Vector3.ZERO:
@@ -203,6 +219,7 @@ func build_proposal(
 			"overburden_cleanup" if _has_native_role(native_paths, "overburden_cleanup") else "no_overburden_cleanup",
 		],
 	})
+	phase_started = _probe_phase("cutter_proposal_usec", phase_started)
 	if not proposal.is_valid():
 		rejected["reason"] = "proposal_validation_failed"
 		return rejected
@@ -257,6 +274,7 @@ func _has_lift_exit_contact(
 		return false
 	var direct_samples := 0
 	var pending_voxels: Dictionary = {}
+	var pending_columns: Dictionary = {}
 	# Use the world-vertical lower envelope, not the box's local +Y face.
 	# The latter may be airborne while the rotated bottom is still in soil.
 	for alpha in [0.0, 0.5, 1.0]:
@@ -271,6 +289,21 @@ func _has_lift_exit_contact(
 			var top_y := layout.INITIAL_SURFACE_Y - voxel_scale_m * 0.25
 			var steps := clampi(ceili(absf(top_y - lower.y) / voxel_scale_m), 1, 32)
 			for step in range(steps + 1):
+				if batch_sampler.is_valid() and direct_samples >= 8 \
+						and absf(top_y - lower.y) <= 32.0 * voxel_scale_m and lower.is_finite():
+					# Spacing <= one voxel makes rounded Y samples a contiguous
+					# integer interval. Merge repeated columns before enumerating;
+					# all intervals end at the same top. Deeper capped scans retain
+					# the original sparse sampling below.
+					var first := layout.world_to_voxel(Vector3(lower.x, lerpf(lower.y, top_y, float(step) / steps), lower.z), voxel_scale_m)
+					var last := layout.world_to_voxel(Vector3(lower.x, top_y, lower.z), voxel_scale_m)
+					var column := Vector2i(roundi(first.x), roundi(first.z))
+					var span := Vector2i(mini(roundi(first.y), roundi(last.y)), maxi(roundi(first.y), roundi(last.y)))
+					if pending_columns.has(column):
+						var prior: Vector2i = pending_columns[column]
+						span = Vector2i(mini(prior.x, span.x), maxi(prior.y, span.y))
+					pending_columns[column] = span
+					break
 				var point := Vector3(lower.x, lerpf(lower.y, top_y, float(step) / steps), lower.z)
 				# Keep the cheap early exit when the first probes already touch soil.
 				# Otherwise collect exactly the old rounded samples and read them in
@@ -285,6 +318,10 @@ func _has_lift_exit_contact(
 				var value: Variant = sdf_sampler.call(point)
 				if value is Dictionary and bool(value.get("valid", false)) and float(value.get("sdf", INF)) <= 0.0:
 					return true
+	for column: Vector2i in pending_columns:
+		var span: Vector2i = pending_columns[column]
+		for y in range(span.x, span.y + 1):
+			pending_voxels[Vector3i(column.x, y, column.y)] = true
 	return bool(batch_sampler.call(pending_voxels)) if not pending_voxels.is_empty() else false
 
 

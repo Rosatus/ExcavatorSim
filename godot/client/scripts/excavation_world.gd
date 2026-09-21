@@ -143,6 +143,10 @@ func _physics_process(delta: float) -> void:
 		if _voxel_authority == null or not _soil_authority_modes.can_product_owner_write("voxel"):
 			return
 		var capture_start := Time.get_ticks_usec() if performance_capture_enabled else 0
+		if performance_capture_enabled:
+			# Disabled automatic soil or rejected pose identities may skip cutter
+			# submission entirely. Never attribute the prior tick's phases again.
+			_voxel_authority.cutter.performance_sample.clear()
 		# Voxel falling-soil presentation is driven by committed one-shot release
 		# events. Never keep a cut/deposit volume sticky across idle frames.
 		_last_flow_volume_m3 = 0.0
@@ -171,6 +175,7 @@ func _physics_process(delta: float) -> void:
 				"publish_usec": capture_end - capture_after_step,
 				"total_usec": capture_end - capture_start,
 				"transaction": voxel_result.get("transaction", {}),
+				"cutter_phases": _voxel_authority.cutter.performance_sample,
 			})
 		return
 

@@ -16,12 +16,15 @@ const FRAME_COLUMNS := [
 	"render_cpu_ms", "render_gpu_ms", "render_setup_cpu_ms", "draw_calls", "primitives", "static_memory_mb",
 	"paused", "focused", "soil_automatic_ms", "soil_step_ms", "soil_publish_ms", "soil_total_ms",
 	"transaction_count", "commit_ms", "coverage_ms", "material_ms", "native_edit_ms", "digest_ms", "readiness_issue_ms",
-	"recorder_ms",
+	"recorder_ms", "chassis_ms", "tracks_ms", "chassis_steps",
+	"cutter_admission_ms", "cutter_contact_ms", "cutter_capsules_ms", "cutter_paths_ms", "cutter_proposal_ms", "support_cleanup_ms",
 ]
+const CUTTER_COLUMNS := {"cutter_admission_usec": 29, "cutter_contact_usec": 30, "cutter_capsules_usec": 31, "cutter_paths_usec": 32, "cutter_proposal_usec": 33}
 const STAGE_COLUMNS := {"automatic_usec": 14, "step_usec": 15, "publish_usec": 16, "total_usec": 17}
 const TRANSACTION_COLUMNS := {"commit_usec": 19, "coverage_usec": 20, "material_usec": 21, "native_edit_usec": 22, "digest_usec": 23, "readiness_issue_usec": 24}
 
 @export var excavation_world_path := NodePath("../TerrainRoot/ExcavationWorld")
+var overlay_measurement := false
 var recording := false
 var last_path := ""
 var last_error := ""
@@ -59,7 +62,37 @@ func _ready() -> void:
 		_world.performance_step_sampled.connect(_on_soil_step)
 	get_window().focus_entered.connect(_on_focus_transition)
 	get_window().focus_exited.connect(_on_focus_transition)
+	get_tree().node_added.connect(_on_node_added)
 	set_process(false)
+
+
+func set_overlay_measurement(enabled: bool) -> void:
+	overlay_measurement = enabled
+	_update_render_measurement()
+
+
+func _update_render_measurement() -> void:
+	_viewport_rid = get_viewport().get_viewport_rid()
+	_render_measurement_enabled = DisplayServer.get_name() != "headless" and (recording or overlay_measurement)
+	if DisplayServer.get_name() != "headless":
+		RenderingServer.viewport_set_measure_render_time(_viewport_rid, _render_measurement_enabled)
+
+
+func _on_node_added(node: Node) -> void:
+	if recording and node is JoltChassisTrackRuntime:
+		_connect_chassis(node)
+
+
+func _connect_chassis(node: Node) -> void:
+	if not node.performance_step_sampled.is_connected(_on_chassis_step):
+		node.performance_step_sampled.connect(_on_chassis_step)
+
+
+func _on_chassis_step(chassis_usec: int, tracks_usec: int) -> void:
+	if recording:
+		_pending[26] += chassis_usec / 1000.0
+		_pending[27] += tracks_usec / 1000.0
+		_pending[28] += 1
 
 
 func start_capture(directory: String = OUTPUT_DIR, duration_limit_s: float = 180.0) -> bool:
@@ -113,6 +146,7 @@ func start_capture(directory: String = OUTPUT_DIR, duration_limit_s: float = 180
 		"soil_diagnostics_enabled": _prior_diagnostics, "soil_timing_enabled": is_instance_valid(_world),
 		"render_timing_available": _render_measurement_enabled,
 		"measurement_notes": [
+			"tracks_ms is nested inside chassis_ms; both accumulate callbacks across physics steps, excluding engine physics solver time.",
 			"All time columns use milliseconds. -1 means unavailable, not zero cost.",
 			"Frame interval is monotonic wall time between late process callbacks; includes pacing/waits, not GPU presentation latency.",
 			"Engine/render timings are latest engine reports and may lag the row. Physics time is one reported tick, not all ticks in the interval.",
@@ -126,7 +160,7 @@ func start_capture(directory: String = OUTPUT_DIR, duration_limit_s: float = 180
 		],
 	}
 	var hashes: Dictionary = {}
-	for path in ["res://scripts/performance_capture.gd", "res://scripts/excavation_world.gd", "res://scripts/voxel_excavation_authority.gd", "res://scripts/voxel_bucket_cutter.gd", "res://scripts/voxel_cut_proposal.gd"]:
+	for path in ["res://scripts/track_contact_solver.gd", "res://scripts/jolt_chassis_track_runtime.gd", "res://scripts/performance_capture.gd", "res://scripts/excavation_world.gd", "res://scripts/voxel_excavation_authority.gd", "res://scripts/voxel_bucket_cutter.gd", "res://scripts/voxel_cut_proposal.gd"]:
 		hashes[path] = FileAccess.get_sha256(path) if FileAccess.file_exists(path) else "unavailable_in_export"
 	_metadata["source_sha256"] = hashes
 	_started_usec = Time.get_ticks_usec()
@@ -138,6 +172,8 @@ func start_capture(directory: String = OUTPUT_DIR, duration_limit_s: float = 180
 	_focus_transition = false
 	_stopped_usec = 0
 	recording = true
+	for node in get_tree().get_nodes_in_group("chassis_performance_sources"):
+		_connect_chassis(node)
 	_sample_context(_started_usec)
 	set_process(true)
 	state_changed.emit()
@@ -152,9 +188,10 @@ func stop_capture(reason: String = "user") -> bool:
 	_stop_reason = reason
 	recording = false
 	set_process(false)
-	if _render_measurement_enabled:
-		RenderingServer.viewport_set_measure_render_time(_viewport_rid, false)
-		_render_measurement_enabled = false
+	_update_render_measurement()
+	for node in get_tree().get_nodes_in_group("chassis_performance_sources"):
+		if node.performance_step_sampled.is_connected(_on_chassis_step):
+			node.performance_step_sampled.disconnect(_on_chassis_step)
 	if is_instance_valid(_world):
 		_world.set_performance_capture_enabled(false)
 	_unsaved = true
@@ -248,8 +285,12 @@ func _on_soil_step(sample: Dictionary) -> void:
 	var started := Time.get_ticks_usec()
 	for key in STAGE_COLUMNS:
 		_pending[STAGE_COLUMNS[key]] += float(sample.get(key, 0)) / 1000.0
+	var cutter_phases := sample.get("cutter_phases", {}) as Dictionary
+	for key in CUTTER_COLUMNS:
+		_pending[CUTTER_COLUMNS[key]] += float(cutter_phases.get(key, 0)) / 1000.0
 	var transaction := sample.get("transaction", {}) as Dictionary
 	if not transaction.is_empty():
+		_pending[34] += float(transaction.get("support_cleanup_usec", 0)) / 1000.0
 		_pending[18] += 1
 		var event := {"kind": "transaction", "t_ms": float(int(sample.get("ended_usec", started)) - _started_usec) / 1000.0, "process_frame": sample.get("process_frame"), "physics_frame": sample.get("physics_frame")}
 		for key in ["generation", "revision", "sequence", "operation", "model_id", "rejection_reason", "accepted_mass_q", "affected_samples", "native_path_count"]:

@@ -104,6 +104,12 @@ func _run() -> void:
 		while Engine.get_physics_frames() - settle_start < settle_ticks:
 			await physics_frame
 	_replay_base_tick = Engine.get_physics_frames()
+	var capture := scene.get_node_or_null("PerformanceCapture") as PerformanceCapture
+	var capture_started := false
+	# Keep the benchmark independent of the user's persisted HUD preference.
+	var operator_ui := scene.get_node_or_null("OperatorUI")
+	if operator_ui != null and is_instance_valid(operator_ui._performance_overlay):
+		operator_ui._performance_overlay.set_enabled(false)
 	var started_usec := Time.get_ticks_usec()
 	var previous_frame_usec := started_usec
 	var last_physics_tick := -1
@@ -147,6 +153,10 @@ func _run() -> void:
 	var reconnect_started := false
 	while float(Time.get_ticks_usec() - started_usec) / 1_000_000.0 < _duration_seconds:
 		var elapsed := float(Time.get_ticks_usec() - started_usec) / 1_000_000.0
+		if not capture_started and elapsed >= _warmup_seconds and capture != null:
+			capture_started = true
+			if not capture.start_capture(_report_path.get_base_dir().path_join("performance-captures"), minf(180.0, _duration_seconds - _warmup_seconds)):
+				_failures.append("performance capture failed: %s" % capture.last_error)
 		var phase_name := _scenario_phase_name(elapsed)
 		if not phase_diagnostics.has(phase_name):
 			phase_diagnostics[phase_name] = {
@@ -354,6 +364,9 @@ func _run() -> void:
 		if not last_error.is_empty():
 			_failures.append("motion client error: %s" % last_error)
 			break
+	if capture != null and capture.recording:
+		if not capture.stop_capture("soak_complete"):
+			_failures.append("performance capture save failed: %s" % capture.last_error)
 	chassis.clear_commands_for_test()
 	chassis.clear_equipment_commands_for_test()
 	var final_status := chassis.get_status_snapshot()
@@ -391,6 +404,7 @@ func _run() -> void:
 	}
 	var report := {
 		"schema_version": REPORT_SCHEMA_VERSION,
+		"performance_capture": capture.get_capture_status() if capture != null else {},
 		"model_id": _model_id,
 		"requested_quality_profile": _quality_profile,
 		"observed_quality_profile": String(quality_snapshot.get("profile", "")),

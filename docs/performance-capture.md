@@ -100,3 +100,38 @@ Window focus-entered/exited signals invalidate the next interval even if both
 transitions occurred between process callbacks. A system suspension or debugger
 pause that sends no focus event cannot be distinguished from a long game frame;
 avoid these during a reproduction and mention them if they occurred.
+
+## Live overlay and recorded-input soak (2026-09-18)
+
+Esc → 高级工具 → 显示帧率与性能曲线 enables the mouse-transparent top-right
+panel. Preference persists in operator_ui.cfg and survives theme changes. It
+shows current 250 ms average FPS/frame interval, the lowest bin-average FPS and
+maximum single-frame interval over the last ten seconds, followed by separate
+FPS/peak-time graphs and latest engine CPU/physics/viewport GPU reports. The
+minimum FPS is explicitly a bin average, not 1% low FPS. Forty timestamped bins
+expire by age; graph reference lines are labelled 60 FPS and 33.3 ms rather than
+showing an ambiguous ceiling. Menus/background stop sampling and clear the
+window; returning starts fresh so focus gaps cannot appear as gameplay hitches. Disabling stops processing/drawing;
+render instrumentation remains enabled only if a capture still needs it.
+
+Capture rows append chassis_ms, tracks_ms and chassis_steps; tracks_ms is nested
+inside chassis_ms. These clocks measure every runtime callback (including snapshot
+publication in chassis_ms), not native Jolt integration. Multiple physics ticks
+accumulate rather than sampling the last tick. Track/runtime source hashes are
+included. Existing analyzers use column names and continue to accept old captures.
+
+Soil bottleneck probes additionally record cutter_admission_ms (front-edge SDF),
+cutter_contact_ms (lift-exit contact, including no-contact rejection),
+cutter_capsules_ms, cutter_paths_ms and cutter_proposal_ms (bounds, creation/hash).
+These are nested within soil_automatic_ms; they do not cover pose sampling or
+authority queue/coalescing. support_cleanup_ms is nested within commit_ms and
+soil_step_ms. Each frame accumulates all intervening physics steps. Probes use
+clocks only while recording and do not enable extra diagnostic SDF reads.
+
+The recorded-input soak now starts this same recorder after warmup and writes a
+sidecar into performance-captures next to its report, with its status/path in the
+Godot report. Its existing summary is unchanged. Captures remain bounded to 180 s /
+60,000 frames; longer release soaks contain only that measured window. The soak
+disables the live overlay in its own process for consistent measurements. Inputs
+are repeatable, but collision/terrain evolution is not guaranteed identical across
+versions; compare settings, trajectories and source hashes before claiming a regression.
