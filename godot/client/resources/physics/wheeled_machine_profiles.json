@@ -1,0 +1,208 @@
+{
+  "schema_version": 1,
+  "profiles": {
+    "sy155w": {
+      "provenance": "Source build_sy155w.py wheel pivots/radius/axes validated against unchanged Godot GLB. Suspension, inertia, tire and drivetrain coefficients are provisional simulator tuning, not manufacturer measurements.",
+      "asset_path": "res://assets/visual/SY155W_excavator_godot.glb",
+      "asset_sha256": "de2d015f0d63cbfa9dd453cc30f7b57806f44a033ff1d9ea099198ef77fc4344",
+      "parameters": {
+        "wheelbase_m": 2.6,
+        "max_speed_mps": 4.5,
+        "max_reverse_speed_mps": 2.0,
+        "max_steer_degrees": 32.0,
+        "steer_rate_degrees_s": 55.0,
+        "steering_lateral_accel_mps2": 2.5,
+        "drive_force_n": 28000.0,
+        "brake_force_n": 85000.0,
+        "rolling_resistance": 0.022,
+        "friction": 0.85,
+        "suspension_travel_m": 0.12,
+        "spring_n_m": 800000.0,
+        "damper_n_s_m": 60000.0,
+        "max_load_n": 100000.0,
+        "wheel_inertia_kg_m2": 32.0
+      },
+      "linear_damp": 0.03,
+      "angular_damp": 0.25,
+      "collision_wheel_width_m": 0.57,
+      "hulls": [
+        {
+          "center_m": [
+            0,
+            0.78,
+            0
+          ],
+          "size_m": [
+            1.43,
+            0.36,
+            3.4
+          ]
+        },
+        {
+          "center_m": [
+            0,
+            1.65,
+            0.3
+          ],
+          "size_m": [
+            2.55,
+            1.15,
+            3.4
+          ]
+        }
+      ],
+      "roll_axis": [
+        0,
+        0,
+        1
+      ],
+      "steer_axis": [
+        0,
+        1,
+        0
+      ],
+      "wheels": [
+        {
+          "mount": [
+            -0.972,
+            0.609,
+            -1.3
+          ],
+          "radius_m": 0.535,
+          "steered": true,
+          "driven": true,
+          "pivot_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS/FRONT_L_STEER",
+          "roll_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS/FRONT_L_STEER/FRONT_L_ROLL",
+          "rest_origin": [
+            -0.972,
+            0.535,
+            -1.3
+          ],
+          "rest_basis": [
+            [
+              0,
+              0,
+              -1
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              1,
+              0,
+              0
+            ]
+          ],
+          "rest_suspension_length_m": 0.074
+        },
+        {
+          "mount": [
+            0.972,
+            0.609,
+            -1.3
+          ],
+          "radius_m": 0.535,
+          "steered": true,
+          "driven": true,
+          "pivot_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS/FRONT_R_STEER",
+          "roll_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS/FRONT_R_STEER/FRONT_R_ROLL",
+          "rest_origin": [
+            0.972,
+            0.535,
+            -1.3
+          ],
+          "rest_basis": [
+            [
+              0,
+              0,
+              -1
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              1,
+              0,
+              0
+            ]
+          ],
+          "rest_suspension_length_m": 0.074
+        },
+        {
+          "mount": [
+            -0.972,
+            0.609,
+            1.3
+          ],
+          "radius_m": 0.535,
+          "steered": false,
+          "driven": true,
+          "pivot_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS/REAR_L_STEER",
+          "roll_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS/REAR_L_STEER/REAR_L_ROLL",
+          "rest_origin": [
+            -0.972,
+            0.535,
+            1.3
+          ],
+          "rest_basis": [
+            [
+              0,
+              0,
+              -1
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              1,
+              0,
+              0
+            ]
+          ],
+          "rest_suspension_length_m": 0.074
+        },
+        {
+          "mount": [
+            0.972,
+            0.609,
+            1.3
+          ],
+          "radius_m": 0.535,
+          "steered": false,
+          "driven": true,
+          "pivot_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS/REAR_R_STEER",
+          "roll_path": "SY155W_Runtime/SY155W_ROOT/CHASSIS/REAR_R_STEER/REAR_R_ROLL",
+          "rest_origin": [
+            0.972,
+            0.535,
+            1.3
+          ],
+          "rest_basis": [
+            [
+              0,
+              0,
+              -1
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              1,
+              0,
+              0
+            ]
+          ],
+          "rest_suspension_length_m": 0.074
+        }
+      ]
+    }
+  }
+}
