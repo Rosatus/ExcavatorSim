@@ -255,6 +255,9 @@ function Write-BuildManifest {
 }
 
 Assert-NoRunningReleaseProcesses
+Invoke-NativeChecked -FilePath "python" -Name "model source asset provenance" -Arguments @(
+    (Join-Path $repoRoot "tools\verify_model_source_assets.py")
+)
 New-Item -ItemType Directory -Path $stagingRoot -Force | Out-Null
 try {
     $isolatedProject = Join-Path $stagingRoot "client"
