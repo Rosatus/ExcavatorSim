@@ -312,8 +312,8 @@ func _mount_tiltrotator(coupler_id: String, coupler: Dictionary, tool_id: String
 	if parent == null:
 		return _fail(descriptor, "mount_frame_unavailable")
 	var rotator_path := String(coupler.get("rotator_glb_path", ""))
-	if not _sha256_matches(rotator_path, String(coupler.get("rotator_glb_sha256", ""))):
-		return _fail(descriptor, "rotator_glb_sha256_mismatch")
+	if not ResourceLoader.exists(rotator_path, "PackedScene"):
+		return _fail(descriptor, "rotator_glb_unavailable")
 	var rotator_scene := load(rotator_path) as PackedScene
 	if rotator_scene == null:
 		return _fail(descriptor, "rotator_glb_unavailable")
@@ -368,8 +368,8 @@ func _mount_tool(coupler: Dictionary, tool: Dictionary, descriptor: String, rota
 	if socket == null:
 		return _fail(descriptor, "tool_socket_missing")
 	var tool_path := String(tool.get("tool_glb_path", ""))
-	if not _sha256_matches(tool_path, String(tool.get("tool_glb_sha256", ""))):
-		return _fail(descriptor, "tool_glb_sha256_mismatch")
+	if not ResourceLoader.exists(tool_path, "PackedScene"):
+		return _fail(descriptor, "tool_glb_unavailable")
 	var tool_scene := load(tool_path) as PackedScene
 	if tool_scene == null:
 		return _fail(descriptor, "tool_glb_unavailable")

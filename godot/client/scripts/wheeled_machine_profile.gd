@@ -69,8 +69,10 @@ func _validate() -> void:
 		error = solver.last_error
 		return
 	var path := String(data.get("asset_path", ""))
-	if path.is_empty() or not FileAccess.file_exists(path) or FileAccess.get_sha256(path) != String(data.get("asset_sha256", "")):
-		error = "wheel profile asset SHA-256 mismatch"
+	# Source hashes are checked before building; exports contain imported scenes.
+	# WheelVisualAnimator validates the actual imported hierarchy/rest transforms.
+	if path.is_empty() or not ResourceLoader.exists(path, "PackedScene"):
+		error = "wheel profile imported scene unavailable"
 		return
 	enabled = true
 

@@ -56,9 +56,21 @@ profile is separate from the legacy physics-rig-v1 work-equipment descriptor.
 `JoltChassisTrackRuntime` selects it, reuses the terrain readiness filter, and
 publishes `wheeled_locomotion`. `MotionPresentation` binds and validates exact
 imported pivot transforms before activating wheel animation. Missing/invalid
-profile data or asset hash/pivot drift fails activation. The existing model
+profile data or imported pivot drift fails activation. The existing model
 catalog, articulation rig and equipment controls are still required for an
 excavator; a standalone vehicle only needs the generic component.
+
+Raw GLB SHA-256 is a source/build-time provenance check. Run
+`pixi run verify-model-sources` after changing model assets or contracts and
+before exporting manually from Godot. `tools/build_release_dist.ps1` and
+`pixi run verify` run this check automatically. Manual Godot exports use the
+standard exporter without a custom plugin; they do not run the external source
+check automatically. At runtime, ResourceLoader loads imported scenes and the
+existing hierarchy, wheel rest-transform, attachment socket and soil geometry
+checks validate them. JSON contract/fill-profile hash checks remain active.
+Original GLB bytes are not required in the exported pack.
+Run `res://tests/sy155w_session_test.gd` against the source project and exported
+pack when changing this boundary.
 
 SY155W geometry comes from source wheel centers (+/-1.3,+/-0.972,.535) in
 Blender coordinates, independently checked in the imported scene. Source

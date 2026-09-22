@@ -110,8 +110,13 @@ static func validate(geometry: Variant, contract: Dictionary, check_resources: b
 			return prefix + " path must be a project resource"
 		if not hash_value is String or hash_value.length() != 64 or not hash_value.is_valid_hex_number(false):
 			return prefix + " hash must be SHA-256"
-		if check_resources and (not FileAccess.file_exists(path) or FileAccess.get_sha256(path) != hash_value):
-			return prefix + " resource hash mismatch"
+		if check_resources:
+			if prefix == "source_glb":
+				# Original bytes are a build-time provenance check, not a runtime asset.
+				if not ResourceLoader.exists(path, "PackedScene"):
+					return "source_glb imported scene unavailable"
+			elif not FileAccess.file_exists(path) or FileAccess.get_sha256(path) != hash_value:
+				return prefix + " resource hash mismatch"
 	if not check_resources:
 		return ""
 	var profile: Variant = JSON.parse_string(FileAccess.get_file_as_string(geometry.fill_profile_path))
