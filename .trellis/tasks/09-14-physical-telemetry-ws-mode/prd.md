@@ -7,6 +7,26 @@
 > superseded. Resume by starting M1: freeze the WS schema under `protocol/`,
 > then build the Gateway's physical layer.
 
+## Preparation update — 2026-09-22 (supersedes conflicting older text)
+
+Implementation preparation has resumed; no business code has been changed in this preparation pass. The earlier Linux-only and patch-delivery requirements below are historical and superseded here.
+
+Confirmed with the operator:
+- Companion checkout: `C:\code\tools\can_replay` (the supplied `C:\code\tools\can\_replay` does not exist). Inspected baseline: `68a8920`, clean working tree.
+- Acceptance target: Windows PCAN. This is an output-backend choice; reuse the existing backend. Linux hardware acceptance is not required for this task.
+- Develop and verify directly. No original/modified snapshots or patch generation are currently required. Prefer no companion changes where its existing protocol suffices; assess that before implementation.
+- Game UI keeps WS endpoint configuration and connection status. Remove the game-side CAN recording, TCP endpoint, ICT and timed-CAN operation entries; CAN operations belong in the replay console. Preserve the explicit legacy CAN pipeline's compatibility.
+- On telemetry timeout or WS disconnect, stop CAN output originating from that telemetry source. Retain last displayed values marked disconnected/stale. Resume only with fresh data, without queued stale replay. Independent user-created injection is a separate source.
+
+Existing-protocol assessment (source inspection, not a runtime test):
+- `web_dashboard.py:create_web_app`: `/ws` accepts `ping`, `state`, and `filter`; it has no physical telemetry ingestion or identity handshake. Thus the older statement that it rejects all client data is inaccurate.
+- `/api/inject` calls `build_custom_frame` with channel, CAN ID, payload bytes and frame format. PC001 likewise carries already encoded CAN frames. Neither accepts semantic IMU/slew/travel/RTK samples.
+- `/api/overwrite` changes a single DBC signal, and may materialize/send a frame. Its persistent override semantics do not provide atomic telemetry families, clock/identity validation, freshness expiry or the physical-to-protocol conversion contract.
+- `socket_bridge.py:bridge_to_vcan` starts its injection consumer only after PC001 connects and handshakes. It cannot be reused as an independent WS output loop unchanged.
+- Conclusion: existing protocols cannot satisfy the agreed physical-only Gateway boundary without adaptation on the receiving side. Minimum companion work: physical WS route and handshake, physical-to-CAN encoder, independent bounded/freshness-aware output lifecycle using the existing PCAN bus abstraction, and physical-value/session state for the new console. Preserve existing PC001 and dashboard routes.
+
+Next: refine M1 schema/session freshness and mode migration, then implement against this baseline. Existing M3 console scope remains unless explicitly changed. Replace M2 Linux/vcan hardware acceptance with Windows PCAN; remove M4 patch/snapshot acceptance. Endpoint spelling and session queue details are implementation choices, not additional approval gates. Real PCAN hardware acceptance must be distinguished from mock-backend and byte-parity checks.
+
 ## Goal
 
 Make the CAN Gateway, when launched with no arguments, run as a pure

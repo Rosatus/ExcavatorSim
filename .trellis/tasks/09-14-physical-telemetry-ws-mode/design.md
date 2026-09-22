@@ -4,6 +4,10 @@
 > implementation has not started. Kept for reference, not superseded. See
 > `prd.md` for the pause banner and resume point.
 
+## 2026-09-22 preparation amendment
+
+The authoritative updated scope and protocol assessment are in `prd.md`, “Preparation update — 2026-09-22”. Windows PCAN replaces Linux hardware acceptance; direct development replaces patch/snapshot delivery. Existing companion ingress is insufficient for semantic telemetry; reuse the PCAN backend and add only the required receiving/encoding/session integration. No business code has been implemented in this preparation pass. Earlier deferred/frozen wording and conflicting delivery/platform statements below are historical.
+
 ## 1. Where the line is drawn
 
 Chain from simulation state to a CAN frame has five stages:
