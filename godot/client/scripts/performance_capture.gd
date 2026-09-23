@@ -18,7 +18,9 @@ const FRAME_COLUMNS := [
 	"transaction_count", "commit_ms", "coverage_ms", "material_ms", "native_edit_ms", "digest_ms", "readiness_issue_ms",
 	"recorder_ms", "chassis_ms", "tracks_ms", "chassis_steps",
 	"cutter_admission_ms", "cutter_contact_ms", "cutter_capsules_ms", "cutter_paths_ms", "cutter_proposal_ms", "support_cleanup_ms",
+	"cut_prepare_ms", "cut_prepare_coverage_ms", "cut_prepare_edit_ms",
 ]
+const PREPARATION_COLUMNS := {"total_usec": 35, "coverage_usec": 36, "edit_usec": 37}
 const CUTTER_COLUMNS := {"cutter_admission_usec": 29, "cutter_contact_usec": 30, "cutter_capsules_usec": 31, "cutter_paths_usec": 32, "cutter_proposal_usec": 33}
 const STAGE_COLUMNS := {"automatic_usec": 14, "step_usec": 15, "publish_usec": 16, "total_usec": 17}
 const TRANSACTION_COLUMNS := {"commit_usec": 19, "coverage_usec": 20, "material_usec": 21, "native_edit_usec": 22, "digest_usec": 23, "readiness_issue_usec": 24}
@@ -160,7 +162,7 @@ func start_capture(directory: String = OUTPUT_DIR, duration_limit_s: float = 180
 		],
 	}
 	var hashes: Dictionary = {}
-	for path in ["res://scripts/track_contact_solver.gd", "res://scripts/jolt_chassis_track_runtime.gd", "res://scripts/performance_capture.gd", "res://scripts/excavation_world.gd", "res://scripts/voxel_excavation_authority.gd", "res://scripts/voxel_bucket_cutter.gd", "res://scripts/voxel_cut_proposal.gd"]:
+	for path in ["res://scripts/track_contact_solver.gd", "res://scripts/jolt_chassis_track_runtime.gd", "res://scripts/performance_capture.gd", "res://scripts/excavation_world.gd", "res://scripts/voxel_excavation_authority.gd", "res://scripts/voxel_bucket_cutter.gd", "res://scripts/voxel_cut_proposal.gd", "res://scripts/voxel_cut_preparation.gd", "res://scripts/voxel_cut_worker.gd"]:
 		hashes[path] = FileAccess.get_sha256(path) if FileAccess.file_exists(path) else "unavailable_in_export"
 	_metadata["source_sha256"] = hashes
 	_started_usec = Time.get_ticks_usec()
@@ -288,6 +290,9 @@ func _on_soil_step(sample: Dictionary) -> void:
 	var cutter_phases := sample.get("cutter_phases", {}) as Dictionary
 	for key in CUTTER_COLUMNS:
 		_pending[CUTTER_COLUMNS[key]] += float(cutter_phases.get(key, 0)) / 1000.0
+	var preparation := sample.get("cut_preparation", {}) as Dictionary
+	for key in PREPARATION_COLUMNS:
+		_pending[PREPARATION_COLUMNS[key]] += float(preparation.get(key, 0)) / 1000.0
 	var transaction := sample.get("transaction", {}) as Dictionary
 	if not transaction.is_empty():
 		_pending[34] += float(transaction.get("support_cleanup_usec", 0)) / 1000.0

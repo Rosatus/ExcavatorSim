@@ -214,6 +214,9 @@ def render_markdown(result: dict[str, Any]) -> str:
         "cutter_paths_ms": "切割路径生成",
         "cutter_proposal_ms": "切割提案构建与哈希",
         "support_cleanup_ms": "悬空土清理（提交内）",
+        "cut_prepare_ms": "切削分帧准备（含最终提交）",
+        "cut_prepare_coverage_ms": "分帧覆盖计算",
+        "cut_prepare_edit_ms": "分帧缓冲区编辑",
     }
     for key, label in labels.items():
         metric = result["metrics_ms"].get(key, {})

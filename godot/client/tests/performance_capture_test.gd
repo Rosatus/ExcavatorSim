@@ -35,6 +35,7 @@ func _run() -> void:
 	check(not capture.start_capture(directory), "duplicate start rejected")
 	check(not world.voxel_diagnostics_enabled and world.performance_capture_enabled, "capture enables timing without full diagnostics")
 	var event := {"ended_usec": Time.get_ticks_usec(), "physics_frame": 1, "automatic_usec": 1000, "step_usec": 3000, "publish_usec": 2000, "total_usec": 6000,
+		"cut_preparation": {"total_usec": 1200, "coverage_usec": 800, "edit_usec": 300},
 		"cutter_phases": {"cutter_admission_usec": 100, "cutter_contact_usec": 500, "cutter_paths_usec": 200},
 		"transaction": {"generation": 1, "revision": 1, "operation": "cut", "model_id": "sy135", "commit_usec": 2000, "coverage_usec": 1000, "support_cleanup_usec": 400}}
 	world.performance_step_sampled.emit(event)
@@ -45,6 +46,7 @@ func _run() -> void:
 	capture._on_chassis_step(4000, 2000)
 	check(capture._pending[26] == 7 and capture._pending[27] == 3 and capture._pending[28] == 2, "chassis and track time accumulate every physics callback")
 	var row := capture._frames[0]
+	check(row[35] == 2.4 and row[36] == 1.6 and row[37] == 0.6, "private preparation is attributed to its actual frame")
 	check(row[14] == 2 and row[17] == 12 and row[18] == 2 and row[19] == 4, "all physics steps and transactions accumulate in frame")
 	check(is_equal_approx(row[29], 0.2) and row[30] == 1.0 and is_equal_approx(row[32], 0.4) and is_equal_approx(row[34], 0.8), "cutter and cleanup phases accumulate across physics steps")
 	check(row[2] >= 20 and row[6] == -1 and row[7] == -1, "wall interval and unavailable headless GPU are explicit")
@@ -52,6 +54,7 @@ func _run() -> void:
 	check(world.reads == 1, "per-frame collection avoids world status reads")
 	capture._process(0.0)
 	check(capture._frames[1][26] == 7 and capture._pending[26] == 0, "chassis timing drains once per render frame")
+	check(capture._frames[1][35] == 0 and capture._frames[1][36] == 0 and capture._frames[1][37] == 0, "preparation drains once per frame")
 	check(capture._frames[1][17] == 0, "stage accumulator resets each frame")
 	check(capture._frames[1][30] == 0 and capture._frames[1][34] == 0, "new phase clocks drain once per frame")
 	capture._last_context_usec -= Capture.CONTEXT_PERIOD_USEC
