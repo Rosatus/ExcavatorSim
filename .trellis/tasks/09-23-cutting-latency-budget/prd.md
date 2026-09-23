@@ -1,0 +1,27 @@
+# Cutting latency optimization
+
+User authorizes implementing the best measured approach. Preserve 60Hz physics, cutting sweep/geometry, mass ledger, lifecycle and collision readiness. Do not reduce graphics or slow simulation to claim performance wins.
+
+Baseline: output/cutting-latency-0923/report.md and baseline/ capture. P99 63.876ms, max163.624, >50ms139. Synchronous coverage and native edits plus physical catchup amplification. One-step experiment is diagnostic only and not a product solution.
+
+Plan: inspect native edit cost and repeated work; first reduce cost with equivalent bounded/batched operations, then select budget scheduling based on residual evidence. Validate exact geometry/ledger against old path, focused regression, and same 60s rendered replay. Preserve incomplete evidence and report remaining limits.
+
+Agent automated: targeted SDF byte/ledger equivalence, real recorded residual cutting, capture checks if changed, rendered soak at normal physics rate. Human manual: final subjective excavation responsiveness/appearance remains separate.
+
+Progress: relevant authority contracts read; no product edits yet. Investigating generic VoxelTool.do_path random access vs detached VoxelBuffer edit and single paste. Native v1.7 source read from upstream.
+
+Milestone 1: private resumable coverage walker + VoxelBuffer native path preparation, 3ms shared rendered-frame budget, atomic main-thread paste/ledger publication. No threads, no physics slowdown. World process callback continues pending job at zero simulation delta; fixed callbacks share same budget. Readiness and cleanup remain at publication. Prepared job blocks other terrain writes; revision guard restarts stale data; clear cancels. Added recorder slice timings and low-rate scheduler counters.
+
+Tests passed: voxel_cut_preparation_test (full cadence SDF digest/ledger parity, 421-frame recorded byte/journal parity, same-frame budget, reset/revision checks); voxel_cutting_performance_test frozen coverage oracles; performance_capture_test; voxel_excavation_world_test. Evidence output/cutting-latency-0923/*.log. First prepared-v1 60s soak running normal physics (output/cutting-latency-0923/prepared-v1). Product source stable during run. Need analyze lag/queue/errors; refine bounds, public pending accessor, age stats and docs; add lifecycle/backpressure edge tests, then final affected checks and soak if meaningful edits.
+
+First soak prepared-v1 FAILED practical acceptance despite P99 improving to26.37ms: max251ms,13>100ms; unbounded coalescing while job pending made huge successor proposals, max private job age3.13s. Not accepted as fix. Changed coalescing to at most3 fixed ticks in budgeted mode and count active job toward12-cut queue bound; public pending accessor and scheduler age added. Focused preparation test still PASS. prepared-v2 soak running; no product edits during run. Need assess overload rejection and lag before accepting.
+
+prepared-v2 not valid acceptance: runner PASS but log contains typed Array ternary runtime errors in outside-batch branch, causing queue_full rejections and omitted submissions. Fixed explicitly typed empty array + conditional merge. Added bounded queue regression exercising40 ticks (33 admitted to11 queued3-tick batches plus1 active slot). Test PASS. prepared-v3 running; check SCRIPT ERROR/ERROR explicitly in addition to runner gates.
+
+prepared-v3 log clean; P99 26.952,max43.991,zero>50ms but queue reached12, queue_full134, oldest90ticks. NOT accepted: throughput insufficient at3ms. Changed product budget only to6ms; prepared-v4 soak running. Need zero new queue losses and limited age; also verify capped60fps operation (uncapped frames can otherwise hide budget starvation).
+
+prepared-v4 6ms still overloaded queue_full84, P99 38ms, so cooperative main-thread implementation insufficient. Implemented isolated WorkerThreadPool task with root-owned completion receipt; task only owns private VoxelCutPreparation and VoxelBuffer. Main copies full bounded halo snapshot, background computes coverage/solid selection/native buffer edits, main polls only completed receipt and atomically publishes. Clear abandons receipt which survives world and reaps when complete; only application shutdown waits native work. Revision restart discards old private result. Worker timings cumulative in context; never counted as main-frame CPU. Tests extended three-way sync/sliced/threaded 421-frame exact geometry/journal parity plus cancel while worker alive after zone freed. PASS. threaded-v1 soak running. Next assess no queue-full + lag + capped60fps; simplify unused sliced product branch if worker succeeds; remaining docs/tests and evidence.
+
+threaded-v1 clean soak PASS runner and log: normal uncapped P99 28.600, max55.884, >50ms2; zero queue_full, max queue2/age4ticks; 359 cut+41 deposit transaction events, replay3601 ticks, conservation error0. Remaining >50ms are 2 status/publish or catchup cases (GPU<3ms), plus fixed-step/publish work. Capped-60 diagnostic keeps the same queue/worker health and replay3601; P99 36.793/max65.189 because fixed 60Hz process budget/physics latency is the limiting condition, not worker starvation. It is not a product failure.
+
+Product scene now opts into threaded preparation explicitly (`main.tscn`), while bare test worlds retain synchronous behavior for deterministic immediate-commit contracts. Final targeted world test PASS after this gate fix.
