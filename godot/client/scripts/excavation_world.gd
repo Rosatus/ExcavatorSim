@@ -24,6 +24,7 @@ const TEST_BUCKET_CAPACITY_M3 := 1000.0
 @export var active_soil_patch_prototype_enabled := false
 @export var voxel_unlimited_bucket_for_testing := false
 @export var voxel_diagnostics_enabled := false
+@export var threaded_cut_preparation_enabled := false
 @export_enum("loose", "compact", "sand", "damp") var active_soil_material_preset := "loose"
 @export_enum("voxel") var soil_material_lifecycle_mode := "voxel"
 ## Keep the existing product writer selected until the v2 release candidate has
@@ -176,8 +177,36 @@ func _physics_process(delta: float) -> void:
 				"total_usec": capture_end - capture_start,
 				"transaction": voxel_result.get("transaction", {}),
 				"cutter_phases": _voxel_authority.cutter.performance_sample,
+				"cut_preparation": _voxel_authority.preparation_sample,
 			})
 		return
+
+
+func _process(_delta: float) -> void:
+	# Continue private preparation on rendered frames without adding simulation
+	# time. Physics catchup and this callback share the authority's frame budget.
+	if not _initialized or _bucket_ground_bypassed() or _voxel_authority == null \
+			or not _soil_authority_modes.can_product_owner_write("voxel") \
+			or not _voxel_authority.has_pending_cut_preparation():
+		return
+	var started := Time.get_ticks_usec() if performance_capture_enabled else 0
+	var result := _voxel_authority.step_fixed(0.0)
+	var after_step := Time.get_ticks_usec() if performance_capture_enabled else 0
+	if bool(result.get("changed", false)):
+		_last_interaction = "cut"
+	if bool(result.get("changed", false)) or bool(result.get("release_changed", false)):
+		excavation_changed.emit(get_status_snapshot())
+		_queue_backend_feedback()
+	if performance_capture_enabled:
+		var ended := Time.get_ticks_usec()
+		performance_step_sampled.emit({
+			"physics_frame": Engine.get_physics_frames(),
+			"process_frame": Engine.get_process_frames(), "ended_usec": ended,
+			"automatic_usec": 0, "step_usec": after_step - started,
+			"publish_usec": ended - after_step, "total_usec": ended - started,
+			"transaction": result.get("transaction", {}),
+			"cut_preparation": _voxel_authority.preparation_sample,
+		})
 
 
 func queue_cut_world(sequence: int, previous_tooth: Vector3, current_tooth: Vector3) -> bool:
@@ -336,7 +365,7 @@ func get_performance_context() -> Dictionary:
 		"automatic_soil_enabled": automatic_soil_enabled, "bucket_ground_bypassed": _bucket_ground_bypassed(),
 		"unlimited_bucket_for_testing": voxel_unlimited_bucket_for_testing, "diagnostics_enabled": voxel_diagnostics_enabled,
 	}
-	for key in ["model_id", "generation", "data_revision", "mesh_revision", "collision_revision", "queue_depth", "pending_readiness_count", "readiness_timed_out", "committed", "rejected", "engaged", "bucket_mass_q", "fill_ratio", "conservation_error_q", "phase_timings_usec", "voxel_statistics", "readiness"]:
+	for key in ["model_id", "generation", "data_revision", "mesh_revision", "collision_revision", "queue_depth", "rejection_reasons", "pending_readiness_count", "cut_preparation", "readiness_timed_out", "committed", "rejected", "engaged", "bucket_mass_q", "fill_ratio", "conservation_error_q", "phase_timings_usec", "voxel_statistics", "readiness"]:
 		result[key] = status.get(key)
 	# Full diagnostics remain at the user's setting. Capture only observes these
 	# low-rate counters; it does not enable per-transaction SDF digests or sorting.
@@ -953,6 +982,8 @@ func _ensure_voxel_authority() -> bool:
 		return false
 	_reset_voxel_authority()
 	_voxel_authority = VoxelAuthority.new()
+	_voxel_authority.cut_preparation_budget_usec = 3000 if threaded_cut_preparation_enabled else 0
+	_voxel_authority.threaded_cut_preparation = threaded_cut_preparation_enabled
 	_voxel_authority.set_diagnostics_enabled(voxel_diagnostics_enabled)
 	_voxel_authority.performance_timing_enabled = performance_capture_enabled
 	var capacity_override := TEST_BUCKET_CAPACITY_M3 if voxel_unlimited_bucket_for_testing else 0.0

@@ -1,6 +1,8 @@
 class_name VoxelExcavationAuthority
 extends RefCounted
 
+const CutWorker = preload("res://scripts/voxel_cut_worker.gd")
+const CutPreparation = preload("res://scripts/voxel_cut_preparation.gd")
 const CutProposal = preload("res://scripts/voxel_cut_proposal.gd")
 const CutTransaction = preload("res://scripts/voxel_cut_transaction.gd")
 const SoilOperationProposal = preload("res://scripts/voxel_soil_operation_proposal.gd")
@@ -16,6 +18,7 @@ const MAX_DEPOSIT_SURFACE_SAMPLES := 32768
 const SCHEMA_VERSION := "voxel-excavation-authority-v3"
 const COMMIT_PERIOD_S := 0.05
 const MAX_QUEUE_DEPTH := 12
+const MAX_COALESCED_CUT_TICKS := 3
 const MAX_JOURNAL_ROWS := 256
 const MAX_STAGED_SAMPLES := 262144
 const MAX_PROPOSAL_CAPSULES := 4096
@@ -67,6 +70,24 @@ var last_error := ""
 var diagnostics_enabled := false
 ## Recording can time existing operations without enabling diagnostic SDF reads.
 var performance_timing_enabled := false
+## Zero keeps the synchronous contract for deterministic standalone callers.
+## Product enables a budget shared by all physics callbacks in a rendered frame.
+var cut_preparation_budget_usec := 0
+var threaded_cut_preparation := false
+var _cut_worker: Node
+var _worker_coverage_usec := 0
+var _worker_edit_usec := 0
+var preparation_sample: Dictionary = {}
+var _preparing_cut: VoxelCutProposal
+var _cut_preparation: VoxelCutPreparation
+var _preparation_revision := -1
+var _preparation_frame := -1
+var _preparation_spent_usec := 0
+var _preparation_slice_max_usec := 0
+var _preparation_started_usec := 0
+var _preparation_latency_max_usec := 0
+var _preparation_completed := 0
+var _preparation_restarts := 0
 var cutter := BucketCutter.new()
 var material_field := MaterialField.new()
 
@@ -192,6 +213,22 @@ func set_bucket_capacity_override_for_testing(capacity_override_m3: float) -> Di
 
 
 func clear() -> void:
+	if is_instance_valid(_cut_worker):
+		_cut_worker.abandon()
+	_cut_worker = null
+	_worker_coverage_usec = 0
+	_worker_edit_usec = 0
+	_preparing_cut = null
+	_cut_preparation = null
+	_preparation_revision = -1
+	_preparation_frame = -1
+	_preparation_spent_usec = 0
+	_preparation_slice_max_usec = 0
+	_preparation_started_usec = 0
+	_preparation_latency_max_usec = 0
+	_preparation_completed = 0
+	_preparation_restarts = 0
+	preparation_sample.clear()
 	_release_published_since_step = false
 	configured = false
 	generation = -1
@@ -371,6 +408,7 @@ func submit_pose(pose_snapshot: Dictionary, identity: Dictionary, delta_s: float
 
 
 func step_fixed(delta: float) -> Dictionary:
+	preparation_sample.clear()
 	var result := _step_fixed_impl(delta)
 	result["release_changed"] = _release_published_since_step
 	_release_published_since_step = false
@@ -386,28 +424,34 @@ func _step_fixed_impl(delta: float) -> Dictionary:
 		_pending_dump_elapsed_s += delta
 		if _pending_dump_elapsed_s + 0.000001 >= DUMP_BATCH_PERIOD_S:
 			_flush_pending_dump_to_queue()
-	if _queue.is_empty() and _soil_queue.is_empty() and _pending_dump == null:
+	if _preparing_cut == null and _queue.is_empty() and _soil_queue.is_empty() and _pending_dump == null:
 		return {"changed": false, "reason": "idle"}
 	# Wait for the pending dump batch to reach its publication deadline.
-	if _queue.is_empty() and _pending_dump != null and _soil_operation_queue_depth("deposit") == 0:
+	if _preparing_cut == null and _queue.is_empty() and _pending_dump != null and _soil_operation_queue_depth("deposit") == 0:
 		return {
 			"changed": false,
 			"reason": "dump_batch_coalescing",
 			"pending_dump_age_s": _pending_dump_elapsed_s,
 		}
-	if _commit_accumulator_s + 0.000001 < COMMIT_PERIOD_S:
+	if _preparing_cut == null and _commit_accumulator_s + 0.000001 < COMMIT_PERIOD_S:
 		return {"changed": false, "reason": "coalescing", "queue_depth": _queue.size() + _soil_queue.size()}
-	_commit_accumulator_s = fmod(_commit_accumulator_s, COMMIT_PERIOD_S)
 	var transaction: VoxelCutTransaction
-	# Continuous settle/compaction is intentionally absent. Deposits commit as
-	# stable repose geometry and remain directly re-diggable.
-	if transaction == null:
-		if _queue.is_empty() and _soil_queue.is_empty():
-			return {"changed": false, "reason": "idle"}
+	if _preparing_cut != null:
+		transaction = _advance_preparing_cut()
+	else:
+		_commit_accumulator_s = fmod(_commit_accumulator_s, COMMIT_PERIOD_S)
 		if _queue.is_empty() and not _soil_queue.is_empty():
 			transaction = _commit_soil_proposal(_dequeue_next_soil_proposal())
-		else:
-			transaction = _commit_proposal(_queue.pop_front())
+		elif not _queue.is_empty():
+			var proposal := _queue.pop_front() as VoxelCutProposal
+			if cut_preparation_budget_usec > 0 and not proposal.native_paths.is_empty():
+				_preparing_cut = proposal
+				_preparation_started_usec = Time.get_ticks_usec()
+				transaction = _advance_preparing_cut()
+			else:
+				transaction = _commit_proposal(proposal)
+	if transaction == null:
+		return {"changed": false, "reason": "cut_preparing" if _preparing_cut != null else "idle"}
 	_record_transaction_telemetry(transaction)
 	_last_transaction = transaction.to_dictionary()
 	_append_journal(_last_transaction)
@@ -415,6 +459,135 @@ func _step_fixed_impl(delta: float) -> Dictionary:
 		_record_rejection(transaction.rejection_reason)
 		return {"changed": false, "reason": transaction.rejection_reason, "transaction": _last_transaction.duplicate(true)}
 	return {"changed": true, "reason": "committed", "transaction": _last_transaction.duplicate(true)}
+
+
+func has_pending_cut_preparation() -> bool:
+	return _preparing_cut != null
+
+
+func _preparation_frame_id() -> int:
+	return Engine.get_process_frames()
+
+
+func _advance_preparing_cut() -> VoxelCutTransaction:
+	var frame := _preparation_frame_id()
+	if frame != _preparation_frame:
+		_preparation_frame = frame
+		_preparation_spent_usec = 0
+	if _preparation_spent_usec >= cut_preparation_budget_usec:
+		return null
+	var started := Time.get_ticks_usec()
+	var previous_coverage := _cut_preparation.coverage_usec if _cut_preparation != null and not threaded_cut_preparation else 0
+	var previous_edit := _cut_preparation.edit_usec if _cut_preparation != null and not threaded_cut_preparation else 0
+	var transaction := _advance_preparing_cut_impl(started + cut_preparation_budget_usec - _preparation_spent_usec)
+	var elapsed := Time.get_ticks_usec() - started
+	_preparation_spent_usec += elapsed
+	_preparation_slice_max_usec = maxi(_preparation_slice_max_usec, elapsed)
+	preparation_sample = {
+		"total_usec": elapsed,
+		"coverage_usec": maxi(0, _cut_preparation.coverage_usec - previous_coverage) if _cut_preparation != null and not threaded_cut_preparation else 0,
+		"edit_usec": maxi(0, _cut_preparation.edit_usec - previous_edit) if _cut_preparation != null and not threaded_cut_preparation else 0,
+	}
+	if transaction != null:
+		if threaded_cut_preparation and _cut_preparation != null \
+				and (not is_instance_valid(_cut_worker) or _cut_worker.completed()):
+			_worker_coverage_usec += _cut_preparation.coverage_usec
+			_worker_edit_usec += _cut_preparation.edit_usec
+		if is_instance_valid(_cut_worker):
+			_cut_worker.abandon()
+		_cut_worker = null
+		_preparation_latency_max_usec = maxi(_preparation_latency_max_usec, Time.get_ticks_usec() - _preparation_started_usec)
+		_preparation_completed += 1
+		_preparing_cut = null
+		_cut_preparation = null
+	return transaction
+
+
+func _advance_preparing_cut_impl(deadline_usec: int) -> VoxelCutTransaction:
+	var proposal := _preparing_cut
+	var started := _diagnostic_clock_usec()
+	if proposal.generation != generation or proposal.model_id != model_id or proposal.tool_hash != tool_hash:
+		return _reject_transaction(_new_cut_transaction(proposal), "stale_or_wrong_tool", started)
+	if (model_id != "sy135" and model_id != "sy135neo") or proposal.native_paths.size() > MAX_NATIVE_PATHS:
+		return _reject_transaction(_new_cut_transaction(proposal), "native_path_work_budget", started)
+	# Other operation types remain ordered behind this job. A defensive revision
+	# guard also prevents a direct/test mutation from publishing an old snapshot.
+	if _cut_preparation != null and _preparation_revision != data_revision:
+		if is_instance_valid(_cut_worker):
+			_cut_worker.abandon()
+		_cut_worker = null
+		_cut_preparation = null
+		_preparation_restarts += 1
+	if _cut_preparation == null:
+		_cut_preparation = CutPreparation.new()
+		_cut_preparation.configure(_native_edit_paths(proposal), _coverage_min, _coverage_size, _coverage_axis_ranks)
+		_preparation_revision = data_revision
+	if threaded_cut_preparation:
+		return _advance_threaded_cut(proposal, started)
+	_cut_preparation.advance_coverage(deadline_usec)
+	if not _cut_preparation.coverage_done or Time.get_ticks_usec() >= deadline_usec:
+		return null
+	if _cut_preparation.buffer == null:
+		var window := _integer_window_without_halo(proposal.area_voxels)
+		var origin := window["origin"] as Vector3i
+		var size := window["size"] as Vector3i
+		if size.x <= 0 or size.y <= 0 or size.z <= 0 or not _tool.is_area_editable(AABB(Vector3(origin), Vector3(size))):
+			return _reject_transaction(_new_cut_transaction(proposal), "voxel_area_not_editable", started)
+		_cut_preparation.coordinates = _solid_coordinates_from_buffer(_cut_preparation.unique, origin, size)
+		if _cut_preparation.coordinates.is_empty():
+			return _reject_transaction(_new_cut_transaction(proposal), "no_sdf_change", started)
+		# Include the native cone rasterizer's one-voxel margin, plus rounding.
+		# Do not clip to the accounting window: native brushes also edit its halo.
+		var area := cutter._native_path_bounds(_cut_preparation.paths).grow(2.0)
+		var buffer_origin := Vector3i(area.position.floor())
+		var buffer_size := Vector3i(area.end.ceil()) - buffer_origin
+		if buffer_size.x * buffer_size.y * buffer_size.z > MAX_STAGED_SAMPLES:
+			return _reject_transaction(_new_cut_transaction(proposal), "staged_window_budget", started)
+		if not _tool.is_area_editable(AABB(Vector3(buffer_origin), Vector3(buffer_size))):
+			return _reject_transaction(_new_cut_transaction(proposal), "voxel_area_not_editable", started)
+		var snapshot := VoxelBuffer.new()
+		snapshot.set_channel_depth(VoxelBuffer.CHANNEL_SDF, VoxelBuffer.DEPTH_16_BIT)
+		snapshot.create(buffer_size.x, buffer_size.y, buffer_size.z)
+		_tool.copy(buffer_origin, snapshot, SDF_CHANNEL_MASK, false)
+		_cut_preparation.begin_edit(snapshot, buffer_origin, _tool.get_sdf_scale(), _tool.get_sdf_strength())
+	_cut_preparation.advance_edit(deadline_usec)
+	if not _cut_preparation.edit_done or Time.get_ticks_usec() >= deadline_usec:
+		return null
+	# No yield inside publication: material validation uses current bucket stock,
+	# then one SDF paste, ledger commit and truthful readiness registration.
+	return _commit_proposal(proposal, _cut_preparation)
+
+
+func _advance_threaded_cut(proposal: VoxelCutProposal, started: int) -> VoxelCutTransaction:
+	if is_instance_valid(_cut_worker):
+		if not _cut_worker.completed():
+			return null
+		if _cut_preparation.coordinates.is_empty():
+			return _reject_transaction(_new_cut_transaction(proposal), "no_sdf_change", started)
+		return _commit_proposal(proposal, _cut_preparation)
+	var window := _integer_window_without_halo(proposal.area_voxels)
+	var origin := window["origin"] as Vector3i
+	var size := window["size"] as Vector3i
+	if size.x <= 0 or size.y <= 0 or size.z <= 0 or not _tool.is_area_editable(AABB(Vector3(origin), Vector3(size))):
+		return _reject_transaction(_new_cut_transaction(proposal), "voxel_area_not_editable", started)
+	var area := cutter._native_path_bounds(_cut_preparation.paths).grow(2.0)
+	var buffer_origin := Vector3i(area.position.floor())
+	var buffer_size := Vector3i(area.end.ceil()) - buffer_origin
+	if buffer_size.x * buffer_size.y * buffer_size.z > MAX_STAGED_SAMPLES:
+		return _reject_transaction(_new_cut_transaction(proposal), "staged_window_budget", started)
+	if not _tool.is_area_editable(AABB(Vector3(buffer_origin), Vector3(buffer_size))):
+		return _reject_transaction(_new_cut_transaction(proposal), "voxel_area_not_editable", started)
+	var snapshot := VoxelBuffer.new()
+	snapshot.set_channel_depth(VoxelBuffer.CHANNEL_SDF, VoxelBuffer.DEPTH_16_BIT)
+	snapshot.create(buffer_size.x, buffer_size.y, buffer_size.z)
+	_tool.copy(buffer_origin, snapshot, SDF_CHANNEL_MASK, false)
+	_cut_preparation.accounting_origin = origin
+	_cut_preparation.accounting_size = size
+	_cut_preparation.begin_edit(snapshot, buffer_origin, _tool.get_sdf_scale(), _tool.get_sdf_strength())
+	_cut_worker = CutWorker.new()
+	_work_zone.get_tree().root.add_child(_cut_worker)
+	_cut_worker.start(_cut_preparation)
+	return null
 
 
 func flush_for_test() -> Dictionary:
@@ -466,6 +639,8 @@ func get_status_snapshot(refresh_diagnostics: bool = false) -> Dictionary:
 	var payload := get_payload_snapshot() if configured else {}
 	var oldest_age_ticks := 0
 	var oldest_tick := _last_submitted_tick
+	if _preparing_cut != null:
+		oldest_tick = mini(oldest_tick, _preparing_cut.fixed_tick_begin)
 	if not _queue.is_empty():
 		oldest_tick = mini(oldest_tick, _queue[0].fixed_tick_begin)
 	if not _soil_queue.is_empty():
@@ -483,8 +658,21 @@ func get_status_snapshot(refresh_diagnostics: bool = false) -> Dictionary:
 		"collision_revision": collision_revision,
 		"model_id": model_id,
 		"tool_hash": tool_hash,
-		"queue_depth": _queue.size() + _soil_queue.size(),
-		"cut_queue_depth": _queue.size(),
+		"queue_depth": _queue.size() + _soil_queue.size() + (1 if _preparing_cut != null else 0),
+		"cut_preparation": {
+			"pending": _preparing_cut != null,
+			"budget_usec": cut_preparation_budget_usec,
+			"threaded": threaded_cut_preparation,
+			"worker_coverage_usec": _worker_coverage_usec,
+			"worker_edit_usec": _worker_edit_usec,
+			"age_usec": Time.get_ticks_usec() - _preparation_started_usec if _preparing_cut != null else 0,
+			"oldest_age_ticks": oldest_age_ticks,
+			"slice_max_usec": _preparation_slice_max_usec,
+			"latency_max_usec": _preparation_latency_max_usec,
+			"completed": _preparation_completed,
+			"restarts": _preparation_restarts,
+		},
+		"cut_queue_depth": _queue.size() + (1 if _preparing_cut != null else 0),
 		"soil_queue_depth": _soil_queue.size(),
 		"queue_capacity": MAX_QUEUE_DEPTH + MAX_SOIL_QUEUE_DEPTH,
 		"cut_queue_capacity": MAX_QUEUE_DEPTH,
@@ -663,11 +851,16 @@ func _coalesce_or_enqueue(proposal: VoxelCutProposal) -> bool:
 	if not _queue.is_empty():
 		var index := _queue.size() - 1
 		var pending := _queue[index]
-		var merged_native_paths := _merge_native_paths(pending.native_paths, proposal.native_paths)
+		# A deferred job must not let its successor grow with every incoming tick.
+		# Keep the original 20Hz batch horizon and preserve later sweeps separately.
+		var within_batch := cut_preparation_budget_usec <= 0 or proposal.fixed_tick_end - pending.fixed_tick_begin < MAX_COALESCED_CUT_TICKS
+		var merged_native_paths: Array[Dictionary] = []
+		if within_batch:
+			merged_native_paths = _merge_native_paths(pending.native_paths, proposal.native_paths)
 		if pending.generation != proposal.generation or pending.model_id != proposal.model_id \
 				or pending.authority_epoch != proposal.authority_epoch:
 			pass
-		elif pending.area_voxels.intersects(proposal.area_voxels) \
+		elif within_batch and pending.area_voxels.intersects(proposal.area_voxels) \
 				and pending.fixed_tick_end < proposal.fixed_tick_begin \
 				and pending.sequence < proposal.sequence \
 				and pending.capsules.size() + pending.clearance_capsules.size() \
@@ -691,10 +884,10 @@ func _coalesce_or_enqueue(proposal: VoxelCutProposal) -> bool:
 			})
 			_coalesced_count += 1
 			return true
-	if _queue.size() >= MAX_QUEUE_DEPTH:
+	if _queue.size() + (1 if _preparing_cut != null else 0) >= MAX_QUEUE_DEPTH:
 		return false
 	_queue.append(proposal.duplicate_typed())
-	_peak_queue_depth = maxi(_peak_queue_depth, _queue.size())
+	_peak_queue_depth = maxi(_peak_queue_depth, _queue.size() + (1 if _preparing_cut != null else 0))
 	return true
 
 
@@ -925,8 +1118,7 @@ func _soil_operation_queue_depth(operation: String) -> int:
 	return count
 
 
-func _commit_proposal(proposal: VoxelCutProposal) -> VoxelCutTransaction:
-	var started := _diagnostic_clock_usec()
+func _new_cut_transaction(proposal: VoxelCutProposal) -> VoxelCutTransaction:
 	var transaction := CutTransaction.new()
 	transaction.generation = proposal.generation
 	transaction.sequence = proposal.sequence
@@ -937,10 +1129,16 @@ func _commit_proposal(proposal: VoxelCutProposal) -> VoxelCutTransaction:
 	transaction.area_voxels = proposal.area_voxels
 	transaction.input_hash = proposal.input_hash
 	transaction.transaction_id = _transaction_id(transaction.operation, proposal.sequence, proposal.input_hash)
+	return transaction
+
+
+func _commit_proposal(proposal: VoxelCutProposal, prepared: VoxelCutPreparation = null) -> VoxelCutTransaction:
+	var started := _diagnostic_clock_usec()
+	var transaction := _new_cut_transaction(proposal)
 	if proposal.generation != generation or proposal.model_id != model_id or proposal.tool_hash != tool_hash:
 		return _reject_transaction(transaction, "stale_or_wrong_tool", started)
 	if not proposal.native_paths.is_empty():
-		return _commit_native_proposal(proposal, transaction, started)
+		return _commit_native_proposal(proposal, transaction, started, prepared)
 	var window := _integer_window(proposal.area_voxels)
 	var origin := window["origin"] as Vector3i
 	var size := window["size"] as Vector3i
@@ -1048,23 +1246,7 @@ func _commit_proposal(proposal: VoxelCutProposal) -> VoxelCutTransaction:
 	return transaction
 
 
-func _commit_native_proposal(
-	proposal: VoxelCutProposal,
-	transaction: VoxelCutTransaction,
-	started_usec: int
-) -> VoxelCutTransaction:
-	if (proposal.model_id != "sy135" and proposal.model_id != "sy135neo") or proposal.native_paths.size() > MAX_NATIVE_PATHS:
-		return _reject_transaction(transaction, "native_path_work_budget", started_usec)
-	var window := _integer_window_without_halo(proposal.area_voxels)
-	var origin := window.get("origin", Vector3i.ZERO) as Vector3i
-	var size := window.get("size", Vector3i.ZERO) as Vector3i
-	if size.x <= 0 or size.y <= 0 or size.z <= 0:
-		return _reject_transaction(transaction, "native_edit_area_empty", started_usec)
-	var edit_area := AABB(Vector3(origin), Vector3(size))
-	if not _tool.is_area_editable(edit_area):
-		return _reject_transaction(transaction, "voxel_area_not_editable", started_usec)
-	var phase_started := _diagnostic_clock_usec()
-	var geometry_candidates: Dictionary = {}
+func _native_edit_paths(proposal: VoxelCutProposal) -> Array[Dictionary]:
 	# Clearance capsules mark the bucket-envelope volume that must be air after
 	# the commit. Convert them into two-point paths so they share the same
 	# coverage ledger and native removal pass as ordinary cut paths; their
@@ -1087,8 +1269,35 @@ func _commit_native_proposal(
 				]),
 				"radii_voxels": PackedFloat32Array([clearance_radius, clearance_radius]),
 			})
+	return edit_paths
+
+
+func _commit_native_proposal(
+	proposal: VoxelCutProposal,
+	transaction: VoxelCutTransaction,
+	started_usec: int,
+	prepared: VoxelCutPreparation = null
+) -> VoxelCutTransaction:
+	if (proposal.model_id != "sy135" and proposal.model_id != "sy135neo") or proposal.native_paths.size() > MAX_NATIVE_PATHS:
+		return _reject_transaction(transaction, "native_path_work_budget", started_usec)
+	var window := _integer_window_without_halo(proposal.area_voxels)
+	var origin := window.get("origin", Vector3i.ZERO) as Vector3i
+	var size := window.get("size", Vector3i.ZERO) as Vector3i
+	if size.x <= 0 or size.y <= 0 or size.z <= 0:
+		return _reject_transaction(transaction, "native_edit_area_empty", started_usec)
+	var edit_area := AABB(Vector3(origin), Vector3(size))
+	if not _tool.is_area_editable(edit_area):
+		return _reject_transaction(transaction, "voxel_area_not_editable", started_usec)
+	var phase_started := _diagnostic_clock_usec()
+	var geometry_candidates: Dictionary = {}
+	var edit_paths := _native_edit_paths(proposal) if prepared == null else prepared.paths
 	transaction.clearance_path_count = proposal.clearance_capsules.size()
-	var coverage_coordinates := _native_coverage_coordinates(edit_paths, origin, size, geometry_candidates)
+	var coverage_coordinates: Array[Vector3i]
+	if prepared == null:
+		coverage_coordinates = _native_coverage_coordinates(edit_paths, origin, size, geometry_candidates)
+	else:
+		coverage_coordinates = prepared.coordinates
+		geometry_candidates = prepared.geometry_candidates
 	transaction.coverage_usec = _diagnostic_clock_usec() - phase_started
 	transaction.coverage_candidate_count = coverage_coordinates.size()
 	if coverage_coordinates.is_empty():
@@ -1134,10 +1343,13 @@ func _commit_native_proposal(
 	_tool.channel = VoxelBuffer.CHANNEL_SDF
 	_tool.mode = VoxelTool.MODE_REMOVE
 	phase_started = _diagnostic_clock_usec()
-	for path in edit_paths:
-		var points := path.get("points_voxels", PackedVector3Array()) as PackedVector3Array
-		var radii := path.get("radii_voxels", PackedFloat32Array()) as PackedFloat32Array
-		_tool.do_path(points, radii)
+	if prepared != null:
+		_tool.paste(prepared.buffer_origin, prepared.buffer, SDF_CHANNEL_MASK)
+	else:
+		for path in edit_paths:
+			var points := path.get("points_voxels", PackedVector3Array()) as PackedVector3Array
+			var radii := path.get("radii_voxels", PackedFloat32Array()) as PackedFloat32Array
+			_tool.do_path(points, radii)
 	transaction.native_geometry_only = geometry_only
 	transaction.native_edit_usec = _diagnostic_clock_usec() - phase_started
 	phase_started = _diagnostic_clock_usec()
@@ -2131,69 +2343,12 @@ func _native_coverage_coordinates(
 	size: Vector3i,
 	geometry_candidates: Dictionary = {}
 ) -> Array[Vector3i]:
+	var job := CutPreparation.new()
+	job.configure(paths, _coverage_min, _coverage_size, _coverage_axis_ranks)
+	job.advance_coverage(0x7FFFFFFFFFFFFFFF)
 	geometry_candidates.clear()
-	var unique: Dictionary = {}
-	var bounds_min := _coverage_min
-	var bounds_max := _coverage_min + _coverage_size - Vector3i.ONE
-	var x_ranks := _coverage_axis_ranks[0]
-	var y_ranks := _coverage_axis_ranks[1]
-	var z_ranks := _coverage_axis_ranks[2]
-	for path in paths:
-		var points := path.get("points_voxels", PackedVector3Array()) as PackedVector3Array
-		var radii := path.get("radii_voxels", PackedFloat32Array()) as PackedFloat32Array
-		for segment_index in range(points.size() - 1):
-			var a := points[segment_index]
-			var b := points[segment_index + 1]
-			var direction := b - a
-			var distance_squared := direction.length_squared()
-			var distance := sqrt(distance_squared)
-			var steps := maxi(1, ceili(distance / NATIVE_COVERAGE_STEP_VOXELS))
-			for step_index in range(steps + 1):
-				var alpha := float(step_index) / float(steps)
-				var sample := a.lerp(b, alpha)
-				var radius := lerpf(radii[segment_index], radii[segment_index + 1], alpha)
-				var center := Vector3i(roundi(sample.x), roundi(sample.y), roundi(sample.z))
-				for offset in NATIVE_COVERAGE_OFFSETS:
-					var coordinate := center + offset
-					# A strict candidate was already inserted into unique on its first
-					# visit. Later samples cannot change either membership or ordering.
-					if geometry_candidates.has(coordinate):
-						continue
-					if coordinate.x < bounds_min.x or coordinate.y < bounds_min.y or coordinate.z < bounds_min.z \
-							or coordinate.x > bounds_max.x or coordinate.y > bounds_max.y or coordinate.z > bounds_max.z:
-						continue
-					var dx := float(coordinate.x) - sample.x
-					var dy := float(coordinate.y) - sample.y
-					var dz := float(coordinate.z) - sample.z
-					var reach := radius + 0.55
-					if dx * dx + dy * dy + dz * dz > reach * reach:
-						continue
-					# Credit's broad stencil can reach outside the brush. Track strict
-					# geometric inclusion separately. A prior failed check cannot skip
-					# this segment, whose radius may include the same coordinate.
-					# Leave a small SDF quantization margin.
-					if distance_squared > 0.00000001:
-						var ax := float(coordinate.x) - a.x
-						var ay := float(coordinate.y) - a.y
-						var az := float(coordinate.z) - a.z
-						var closest_alpha := clampf((ax * direction.x + ay * direction.y + az * direction.z) / distance_squared, 0.0, 1.0)
-						var exact_radius := lerpf(radii[segment_index], radii[segment_index + 1], closest_alpha) - 0.02
-						var ex := ax - direction.x * closest_alpha
-						var ey := ay - direction.y * closest_alpha
-						var ez := az - direction.z * closest_alpha
-						if exact_radius > 0.0 and ex * ex + ey * ey + ez * ez < exact_radius * exact_radius:
-							geometry_candidates[coordinate] = true
-					# Integer keys retain the old decimal-string lexical order so
-					# the capped sample subset and transaction digests stay identical.
-					var key := (x_ranks[coordinate.x - bounds_min.x] * _coverage_size.y \
-						+ y_ranks[coordinate.y - bounds_min.y]) * _coverage_size.z \
-						+ z_ranks[coordinate.z - bounds_min.z]
-					if unique.has(key):
-						continue
-					unique[key] = coordinate
-					if unique.size() >= MAX_NATIVE_COVERAGE_PROBES:
-						return _solid_coordinates_from_buffer(unique, origin, size)
-	return _solid_coordinates_from_buffer(unique, origin, size)
+	geometry_candidates.merge(job.geometry_candidates)
+	return _solid_coordinates_from_buffer(job.unique, origin, size)
 
 
 func _solid_coordinates_from_buffer(unique: Dictionary, origin: Vector3i, size: Vector3i) -> Array[Vector3i]:
