@@ -1,269 +1,61 @@
-# Physical telemetry WS mode (gateway default, Linux-side CAN assembly)
+# Physical telemetry WS mode
 
-> **Status: DEFERRED (paused) — 2026-09-14.**
-> Planning is complete and locked; **no code has been written**. Implementation
-> is postponed at the operator's request. The task stays in
-> `.trellis/tasks/` unarchived — it is not abandoned and nothing here is
-> superseded. Resume by starting M1: freeze the WS schema under `protocol/`,
-> then build the Gateway's physical layer.
+状态：规划完善，2026-09-22。尚未实施业务代码。本文替代 09-14 的暂停版需求；当前授权范围是完善规划。
 
-## Preparation update — 2026-09-22 (supersedes conflicting older text)
+## 目标与已确认决策
 
-Implementation preparation has resumed; no business code has been changed in this preparation pass. The earlier Linux-only and patch-delivery requirements below are historical and superseded here.
+Gateway 默认仅产生语义物理量，通过一条 WS 发送到 can_replay；对侧负责量化、CAN 编码和总线输出。Windows PCAN 为本次硬件验收平台，出口后端沿用现有实现。
 
-Confirmed with the operator:
-- Companion checkout: `C:\code\tools\can_replay` (the supplied `C:\code\tools\can\_replay` does not exist). Inspected baseline: `68a8920`, clean working tree.
-- Acceptance target: Windows PCAN. This is an output-backend choice; reuse the existing backend. Linux hardware acceptance is not required for this task.
-- Develop and verify directly. No original/modified snapshots or patch generation are currently required. Prefer no companion changes where its existing protocol suffices; assess that before implementation.
-- Game UI keeps WS endpoint configuration and connection status. Remove the game-side CAN recording, TCP endpoint, ICT and timed-CAN operation entries; CAN operations belong in the replay console. Preserve the explicit legacy CAN pipeline's compatibility.
-- On telemetry timeout or WS disconnect, stop CAN output originating from that telemetry source. Retain last displayed values marked disconnected/stale. Resume only with fresh data, without queued stale replay. Independent user-created injection is a separate source.
+- 参数 `--output {physical,can}`，默认 physical；旧 `--mode {standalone,godot-managed}` 仅用于 `--output can`，显式与 physical 同用时报错。
+- 保留旧 CAN 流水线、控制协议及旧控制台，原地标注归档，显式参数可用，行为不退化。
+- 对侧实际目录 `C:/code/tools/can_replay`，检查基线 `68a8920`，当时工作区干净。用户最初给的 `C:/code/tools/can/_replay` 不存在。
+- 直接开发和验证；暂不生成补丁或 original/modified 快照。优先复用对侧能力，只做满足边界的必要扩展。
+- 游戏仅保留 WS 地址配置、Gateway 启动/重启和连接状态；移除 CAN 录制、TCP 地址、ICT、定时 CAN 的产品入口。CAN 操作由 replay 控制台承担。
+- 遥测超时或 WS 断开后停止该遥测源的 CAN 输出；页面保留最后值并标记断流。恢复只使用新数据，不重放积压。独立手动注入任务不因遥测断流被误停。
+- 新控制台为 `tools/replay_console/` 独立项目，复制旧控制台视觉骨架，由对侧托管；旧 `tools/can_gateway/web/` 不迁移、不改造成新控制台。
 
-Existing-protocol assessment (source inspection, not a runtime test):
-- `web_dashboard.py:create_web_app`: `/ws` accepts `ping`, `state`, and `filter`; it has no physical telemetry ingestion or identity handshake. Thus the older statement that it rejects all client data is inaccurate.
-- `/api/inject` calls `build_custom_frame` with channel, CAN ID, payload bytes and frame format. PC001 likewise carries already encoded CAN frames. Neither accepts semantic IMU/slew/travel/RTK samples.
-- `/api/overwrite` changes a single DBC signal, and may materialize/send a frame. Its persistent override semantics do not provide atomic telemetry families, clock/identity validation, freshness expiry or the physical-to-protocol conversion contract.
-- `socket_bridge.py:bridge_to_vcan` starts its injection consumer only after PC001 connects and handshakes. It cannot be reused as an independent WS output loop unchanged.
-- Conclusion: existing protocols cannot satisfy the agreed physical-only Gateway boundary without adaptation on the receiving side. Minimum companion work: physical WS route and handshake, physical-to-CAN encoder, independent bounded/freshness-aware output lifecycle using the existing PCAN bus abstraction, and physical-value/session state for the new console. Preserve existing PC001 and dashboard routes.
+## 范围与链路
 
-Next: refine M1 schema/session freshness and mode migration, then implement against this baseline. Existing M3 console scope remains unless explicitly changed. Replace M2 Linux/vcan hardware acceptance with Windows PCAN; remove M4 patch/snapshot acceptance. Endpoint spelling and session queue details are implementation choices, not additional approval gates. Real PCAN hardware acceptance must be distinguished from mock-backend and byte-parity checks.
+1. Godot ↔ Gateway：保留 UDP 29764（CTN1/CTNC）及 29765（心跳/结果）。保留子进程所有权、精确 PID 重启和旧心跳防串扰约束。
+2. Gateway → companion：Gateway 为 WS 客户端，单连接，物理数据与会话事件两类消息。Gateway 不提供新模式 Web API，不加载 DBC 编解码器、CAN sink、PC001、CAN 控制台或 CAN 管理。
+3. Browser ↔ companion：REST + 快照 WS。物理值及对侧状态由对侧提供；不展示旧 Gateway CAN 传输状态，不沿用逐 CAN ID freshness/实际频率列。允许显示遥测源整体断流标记。
 
-## Goal
+保留 MachineState、校准、QML 投影和 FrameScheduler 的物理语义及调度。传输 IMU roll/pitch/yaw（deg）、回转角、行走压力（既有 0/9，MPa）、RTK 位置/航向/ENU 速度和 Gateway 采样的墙钟。禁止对侧重新计算行走压力或用自身墙钟替换 GPS 时间。
 
-Make the CAN Gateway, when launched with no arguments, run as a pure
-**physical-quantity producer**: it derives each sensor's physical values and
-publishes them over a WebSocket to a companion tool on a Linux VM, which owns
-CAN frame assembly, CAN transport and physical CAN management. The Gateway no
-longer encodes CAN, no longer manages CAN, and no longer serves its own Web API
-in this mode.
+## 对侧协议评估与最小改动
 
-The existing CAN-producing modes stay available but must be requested
-explicitly.
+源码检查：`web_dashboard.py` 的 `/ws` 接受 ping/state/filter，无物理遥测输入；`/api/inject` 和 PC001 要求已编码帧；overwrite 是持久单信号覆盖，不具备完整遥测语义。`socket_bridge.py` 的 injection 消费依赖 PC001 握手，不能直接充当独立 WS 接收运行模式。
 
-## Background
+因此零修改对侧无法满足已确认边界。必要扩展限于：物理 WS 输入与校验、编码适配、独立发送生命周期、物理值快照与新控制台托管。复用 DBC 加载、overwrite、录制、dashboard、`make_bus_client('pcan', ...)`。保留原有 PC001/API 行为，不重写 PCAN 驱动或强制更改映射。
 
-- Today `gateway.py --mode standalone|godot-managed` owns the entire chain:
-  `TelemetrySample -> MachineState / QmlCanMapper -> DBC encode -> sink`
-  (CSV / SocketCAN / PC001 TCP). Its React console at `127.0.0.1:29777` is a
-  *CAN* console (message table, DBC editing, per-ID authority, transport
-  reconfiguration) and displays per-ID freshness and actual egress frequency.
-- The companion tool is `E:\projects\temp\tools\can_replay` (Linux VM). It has
-  **no physical-quantity input interface today**: every input path normalises
-  to an already-encoded `CanReplayFrame`; there is no UDP listener; the PC001
-  protocol carries only `can_id / dlc / data[8] / channel`; its FastAPI `/ws`
-  endpoint is server-to-client snapshot only and rejects client data.
-- Reusable building blocks on the companion side: `dbc.load_machine_messages_by_channel`,
-  cantools `Message.encode(values, strict=True)`, `FrameOverwriteResolver`,
-  `CanReplayFrame`, the transport-decoupled `injection_queue` in
-  `socket_bridge.py`, `CanDashboard.update_frame`, `vcan_client.send_raw_async`,
-  and the physical-CAN routing (`ch0->can1`, `ch2->can4`, `ch3->can3`) from the
-  prior `09-04-physical-can-socket-bridge-low-latency` delivery.
-- A prior unmerged delivery (`can_replay_physical_bridge_delivery_20260904`)
-  added `simulator.py` (physical values -> payload). Note its `bridge-physical`
-  command's "physical" means physical CAN *interfaces*, not physical
-  quantities — only `simulator.py` is a shape reference.
+## 控制台能力清单
 
-## Communication topology
+- 物理值视图、遥测源会话状态、对侧输出状态。
+- CAN 报文表、模糊搜索、通道/上送筛选、搜索命中高亮。
+- overwrite 设置/清除，未上送消息物化注入，单次/20 ms/50 ms 预设及当前周期回显，父行与信号行高亮。
+- 自定义帧与周期注入、停止操作；覆盖旧游戏定时帧的可配置能力（0x18FFF100、20 ms、10 s），不迁移 Linux ICT 管理流程到 PCAN。
+- CSV、RRD、gRPC 录制，info/help、进度条及能力可用状态。
+- 完整协议 CSV 22 列及 DBC 信号详情：scale、offset、范围、单位、choices、multiplexer、comment、cycle time、senders。
+- 排除交互启动向导及 Rich 文本渲染器。实时源没有总长度时不伪造百分比进度。
 
-There are exactly **three** links, and only two of them are WebSocket. The
-Gateway never speaks to a browser in the new mode.
+## 验收
 
-| Link | Transport | What it carries |
-|---|---|---|
-| Godot ↔ Gateway | **UDP**, two ports | `:29764` — telemetry CTN1 + control CTNC (record / ICT / timed-CAN / shutdown commands). `:29765` — heartbeat CTNK, session-done CTND, ICT-result CTNR. No TCP, no WS, unchanged by this work. |
-| Gateway → companion | **1 WebSocket**, 2 logical channels | Gateway is the **client**. `data` = physical quantities, lossy, latest-value coalesced per `(family, key)`. `event` = handshake / health / errors, never coalesced, never dropped. |
-| Browser ↔ companion | **REST + WS** | Browser is the **client**. REST `/api/*` for actions (overwrite, inject, record, stop); WS `/ws` for server→client snapshots only, throttled (~0.1 s). Unchanged shape from today. |
+- [ ] 无参数启动 physical；显式 can + mode 保持旧路径；非法组合明确报错。
+- [ ] physical 运行不加载 CAN 编码/出口/旧 Web 模块，不录本地 CAN 文件，不启动 Gateway HTTP 服务。
+- [ ] 冻结墙钟和相同遥测输入后，新路径与旧 emit_frames 的每个 `(channel, can_id, extended, dlc, payload)` 完全一致，覆盖所有现有支持的 model/profile 和四类数据。
+- [ ] 握手不匹配、未握手数据、格式/非有限数值错误不产生 CAN 帧；坏样本不产生部分 family。
+- [ ] 慢端、缺席、断线、UDP 停流、仿真重置、重连均不阻塞 UDP、不导致无界缓存或旧样本补发。
+- [ ] 单会话所有权及源级停发正确；手动注入生命周期独立；队列淘汰在实际发送前检查。
+- [ ] 新控制台覆盖清单，只连接对侧，独立构建，旧控制台仍可构建和使用。
+- [ ] 游戏默认启动新模式、正确显示进程和 peer 状态、持久化 WS 地址、保留精确 PID 生命周期；不再提供旧 CAN 操作入口。
+- [ ] Windows PCAN 实机可观察正确通道/帧数据，断流停发、重连恢复及手动注入隔离通过。软件 mock 不冒充实机通过。
+- [ ] Gateway 和 replay 相关现有测试相对实施前基线无新增回归，冻包启动冒烟通过。
+- [ ] 行走压力 kg 文案修正为 MPa，不改变数值或线协议。
 
-The browser never talks to the Gateway in the new mode, and it carries over **no
-legacy status display**: the old console's freshness and actual-frequency columns
-are removed, and the Gateway's own transport state (CAN interface, PC001 peer,
-socket errors) is **not** surfaced in the new console either. In this mode the
-Gateway does not manage CAN at all, so that state no longer exists; the new
-console shows physical quantities plus the companion's own status. The `event`
-channel therefore carries only the handshake, health and error traffic needed to
-keep the Gateway↔companion session correct — it is not a status feed for the
-browser.
+## 非目标与边界
 
-## Decisions (confirmed with the operator)
+不改 DBC/PC001 字节协议、标定与投影数学、CAN 波特率默认值；不要求 Linux 硬件验收、补丁交付、多遥测生产者并行或第三方兼容。软件无法撤销已进入 PCAN 驱动/硬件的帧，停发保证以应用发送入口为界并测量实际尾部延迟。
 
-| Topic | Decision |
-|---|---|
-| Mode selection | `--output {physical, can}`, default `physical` — a dedicated parameter, *not* a new `--mode` value. `--mode` keeps `{standalone, godot-managed}` and is honoured only with `--output can`; passing `--mode` together with `--output physical` is a hard error rather than a silent ignore. |
-| Legacy archive | In place with documentation: files and directories do not move; the legacy pipeline is annotated as archived and gets no further feature work. |
-| Frontend scope | The full `design.md` §4.1 checklist, excluding the interactive start-up wizard and the Rich text fallback renderer. |
-| WS role | Gateway is the WS **client**; the companion is the **server** |
-| Payload boundary | **Semantic physical quantities** — roll/pitch/yaw (deg), slew angle, travel pressure (**MPa**), geodetic position, heading, ENU velocity. The companion reproduces all quantisation and conversion. |
-| Travel payload | Transmit the value as today, i.e. the already-binarised `0` / `9`. Its physical unit is **MPa** (the current `kg` wording in code and README is wrong and must be corrected). |
-| Frontend location | A **new standalone project** at `tools/replay_console/` — *not* the archived `tools/can_gateway/web/`. The two consoles have wholly different semantics (physical quantities vs CAN frames), so they share neither directory nor build. `tools/can_gateway/web/` stays in place as part of the archive. |
-| Web frontend | Keep the **existing Web console's skeleton and design**, but implement **every feature the companion's terminal TUI provides**. Hosted by the companion, re-pointed at the companion's API/WS. **No legacy status display is carried over**: no freshness column, no actual-frequency column, and no Gateway transport state. The Gateway serves no Web endpoint in the new mode. |
-| Recording | The new mode records nothing (no CSV, no local file). The game panel `[CAN 输出]` control is removed. |
-| Legacy modes | **Archived, not deleted** — kept in the tree, reachable only by explicit parameters, no longer developed. |
-| Direction | The new mode becomes the primary mode for both the Gateway and the game. |
-| Delivery | Both sides are planned; the companion side ships as a `git apply`-able patch, in the style of the `09-04` delivery. |
+## 进度与下一步
 
-## Requirements
-
-### Gateway
-
-- R1. Add `--output {physical, can}` with default `physical`, selecting the new
-  pipeline through a parameter of its own rather than through a new value of
-  `--mode`. The new mode is therefore what runs when nothing is passed.
-  `standalone` and `godot-managed` stay reachable only via
-  `--output can --mode ...`, and `--mode` combined with `--output physical` is a
-  hard error, not a silent ignore.
-- R2. In the new mode the Gateway must not load or use DBC codecs, encoders,
-  frame sinks, PC001, can0 setup, the CAN console, or the Web REST API.
-- R3. Topology: **one** WebSocket connection to the companion, carrying **two
-  logical channels**:
-  - a `data` channel for physical quantities — lossy by design, latest-value
-    coalesced per `(family, key)`, and
-  - an `event` / `status` channel for handshake, health and errors — never
-    coalesced, never dropped. It is **not** a browser-facing status feed: the
-    new console does not carry over the legacy console's status display.
-
-  Bounded reconnect/backoff; a slow or absent peer must never stall the UDP
-  receive loop nor produce stale replay.
-- R4. Publish a `hello` handshake carrying protocol version, model id, profile
-  id and calibration SHA-256 so the companion can reject an inconsistent pair.
-- R5. Keep the existing telemetry intake, `FrameScheduler` cadence,
-  `MachineState`, the calibration layer and QML projection unchanged, since the
-  semantic values depend on them.
-- R6. The physical-quantity payload must carry the Gateway's wall clock where a
-  CAN frame would today (GPS week/time), so the companion does not substitute
-  its own clock.
-- R7. Legacy modes must keep byte-identical behaviour, including PC001, CSV and
-  SocketCAN paths.
-
-### Companion (Linux VM)
-
-- R8. Add a physical-quantity input endpoint (WebSocket, same uvicorn process)
-  alongside the existing snapshot `/ws`.
-- R9. Add an encoder that converts semantic physical quantities into
-  `CanReplayFrame`s, reproducing the Gateway's semantics exactly: IMU axis
-  remap `slots = (-pitch, roll, yaw)`, quantisation `round((slot + 180) / 0.01)`,
-  clamp `[1, 65535]`, slew angle handling, travel binarisation, RTK origin /
-  constants / secondary antenna / bound clamping, and the GPS wall clock.
-- R10. Deliver encoded frames through the existing decoupled injection path so
-  the dashboard, recorder and `/ws` snapshot update without schema changes.
-- R11. Serve the frontend bundle built from the new `tools/replay_console/`
-  project. It must keep the existing console's
-  skeleton and design, must drop the freshness and actual-frequency columns,
-  must carry over **no** legacy status display (including the Gateway's
-  transport state), and
-  must provide **every capability the companion's terminal TUI provides**. Known
-  gaps in the current web dashboard that therefore become new work: the full DBC
-  / protocol-CSV detail (22-column table plus per-signal scale, offset, range,
-  unit, choices, multiplexer, comment, cycle time, senders), the progress bar,
-  overwrite period presets with current-period recall, parent-row overwrite
-  highlighting, and search-hit highlighting.
-- R12. Ship as `original-project/` + `modified-project/` + `changes.patch` +
-  `DELIVERY.md`, verified with `git apply --check` and byte-for-byte snapshot
-  comparison.
-
-### Contract
-
-- R13. Freeze the WS contract as a versioned schema under `protocol/`
-  (following the existing `*-vN.schema.json` convention) and register it in
-  `protocol/version-manifest.json`.
-
-### Migration
-
-- R14. Update the game so it launches the new mode, and remove the panel
-  `[CAN 输出]` control and its `RECORD_START` / `RECORD_STOP` plumbing.
-- R15. Update scripts and tests that assume the default mode is
-  `standalone`/`tcp` (`smoke_frozen_gateway.py`, `tests/test_gateway_process.py`,
-  `godot/client/tests/run_standalone_matrix.ps1`).
-- R16. **Archive** the legacy CAN pipeline rather than deleting it: keep
-  `standalone` / `godot-managed`, `gateway_web.py`, the CAN console and the DBC
-  runtime in the tree, reachable only by explicit parameters, documented as
-  archived, and no longer developed. The legacy console frontend
-  `tools/can_gateway/web/` is archived with it and is **not** the source of the
-  new console — the new console is a separate project (R11).
-- R17. Correct the travel pressure unit from `kg` to `MPa` in
-  `encoders/travel_pilot.py` and `README.md`. Documentation and comments only —
-  no numeric or wire change.
-
-## Acceptance Criteria
-
-- [ ] Launching the Gateway with no arguments starts the physical-quantity mode
-      and emits nothing but sensor physical values over WS.
-- [ ] `--mode standalone` and `--mode godot-managed` still reproduce today's
-      behaviour, byte-for-byte, including PC001 / CSV / SocketCAN.
-- [ ] Driving the new pipeline end-to-end with a frozen telemetry battery
-      produces CAN frames on the companion that are **byte-identical** to the
-      frames the legacy Gateway produced for the same battery (same
-      `can_id`, `payload`, `channel` for all families).
-- [ ] The UDP receive loop does not stall when the WS peer is slow or absent;
-      the Gateway reconnects and does not replay stale values.
-- [ ] The companion rejects a `hello` whose `model` / `profile` /
-      `calibration_sha256` is inconsistent.
-- [ ] The hosted frontend shows physical quantities with no freshness or
-      actual-frequency columns, carries over no legacy status display, and talks
-      only to the companion.
-- [ ] The frontend is its own project at `tools/replay_console/` with its own
-      build, and the legacy `tools/can_gateway/web/` is left untouched.
-- [ ] The three links stay as specified: Godot↔Gateway on UDP 29764/29765,
-      Gateway→companion on a single WS with `data` + `event` channels, and
-      browser↔companion over REST + WS. No browser traffic reaches the Gateway.
-- [ ] The companion patch applies cleanly with plain `git apply --check` and
-      reproduces the modified snapshot byte-for-byte.
-- [ ] Existing Gateway test suite shows no regressions against the recorded
-      baseline.
-- [ ] `--output physical` is the default; `--output can --mode standalone` and
-      `--output can --mode godot-managed` reach the legacy pipeline; `--mode`
-      combined with `--output physical` is rejected with a clear error.
-- [ ] The archived legacy pipeline is still reachable by explicit parameters and
-      behaves exactly as before.
-- [ ] The hosted frontend offers the companion TUI's capability set, including
-      the full DBC / protocol-CSV detail table.
-- [ ] Travel pressure is documented as MPa, with no change to the transmitted
-      value or wire bytes.
-
-## Open Items
-
-- Whether the Gateway keeps serving the legacy console bundle
-  (`tools/can_gateway/web/`) in legacy modes. Non-blocking; the working
-  assumption is that it keeps serving it, since the legacy pipeline is archived
-  rather than removed.
-- The exact spelling of the companion-endpoint parameter. Non-blocking;
-  candidates are `--ws-endpoint ws://HOST:PORT`, or a `--ws-host` / `--ws-port`
-  pair mirroring the existing `--tcp-host` / `--tcp-port`. Either way it
-  defaults through the existing `GatewayConfigStore` persistence.
-
-All other decisions are settled.
-
-## Out of Scope
-
-- Changing `conventions.py` semantics, the calibration layer, or the QML
-  projection maths.
-- Changing PC001 wire framing, the DBC files, or CAN bitrate/restart-ms.
-- Lossless delivery under overload.
-- Third-party consumers of the physical-quantity stream.
-
-## Progress
-
-- **State: DEFERRED (paused) as of 2026-09-14, at the operator's request.**
-  Unarchived, not abandoned, nothing superseded. The active-task pointer was
-  cleared (`task.py finish`); the task directory stays where it is.
-- Current milestone: plan locked; still no code written.
-- Completed: investigation of both codebases; companion-side capability audit
-  (confirmed no physical-quantity input exists today); full companion TUI
-  feature inventory including the delta against its existing web dashboard;
-  operator corrections folded in; every decision settled — `--output
-  {physical, can}`, one WS connection carrying two logical channels, in-place
-  archive, the full §4.1 frontend scope, the three-link topology, and the new
-  frontend project directory `tools/replay_console/`.
-- Last requirement change before pausing: dropped the idea of forwarding the
-  Gateway's transport state to the browser. The new console carries over no
-  legacy status display at all — no freshness, no actual frequency, no Gateway
-  transport state. The `event` channel is therefore only session-integrity
-  traffic (handshake / health / errors), not a status feed.
-- Confirmed: no code has been changed — only `.trellis/` and `.workbuddy/` are
-  touched; HEAD is still `c8a6c42`.
-- Pending: implementation of M1–M4 (nothing started).
-- Decisions and evidence: see `design.md`.
-- Blockers: none technical. Paused by operator decision, not by an unresolved
-  issue.
-- Next (on resume): start M1 — freeze the WS schema under `protocol/`, then
-  build the Gateway's physical layer.
-- Resume prerequisites: none beyond the two non-blocking open items above; they
-  do not gate M1 and can be settled during it.
+完成：需求澄清、当前对侧协议可复用性评估、规划重整。未开始：M1–M4 所有实现与运行验证。滚动执行安排见 implement.md，协议和架构见 design.md。无待用户裁决的需求阻塞；实机阶段再确认可用 PCAN 设备及实际通道配置。

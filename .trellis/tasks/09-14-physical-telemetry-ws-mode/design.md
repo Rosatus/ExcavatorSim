@@ -1,298 +1,62 @@
 # Design — Physical telemetry WS mode
 
-> **Deferred (paused) 2026-09-14.** The design below is frozen and complete;
-> implementation has not started. Kept for reference, not superseded. See
-> `prd.md` for the pause banner and resume point.
+2026-09-22 规划版；业务代码未实施。需求以 prd.md 为准。以下参数是实现初始选择，须由 M1 故障测试验证，不作为额外审批项。
 
-## 2026-09-22 preparation amendment
+## 1. 职责与兼容边界
 
-The authoritative updated scope and protocol assessment are in `prd.md`, “Preparation update — 2026-09-22”. Windows PCAN replaces Linux hardware acceptance; direct development replaces patch/snapshot delivery. Existing companion ingress is insufficient for semantic telemetry; reuse the PCAN backend and add only the required receiving/encoding/session integration. No business code has been implemented in this preparation pass. Earlier deferred/frozen wording and conflicting delivery/platform statements below are historical.
+`CTN1 → MachineState / QML projection → PhysicalSample → WS → PhysicalFrameEncoder → existing CAN bus client`。
 
-## 1. Where the line is drawn
+物理量边界在姿态解算后、协议量化前。共享物理语义但不让 physical 路径通过导入 gateway legacy 入口间接加载 DBC/sinks。保留 legacy emit_frames 作为字节基准。physical 运行生命周期必须支持游戏启动和退出，不借用仅 can 可用的 --mode；显式 parent PID/heartbeat 约束沿用当前监督设计。
 
-Chain from simulation state to a CAN frame has five stages:
+Godot 只移除产品中的录制/ICT/定时 CAN 操作及发送调用；Gateway legacy 控制协议定义与处理保留。不得全局删除 RECORD_START/STOP 破坏旧模式。
 
-```
-(1) 四元数/速度   ->  (2) 姿态解算        ->  (3) 协议量化       ->  (4) 编码          ->  (5) CAN 帧
-    CTN1 UDP          MachineState            sensor_slots        DBC / struct        can_id+payload
-                      link_rpy / QML proj     round((s+180)/.01)  Message.encode      + channel
-```
+## 2. WS v1 与配置
 
-The agreed boundary is **after stage (2)**: the Gateway ships semantic physical
-quantities and the companion owns stages (3), (4) and (5). Stage (1) and (2)
-stay in the Gateway because the semantic values depend on `conventions.py`,
-the calibration layer and the QML projection.
+入口拟定 `/ws/physical`，与浏览器 `/ws` 分离，复用同一 uvicorn 服务。Gateway 参数 `--ws-endpoint`，默认 `ws://127.0.0.1:8000/ws/physical`，通过 GatewayConfigStore 独立键持久化，不把旧 0.0.0.0 TCP 地址静默迁移为客户端目的地址。跨机器由用户配置；对侧监听地址复用现有 web 配置。
 
-Consequence: the companion must reproduce stage (3) exactly. That is the single
-largest correctness risk in this work and is handled by §5.
+对侧新增独立 physical 接收命令/运行模式，复用 bus/bitrate/channel mapping 参数；不依赖 PC001 连接。Windows 验收使用 pcan；默认映射来自现有 bus_client，不在新协议硬编码 USB 口。原命令不变。
 
-## 2. Gateway components
+协议落在 `protocol/physical-telemetry-ws-v1.schema.json`，manifest 添加独立版本键，不提升无关主协议版本。协议及语义常量只在本仓库维护权威源，对侧使用可校验版本/摘要的发布副本，不要求对侧运行时读取本仓库路径。
 
-| Concern | Today | New mode |
-|---|---|---|
-| Telemetry intake (UDP CTN1, heartbeat) | `gateway.py` | unchanged |
-| Cadence | `FrameScheduler` | unchanged |
-| Semantics | `MachineState`, `qml_compat`, `calibration.py` | unchanged |
-| Physical-quantity settlement | inline inside `emit_frames()` | **new** `physical.py` producing a `PhysicalSample` |
-| CAN encode | `dbc_engine`, `encoders/*` | not loaded |
-| Sinks | `sinks.py`, `pc001_sink.py`, `can0_setup.py` | not loaded |
-| CAN console / DBC runtime | `can_console.py`, `OperatorDbcRuntime` | not loaded |
-| Web API | `gateway_web.py` | not started |
-| Transport | sink dispatch | **new** WS client |
+### 消息
 
-- **Mode selection uses a dedicated parameter, not a new `--mode` value.**
-  `--output {physical, can}`, default `physical`. `--mode {standalone,
-  godot-managed}` keeps its meaning as the legacy pipeline's supervision
-  selector and is honoured only alongside `--output can`; combining `--mode`
-  with `--output physical` is a hard error, so a stale command line can never
-  silently fall back to the archived pipeline.
-- The companion endpoint needs its own parameter, kept independent of mode
-  selection. Proposed: `--ws-endpoint ws://HOST:PORT`, or a `--ws-host` /
-  `--ws-port` pair mirroring the existing `--tcp-host` / `--tcp-port`, both
-  defaulting through the `GatewayConfigStore` persistence pattern already used
-  for the PC001 endpoint.
-- `emit_frames()` keeps its current shape for legacy modes; the new mode calls a
-  sibling `settle_physical()` that reuses the same scheduling and semantics but
-  returns values instead of bytes.
-- Backpressure: bounded queue with latest-value coalescing per `(family, key)`,
-  non-blocking enqueue from the receive loop, exponential-backoff reconnect.
-  Mirrors the existing can0 latest-value discipline; a slow or absent peer must
-  never produce stale replay or stall intake.
+- hello：version、session_id、model、profile、calibration_sha256、encoding_contract_hash、rates_hz、families。每次重连/仿真重置创建新 session。
+- hello_ack / hello_reject：对侧确认期望身份和版本后才允许数据；拒绝含稳定错误码。单生产者，现有有效生产者占用时拒绝第二个，避免静默抢占。
+- data：session_id、单调递增 seq、仿真 t_ms、物理采样 unix_s，以及 imu/slew/travel/rtk family。时钟字段单位明确，不接受 NaN/Inf。
+- imu：body/boom/arm/bucket 各 `[roll,pitch,yaw]`，deg。
+- slew：angle_deg；travel：left/right，MPa，保留 0/9。
+- rtk：lat/lon（deg）、alt（m）、heading_deg、ve/vn/vu/speed（m/s）、vice_lat/lon/alt、satellite_status、用于 GPS 周/时间的 Gateway unix_s。
+- 会话事件：source_stale/source_live、健康/错误；对侧状态响应区分已握手与数据活跃。
 
-## 3. WS topology and contract (draft, to be frozen as `protocol/physical-telemetry-ws-v1.schema.json`)
+profile 与 model、DBC machine 的显式映射，以及无 QML profile 时 calibration 指纹的规范形式，在 M1 从实际 supported profiles 列表生成并纳入契约。对侧从配置/受支持契约白名单取得期望值，不能只信任发送者自报 hash。M1 对 RTK 字段与编码常量逐项核对，避免两侧重复应用 origin、secondary antenna 或 clamp。
 
-### 3.0 The three links
+## 3. 排队、超时与断流
 
-Only two of the three links are WebSocket, and the Gateway is a WS **client** on
-the only one it owns:
+- UDP intake 不等待网络。发送工作者与 intake 隔离；数据按 family/key 最新值合并，IMU 一组原子替换，RTK 一组编码，不保留历史 FIFO。
+- 初值：telemetry 超时 500 ms；应用内待发送样本最大年龄 250 ms；hello 超时 3 s；网络发送超时 1 s；重连 0.25–5 s 指数退避并加抖动；事件队列上限 64。参数及调节依据写入测试/配置说明。
+- Gateway 与 receiver 都用本地 monotonic 衡量停流和队列驻留，不直接相减两台机器的墙钟。seq/session 排除重复和旧会话。仿真 tick 回退意味着重建会话。
+- receiver 发送前再次检查 session、源状态、队列年龄；断流使该源 generation 失效并清除未发送帧。慢发送达到期限直接终止会话、清空 pending、重新握手。恢复必须等待握手后的新遥测，不能把断线前最后值重新标成 fresh。
+- 超时协议必须覆盖 TCP 内积压：应用队列清空不等于网络缓冲清空。M1 用可控慢链路验证；可用 receiver challenge/ack 建立恢复门槛，恢复时丢弃门槛之前的数据，不能凭到达时间把旧批次当成新数据。
+- 事件在有效连接内不合并、不静默丢弃；队列满/发送失败时显式结束会话。离线不提供持久事件日志；重连重新声明当前状态。删除原“断网仍永不丢事件”的不可实现承诺。
+- UI 保留最后物理值，整体标记等待/活跃/断流/拒绝。独立手动 injection 有独立 source，遥测停流不取消它；只依附遥测的 overwrite 不制造新的持续发送源。
+- 已进入驱动的帧无法撤回；测试分别记录应用停发时间及总线最后帧时间。检查现有 PCAN QXMTFULL 重试是否可被上层截止期限终止；只有证据表明必要时才最小扩展后端，不用无限后台线程掩盖积压。
 
-| Link | Transport | Carries |
-|---|---|---|
-| Godot ↔ Gateway | UDP `:29764` + `:29765` | `:29764` telemetry CTN1 + control CTNC; `:29765` heartbeat CTNK, session-done CTND, ICT-result CTNR. Unchanged. |
-| Gateway → companion | 1 WebSocket, 2 logical channels | `data` (lossy, coalesced) + `event` (no-drop). Gateway is the client. |
-| Browser ↔ companion | REST + WS | REST `/api/*` for actions, WS `/ws` for server→client snapshots. Browser is the client. |
+## 4. 编码与字节一致性
 
-The browser never reaches the Gateway in the new mode, and it also carries over
-no legacy status display: the old console's freshness and actual-frequency
-columns are gone, and the Gateway's transport state (CAN interface, PC001 peer,
-socket errors) is **not** surfaced in the new console either — in this mode the
-Gateway does not manage CAN at all, so that state no longer exists. The new
-console shows physical quantities plus the companion's own status. The `event`
-channel is therefore session-integrity traffic only, not a browser-facing status
-feed.
+IMU 使用 legacy 表达式 `round((slot + 180) / 0.01)`，slots=(-pitch,roll,yaw)，clamp [1,65535]。不得等价改写为乘 100。回转经对应 ROTATE signal；行走压力直接编码既有 0/9，不从速度推导。RTK 保留原 origin、常量、1 m 副天线、范围与 GPS 时间算法，明确哪些已由 physical settlement 计算，禁止重复转换。
 
-### 3.1 One connection, two channels
+实施前对 legacy emit_frames 保存冻结时钟的 fixtures 和逐帧 tuple。覆盖零位、正负/极值、舍入半边界、RTK 边界、行走 0/9、所有实际支持 model/profile。先直接调用新 encoder 比较，再用真实 loopback WS + fake PCAN 端到端比较。无故障情况下每个 family/调度步逐帧比较；过载允许丢旧数据但不允许旧数据恢复回放。
 
-**One** WebSocket connection carries **two logical channels**, distinguished by
-message type:
+## 5. 对侧复用与控制台
 
-| Channel | Direction | Content | Discipline |
-|---|---|---|---|
-| `data` | gateway -> companion | `imu`, `slew`, `travel`, `rtk` | lossy by design; latest-value coalesced per `(family, key)`; own bounded queue |
-| `event` | gateway -> companion | `hello`, `status`, `event` | never coalesced and never dropped; own queue. Session integrity only — never relayed to the browser |
+新增 physical endpoint/encoder/session runner 为主要改动；复用 DBC loader、overwrite resolver、dashboard、recorder 和 bus client。新 runner 拥有输出生命周期，不启动假 PC001 服务来激活旧 injection loop。CAN 帧成功发送后再沿用原 on_frame 观测语义，编码失败与硬件发送失败区分报告。
 
-Why one connection rather than two:
+浏览器物理值/会话通过对侧快照的 additive 字段提供；老字段/API 保留。新静态 bundle 与旧内嵌 dashboard 保留可选择入口，缺 bundle 明确报错而不出现空白页。详情接口按需补齐现有缺失字段。完整能力范围见 prd.md。
 
-- One handshake, one reconnect/backoff state machine, one place to validate the
-  `model` / `profile` / `calibration_sha256` fingerprint.
-- What needs isolating is the *queue*, not the *socket* — coalescing is a
-  sender-side policy. A second socket adds failure modes ("which one is up?",
-  "which one does the peer trust?") and buys nothing.
-- Cross-plane message ordering stays unambiguous.
+新前端只复制视觉骨架一次，不建立与归档项目的持续同步。独立 package/build；对侧以配置指向构建输出，部署时复制 bundle，不依赖开发机器绝对路径。
 
-A second physical link would only pay off if the status plane had to survive
-independently (separate process or network path) or needed a different
-transport. Neither applies here.
+## 6. Godot 与发布
 
-The Gateway has **no** browser-facing WS — the frontend is hosted by the
-companion. Godot keeps its UDP control (CTNC) and heartbeat (CTNK) channels;
-those are not WS and do not change.
+复用桥接器唯一子 PID、配置持久化与重启逻辑；游戏连接状态分别表达进程在线、WS 已握手、遥测断流。在 M1 设计 additive UDP 状态包/兼容字段，不挪用旧 recording/ICT flag 含义；旧包解析保持。浏览器不连 Gateway。
 
-### 3.2 Messages
-
-Gateway -> companion, JSON text frames:
-
-```
-hello   { type, protocol_version, model, profile, calibration_sha256,
-          rates_hz:{imu,slew,rtk,travel}, families:[...], source_clock_unix_s }
-imu     { type, t_ms, links:{ body:[r,p,y], boom:[...], arm:[...], bucket:[...] } }   # 100 Hz
-slew    { type, t_ms, angle_deg }                                                     # 100 Hz
-travel  { type, t_ms, left, right }                                                   # 10 Hz; binarised 0/9, unit MPa
-rtk     { type, t_ms, unix_s, lat, lon, alt, heading_deg, ve, vn, vu, speed,
-          vice_lat, vice_lon, vice_alt, satellite_status }                            # 10 Hz
-event   { type, level, code, detail }
-```
-
-- `t_ms` is the deterministic simulation tick (`sample.tick_ms`), not wall clock,
-  so replay comparison is reproducible.
-- `unix_s` is carried explicitly so the companion never substitutes its own
-  clock for the GPS week/time frame.
-- Handshake validation: the companion rejects a session whose `model` /
-  `profile` / `calibration_sha256` disagrees with its own configuration.
-- A slow or absent peer affects only the `data` channel: its queue coalesces and
-  drops, while the `event` channel keeps flowing.
-- `event` deliberately carries **no** Gateway-side transport or connection
-  telemetry for the browser. It exists so the pair can validate the handshake
-  and report session health to each other. The companion renders its own status
-  in the console; the Gateway's archived CAN state is not resurrected.
-
-## 4. Companion components
-
-| Concern | Plan |
-|---|---|
-| WS input endpoint | new WebSocket route next to the existing snapshot `/ws`, same uvicorn process |
-| Quantisation + encode | new `PhysicalFrameEncoder`: stage (3) + stage (4) |
-| Frame delivery | reuse the transport-decoupled `injection_queue` so dashboard, recorder and `/ws` snapshot update unchanged |
-| Physical CAN output | reuse the `09-04` fixed routing `ch0->can1`, `ch2->can4`, `ch3->can3` and its non-blocking bounded latest-value send |
-| Frontend hosting | serve the bundle built from the **new** `tools/replay_console/` project; drop **all** legacy status display (freshness, actual frequency, Gateway transport state). The legacy `tools/can_gateway/web/` is not reused or moved. |
-| Configuration | new `[physical]` TOML section (listen address/port, DBC machine, routing) |
-
-Quantisation to reproduce, per family:
-
-- IMU: `slots = (-pitch, roll, yaw)`; `count = round((slot + 180) / 0.01)`;
-  clamp `[1, 65535]` (lower bound is 1 — a triple of zeros is the parser's
-  invalid marker).
-- Slew: degrees into the `ROTATE` DBC signal.
-- Travel: the already-binarised `0` / `9` value arrives as-is and is packed
-  unchanged (unit **MPa**). The companion must **not** re-derive it from speed.
-  The frame is **not** in the DBC and is a raw struct with the first four bytes
-  zero. The `kg` wording in `encoders/travel_pilot.py` and `README.md` is wrong
-  and gets corrected to MPa (comments only, no numeric change).
-- RTK: nine frames — origin conversion, six constants, secondary antenna at
-  1.0 m opposite the heading, `+-327.67` bound clamping, and the GPS wall clock.
-
-### 4.1 Frontend scope
-
-Keep the existing console's skeleton and design, and port the companion TUI's
-capability set into it.
-
-Already available in the companion's own web dashboard, so reused rather than
-rebuilt: message table, fuzzy search, channel / uploaded-message filters,
-overwrite set and clear, materialise-and-inject for never-uploaded messages,
-custom-frame injection, CSV / RRD / gRPC recording, info and help dialogs,
-status text and capability flags.
-
-New work, because these are TUI-only today:
-
-| Item | Delta |
-|---|---|
-| Full DBC / protocol-CSV detail | 22-column protocol table plus per-signal scale, offset, range, unit, choices, multiplexer, comment, cycle time and senders. The current web detail view returns only name, start, length, byte order, signed, min, max, unit. |
-| Progress bar | TUI has one; the web shows text only. |
-| Overwrite period presets | TUI offers once / 20 ms / 50 ms and recalls the active period; the web is a free number field. |
-| Parent-row overwrite highlighting | TUI marks the parent row orange and the signal rows yellow; the web colours child values only. |
-| Search-hit highlighting | TUI bolds the matched substrings. |
-
-Likely out of scope: the interactive start-up wizard and the Rich text fallback
-renderer.
-
-### 4.2 Frontend project location
-
-The console is a **new standalone project** at `tools/replay_console/`, with its
-own `package.json` / `vite.config.ts` / build output, and is served by the
-companion.
-
-Rationale: the legacy console at `tools/can_gateway/web/` is a *CAN* console —
-its state model, its API client and its columns are all built around frames and
-channels. The new console is a *physical-quantity* console whose data arrives
-from the companion. Sharing a directory would mean either mutating a project we
-have just archived, or threading two incompatible semantics through one codebase.
-A separate directory keeps the archive intact and keeps each build independent.
-
-What it *keeps* from the legacy console is the **visual skeleton and design**
-(layout, panels, table styling, dialog patterns) — copied in as a starting
-point and then re-pointed at the companion's API. What it must not carry over is
-the freshness column, the actual-frequency column, the Gateway transport-state
-indicators, or any Gateway REST/WS client. Status shown in the new console is
-the companion's own, not the Gateway's.
-
-Build wiring: `tools/build_gateway_dist.ps1` currently builds
-`tools/can_gateway/web/` into `tools/can_gateway/resources/web/`. The legacy
-build keeps working (the archive still needs its bundle). The new project gets
-its own build step and its own output, and that output is what the companion
-serves.
-
-## 5. Byte-parity strategy
-
-The acceptance criterion is that the companion's CAN frames are byte-identical
-to today's Gateway frames. Approach, modelled on the successful calibration
-refactor verification:
-
-1. Record a **golden** digest from the legacy path: run `emit_frames()` over a
-   fixed telemetry battery with the wall clock frozen, dump every
-   `(can_id, payload, channel)` triple. (Freezing is mandatory — the RTK
-   week/time frame is wall-clock derived, which already caused a false failure
-   during the calibration refactor.)
-2. Feed the same battery through the new path: Gateway physical settlement ->
-   WS -> companion encoder -> frames, dump the same tuples.
-3. Compare. All families, all scenarios, byte-for-byte.
-4. To keep this runnable from one repository, the companion encoder is imported
-   from its checkout path by the parity test, and the same fixtures are reused
-   by a companion-side test.
-
-Rounding note: both sides are Python, so porting the quantisation expressions
-verbatim avoids the C `round` (half-away-from-zero) versus Python `round`
-(half-to-even) trap. Do **not** re-derive `(slot + 180) / 0.01` as `* 100` —
-`0.01` is not exactly representable and the two forms can disagree.
-
-## 6. Migration impact
-
-- `godot/client/scripts/can_telemetry_bridge.gd` currently passes
-  `--mode godot-managed --sink tcp ...` explicitly. Because `--mode` together
-  with the new default (`--output physical`) is a hard error, that argv would
-  start failing the moment the default is flipped. The game migration therefore
-  has to land **in the same release** as the default switch: either append
-  `--output can` to keep the legacy pipeline, or — per R14 — migrate the game to
-  the new mode altogether. There is no third option, and the failure is loud
-  rather than silent, which is the point of making it an error.
-- `godot/client/scripts/operator_ui.gd` holds the `[CAN 输出]` control; removing
-  it also removes the `RECORD_START` / `RECORD_STOP` plumbing in
-  `control_protocol.py` and the gateway's handling.
-- Scripts and tests assuming the default is `standalone`/`tcp` need updating:
-  `tools/can_gateway/smoke_frozen_gateway.py`,
-  `tools/can_gateway/tests/test_gateway_process.py`,
-  `godot/client/tests/run_standalone_matrix.ps1`.
-- `tools/build_gateway_dist.ps1` bundles the legacy web assets into
-  `tools/can_gateway/resources/web/`; that path keeps working for the archived
-  pipeline. The new console at `tools/replay_console/` gets its own build and
-  its own output, and the companion serves that output.
-- The legacy CAN pipeline is **archived, not deleted**: `standalone` /
-  `godot-managed`, `gateway_web.py`, the CAN console, the DBC runtime and the
-  legacy frontend `tools/can_gateway/web/` stay in the tree, reachable only
-  through explicit parameters, and are no longer developed. Nothing is removed,
-  so the build script keeps bundling them.
-- The travel unit correction touches `encoders/travel_pilot.py` comments and the
-  `README.md` convention line; no bytes change.
-
-## 7. Milestones
-
-| # | Milestone | Acceptance |
-|---|---|---|
-| M1 | Contract frozen + Gateway physical layer (mode, `PhysicalSample`, WS client, backpressure) + loopback stub server | Gateway emits physical values only; no CAN loaded; reconnect and coalescing behave |
-| M2 | Companion endpoint + encoder + vcan output | **Byte-parity harness green** across all families |
-| M3 | New console project `tools/replay_console/` (skeleton copied from the legacy console, re-pointed at the companion), the TUI feature port (§4.1), and companion hosting | Physical-quantity view, no freshness/frequency, capability parity with the TUI |
-| M4 | Game migration + script/test updates + patch delivery | `git apply --check` clean; snapshot comparison clean; suite at baseline |
-
-M1 and the contract are the resume point. Every design choice is settled.
-Two non-blocking items remain open, neither of which touches M1: whether the
-Gateway keeps serving the *legacy* console bundle in legacy modes (working
-assumption: yes), and the exact spelling of the companion-endpoint parameter
-(`--ws-endpoint` vs `--ws-host` / `--ws-port`).
-
-**The task is deferred as of 2026-09-14, so M1 has not started.** Milestones
-M1–M4 above are unstarted scope, recorded so the work can resume without
-re-planning.
-
-## 8. Risks
-
-| Risk | Mitigation |
-|---|---|
-| Companion quantisation drifts from the Gateway | Byte-parity harness (§5) as a hard gate; single source for constants |
-| Duplicated constants diverge silently over time | Publish the constant/origin set as a shared artefact under `protocol/` and generate the companion's table from it |
-| Default-mode switch breaks tests/scripts | Enumerate and update the three known call sites before flipping the default |
-| WS backpressure stalls the UDP receive loop | Bounded queue + latest-value coalescing + non-blocking enqueue, mirroring the can0 discipline |
-| GPS frame non-determinism hides a real regression | Always freeze the wall clock in parity runs |
-| Travel direction is not representable on `0x256` | Document explicitly; the value ships already binarised and never claims direction |
-| Archived legacy pipeline bit-rots silently | Keep its tests in the suite, and use its output as the parity harness reference |
-| Default flip breaks the game's explicit `--mode` argv | Land the game migration in the same release; the mismatch is a hard error, so it surfaces immediately rather than degrading silently |
-| The two console projects drift apart on shared visual design | New console copies the skeleton once at creation; no ongoing sync is promised, and the legacy console is frozen anyway |
-| Frontend port scope grows without bound | §4.1 is the checklist; the start-up wizard and Rich fallback are explicitly excluded |
+默认切换必须与游戏 argv 迁移、冻包依赖、smoke_frozen_gateway、test_gateway_process 和 run_standalone_matrix 同批集成；M1–M3 可先显式 physical 验证，M4 才提交可运行的默认切换。legacy 路径用 `--output can --mode ...` 回归。

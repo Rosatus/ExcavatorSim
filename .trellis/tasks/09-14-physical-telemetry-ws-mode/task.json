@@ -1,8 +1,8 @@
 {
   "id": "physical-telemetry-ws-mode",
   "name": "physical-telemetry-ws-mode",
-  "title": "Physical telemetry WS mode (gateway default, Linux-side CAN assembly)",
-  "description": "",
+  "title": "Physical telemetry WS mode (gateway default, Windows PCAN acceptance)",
+  "description": "Physical-only Gateway over WS; minimal companion adaptation, standalone replay console, game migration. Direct development; no patch delivery.",
   "status": "planning",
   "dev_type": null,
   "scope": null,
@@ -21,6 +21,6 @@
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "",
+  "notes": "2026-09-22 planning refreshed; implementation not started. See prd.md, design.md and implement.md.",
   "meta": {}
 }
