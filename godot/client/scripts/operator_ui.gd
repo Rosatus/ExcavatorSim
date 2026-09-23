@@ -93,6 +93,7 @@ var _gateway_host_edit: LineEdit
 var _gateway_port_edit: LineEdit
 var _unlimited_bucket_button: CheckButton
 var _cutting_diagnostics_button: CheckButton
+var _race_mode_button: CheckButton
 
 const GATEWAY_CONFIG_PATH := "user://ict_config.cfg"
 var _bucket_volume_label: Label
@@ -176,6 +177,7 @@ func _bind_controls() -> void:
 	_gateway_port_edit = $StatusPanel/Margin/VBox/AdvancedPanel/GatewayPort
 	_unlimited_bucket_button = $StatusPanel/Margin/VBox/AdvancedPanel/UnlimitedBucketCapacity
 	_cutting_diagnostics_button = $StatusPanel/Margin/VBox/AdvancedPanel/CuttingDiagnostics
+	_race_mode_button = $StatusPanel/Margin/VBox/AdvancedPanel/RaceMode
 	_bucket_volume_label = $StatusPanel/Margin/VBox/AdvancedPanel/BucketVolume
 	_advanced_panel = $StatusPanel/Margin/VBox/AdvancedPanel
 	_reset_button = $StatusPanel/Margin/VBox/Actions/Reset
@@ -204,6 +206,7 @@ func _connect_controls() -> void:
 	_slope_assist_button.pressed.connect(_on_slope_assist_pressed)
 	_unlimited_bucket_button.toggled.connect(_on_unlimited_bucket_toggled)
 	_cutting_diagnostics_button.toggled.connect(_on_cutting_diagnostics_toggled)
+	_race_mode_button.toggled.connect(_on_race_mode_toggled)
 	_can_output_button.pressed.connect(_on_can_output_pressed)
 	_gateway_button.pressed.connect(_on_gateway_restart_pressed)
 	_timed_can_button.pressed.connect(_on_timed_can_pressed)
@@ -261,6 +264,7 @@ func _ready() -> void:
 	_layout_menu()
 	_set_panel_collapsed(true)
 	_sync_test_graphics_toggle()
+	_load_race_mode()
 	_guide_panel.visible = false
 	_build_assist_menu()
 	_build_slope_side_view()
@@ -497,6 +501,7 @@ func _rebuild_menu_theme() -> void:
 	_set_panel_collapsed(_panel_collapsed)
 	_refresh_prompt_copy()
 	_sync_test_graphics_toggle()
+	_sync_race_mode_toggle()
 	_refresh()
 	_refresh_model_selector()
 	_refresh_capture_status()
@@ -770,6 +775,35 @@ func _on_cutting_diagnostics_toggled(enabled: bool) -> void:
 	if _excavation_world != null:
 		_excavation_world.set_voxel_diagnostics_enabled(enabled)
 	_sync_cutting_diagnostics_toggle()
+
+
+func _on_race_mode_toggled(enabled: bool) -> void:
+	var config := ConfigFile.new()
+	config.load(CONFIG_PATH)
+	config.set_value(CONFIG_SECTION_UI, "race_mode", enabled)
+	config.save(CONFIG_PATH)
+	if _product_session != null:
+		_product_session.request_race_mode(enabled)
+	_sync_race_mode_toggle()
+
+
+func _sync_race_mode_toggle() -> void:
+	if _race_mode_button == null:
+		return
+	_race_mode_button.set_pressed_no_signal(
+		_product_session != null and _product_session.race_mode_enabled
+	)
+
+
+## Persisted race-mode choice is applied once the product session exists; the
+## chassis re-applies it to each freshly configured Jolt runtime.
+func _load_race_mode() -> void:
+	var config := ConfigFile.new()
+	if config.load(CONFIG_PATH) != OK:
+		return
+	if _product_session != null and bool(config.get_value(CONFIG_SECTION_UI, "race_mode", false)):
+		_product_session.request_race_mode(true)
+	_sync_race_mode_toggle()
 
 
 func _sync_cutting_diagnostics_toggle() -> void:

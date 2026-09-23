@@ -272,6 +272,11 @@ text = "无限收集斗容（测试）"
 layout_mode = 2
 text = "切削性能诊断"
 
+[node name="RaceMode" type="CheckButton" parent="StatusPanel/Margin/VBox/AdvancedPanel"]
+layout_mode = 2
+text = "竞速模式（高速行驶）"
+tooltip_text = "大幅提高履带/轮式行驶速度并提供赛车化操控辅助，仅用于驾驶娱乐；精细作业前请关闭"
+
 [node name="BucketVolume" type="Label" parent="StatusPanel/Margin/VBox/AdvancedPanel" unique_id=2114908316]
 layout_mode = 2
 theme_override_font_sizes/font_size = 12

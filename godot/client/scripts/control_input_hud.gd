@@ -211,7 +211,7 @@ func set_prompt_mode(mode: String) -> void:
 		(_keys[ACTIONS[index]] as Label).text = copy[index]
 	_footer.text = "1–5 切换视角 · C 复位" if mode == "keyboard" else "十字键 切换视角 · R3 复位"
 	if _wheeled and mode == "keyboard":
-		_footer.text += " · 空格刹车"
+		_footer.text += " · 空格刹车 · Shift 漂移"
 
 func _process(_delta: float) -> void:
 	refresh_input_state_for_test()
