@@ -66,6 +66,11 @@ func _reject(message: String) -> bool:
 func set_commands(throttle: float, brake: float, steer: float) -> void:
 	_command = Vector3(clampf(throttle, -1.0, 1.0), clampf(brake, 0.0, 1.0), clampf(steer, -1.0, 1.0)) if Vector3(throttle, brake, steer).is_finite() else Vector3(0, 1, 0)
 
+## Drift is a race-only command channel; the normal solver ignores it so the
+## same call sites can feed either solver polymorphically.
+func set_drift(_value: float) -> void:
+	pass
+
 func reset() -> void:
 	_command = Vector3.ZERO
 	steer_angle_rad = 0.0

@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "comment": "Race-mode overlays applied on top of the normal physics rig. 'params' are applied to the tracked 'tracks' block or the wheeled solver 'parameters' block (set = absolute, scale = multiplier, keys absent from the base are ignored). 'body' is applied the same way to 'chassis_dynamics'. 'assist' holds race-only helper gains consumed by RaceMotionAssist. models.<id>.<kind> entries deep-merge over defaults.<kind>.",
+  "defaults": {
+    "tracked": {
+      "params": {
+        "set": {
+          "max_belt_speed_m_s": 14.0
+        },
+        "scale": {
+          "max_drive_force_n": 3.0,
+          "brake_force_n": 2.5,
+          "traction_response_n_per_m_s": 2.0,
+          "drive_effort_slew_n_per_tick": 4.0,
+          "brake_effort_slew_n_per_tick": 4.0,
+          "lateral_resistance_n_per_m_s": 1.0,
+          "pivot_lateral_resistance_scale": 0.75,
+          "friction": 1.15,
+          "support_damping_n_s_per_m": 1.25
+        }
+      },
+      "body": {
+        "set": {
+          "max_linear_speed_m_s": 18.0,
+          "max_angular_speed_rad_s": 3.2
+        },
+        "scale": {
+          "angular_damp": 0.6,
+          "linear_damp": 0.4
+        }
+      },
+      "assist": {
+        "yaw_assist_gain_nm_s_per_rad": 140000.0,
+        "max_yaw_assist_torque_nm": 260000.0,
+        "yaw_capacity_scale": 0.45,
+        "yaw_capacity_floor_rad_s": 0.7,
+        "steer_soften_mps": 4.0,
+        "turn_grip_loss_per_rad_s": 0.08,
+        "turn_grip_loss_max": 0.3,
+        "turn_drag_n": 45000.0,
+        "turn_inner_brake_scale": 0.22,
+        "turn_inner_brake_floor": -0.35,
+        "attitude_deadband_deg": 18.0,
+        "attitude_stiffness_nm_per_rad": 180000.0,
+        "attitude_damping_nm_s_per_rad": 140000.0,
+        "max_attitude_torque_nm": 300000.0,
+        "downforce_n_per_m_s2": 0.0,
+        "max_downforce_n": 0.0
+      }
+    },
+    "wheeled": {
+      "params": {
+        "set": {
+          "max_speed_mps": 28.0,
+          "max_reverse_speed_mps": 9.0
+        },
+        "scale": {
+          "drive_force_n": 3.5,
+          "brake_force_n": 2.0,
+          "steer_rate_degrees_s": 1.8,
+          "steering_lateral_accel_mps2": 4.0,
+          "friction": 1.2,
+          "rolling_resistance": 0.5,
+          "spring_n_m": 1.35,
+          "damper_n_s_m": 1.35
+        }
+      },
+      "body": {
+        "set": {
+          "max_linear_speed_m_s": 32.0,
+          "max_angular_speed_rad_s": 3.0
+        },
+        "scale": {
+          "angular_damp": 0.7,
+          "linear_damp": 0.5
+        }
+      },
+      "assist": {
+        "yaw_assist_gain_nm_s_per_rad": 45000.0,
+        "max_yaw_assist_torque_nm": 90000.0,
+        "attitude_deadband_deg": 12.0,
+        "attitude_stiffness_nm_per_rad": 160000.0,
+        "attitude_damping_nm_s_per_rad": 110000.0,
+        "max_attitude_torque_nm": 260000.0,
+        "downforce_n_per_m_s2": 45.0,
+        "max_downforce_n": 60000.0,
+        "drift_rear_lateral_grip": 0.35,
+        "drift_brake_n": 16000.0,
+        "drift_yaw_rate_rad_s": 1.1,
+        "drift_slip_limit_rad": 0.75,
+        "drift_engage_mps": 5.0,
+        "drift_engage_s": 0.1,
+        "drift_release_s": 0.3
+      }
+    }
+  },
+  "models": {
+    "sy155w": {
+      "wheeled": {
+        "assist": {
+          "yaw_assist_gain_nm_s_per_rad": 240000.0,
+          "max_yaw_assist_torque_nm": 480000.0,
+          "attitude_stiffness_nm_per_rad": 420000.0,
+          "attitude_damping_nm_s_per_rad": 320000.0,
+          "max_attitude_torque_nm": 700000.0,
+          "downforce_n_per_m_s2": 110.0,
+          "max_downforce_n": 160000.0,
+          "drift_brake_n": 52000.0
+        }
+      }
+    }
+  }
+}

@@ -50,10 +50,16 @@ var _descriptor: Dictionary = {}
 var _dynamics: Dictionary = {}
 var _tracks: Dictionary = {}
 var _track_solver := preload("res://scripts/track_contact_solver.gd").new()
+var _race_track_solver := RaceTrackContactSolver.new()
+var _tracks_base: Dictionary = {}
+var _dynamics_base: Dictionary = {}
+var race_mode := false
 var _wheel_profile: WheeledMachineProfile
 var _wheel_solver := WheeledLocomotionState.new()
+var _race_wheel_solver := RaceWheeledLocomotionState.new()
 var _wheel_snapshot: Dictionary = {}
 var _wheel_command := Vector3.ZERO
+var _wheel_drift := 0.0
 var _wheel_neutral_armed := false
 var _wheel_colliders: Array[CollisionShape3D] = []
 var _track_probes: Array = []
@@ -236,6 +242,9 @@ func configure(
 		_dynamics["max_linear_speed_m_s"] = maxf(float(_dynamics["max_linear_speed_m_s"]), float(_wheel_solver.parameters.max_speed_mps) * 1.5)
 	else:
 		_track_solver.configure(_tracks, _dynamics)
+	_tracks_base = _tracks.duplicate(true)
+	_dynamics_base = _dynamics.duplicate(true)
+	_apply_locomotion_mode()
 	_terrain_world = terrain_world
 	_terrain_collider = terrain_collider
 	_static_map_root = static_map_root
@@ -266,6 +275,12 @@ func teardown() -> void:
 	_descriptor.clear()
 	_dynamics.clear()
 	_tracks.clear()
+	_tracks_base.clear()
+	_dynamics_base.clear()
+	_race_track_solver.reset()
+	_race_track_solver.assist.clear()
+	_race_wheel_solver.reset()
+	_race_wheel_solver.assist.clear()
 	_wheel_profile = null
 	_wheel_snapshot.clear()
 	_wheel_solver.reset()
@@ -316,15 +331,73 @@ func set_enabled(value: bool) -> void:
 		stop_motion()
 		_track_neutral_armed = false
 		_track_solver.reset()
+		_race_track_solver.reset()
+		_race_wheel_solver.reset()
 		_left_effort_n = 0.0
 		_right_effort_n = 0.0
+
+
+## Race mode swaps in a parallel solver pair tuned from the same descriptors;
+## normal parameters are snapshotted at configure so toggling off restores them
+## byte-for-byte. The flag survives model switches via configure().
+func set_race_mode(value: bool) -> void:
+	if race_mode == value:
+		return
+	race_mode = value
+	stop_motion()
+	_track_solver.reset()
+	_race_track_solver.reset()
+	_wheel_solver.reset()
+	_race_wheel_solver.reset()
+	_apply_locomotion_mode()
+	_capture_post_step_snapshot()
+
+
+func _apply_locomotion_mode() -> void:
+	if _descriptor.is_empty() or _dynamics_base.is_empty():
+		return
+	_dynamics = _dynamics_base.duplicate(true)
+	_tracks = _tracks_base.duplicate(true)
+	var kind := "wheeled" if uses_wheels() else "tracked"
+	var overlay := RaceModeProfile.overlay_for(model_id, kind) if race_mode else {}
+	if race_mode and overlay.is_empty():
+		_quality_flags.append("race_overlay_unavailable")
+	if not race_mode:
+		if uses_wheels():
+			_wheel_solver.configure(_wheel_profile.data.parameters, _wheel_profile.stations)
+		else:
+			_track_solver.configure(_tracks, _dynamics)
+	elif uses_wheels():
+		var base_params := WheeledLocomotionState.DEFAULTS.duplicate(true)
+		for key in _wheel_profile.data.parameters:
+			base_params[key] = _wheel_profile.data.parameters[key]
+		var wheel_params := RaceModeProfile.apply_overlay(base_params, overlay.get("params", {}))
+		if not _race_wheel_solver.configure_race(
+			wheel_params, _wheel_profile.stations, overlay.get("assist", {})
+		):
+			_quality_flags.append("race_wheel_rejected")
+			race_mode = false
+			_apply_locomotion_mode()
+			return
+		_dynamics = RaceModeProfile.apply_overlay(_dynamics, overlay.get("body", {}))
+		_dynamics["max_linear_speed_m_s"] = maxf(
+			float(_dynamics["max_linear_speed_m_s"]),
+			float(wheel_params.get("max_speed_mps", 0.0)) * 1.5
+		)
+	else:
+		_tracks = RaceModeProfile.apply_overlay(_tracks, overlay.get("params", {}))
+		_dynamics = RaceModeProfile.apply_overlay(_dynamics, overlay.get("body", {}))
+		_race_track_solver.configure_race(_tracks, _dynamics, overlay.get("assist", {}))
+	if _body != null and is_instance_valid(_body):
+		_body.linear_damp = float(_dynamics["linear_damp"])
+		_body.angular_damp = float(_dynamics["angular_damp"])
 
 
 func uses_wheels() -> bool:
 	return _wheel_profile != null and _wheel_profile.enabled
 
 
-func set_wheeled_commands(throttle: float, brake: float, steer: float) -> void:
+func set_wheeled_commands(throttle: float, brake: float, steer: float, drift := 0.0) -> void:
 	var command := Vector3(throttle, brake, steer)
 	if not command.is_finite():
 		command = Vector3(0, 1, 0)
@@ -332,6 +405,7 @@ func set_wheeled_commands(throttle: float, brake: float, steer: float) -> void:
 	if enabled and command.is_zero_approx():
 		_wheel_neutral_armed = true
 	_wheel_command = command if enabled and _wheel_neutral_armed else Vector3(0, 1, 0)
+	_wheel_drift = clampf(drift, 0.0, 1.0) if enabled and _wheel_neutral_armed and is_finite(drift) else 0.0
 	# Existing feedback/diagnostics retain common signed travel channels.
 	_left_command = _wheel_command.x
 	_right_command = _wheel_command.x
@@ -757,6 +831,7 @@ func _payload_center_in_bucket(center: Vector3) -> bool:
 
 func stop_motion() -> void:
 	_wheel_command = Vector3(0, 1, 0)
+	_wheel_drift = 0.0
 	_wheel_neutral_armed = false
 	set_commands(0.0, 0.0)
 	set_equipment_commands(Vector4.ZERO)
@@ -1109,6 +1184,11 @@ func _capture_post_step_snapshot() -> void:
 		"hull_collision_switch_count": 0,
 		"track_contact_model": "wheel_suspension_v1" if uses_wheels() else "swept_stations_v1",
 		"locomotion_mode": "wheeled" if uses_wheels() else "tracked",
+		"race_mode": race_mode,
+		"race_assist": (
+			(_race_wheel_solver.assist_telemetry if uses_wheels() else _race_track_solver.assist_telemetry)
+			if race_mode else {}
+		),
 		"wheeled_locomotion": _wheel_snapshot.duplicate(true),
 		"track_probes": _track_probes.duplicate(true),
 		"track_rejections": _track_rejections.duplicate(true),
@@ -1366,7 +1446,8 @@ func _apply_track_forces() -> void:
 	if not is_inside_tree() or get_world_3d() == null:
 		_quality_flags.append("physics_space_unavailable")
 		return
-	var result: Dictionary = _track_solver.step(
+	var solver := _race_track_solver if race_mode else _track_solver
+	var result: Dictionary = solver.step(
 		_body, Vector2(_left_command, _right_command), _last_fixed_delta_s,
 		_layer_mask(int(_descriptor["collision_layers"]["terrain"])),
 		Callable(self, "_accept_track_support_hit")
@@ -1508,10 +1589,13 @@ func _clear_tick_telemetry() -> void:
 func _reset_response_telemetry() -> void:
 	_wheel_neutral_armed = false
 	_wheel_command = Vector3.ZERO
+	_wheel_drift = 0.0
 	_wheel_solver.reset()
+	_race_wheel_solver.reset()
 	_wheel_snapshot.clear()
 	_track_neutral_armed = false
 	_track_solver.reset()
+	_race_track_solver.reset()
 	_left_effort_n = 0.0
 	_right_effort_n = 0.0
 	_posture_error_rad = 0.0
@@ -1764,8 +1848,10 @@ func _apply_wheel_forces() -> void:
 	# Neutral holds a work machine through bounded service braking. Suspension
 	# remains live while paused, so disabling input does not drop the chassis.
 	var brake := maxf(command.y, 1.0 if absf(command.x) < 0.001 else 0.0)
-	_wheel_solver.set_commands(command.x, brake, command.z)
-	_wheel_snapshot = _wheel_solver.step(_body, _last_fixed_delta_s,
+	var solver: WheeledLocomotionState = _race_wheel_solver if race_mode else _wheel_solver
+	solver.set_commands(command.x, brake, command.z)
+	solver.set_drift(_wheel_drift)
+	_wheel_snapshot = solver.step(_body, _last_fixed_delta_s,
 		_layer_mask(int(_descriptor["collision_layers"]["terrain"])), Callable(self, "_accept_track_support_hit"))
 	var samples: Array = _wheel_snapshot.get("wheels", [])
 	for index in samples.size():
