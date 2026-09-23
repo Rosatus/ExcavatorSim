@@ -65,7 +65,7 @@ var _base_local_transform := Transform3D.IDENTITY
 var _jolt_runtime: JoltChassisTrackRuntime
 var _use_test_commands := false
 var _test_commands := Vector2.ZERO
-var _test_wheel_commands := Vector3.ZERO
+var _test_wheel_commands := Vector4.ZERO
 var _use_test_wheel_commands := false
 var _use_test_equipment_commands := false
 var _test_equipment_commands := Vector4.ZERO
@@ -86,6 +86,7 @@ var _assist_view_cache: Dictionary = {}
 var _assist_menu_open := false
 var _assist_menu_index := 0
 var _menu_nav_axis := 0.0
+var race_mode_enabled := false
 
 
 func _ready() -> void:
@@ -155,6 +156,12 @@ func set_controller_enabled(value: bool) -> void:
 			_reset_motion()
 
 
+func set_race_mode(value: bool) -> void:
+	race_mode_enabled = value
+	if _jolt_runtime != null:
+		_jolt_runtime.set_race_mode(value)
+
+
 func set_product_session_state(running: bool, focused: bool) -> void:
 	if AuthorityProfile.writes_product_pose(authority_profile):
 		controller_enabled = running
@@ -195,14 +202,14 @@ func set_commands_for_test(left: float, right: float) -> void:
 		_jolt_runtime.set_commands(_test_commands.x, _test_commands.y)
 
 
-func set_wheeled_commands_for_test(throttle: float, brake: float, steer: float) -> void:
+func set_wheeled_commands_for_test(throttle: float, brake: float, steer: float, drift := 0.0) -> void:
 	_use_test_wheel_commands = true
-	_test_wheel_commands = Vector3(throttle, brake, steer)
+	_test_wheel_commands = Vector4(throttle, brake, steer, drift)
 
 
 func clear_commands_for_test() -> void:
 	_use_test_wheel_commands = false
-	_test_wheel_commands = Vector3.ZERO
+	_test_wheel_commands = Vector4.ZERO
 	_use_test_commands = false
 	_test_commands = Vector2.ZERO
 	locomotion_state.set_commands(0.0, 0.0)
@@ -848,7 +855,7 @@ func _step_authoritative_chassis(delta: float) -> void:
 			_jolt_runtime.stop_motion()
 		else:
 			var command := _test_wheel_commands if _use_test_wheel_commands else WheeledVehicleController.read_machine_input()
-			_jolt_runtime.set_wheeled_commands(command.x, command.y, command.z)
+			_jolt_runtime.set_wheeled_commands(command.x, command.y, command.z, command.w)
 	else:
 		_jolt_runtime.set_commands(left, right)
 	var equipment_axes := Vector4.ZERO
@@ -930,6 +937,7 @@ func _configure_jolt_runtime(catalog_entry: Dictionary) -> bool:
 		_destroy_jolt_runtime()
 		return false
 	_jolt_runtime.set_enabled(controller_enabled)
+	_jolt_runtime.set_race_mode(race_mode_enabled)
 	if not _jolt_runtime.set_bucket_ground_mode(_bucket_ground_mode):
 		contract_error = "could not apply bucket-ground interaction policy"
 		_destroy_jolt_runtime()

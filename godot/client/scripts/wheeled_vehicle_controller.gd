@@ -8,35 +8,63 @@ extends Node
 @export var keyboard_input := false
 @export_flags_3d_physics var terrain_collision_mask := 1
 var locomotion := WheeledLocomotionState.new()
+var _race_locomotion := RaceWheeledLocomotionState.new()
+var race_mode := false
 var input_enabled := true
 var neutral_armed := false
 var _focused := true
 var _body: RigidBody3D
 var _animator: WheelVisualAnimator
-var _command := Vector3.ZERO
+var _command := Vector4.ZERO
 
 func _ready() -> void:
 	ensure_input_actions()
 	_body = get_parent() as RigidBody3D
 	_animator = get_node_or_null(wheel_animator_path) as WheelVisualAnimator
-	if _body == null or not locomotion.configure(parameters, wheel_stations):
-		push_error("Invalid wheeled vehicle: " + locomotion.last_error)
+	if _body == null or not _configure_locomotion():
+		push_error("Invalid wheeled vehicle: " + _active_solver().last_error)
 		set_physics_process(false)
 
-func set_commands(throttle: float, brake: float, steer: float) -> void:
-	_command = Vector3(throttle, brake, steer) if Vector3(throttle, brake, steer).is_finite() else Vector3(0, 1, 0)
+func _active_solver() -> WheeledLocomotionState:
+	return _race_locomotion if race_mode else locomotion
+
+func _configure_locomotion() -> bool:
+	if not race_mode:
+		return locomotion.configure(parameters, wheel_stations)
+	var overlay := RaceModeProfile.overlay_for("", "wheeled")
+	var base := WheeledLocomotionState.DEFAULTS.duplicate(true)
+	for key in parameters:
+		base[key] = parameters[key]
+	var effective := RaceModeProfile.apply_overlay(base, overlay.get("params", {}))
+	return _race_locomotion.configure_race(effective, wheel_stations, overlay.get("assist", {}))
+
+func set_race_mode(value: bool) -> void:
+	if race_mode == value:
+		return
+	race_mode = value
+	neutral_armed = false
+	_command = Vector4.ZERO
+	if _body != null and not _configure_locomotion():
+		push_error("Invalid race wheeled vehicle: " + _race_locomotion.last_error)
+		race_mode = false
+		locomotion.configure(parameters, wheel_stations)
+	locomotion.reset()
+	_race_locomotion.reset()
+
+func set_commands(throttle: float, brake: float, steer: float, drift := 0.0) -> void:
+	_command = Vector4(throttle, brake, steer, drift) if Vector4(throttle, brake, steer, drift).is_finite() else Vector4(0, 1, 0, 0)
 
 func set_enabled(value: bool) -> void:
 	input_enabled = value
 	if not value:
 		neutral_armed = false
-		_command = Vector3.ZERO
+		_command = Vector4.ZERO
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
 		_focused = false
 		neutral_armed = false
-		_command = Vector3.ZERO
+		_command = Vector4.ZERO
 	elif what == NOTIFICATION_APPLICATION_FOCUS_IN:
 		_focused = true
 
@@ -46,25 +74,28 @@ func _physics_process(delta: float) -> void:
 		command = read_machine_input()
 	if not input_enabled or not _focused:
 		neutral_armed = false
-	elif command.is_zero_approx():
+	elif Vector3(command.x, command.y, command.z).is_zero_approx():
 		neutral_armed = true
 	if not neutral_armed:
-		command = Vector3(0, 1, 0)
-	locomotion.set_commands(command.x, command.y, command.z)
-	var snapshot := locomotion.step(_body, delta, terrain_collision_mask)
+		command = Vector4(0, 1, 0, 0)
+	var solver := _active_solver()
+	solver.set_commands(command.x, command.y, command.z)
+	solver.set_drift(command.w)
+	var snapshot := solver.step(_body, delta, terrain_collision_mask)
 	if _animator != null:
 		_animator.apply_physics_snapshot(snapshot)
 
 func get_status_snapshot() -> Dictionary:
-	var result := locomotion.get_status_snapshot()
+	var result := _active_solver().get_status_snapshot()
 	result["neutral_armed"] = neutral_armed
+	result["race_mode"] = race_mode
 	return result
 
 ## Call after the owning scene resets/teleports its body, including model switches.
 func reset_motion() -> void:
 	neutral_armed = false
-	_command = Vector3.ZERO
-	locomotion.reset()
+	_command = Vector4.ZERO
+	_active_solver().reset()
 	if _animator != null:
 		_animator.reset_animation()
 
@@ -75,6 +106,7 @@ const INPUT_ACTIONS := {
 	"wheel_reverse": {"key": KEY_B, "button": JOY_BUTTON_LEFT_SHOULDER},
 	"wheel_right": {"key": KEY_N, "axis": JOY_AXIS_TRIGGER_RIGHT},
 	"wheel_left": {"key": KEY_V, "button": JOY_BUTTON_RIGHT_SHOULDER},
+	"wheel_drift": {"key": KEY_SHIFT, "button": JOY_BUTTON_A},
 }
 
 static func ensure_input_actions() -> void:
@@ -96,9 +128,10 @@ static func ensure_input_actions() -> void:
 			button.button_index = definition.button
 			InputMap.action_add_event(action, button)
 
-static func read_machine_input() -> Vector3:
-	return Vector3(
+static func read_machine_input() -> Vector4:
+	return Vector4(
 		Input.get_action_strength("wheel_forward") - Input.get_action_strength("wheel_reverse"),
 		float(Input.is_physical_key_pressed(KEY_SPACE)),
-		Input.get_action_strength("wheel_right") - Input.get_action_strength("wheel_left")
+		Input.get_action_strength("wheel_right") - Input.get_action_strength("wheel_left"),
+		Input.get_action_strength("wheel_drift")
 	)
