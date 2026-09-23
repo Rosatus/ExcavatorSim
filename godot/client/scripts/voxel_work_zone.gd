@@ -230,6 +230,8 @@ func _make_soil_material() -> ShaderMaterial:
 	material.set_shader_parameter("texture_albedo", visuals.ALBEDO)
 	material.set_shader_parameter("texture_normal", visuals.NORMAL_ROUGHNESS)
 	material.set_shader_parameter("soil_bounds", Vector4(layout.MIN_WORLD.x, layout.MIN_WORLD.z, layout.MAX_WORLD.x, layout.MAX_WORLD.z))
+	material.set_shader_parameter("initial_surface_y", layout.INITIAL_SURFACE_Y)
+	material.set_shader_parameter("starter_pit_depth", 0.6 if starter_pit else 0.0)
 	return material
 
 

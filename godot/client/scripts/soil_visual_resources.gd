@@ -1,24 +1,24 @@
 extends RefCounted
 
-const ALBEDO = preload("res://assets/terrain/textures/ground037_alb_ht.png")
-const NORMAL_ROUGHNESS = preload("res://assets/terrain/textures/ground037_nrm_rgh.png")
+const ALBEDO = preload("res://assets/terrain/textures/fine03/albedo.png")
+const NORMAL_ROUGHNESS = preload("res://assets/terrain/textures/fine03/normal_roughness.png")
 static var _clod_meshes: Dictionary = {}
 static var _dust_texture: ImageTexture
 
 
 static func surface_material(world_coordinates: bool = false) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.82, 0.72, 0.59)
+	material.albedo_color = Color(0.88, 0.84, 0.78)
 	material.albedo_texture = ALBEDO
-	material.roughness = 0.96
+	material.roughness = 1.0
 	material.roughness_texture = NORMAL_ROUGHNESS
 	material.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_ALPHA
 	material.normal_enabled = true
 	material.normal_texture = NORMAL_ROUGHNESS
-	material.normal_scale = 0.55
+	material.normal_scale = 0.65
 	material.uv1_triplanar = true
 	material.uv1_world_triplanar = world_coordinates
-	material.uv1_scale = Vector3.ONE * 1.4
+	material.uv1_scale = Vector3.ONE * 0.5
 	material.uv1_triplanar_sharpness = 4.0
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	return material
