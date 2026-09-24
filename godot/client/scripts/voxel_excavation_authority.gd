@@ -2503,37 +2503,52 @@ func _apply_support_cleanup(edit_area: AABB) -> Dictionary:
 	buffer.set_channel_depth(VoxelBuffer.CHANNEL_SDF, VoxelBuffer.DEPTH_16_BIT)
 	buffer.create(size.x, size.y, size.z)
 	_tool.copy(origin, buffer, SDF_CHANNEL_MASK, false)
-	# Only signs are needed. Read the native signed-16 channel once instead of
-	# calling get_voxel_f for every sample, then write only deleted samples.
-	# Untouched SDF bytes (including the support row) stay exactly unchanged.
-	var raw := buffer.get_channel_as_byte_array(VoxelBuffer.CHANNEL_SDF)
+	# Build signs natively, then search occupied runs instead of visiting every
+	# air sample in GDScript. Untouched SDF bytes and the support row stay exact.
+	var mask := VoxelBuffer.new()
+	mask.set_channel_depth(VoxelBuffer.CHANNEL_TYPE, VoxelBuffer.DEPTH_8_BIT)
+	mask.create(size.x, size.y, size.z)
+	mask.op_select_less_src_f_dst_i_values(buffer, VoxelBuffer.CHANNEL_SDF, 0.000001, 1, 0, VoxelBuffer.CHANNEL_TYPE)
+	var raw := mask.get_channel_as_byte_array(VoxelBuffer.CHANNEL_TYPE)
 	var deleted := 0
 	var columns := 0
+	var changed_min := size
+	var changed_max := Vector3i.ZERO
 	for lx in size.x:
 		for lz in size.z:
 			columns += 1
-			var column_start := (lz * size.x + lx) * size.y * 2
-			var below_solid := raw[column_start + 1] >= 0x80 or (raw[column_start + 1] == 0 and raw[column_start] == 0)
-			var deleting := false
-			for ly in range(1, size.y):
-				var index := column_start + ly * 2
-				if raw[index + 1] >= 0x80 or (raw[index + 1] == 0 and raw[index] == 0):
-					if deleting or not below_solid:
-						buffer.set_voxel_f(1.0, lx, ly, lz, VoxelBuffer.CHANNEL_SDF)
-						deleted += 1
-						deleting = true
-						below_solid = false
-					else:
-						below_solid = true
-				else:
-					below_solid = false
+			var column_start := (lz * size.x + lx) * size.y
+			var column := raw.slice(column_start, column_start + size.y)
+			# Native searches skip air runs. Preserve the legacy cap's first-row
+			# check on later columns, and never write the support reference row.
+			var end_y := size.y if deleted < MAX_SUPPORT_CLEANUP_SAMPLES else 2
+			var first_air := column.find(0)
+			if first_air < 0 or first_air >= end_y - 1:
+				continue
+			var run_start := column.find(1, first_air + 1)
+			while run_start >= 0 and run_start < end_y:
+				var run_end := column.find(0, run_start)
+				if run_end < 0:
+					run_end = end_y
+				run_end = mini(run_end, end_y)
+				run_end = mini(run_end, run_start + maxi(1, MAX_SUPPORT_CLEANUP_SAMPLES - deleted))
+				buffer.fill_area_f(1.0, Vector3i(lx, run_start, lz), Vector3i(lx + 1, run_end, lz + 1), VoxelBuffer.CHANNEL_SDF)
+				deleted += run_end - run_start
+				changed_min = changed_min.min(Vector3i(lx, run_start, lz))
+				changed_max = changed_max.max(Vector3i(lx + 1, run_end, lz + 1))
 				if deleted >= MAX_SUPPORT_CLEANUP_SAMPLES:
 					break
+				run_start = column.find(1, run_end)
 	result["deleted_samples"] = deleted
 	result["columns"] = columns
 	if deleted > 0:
-		_tool.paste(origin, buffer, SDF_CHANNEL_MASK)
-		result["area"] = AABB(Vector3(origin), Vector3(size))
+		var changed_size := changed_max - changed_min
+		var patch := VoxelBuffer.new()
+		patch.set_channel_depth(VoxelBuffer.CHANNEL_SDF, VoxelBuffer.DEPTH_16_BIT)
+		patch.create(changed_size.x, changed_size.y, changed_size.z)
+		patch.copy_channel_from_area(buffer, changed_min, changed_max, Vector3i.ZERO, VoxelBuffer.CHANNEL_SDF)
+		_tool.paste(origin + changed_min, patch, SDF_CHANNEL_MASK)
+		result["area"] = AABB(Vector3(origin + changed_min), Vector3(changed_size))
 	result["usec"] = _diagnostic_clock_usec() - started
 	return result
 

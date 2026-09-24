@@ -67,4 +67,3 @@ func _apply_support_cleanup(edit_area: AABB) -> Dictionary:
 		result["area"] = AABB(Vector3(origin), Vector3(size))
 	result["usec"] = _diagnostic_clock_usec() - started
 	return result
-
