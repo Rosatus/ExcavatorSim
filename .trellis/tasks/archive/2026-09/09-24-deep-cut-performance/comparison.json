@@ -1,0 +1,329 @@
+{
+  "fixed-replay-baseline": {
+    "pass": true,
+    "duration_ms": 42208.12,
+    "frames": 10272,
+    "metrics": {
+      "frame_interval_ms": {
+        "p95": 8.324,
+        "p99": 28.698,
+        "max": 161.215,
+        "sum": 42191.38399999996
+      },
+      "soil_total_ms": {
+        "p95": 0.973,
+        "p99": 16.995,
+        "max": 107.583,
+        "sum": 7720.381000000002
+      },
+      "soil_step_ms": {
+        "p95": 0.033,
+        "p99": 12.019,
+        "max": 75.0,
+        "sum": 3774.9550000000004
+      },
+      "soil_publish_ms": {
+        "p95": 0.002,
+        "p99": 0.979,
+        "max": 10.396,
+        "sum": 353.8009999999998
+      },
+      "coverage_ms": {
+        "p95": 0.0,
+        "p99": 7.367,
+        "max": 42.853,
+        "sum": 2277.5040000000004
+      },
+      "native_edit_ms": {
+        "p95": 0.0,
+        "p99": 3.772,
+        "max": 27.532,
+        "sum": 1217.9219999999998
+      },
+      "cut_prepare_ms": {
+        "p95": 0.0,
+        "p99": 0.0,
+        "max": 0.0,
+        "sum": 0.0
+      },
+      "render_gpu_ms": {
+        "p95": 1.46599996089935,
+        "p99": 1.71700000762939,
+        "max": 3.02500009536743,
+        "sum": 12988.72100520134
+      },
+      "physics_steps": {
+        "p95": 1.0,
+        "p99": 2.0,
+        "max": 8.0,
+        "sum": 2520.0
+      }
+    },
+    "replay": {
+      "applied_ticks": 2521,
+      "loops": 0,
+      "model_mismatch": false,
+      "path": "C:\\code\\ExcavatorSim\\backend\\fixtures\\soak\\sy135-deep-cut-42s.json",
+      "tick_count": 2521,
+      "yaw_divergence_final_deg": 0.00628428871368669,
+      "yaw_divergence_max_deg": 0.0403158565144395
+    },
+    "memory": {
+      "baseline_bytes": 612384768,
+      "peak_bytes": 653332480,
+      "growth_bytes": 40947712,
+      "growth_ratio": 0.066865987104369,
+      "sample_count": 84,
+      "measurement_started_seconds": 9.671999999991385
+    },
+    "stalls": {
+      "16.7": 159,
+      "33.3": 95,
+      "50": 77,
+      "100": 46
+    },
+    "max_queue": 1,
+    "max_age_ticks": 4,
+    "preparation": {
+      "age_usec": 0,
+      "budget_usec": 0,
+      "completed": 0,
+      "latency_max_usec": 0,
+      "oldest_age_ticks": 0,
+      "pending": false,
+      "restarts": 0,
+      "slice_max_usec": 0,
+      "threaded": false,
+      "worker_coverage_usec": 0,
+      "worker_edit_usec": 0
+    },
+    "end": {
+      "committed": 189,
+      "rejected": 2175,
+      "bucket_mass_q": 1056000000,
+      "conservation_error_q": 0,
+      "pending_readiness_count": 1,
+      "readiness_timed_out": 1
+    },
+    "max_conservation_error": 0,
+    "deposit_max_ms": 13.88
+  },
+  "threaded": {
+    "pass": true,
+    "duration_ms": 42011.467,
+    "frames": 11404,
+    "metrics": {
+      "frame_interval_ms": {
+        "p95": 10.715,
+        "p99": 18.435,
+        "max": 38.859,
+        "sum": 41995.129000000044
+      },
+      "soil_total_ms": {
+        "p95": 2.523,
+        "p99": 5.537,
+        "max": 25.883,
+        "sum": 4540.144999999999
+      },
+      "soil_step_ms": {
+        "p95": 0.06,
+        "p99": 1.308,
+        "max": 15.755,
+        "sum": 535.1410000000001
+      },
+      "soil_publish_ms": {
+        "p95": 0.002,
+        "p99": 0.974,
+        "max": 10.41,
+        "sum": 325.88599999999974
+      },
+      "coverage_ms": {
+        "p95": 0.0,
+        "p99": 0.002,
+        "max": 14.996,
+        "sum": 124.28699999999998
+      },
+      "native_edit_ms": {
+        "p95": 0.0,
+        "p99": 0.022,
+        "max": 0.05,
+        "sum": 4.613999999999998
+      },
+      "cut_prepare_ms": {
+        "p95": 0.004,
+        "p99": 0.844,
+        "max": 2.727,
+        "sum": 273.14299999999986
+      },
+      "render_gpu_ms": {
+        "p95": 1.34099996089935,
+        "p99": 1.53999996185303,
+        "max": 2.03099989891052,
+        "sum": 14285.326998353004
+      },
+      "physics_steps": {
+        "p95": 1.0,
+        "p99": 1.0,
+        "max": 2.0,
+        "sum": 2520.0
+      }
+    },
+    "replay": {
+      "applied_ticks": 2521,
+      "loops": 0,
+      "model_mismatch": false,
+      "path": "C:\\code\\ExcavatorSim\\backend\\fixtures\\soak\\sy135-deep-cut-42s.json",
+      "tick_count": 2521,
+      "yaw_divergence_final_deg": -0.00320052560579143,
+      "yaw_divergence_max_deg": 0.0464156324129021
+    },
+    "memory": {
+      "baseline_bytes": 614383616,
+      "peak_bytes": 662044672,
+      "growth_bytes": 47661056,
+      "growth_ratio": 0.07757540201072029,
+      "sample_count": 83,
+      "measurement_started_seconds": 9.671999999991385
+    },
+    "stalls": {
+      "16.7": 159,
+      "33.3": 6,
+      "50": 0,
+      "100": 0
+    },
+    "max_queue": 2,
+    "max_age_ticks": 4,
+    "preparation": {
+      "age_usec": 0,
+      "budget_usec": 3000,
+      "completed": 213,
+      "latency_max_usec": 44266,
+      "oldest_age_ticks": 0,
+      "pending": false,
+      "restarts": 0,
+      "slice_max_usec": 2723,
+      "threaded": true,
+      "worker_coverage_usec": 2389811,
+      "worker_edit_usec": 1368263
+    },
+    "end": {
+      "committed": 206,
+      "rejected": 2105,
+      "bucket_mass_q": 0,
+      "conservation_error_q": 0,
+      "pending_readiness_count": 3,
+      "readiness_timed_out": 1
+    },
+    "max_conservation_error": 0,
+    "deposit_max_ms": 15.507
+  },
+  "final": {
+    "pass": true,
+    "duration_ms": 42022.6,
+    "frames": 11520,
+    "metrics": {
+      "frame_interval_ms": {
+        "p95": 10.534,
+        "p99": 17.563,
+        "max": 37.03,
+        "sum": 42005.593
+      },
+      "soil_total_ms": {
+        "p95": 2.482,
+        "p99": 5.309,
+        "max": 17.962,
+        "sum": 4479.967999999996
+      },
+      "soil_step_ms": {
+        "p95": 0.072,
+        "p99": 1.309,
+        "max": 8.575,
+        "sum": 491.64599999999956
+      },
+      "soil_publish_ms": {
+        "p95": 0.002,
+        "p99": 0.96,
+        "max": 10.661,
+        "sum": 332.25999999999976
+      },
+      "coverage_ms": {
+        "p95": 0.0,
+        "p99": 0.002,
+        "max": 7.695,
+        "sum": 64.566
+      },
+      "native_edit_ms": {
+        "p95": 0.0,
+        "p99": 0.021,
+        "max": 0.07,
+        "sum": 4.530999999999998
+      },
+      "cut_prepare_ms": {
+        "p95": 0.004,
+        "p99": 0.82,
+        "max": 3.183,
+        "sum": 276.12
+      },
+      "render_gpu_ms": {
+        "p95": 1.34200000762939,
+        "p99": 1.52499997615814,
+        "max": 1.81299996376038,
+        "sum": 14392.345993340015
+      },
+      "physics_steps": {
+        "p95": 1.0,
+        "p99": 1.0,
+        "max": 2.0,
+        "sum": 2520.0
+      }
+    },
+    "replay": {
+      "applied_ticks": 2521,
+      "loops": 0,
+      "model_mismatch": false,
+      "path": "C:\\code\\ExcavatorSim\\backend\\fixtures\\soak\\sy135-deep-cut-42s.json",
+      "tick_count": 2521,
+      "yaw_divergence_final_deg": 0.00417583018463574,
+      "yaw_divergence_max_deg": 0.0364324663527782
+    },
+    "memory": {
+      "baseline_bytes": 615354368,
+      "peak_bytes": 662102016,
+      "growth_bytes": 46747648,
+      "growth_ratio": 0.0759686620116752,
+      "sample_count": 84,
+      "measurement_started_seconds": 9.64100000000326
+    },
+    "stalls": {
+      "16.7": 125,
+      "33.3": 5,
+      "50": 0,
+      "100": 0
+    },
+    "max_queue": 2,
+    "max_age_ticks": 4,
+    "preparation": {
+      "age_usec": 0,
+      "budget_usec": 3000,
+      "completed": 216,
+      "latency_max_usec": 43293,
+      "oldest_age_ticks": 0,
+      "pending": false,
+      "restarts": 0,
+      "slice_max_usec": 3183,
+      "threaded": true,
+      "worker_coverage_usec": 2387970,
+      "worker_edit_usec": 1348431
+    },
+    "end": {
+      "committed": 201,
+      "rejected": 2107,
+      "bucket_mass_q": 0,
+      "conservation_error_q": 0,
+      "pending_readiness_count": 4,
+      "readiness_timed_out": 1
+    },
+    "max_conservation_error": 0,
+    "deposit_max_ms": 8.291
+  }
+}
