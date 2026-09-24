@@ -26,6 +26,26 @@ def test_soak_cli_rejects_an_unknown_quality_profile() -> None:
     assert "invalid choice" in result.stderr
 
 
+def test_recorded_soak_requires_exact_single_fixed_tick_playback() -> None:
+    replay = {
+        "path": "sy135-deep-cut-42s.json", "tick_count": 2521,
+        "applied_ticks": 2521, "loops": 0, "model_mismatch": False,
+    }
+    report = {"scenario": {"replay": replay}}
+    gates = evaluate_godot_report(report, SoakBudgets(), "sy135", "balanced")
+    assert gates["replay_complete"]
+    assert not {"scenario_support", "reset_completed", "reconnect_completed"} & gates.keys()
+    assert not gates["scenario_cut"]
+    assert not gates["scenario_dump"]
+    for key, value in (("applied_ticks", 2520), ("applied_ticks", 2522),
+                       ("loops", 1), ("model_mismatch", True)):
+        invalid = dict(replay, **{key: value})
+        gates = evaluate_godot_report(
+            {"scenario": {"replay": invalid}}, SoakBudgets(), "sy135", "balanced"
+        )
+        assert not gates["replay_complete"]
+
+
 def test_godot_report_requires_performance_and_complete_scenario() -> None:
     report = {
         "schema_version": GODOT_REPORT_SCHEMA_VERSION,

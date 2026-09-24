@@ -93,6 +93,10 @@ func _run() -> void:
 	if observed_bucket_ground_mode != _bucket_ground_mode:
 		_failures.append("bucket-ground mode mismatch: requested=%s observed=%s" % [_bucket_ground_mode, observed_bucket_ground_mode])
 	var bucket_ground_work_before := _bucket_ground_work_snapshot(chassis, excavation, effects)
+	session.request_race_mode(false)
+	if bool(session.get_status_snapshot().get("race_mode_enabled", true)):
+		_finish({}, "race mode must be disabled for soak")
+		return
 	session.request_start()
 	await _wait_for_lifecycle(session, ProductSession.LIFECYCLE_RUNNING)
 	if not _replay_path.is_empty() and not _load_replay():
@@ -104,6 +108,11 @@ func _run() -> void:
 		while Engine.get_physics_frames() - settle_start < settle_ticks:
 			await physics_frame
 	_replay_base_tick = Engine.get_physics_frames()
+	var replay_callback := _apply_replay.bind(chassis)
+	if not _replay_equipment.is_empty():
+		# SceneTree emits this before node physics callbacks, including catch-up
+		# ticks. Render cadence must never skip or repeat recorded commands.
+		physics_frame.connect(replay_callback)
 	var capture := scene.get_node_or_null("PerformanceCapture") as PerformanceCapture
 	var capture_started := false
 	# Keep the benchmark independent of the user's persisted HUD preference.
@@ -151,11 +160,11 @@ func _run() -> void:
 	var reconnect_completed := false
 	var reset_started := false
 	var reconnect_started := false
-	while float(Time.get_ticks_usec() - started_usec) / 1_000_000.0 < _duration_seconds:
+	while (_replay_applied_ticks < _replay_equipment.size() if not _replay_equipment.is_empty() else float(Time.get_ticks_usec() - started_usec) / 1_000_000.0 < _duration_seconds):
 		var elapsed := float(Time.get_ticks_usec() - started_usec) / 1_000_000.0
 		if not capture_started and elapsed >= _warmup_seconds and capture != null:
 			capture_started = true
-			if not capture.start_capture(_report_path.get_base_dir().path_join("performance-captures"), minf(180.0, _duration_seconds - _warmup_seconds)):
+			if not capture.start_capture(_report_path.get_base_dir().path_join("performance-captures"), 180.0 if not _replay_equipment.is_empty() else minf(180.0, _duration_seconds - _warmup_seconds)):
 				_failures.append("performance capture failed: %s" % capture.last_error)
 		var phase_name := _scenario_phase_name(elapsed)
 		if not phase_diagnostics.has(phase_name):
@@ -173,8 +182,6 @@ func _run() -> void:
 		phase_diag["frames"] = int(phase_diag["frames"]) + 1
 		if _replay_equipment.is_empty():
 			_apply_scenario(chassis, excavation, elapsed)
-		else:
-			_apply_replay(chassis)
 		if _replay_equipment.is_empty() and not reset_started and elapsed >= _duration_seconds * 0.55:
 			reset_started = true
 			session.request_reset()
@@ -364,6 +371,8 @@ func _run() -> void:
 		if not last_error.is_empty():
 			_failures.append("motion client error: %s" % last_error)
 			break
+	if physics_frame.is_connected(replay_callback):
+		physics_frame.disconnect(replay_callback)
 	if capture != null and capture.recording:
 		if not capture.stop_capture("soak_complete"):
 			_failures.append("performance capture save failed: %s" % capture.last_error)
@@ -484,7 +493,7 @@ func _run() -> void:
 			_failures.append("scenario did not observe dump")
 		if maximum_payload_mass_kg <= 0.0:
 			_failures.append("scenario never carried a payload")
-		if support_frames == 0:
+		if support_frames == 0 and _replay_equipment.is_empty():
 			_failures.append("scenario never applied a support wrench")
 		contract_report["failures"] = _failures.duplicate()
 		contract_report["clean"] = final_contract_clean and _failures.is_empty()
@@ -544,12 +553,12 @@ func _apply_replay(chassis: TrackedChassisController) -> void:
 	var count := _replay_equipment.size()
 	if count == 0 or _replay_base_tick < 0:
 		return
-	var tick := Engine.get_physics_frames() - _replay_base_tick
-	if tick < 0:
+	if _replay_applied_ticks >= count:
+		chassis.set_commands_for_test(0.0, 0.0)
+		chassis.set_equipment_commands_for_test(Vector4.ZERO)
 		return
-	_replay_applied_ticks = maxi(_replay_applied_ticks, tick + 1)
-	_replay_loops = maxi(_replay_loops, int(tick / count))
-	var index := tick % count
+	var index := _replay_applied_ticks
+	_replay_applied_ticks += 1
 	var tr: Array = _replay_tracks[index]
 	var eq: Array = _replay_equipment[index]
 	chassis.set_commands_for_test(float(tr[0]), float(tr[1]))

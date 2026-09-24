@@ -83,6 +83,18 @@ def evaluate_godot_report(
         "reset_completed": bool(scenario.get("reset_completed", False)),
         "reconnect_completed": bool(scenario.get("reconnect_completed", False)),
     }
+    replay = _mapping(scenario.get("replay"))
+    if replay.get("path"):
+        # A recorded cut/dump does not include the scripted support/reset/
+        # reconnect phases. Verify its actual fixed-tick contract instead.
+        for name in ("scenario_support", "reset_completed", "reconnect_completed"):
+            gates.pop(name)
+        gates["replay_complete"] = (
+            int(replay.get("tick_count", 0)) > 0
+            and int(replay.get("applied_ticks", -1)) == int(replay["tick_count"])
+            and int(replay.get("loops", -1)) == 0
+            and not bool(replay.get("model_mismatch", True))
+        )
     if expected_bucket_ground_mode == "bucket_passthrough":
         gates.update(
             {

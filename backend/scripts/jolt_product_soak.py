@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import hashlib
 import json
 import os
 import platform
@@ -36,6 +37,7 @@ GODOT_TOOLCHAIN_CLI = ROOT / "tools/godot_voxel_toolchain.py"
 SOAK_SCRIPT = ROOT / "backend/scripts/godot/jolt_product_soak.gd"
 RECORDER_SCRIPT = ROOT / "backend/scripts/godot/jolt_input_recorder.gd"
 RECORDING_SCHEMA = "excavator-sim-input-recording-v1"
+CANONICAL_SOAK_TRACE = ROOT / "backend/fixtures/soak/sy135-deep-cut-42s.json"
 STARTUP_TIMEOUT_SECONDS = 120.0
 GODOT_STARTUP_TIMEOUT_SECONDS = 240.0
 PROCESS_QUERY_INFORMATION = 0x0400
@@ -59,12 +61,14 @@ class _ProcessMemoryCounters(ctypes.Structure):
 
 def main() -> int:
     args = _build_parser().parse_args()
+    if args.record is None and args.replay is None:
+        args.replay = CANONICAL_SOAK_TRACE
     duration_seconds = args.duration_seconds
     warmup_seconds = args.warmup_seconds
     if duration_seconds is None:
-        duration_seconds = 90.0 if args.mode == "quick" else 900.0
+        duration_seconds = 42.016666666666666 if args.record is None else 90.0
     if warmup_seconds is None:
-        warmup_seconds = 15.0 if args.mode == "quick" else 30.0
+        warmup_seconds = 0.0 if args.record is None else 15.0
     if duration_seconds <= 0.0 or warmup_seconds < 0.0 or warmup_seconds >= duration_seconds:
         raise SystemExit("duration must be positive and warmup must be within the run")
     godot_exe = _find_godot(args.godot_exe)
@@ -76,6 +80,10 @@ def main() -> int:
     )
     record_path = (
         args.record if args.record is None or args.record.is_absolute() else ROOT / args.record
+    )
+    trace_identity = (
+        f"{replay_path.name}:sha256:{hashlib.sha256(replay_path.read_bytes()).hexdigest()}"
+        if replay_path is not None else "bucket-ground-cycle-v1"
     )
     if record_path is not None:
         record_path.parent.mkdir(parents=True, exist_ok=True)
@@ -106,7 +114,7 @@ def main() -> int:
                             "quality_profile": quality_profile,
                             "repetition": repetition,
                             "bucket_ground_mode": bucket_ground_mode,
-                            "trace_identity": "bucket-ground-cycle-v1",
+                            "trace_identity": trace_identity,
                         }
                     )
                     model_reports.append(
@@ -116,7 +124,7 @@ def main() -> int:
                             bucket_ground_mode=bucket_ground_mode,
                             repetition=repetition,
                             run_ordinal=run_ordinal,
-                            trace_identity="bucket-ground-cycle-v1",
+                            trace_identity=trace_identity,
                             godot_exe=godot_exe,
                             duration_seconds=duration_seconds,
                             warmup_seconds=warmup_seconds,
@@ -185,7 +193,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--mode", choices=("quick", "release"), default="quick")
     parser.add_argument(
-        "--models", nargs="+", choices=("sy205", "sy135"), default=["sy205", "sy135"]
+        "--models", nargs="+", choices=("sy205", "sy135"), default=["sy135"]
     )
     parser.add_argument(
         "--quality-profile",
@@ -216,7 +224,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--replay-settle-seconds",
         type=float,
-        default=0.0,
+        default=5.0,
         help="wait this many seconds after RUNNING before applying the replayed trace "
         "(mirrors the recorder lead-in so the chassis is equally settled)",
     )
@@ -370,6 +378,9 @@ def _run_model(
         if allow_incomplete_scenario:
             godot_command.append("--allow-incomplete-scenario")
     samples: list[tuple[float, int]] = []
+    capture_dir = output_dir / "performance-captures"
+    existing_captures = set(capture_dir.glob("*.json"))
+    measurement_started: float | None = None
     health_samples = 0
     telemetry = {"accepted_batches": 0, "dropped_batches": 0, "maximum_history_count": 0}
     observed_model_id = ""
@@ -397,6 +408,10 @@ def _run_model(
                 deadline = time.monotonic() + duration_seconds + GODOT_STARTUP_TIMEOUT_SECONDS
                 while godot.poll() is None and time.monotonic() < deadline:
                     elapsed = time.monotonic() - started
+                    if measurement_started is None and (
+                        set(capture_dir.glob("*.json")) - existing_captures
+                    ):
+                        measurement_started = elapsed
                     samples.append((elapsed, _working_set(backend.pid) + _working_set(godot.pid)))
                     health = _read_json(health_url)
                     if health is not None:
@@ -426,7 +441,12 @@ def _run_model(
         finally:
             _terminate(backend)
     godot_report = _load_report(godot_report_path)
-    memory = _memory_summary(samples, warmup_seconds)
+    memory = _memory_summary(
+        samples, measurement_started if measurement_started is not None else warmup_seconds
+    )
+    memory["measurement_started_seconds"] = (
+        measurement_started if measurement_started is not None else -1.0
+    )
     gateway_report: dict[str, Any] = {
         "health_samples": health_samples,
         "model_id": observed_model_id,
@@ -446,12 +466,6 @@ def _run_model(
             godot_report, budgets, model_id, quality_profile, bucket_ground_mode
         )
         gates.update(evaluate_gateway_report(gateway_report, budgets, model_id))
-        if replay_path is not None:
-            # Replay keeps the input trace on one timeline; the scripted reset /
-            # reconnect interlude is intentionally skipped, so its gates relax.
-            for name in ("reset_completed", "reconnect_completed"):
-                if name in gates:
-                    gates[name] = True
     gates["godot_process_exit"] = godot_exit_code == 0
     gates["rendered_product_path"] = not headless or record_path is not None
     if allow_incomplete_scenario:
