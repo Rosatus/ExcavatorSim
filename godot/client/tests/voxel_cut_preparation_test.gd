@@ -23,6 +23,9 @@ class BudgetAuthority extends VoxelExcavationAuthority:
 
 func _run() -> void:
 	var failures: Array[String] = []
+	var product := (load("res://scenes/main.tscn") as PackedScene).instantiate()
+	_expect(product.get_node("TerrainRoot/ExcavationWorld").threaded_cut_preparation_enabled, "product scene actually enables threaded preparation after script attachment", failures)
+	product.free()
 	var reference := await _run_cadence(PackedFloat32Array([0.05]))
 	var budgeted := BudgetAuthority.new()
 	budgeted.cut_preparation_budget_usec = 250
