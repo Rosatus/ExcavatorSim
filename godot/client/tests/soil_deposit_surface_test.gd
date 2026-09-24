@@ -1,11 +1,13 @@
 extends "res://tests/voxel_excavation_authority_test.gd"
 
 const Surface = preload("res://scripts/soil_deposit_surface.gd")
+const LegacySurface = preload("res://tests/fixtures/legacy_soil_deposit_surface.gd")
 
 
 func _run() -> void:
 	var failures: Array[String] = []
 	_check_surface_solver(failures)
+	_check_routing_parity(failures)
 	await _check_pit_edge_commits(failures)
 	await _check_recorded_pit(failures)
 	for failure in failures:
@@ -13,6 +15,29 @@ func _run() -> void:
 	if failures.is_empty():
 		print("PASS deposit surface: source routing, barriers, volume, slope, pit-edge unloading")
 	quit(0 if failures.is_empty() else 1)
+
+
+func _check_routing_parity(failures: Array[String]) -> void:
+	# Freeze the pre-optimization solver to protect traversal/tie order and
+	# floating-point accumulation, not merely total volume or mound shape.
+	var side := 33
+	for shape in 5:
+		var heights := PackedFloat64Array()
+		heights.resize(side * side)
+		for z in side:
+			for x in side:
+				var height := 0.0
+				match shape:
+					1: height = -16.0 if x < 16 else 0.0
+					2: height = 12.0 if x == 19 else (-20.0 if x > 19 else 0.0)
+					3: height = INF if x < 4 or z < 4 else float((x * 17 + z * 7) % 9) * 0.1
+					4: height = 100.0 + sin(float(x) * 0.3) + cos(float(z) * 0.2)
+				heights[z * side + x] = height
+		for source in [Vector2(16.3, 16.1), Vector2(2, 16)]:
+			for volume in [0.0001, 30.0, 200.0]:
+				var expected := LegacySurface.plan(heights, side, source, volume, tan(deg_to_rad(35.0)))
+				var actual := Surface.plan(heights, side, source, volume, tan(deg_to_rad(35.0)))
+				_expect(actual == expected, "routing preserves exact additions, boundary, step count and budget outcome", failures)
 
 
 func _check_surface_solver(failures: Array[String]) -> void:

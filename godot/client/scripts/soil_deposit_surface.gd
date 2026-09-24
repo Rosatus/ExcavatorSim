@@ -32,6 +32,13 @@ static func plan(
 	var remaining := volume
 	var steps := 0
 	var cursor := start
+	# The stencil and repose rise do not change during a disposable plan.
+	# Avoid Vector2i/Variant arithmetic and square roots on every route step.
+	var neighbor_offsets := PackedInt32Array()
+	var neighbor_rises := PackedFloat64Array()
+	for offset in NEIGHBORS:
+		neighbor_offsets.append(offset.y * side + offset.x)
+		neighbor_rises.append(slope * (1.0 if offset.x == 0 or offset.y == 0 else sqrt(2.0)))
 	while remaining > 0.000000001 and steps < MAX_ROUTE_STEPS:
 		steps += 1
 		var x := cursor % side
@@ -42,10 +49,9 @@ static func plan(
 			return {"boundary_active": true}
 		var lowest := INF
 		var next := -1
-		for offset in NEIGHBORS:
-			var neighbor: int = (z + offset.y) * side + x + offset.x
-			var distance := 1.0 if offset.x == 0 or offset.y == 0 else sqrt(2.0)
-			var threshold := surface[neighbor] + slope * distance
+		for index in neighbor_offsets.size():
+			var neighbor := cursor + neighbor_offsets[index]
+			var threshold := surface[neighbor] + neighbor_rises[index]
 			if threshold < lowest:
 				lowest = threshold
 				next = neighbor

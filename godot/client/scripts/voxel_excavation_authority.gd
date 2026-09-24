@@ -1710,7 +1710,14 @@ func _sample_deposit_surface_domain(center: Vector2i, radius: int, previous: Dic
 	# One native read per domain. Scanning scalar terrain queries would lock/
 	# look up a block for every air voxel above every receiving column.
 	_tool.copy(origin, buffer, SDF_CHANNEL_MASK, false)
-	var raw := buffer.get_channel_as_byte_array(VoxelBuffer.CHANNEL_SDF)
+	# Signed 16-bit SDF has no positive value below this threshold. Classify
+	# once natively, then find each column's last solid sample without a
+	# GDScript loop over its air height. The two interpolated SDF reads stay exact.
+	var mask := VoxelBuffer.new()
+	mask.set_channel_depth(VoxelBuffer.CHANNEL_TYPE, VoxelBuffer.DEPTH_8_BIT)
+	mask.create(side, sy, side)
+	mask.op_select_less_src_f_dst_i_values(buffer, VoxelBuffer.CHANNEL_SDF, 0.000001, 1, 0, VoxelBuffer.CHANNEL_TYPE)
+	var solid := mask.get_channel_as_byte_array(VoxelBuffer.CHANNEL_TYPE)
 	var heights := PackedFloat64Array()
 	var gradients := PackedFloat32Array()
 	heights.resize(side * side)
@@ -1732,16 +1739,8 @@ func _sample_deposit_surface_domain(center: Vector2i, radius: int, previous: Dic
 			if not editable.has_point(world):
 				heights[i] = INF
 				continue
-			var column_offset := (z * side + x) * sy * 2
-			var hit_y := -1
-			# Same [z][x][y], signed-16 SDF layout as native coverage. Read only
-			# signs during the scan, then decode the two actual surface samples.
-			for y in range(sy - 1, -1, -1):
-				var byte_index := column_offset + y * 2
-				var hi := raw[byte_index + 1]
-				if hi >= 0x80 or (hi == 0 and raw[byte_index] == 0):
-					hit_y = y
-					break
+			var column_offset := (z * side + x) * sy
+			var hit_y := solid.slice(column_offset, column_offset + sy).rfind(1)
 			if hit_y < 0 or hit_y == sy - 1:
 				return {"valid": false, "reason": "dump_surface_support_unavailable"}
 			var sdf := buffer.get_voxel_f(x, hit_y, z, VoxelBuffer.CHANNEL_SDF)
