@@ -312,6 +312,22 @@ func set_bucket_ground_mode(value: String) -> bool:
 	return true
 
 
+## Simple-digging mode (production assist option): soil cut into the bucket
+## can never leave it — the authority's dump gate is held closed — and a full
+## bucket never blocks cutting. Capacity already overflows into discarded
+## mass (capacity_clipped), so cutting continues unbounded; the mode only
+## needs to suppress dumping. Re-applied after every authority rebuild.
+var simple_digging_enabled := false
+
+
+func set_simple_digging_enabled(value: bool) -> bool:
+	simple_digging_enabled = value
+	if _voxel_authority != null:
+		_voxel_authority.set_dump_gate_enabled(not value)
+	excavation_changed.emit(get_status_snapshot())
+	return true
+
+
 func can_set_voxel_unlimited_bucket_for_testing() -> bool:
 	return _selected_soil_mode() == "voxel" \
 		and _voxel_authority != null and _voxel_authority.configured
@@ -439,6 +455,7 @@ func get_status_snapshot() -> Dictionary:
 	status["soil_surface_solver_mode"] = _selected_soil_solver_mode()
 	status["requested_soil_surface_solver_mode"] = soil_surface_solver_mode
 	status["voxel_unlimited_bucket_for_testing"] = voxel_unlimited_bucket_for_testing
+	status["simple_digging_enabled"] = simple_digging_enabled
 	status["voxel_diagnostics_enabled"] = voxel_diagnostics_enabled
 	status["voxel_unlimited_bucket_toggle_available"] = can_set_voxel_unlimited_bucket_for_testing()
 	status["voxel_capacity_override_error"] = _last_voxel_capacity_override_error
@@ -986,6 +1003,7 @@ func _ensure_voxel_authority() -> bool:
 	_voxel_authority.threaded_cut_preparation = threaded_cut_preparation_enabled
 	_voxel_authority.set_diagnostics_enabled(voxel_diagnostics_enabled)
 	_voxel_authority.performance_timing_enabled = performance_capture_enabled
+	_voxel_authority.set_dump_gate_enabled(not simple_digging_enabled)
 	var capacity_override := TEST_BUCKET_CAPACITY_M3 if voxel_unlimited_bucket_for_testing else 0.0
 	return _voxel_authority.configure(
 		voxel_work_zone,

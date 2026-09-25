@@ -71,6 +71,7 @@ var _previous_solid_world := Transform3D.IDENTITY
 var _assist_pipeline := AssistPipeline.new()
 var _assist_context: Dictionary = {}
 var _assist_enable: Dictionary = {}
+var _assist_relaxed := false
 var _assist_configured := false
 # Cached level-assist reach band: the flat profile tracks the live forward
 # axis, so its swept envelope is nearly invariant in profile space. Re-sweep
@@ -475,6 +476,12 @@ func is_equipment_assist_enabled(stage_name: String) -> bool:
 ## Runtime parameter injection for stages whose task is parameterized after
 ## configure (the confirmed slope profile arrives here from the controller).
 func set_equipment_assist_params(stage_name: String, params: Dictionary) -> bool:
+	# The relaxed-attitude toggle is a durable user option: persist it so a
+	# configure() rebuild re-arms it; the single-use slope profile is NOT
+	# persisted — replaying a consumed profile after a model switch would
+	# re-anchor a stale surface.
+	if params.has("relaxed_attitude"):
+		_assist_relaxed = bool(params.get("relaxed_attitude"))
 	if not _assist_configured:
 		return false
 	return _assist_pipeline.set_stage_params(stage_name, params)
@@ -980,6 +987,9 @@ func _build_rig() -> bool:
 	_assist_configured = _assist_pipeline.configure(_descriptor, _soil_contract, model_id)
 	for stage_name in _assist_enable.keys():
 		_assist_pipeline.set_stage_enabled(String(stage_name), bool(_assist_enable[stage_name]))
+	if _assist_relaxed:
+		for stage_name in ["bucket_level", "slope_grade"]:
+			_assist_pipeline.set_stage_params(stage_name, {"relaxed_attitude": true})
 	if not _solid_contacts.configure(_soil_contract, _layer_mask(int(_descriptor["collision_layers"]["terrain"]))):
 		return false
 	return _bucket_sweeper.configure(

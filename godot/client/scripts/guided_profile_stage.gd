@@ -32,6 +32,11 @@ var dls_lambda := 0.08
 ## Flag namespace emitted by this stage ("level_assist", "slope_assist");
 ## concrete stages set it in configure before calling super.
 var flag_prefix := "assist"
+## Relaxed mode: when the held-attitude solve hits a kinematic bound, the
+## pitch row is dropped and the 2x3 fallback keeps riding the surface while
+## the bucket angle floats free. The attitude reference tracks the measured
+## angle on relaxed ticks so re-engaging the constraint cannot snap.
+var relaxed_attitude := false
 
 var _attitude_ref := 0.0
 var _active := false
@@ -70,6 +75,14 @@ func configure(_descriptor: Dictionary, _soil_contract: Dictionary, params: Dict
 		set(field, value)
 	configured = true
 	reset("configured")
+	return true
+
+
+## Shared runtime knobs pushed via set_stage_params; slope adds its
+## confirmed profile on top of these.
+func apply_params(params: Dictionary) -> bool:
+	if params.has("relaxed_attitude"):
+		relaxed_attitude = bool(params.get("relaxed_attitude"))
 	return true
 
 
@@ -202,7 +215,6 @@ func step(ctx: RefCounted, commands: Vector4) -> Dictionary:
 	var rates := Solver.solve_dls(jacobian, desired, dls_lambda)
 	_solve_count += 1
 	var solved := Solver.rates_to_commands(rates, ctx, WORK_JOINTS)
-	var commands_out := solved.get("commands", Vector3.ZERO) as Vector3
 	var debug := solved.get("debug", {}) as Dictionary
 	_debug_rates = debug.get("rates", Vector3.ZERO)
 	_debug_lo = debug.get("lo", Vector3.ZERO)
@@ -210,6 +222,45 @@ func step(ctx: RefCounted, commands: Vector4) -> Dictionary:
 	_debug_v0 = debug.get("v0", Vector3.ZERO)
 	_debug_blocked = String(debug.get("blocked_joint", ""))
 	var blocked := int(solved.get("blocked", Solver.BLOCKED_NONE))
+	if blocked == Solver.BLOCKED_KINEMATIC and relaxed_attitude:
+		# Relaxed mode: the pitch row demanded a joint past its bound, so
+		# drop it and re-solve height+intent only — the bucket angle floats
+		# free (continuously, via DLS's least-norm rates) and the pass keeps
+		# extending along the surface. Any joint whose solved rate pushes past
+		# a kinematic bound (reach <= 0) is also removed from the fallback
+		# Jacobian — least-norm rates would otherwise still push it into its
+		# limit and re-block — and the solve retries until it passes or no
+		# saturated column remains. Adopting the live attitude as the
+		# reference keeps re-engagement snap-free when the corner clears.
+		var j_relaxed: Array = [(jacobian[0] as Array).duplicate(), (jacobian[1] as Array).duplicate()]
+		var desired2 := Vector2(desired.x, desired.y)
+		for _attempt in WORK_JOINTS.size():
+			var free_rates := Solver.solve_dls_2x3(j_relaxed, desired2, dls_lambda)
+			var free := Solver.rates_to_commands(free_rates, ctx, WORK_JOINTS)
+			if int(free.get("blocked", Solver.BLOCKED_KINEMATIC)) == Solver.BLOCKED_NONE:
+				solved = free
+				blocked = Solver.BLOCKED_NONE
+				_attitude_ref = ctx.bucket_attitude_rad()
+				flags.append("%s_relaxed" % flag_prefix)
+				break
+			var free_debug := free.get("debug", {}) as Dictionary
+			var free_lo := free_debug.get("lo", Vector3.ZERO) as Vector3
+			var free_hi := free_debug.get("hi", Vector3.ZERO) as Vector3
+			var rate_list := [free_rates.x, free_rates.y, free_rates.z]
+			var lo_list := [free_lo.x, free_lo.y, free_lo.z]
+			var hi_list := [free_hi.x, free_hi.y, free_hi.z]
+			var dropped := false
+			for index in WORK_JOINTS.size():
+				var rate := float(rate_list[index])
+				if absf(rate) <= Solver.RATE_EPS:
+					continue
+				var reach: float = float(hi_list[index]) / rate if rate > 0.0 else float(lo_list[index]) / rate
+				if reach <= Solver.SINGULAR_EPS:
+					j_relaxed[0][index] = 0.0
+					j_relaxed[1][index] = 0.0
+					dropped = true
+			if not dropped:
+				break
 	if blocked != Solver.BLOCKED_NONE:
 		# Stopping at a real kinematic bound must not deadlock the corner:
 		# relatching collapses the correction terms to zero, so the next solve
@@ -231,6 +282,7 @@ func step(ctx: RefCounted, commands: Vector4) -> Dictionary:
 		out.w = 0.0
 		return {"commands": out, "scale": 1.0, "flags": flags}
 	_last_scale = float(solved.get("scale", 1.0))
+	var commands_out := solved.get("commands", Vector3.ZERO) as Vector3
 	out.y = commands_out.x
 	out.z = commands_out.y
 	out.w = commands_out.z

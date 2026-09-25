@@ -38,6 +38,8 @@ var requested_bucket_ground_mode := BucketGroundInteractionMode.NORMAL
 var bucket_ground_transition_sequence := 0
 var level_assist_enabled := false
 var race_mode_enabled := false
+var relaxed_assist_enabled := false
+var simple_digging_enabled := false
 
 var _presentation: MotionPresentation
 var _motion_client: MotionClient
@@ -55,7 +57,11 @@ func _ready() -> void:
 	_chassis = get_node_or_null(chassis_path) as TrackedChassisController
 	if _chassis != null and race_mode_enabled:
 		_chassis.set_race_mode(race_mode_enabled)
+	if _chassis != null and relaxed_assist_enabled:
+		_chassis.set_relaxed_assist_enabled(relaxed_assist_enabled)
 	_excavation = get_node_or_null(excavation_world_path) as ExcavationWorld
+	if _excavation != null and simple_digging_enabled:
+		_excavation.set_simple_digging_enabled(simple_digging_enabled)
 	_attachment_rig = get_node_or_null(attachment_rig_path) as AttachmentRig
 	if _attachment_rig != null:
 		_attachment_rig.attachment_activated.connect(_on_attachment_activated)
@@ -282,6 +288,32 @@ func request_race_mode(enabled: bool) -> bool:
 	return true
 
 
+## Relaxed-assist option: guided stages drop the held bucket-angle constraint
+## at kinematic bounds so surface tracking extends past the corner. Strict
+## attitude hold stays the default; the flag survives configure() rebuilds.
+func request_relaxed_assist(enabled: bool) -> bool:
+	relaxed_assist_enabled = enabled
+	if _chassis != null:
+		_chassis.set_relaxed_assist_enabled(enabled)
+		relaxed_assist_enabled = _chassis.relaxed_assist_enabled
+	last_error.clear()
+	status_changed.emit(get_status_snapshot())
+	return true
+
+
+## Simple-digging option: contained soil can never leave the bucket and a
+## full bucket never blocks cutting (overflow is discarded mass), so the tool
+## behaves as a cut-only black hole. Applies to the voxel authority path.
+func request_simple_digging(enabled: bool) -> bool:
+	simple_digging_enabled = enabled
+	if _excavation != null:
+		_excavation.set_simple_digging_enabled(enabled)
+		simple_digging_enabled = _excavation.simple_digging_enabled
+	last_error.clear()
+	status_changed.emit(get_status_snapshot())
+	return true
+
+
 ## Slope-assist state machine mirror of the chassis controller: advance moves
 ## off -> preview -> active -> off (same as the T/Enter keys), cancel drops
 ## back to off from any state (same as Esc during preview).
@@ -347,6 +379,8 @@ func get_status_snapshot() -> Dictionary:
 		"bucket_ground_transition_sequence": bucket_ground_transition_sequence,
 		"level_assist_enabled": _chassis.level_assist_enabled if _chassis != null else level_assist_enabled,
 		"race_mode_enabled": _chassis.race_mode_enabled if _chassis != null else race_mode_enabled,
+		"relaxed_assist_enabled": _chassis.relaxed_assist_enabled if _chassis != null else relaxed_assist_enabled,
+		"simple_digging_enabled": _excavation.simple_digging_enabled if _excavation != null else simple_digging_enabled,
 		"slope_assist": _chassis.slope_status_snapshot() if _chassis != null else {"state": "off"},
 		"assist_menu": _chassis.assist_menu_snapshot() if _chassis != null else {"open": false, "index": 0, "entries": []},
 		"assist_view": _chassis.assist_view_snapshot() if _chassis != null else {},

@@ -39,6 +39,7 @@ const MENU_NAV_THRESHOLD := 0.5
 @export var use_jolt_support_hints := true
 @export var digging_response_enabled := true
 @export var level_assist_enabled := false
+var relaxed_assist_enabled := false
 @export var jolt_probe_height_m := 4.0
 @export var jolt_hint_max_error_m := 0.2
 @export_flags_3d_physics var terrain_collision_mask := 1
@@ -306,6 +307,7 @@ func get_status_snapshot() -> Dictionary:
 	status["digging_response"] = _digging_response.get_status_snapshot()
 	status["bucket_ground_mode"] = _bucket_ground_mode
 	status["level_assist_enabled"] = level_assist_enabled
+	status["relaxed_assist_enabled"] = relaxed_assist_enabled
 	status["slope_assist"] = slope_status_snapshot()
 	status["assist_menu"] = assist_menu_snapshot()
 	status["assist_view"] = _assist_view_cache
@@ -336,6 +338,21 @@ func set_digging_response_enabled(value: bool) -> void:
 		_jolt_runtime.set_external_digging_response_enabled(
 			value and _digging_response.configured and not _bucket_ground_bypassed()
 		)
+
+
+## Relaxed-assist option (menu toggle, persisted): both guided stages drop
+## the held bucket-angle constraint at kinematic bounds instead of stalling,
+## so surface tracking keeps extending past the corner. The runtime keeps
+## the flag across configure() rebuilds.
+func set_relaxed_assist_enabled(value: bool) -> bool:
+	relaxed_assist_enabled = value
+	if _jolt_runtime == null:
+		return false
+	var ok := true
+	for stage_name in ["bucket_level", "slope_grade"]:
+		ok = _jolt_runtime.set_equipment_assist_params(
+				stage_name, {"relaxed_attitude": value}) and ok
+	return ok
 
 
 func set_level_assist_enabled(value: bool) -> bool:

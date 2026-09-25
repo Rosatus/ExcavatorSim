@@ -143,6 +143,7 @@ var _dump_pose_valid := false
 var _opening_down_dot := -1.0
 var _contract_dump_threshold := SoilContractDescriptor.MIN_DUMP_OPENING_DOWN_DOT
 var _effective_dump_threshold := SoilContractDescriptor.MIN_DUMP_OPENING_DOWN_DOT
+var _dump_gate_enabled := true
 var _dump_gate_raw_active := false
 var _dump_gate_active := false
 var _dump_gate_hold_s := 0.0
@@ -210,6 +211,18 @@ func set_bucket_capacity_override_for_testing(capacity_override_m3: float) -> Di
 	if not configured:
 		return {"accepted": false, "reason": "authority_unavailable"}
 	return material_field.set_bucket_capacity_override_for_testing(capacity_override_m3)
+
+
+## Simple-digging mode: the dump gate can never open, so no dump proposal is
+## built and staged deposit transactions fail admission — contained soil
+## cannot leave the bucket by any path. Cutting is unaffected.
+func set_dump_gate_enabled(value: bool) -> void:
+	_dump_gate_enabled = value
+	if not value:
+		_dump_gate_raw_active = false
+		_dump_gate_active = false
+		_dump_gate_hold_s = 0.0
+		_cancel_uncommitted_dumps("dump_gate_disabled")
 
 
 func clear() -> void:
@@ -1401,6 +1414,15 @@ func submit_track_compaction(_chassis_status: Dictionary) -> Dictionary:
 
 func _update_dump_gate_diagnostics(pose_snapshot: Dictionary, delta_s: float) -> void:
 	_dump_pose_valid = bool(pose_snapshot.get("valid", false))
+	# Simple-digging mode never opens the gate: no proposal can be built and
+	# staged deposit transactions keep failing admission, so contained soil
+	# can only ever stay in the bucket.
+	if not _dump_gate_enabled:
+		_opening_down_dot = -1.0
+		_dump_gate_raw_active = false
+		_dump_gate_active = false
+		_dump_gate_hold_s = 0.0
+		return
 	var contract := pose_snapshot.get("contract", {}) as Dictionary
 	var interaction := contract.get("interaction", {}) as Dictionary
 	_contract_dump_threshold = float(interaction.get(

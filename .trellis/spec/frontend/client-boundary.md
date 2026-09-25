@@ -320,6 +320,12 @@ ProductSession.cancel_slope_assist() -> void
 ProductSession.open_assist_menu() -> void
 ProductSession.close_assist_menu() -> void
 ProductSession.activate_assist_entry(index: int) -> String
+ProductSession.request_relaxed_assist(enabled: bool) -> bool
+ProductSession.request_simple_digging(enabled: bool) -> bool
+TrackedChassisController.set_relaxed_assist_enabled(enabled: bool) -> bool
+ExcavationWorld.set_simple_digging_enabled(enabled: bool) -> bool
+VoxelExcavationAuthority.set_dump_gate_enabled(enabled: bool) -> void
+AssistRateSolver.solve_dls_2x3(jacobian: Array, desired: Vector2, lambda: float) -> Vector3
 JoltChassisTrackRuntime.set_bucket_payload(mass_kg: float, center_of_mass_local: Vector3, identity: int) -> bool
 JoltChassisTrackRuntime.stop_motion() -> void
 JoltChassisTrackRuntime.reset(spawn_global_transform: Transform3D) -> void

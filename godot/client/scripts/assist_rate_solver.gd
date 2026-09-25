@@ -55,6 +55,34 @@ static func solve_dls(jacobian: Array, desired: Vector3, lambda: float) -> Vecto
 	)
 
 
+## Rectangular fallback for relaxed assists: J is 2x3 (vertical + intent
+## rows; the pitch constraint is dropped), so (J J^T + lambda^2 I) is 2x2
+## and inverted directly. Same DLS form: rates = J^T w.
+static func solve_dls_2x3(jacobian: Array, desired: Vector2, lambda: float) -> Vector3:
+	var a := 0.0
+	var b := 0.0
+	var c := 0.0
+	for k in 3:
+		var r0 := float(jacobian[0][k])
+		var r1 := float(jacobian[1][k])
+		a += r0 * r0
+		b += r0 * r1
+		c += r1 * r1
+	a += lambda * lambda
+	c += lambda * lambda
+	var det := a * c - b * b
+	if absf(det) < 1e-12:
+		return Vector3.ZERO
+	var inv := 1.0 / det
+	var w0 := (c * desired.x - b * desired.y) * inv
+	var w1 := (-b * desired.x + a * desired.y) * inv
+	return Vector3(
+		float(jacobian[0][0]) * w0 + float(jacobian[1][0]) * w1,
+		float(jacobian[0][1]) * w0 + float(jacobian[1][1]) * w1,
+		float(jacobian[0][2]) * w0 + float(jacobian[1][2]) * w1,
+	)
+
+
 ## Exact inverse of a symmetric positive definite 3x3 via the adjugate; the
 ## damping term guarantees a non-zero determinant.
 static func _solve3x3(m: Array, rhs: Vector3) -> Vector3:

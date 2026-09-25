@@ -42,6 +42,15 @@ pixi run python backend/scripts/sync_sy205_joint_contract.py [--check]
   one tick — is `level_assist_reversing`: the same zero output brakes it, but
   setpoints are held so feedback pulls the coast excursion back instead of
   ratifying it. Neither state latches; every tick is re-judged.
+- Relaxed assist (advanced settings opt-in, `relaxed_attitude` stage knob via
+  `set_stage_params`, forwarded by both guided stages) changes only the
+  kinematic-bound response: on `BLOCKED_KINEMATIC` the pitch row is dropped
+  and a damped 2x3 solve keeps tracking surface height + along-axis intent
+  (`Solver.solve_dls_2x3`); any joint whose least-norm rate would still push
+  past a bound has its Jacobian column zeroed and the solve retried. The flag
+  becomes `<prefix>_relaxed`, the bucket angle floats continuously, and the
+  attitude reference re-latches to the live angle every relaxed tick so a
+  later strict solve cannot snap. Strict (default) keeps the 3x3 stall.
 - The assist tracks constraints by *integrator inversion*, not blind rate
   commands: `EquipmentKinematicsContext` mirrors `propose_step`'s cut/limit
   multipliers and the accel/jerk `move_toward` chain, and the stage scales

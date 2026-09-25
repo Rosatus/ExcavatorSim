@@ -101,6 +101,8 @@ var _gateway_port_edit: LineEdit
 var _unlimited_bucket_button: CheckButton
 var _cutting_diagnostics_button: CheckButton
 var _race_mode_button: CheckButton
+var _relaxed_assist_button: CheckButton
+var _simple_digging_button: CheckButton
 
 const GATEWAY_CONFIG_PATH := "user://ict_config.cfg"
 var _bucket_volume_label: Label
@@ -185,6 +187,8 @@ func _bind_controls() -> void:
 	_unlimited_bucket_button = $StatusPanel/Margin/VBox/AdvancedPanel/UnlimitedBucketCapacity
 	_cutting_diagnostics_button = $StatusPanel/Margin/VBox/AdvancedPanel/CuttingDiagnostics
 	_race_mode_button = $StatusPanel/Margin/VBox/AdvancedPanel/RaceMode
+	_relaxed_assist_button = $StatusPanel/Margin/VBox/AdvancedPanel/RelaxedAssist
+	_simple_digging_button = $StatusPanel/Margin/VBox/AdvancedPanel/SimpleDigging
 	_bucket_volume_label = $StatusPanel/Margin/VBox/AdvancedPanel/BucketVolume
 	_advanced_panel = $StatusPanel/Margin/VBox/AdvancedPanel
 	_reset_button = $StatusPanel/Margin/VBox/Actions/Reset
@@ -214,6 +218,8 @@ func _connect_controls() -> void:
 	_unlimited_bucket_button.toggled.connect(_on_unlimited_bucket_toggled)
 	_cutting_diagnostics_button.toggled.connect(_on_cutting_diagnostics_toggled)
 	_race_mode_button.toggled.connect(_on_race_mode_toggled)
+	_relaxed_assist_button.toggled.connect(_on_relaxed_assist_toggled)
+	_simple_digging_button.toggled.connect(_on_simple_digging_toggled)
 	_can_output_button.pressed.connect(_on_can_output_pressed)
 	_gateway_button.pressed.connect(_on_gateway_restart_pressed)
 	_timed_can_button.pressed.connect(_on_timed_can_pressed)
@@ -274,6 +280,7 @@ func _ready() -> void:
 	_set_panel_collapsed(true)
 	_sync_test_graphics_toggle()
 	_load_race_mode()
+	_load_assist_options()
 	_guide_panel.visible = false
 	_build_assist_menu()
 	_build_slope_side_view()
@@ -691,6 +698,8 @@ func get_control_for_test(id: String) -> Control:
 		"video_page": (_menu["tabs"] as TabContainer).get_tab_control(3),
 		"window_mode_selector": _menu.get("window_mode_selector"),
 		"fps_limit_selector": _menu.get("fps_limit_selector"),
+		"relaxed_assist": _relaxed_assist_button,
+		"simple_digging": _simple_digging_button,
 	}.get(id) as Control
 
 
@@ -941,6 +950,42 @@ func _sync_race_mode_toggle() -> void:
 	)
 
 
+func _on_relaxed_assist_toggled(enabled: bool) -> void:
+	var config := ConfigFile.new()
+	config.load(CONFIG_PATH)
+	config.set_value(CONFIG_SECTION_UI, "relaxed_assist", enabled)
+	config.save(CONFIG_PATH)
+	if _product_session != null:
+		_product_session.request_relaxed_assist(enabled)
+	_sync_relaxed_assist_toggle()
+
+
+func _sync_relaxed_assist_toggle() -> void:
+	if _relaxed_assist_button == null:
+		return
+	_relaxed_assist_button.set_pressed_no_signal(
+		_product_session != null and _product_session.relaxed_assist_enabled
+	)
+
+
+func _on_simple_digging_toggled(enabled: bool) -> void:
+	var config := ConfigFile.new()
+	config.load(CONFIG_PATH)
+	config.set_value(CONFIG_SECTION_UI, "simple_digging", enabled)
+	config.save(CONFIG_PATH)
+	if _product_session != null:
+		_product_session.request_simple_digging(enabled)
+	_sync_simple_digging_toggle()
+
+
+func _sync_simple_digging_toggle() -> void:
+	if _simple_digging_button == null:
+		return
+	_simple_digging_button.set_pressed_no_signal(
+		_product_session != null and _product_session.simple_digging_enabled
+	)
+
+
 ## Persisted race-mode choice is applied once the product session exists; the
 ## chassis re-applies it to each freshly configured Jolt runtime.
 func _load_race_mode() -> void:
@@ -950,6 +995,21 @@ func _load_race_mode() -> void:
 	if _product_session != null and bool(config.get_value(CONFIG_SECTION_UI, "race_mode", false)):
 		_product_session.request_race_mode(true)
 	_sync_race_mode_toggle()
+
+
+## Persisted advanced assist options; session forwards them to the chassis
+## runtime and the excavation world, both of which re-apply across rebuilds.
+func _load_assist_options() -> void:
+	var config := ConfigFile.new()
+	if config.load(CONFIG_PATH) != OK:
+		return
+	if _product_session != null:
+		if bool(config.get_value(CONFIG_SECTION_UI, "relaxed_assist", false)):
+			_product_session.request_relaxed_assist(true)
+		if bool(config.get_value(CONFIG_SECTION_UI, "simple_digging", false)):
+			_product_session.request_simple_digging(true)
+	_sync_relaxed_assist_toggle()
+	_sync_simple_digging_toggle()
 
 
 func _sync_cutting_diagnostics_toggle() -> void:

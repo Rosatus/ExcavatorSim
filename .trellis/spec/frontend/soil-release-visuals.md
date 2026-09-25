@@ -19,6 +19,17 @@ debit stock; clipped deposits retain their remainder. Soil proposals accept only
 Ledger mass is exact; voxel surface column geometry remains approximate.
 Collision acknowledgement may lag the visible SDF by the engine rebuild interval.
 
+Simple digging (advanced settings opt-in, `ExcavationWorld.set_simple_digging_enabled`
+-> `VoxelExcavationAuthority.set_dump_gate_enabled`) holds the dump gate closed:
+no pose can open the gate or stage a deposit, and staged-but-uncommitted dumps
+are cancelled on entry — contained soil can never leave the bucket. Cutting is
+unchanged: geometry commits at any fill level and `stage_cut(..., allow_overflow)`
+keeps clipping captured inventory to remaining capacity, routing the excess into
+`discarded_cut_mass_q`, so a full bucket never blocks a cut. The flag survives
+authority rebuilds (re-applied on configure) and re-enabling restores the normal
+gate. This is a production mode, distinct from the test-only
+`set_voxel_unlimited_bucket_for_testing` capacity override.
+
 ### Receiving surface (2026-09-18)
 
 Route incoming material from the column below the release point over the current

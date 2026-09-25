@@ -26,8 +26,12 @@ func configure(_descriptor: Dictionary, _soil_contract: Dictionary, params: Dict
 
 ## The confirm step injects the frozen profile built from the preview
 ## parameters. Without one the stage refuses to enable — tracking nothing
-## would just fight the operator.
+## would just fight the operator. Shared knobs (relaxed_attitude) pass
+## through the base implementation.
 func apply_params(params: Dictionary) -> bool:
+	super.apply_params(params)
+	if not params.has("profile"):
+		return true
 	var profile := params.get("profile") as Profile
 	if profile == null:
 		return false
