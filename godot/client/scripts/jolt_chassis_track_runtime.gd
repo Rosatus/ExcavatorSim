@@ -16,17 +16,6 @@ const GRAVITY_M_S2 := 9.80665
 const MAX_PAYLOAD_MASS_KG := 5000.0
 const BODY_NAMES := ["chassis", "upper", "boom", "arm", "bucket"]
 const JOINT_NAMES := ["swing_joint", "boom_joint", "arm_joint", "bucket_joint"]
-const SUPPORT_FORCE_PER_BLOCKED_M_N := 240000.0
-const MAX_SUPPORT_FORCE_N := 180000.0
-const MAX_SUPPORT_TORQUE_NM := 320000.0
-const SUPPORT_REQUEST_LIFETIME_TICKS := 2
-const MAX_SUPPORT_FORCE_DELTA_N_PER_TICK := 30000.0
-const MAX_SUPPORT_TORQUE_DELTA_NM_PER_TICK := 60000.0
-const MAX_SUPPORT_DURATION_TICKS := 45
-const MAX_SUPPORT_HEAVE_SPEED_M_S := 0.8
-const MAX_SUPPORT_TILT_RATE_RAD_S := 0.65
-const MIN_SUPPORT_NORMAL_UP_DOT := 0.2
-const MIN_SUPPORT_INTO_SURFACE_M := 0.001
 # Cutting resistance: engagement normalizes edge penetration below grade and
 # is low-passed so the load ramps smoothly instead of flickering per tick.
 const MAX_CUT_DEPTH_M := 0.25
@@ -73,6 +62,12 @@ var _right_effort_n := 0.0
 var _equipment_commands := Vector4.ZERO
 var _articulation := KinematicArticulationState.new()
 var _bucket_sweeper := BucketProxySweeper.new()
+var _solid_contacts := preload("res://scripts/bucket_solid_contact_solver.gd").new()
+var solid_tool_identity := ""
+var solid_tool_acceptor := Callable()
+var _solid_tool_mount := Transform3D.IDENTITY
+var _previous_solid_tool_mount := Transform3D.IDENTITY
+var _previous_solid_world := Transform3D.IDENTITY
 var _assist_pipeline := AssistPipeline.new()
 var _assist_context: Dictionary = {}
 var _assist_enable: Dictionary = {}
@@ -133,9 +128,6 @@ var _bucket_query: Dictionary = {}
 var _queued_support_wrench: Dictionary = {}
 var _applied_support_wrench: Dictionary = {}
 var _support_contact_ticks := 0
-var _support_contact_observed := false
-var _last_support_force := Vector3.ZERO
-var _last_support_torque := Vector3.ZERO
 var _last_applied_support_request_id := ""
 var _support_wrench_apply_count := 0
 var _bucket_ground_mode := BucketGroundInteractionMode.NORMAL
@@ -184,6 +176,25 @@ func set_attachment_bucket_limits(attachment_id: String) -> void:
 		_level_band_valid = false
 
 
+func configure_solid_tool(identity: String, contract: Dictionary) -> void:
+	solid_tool_identity = identity
+	_solid_contacts.parts.clear()
+	if not contract.is_empty():
+		_solid_contacts.configure(contract, _layer_mask(int(_descriptor["collision_layers"]["terrain"])))
+	_solid_tool_mount = Transform3D.IDENTITY
+	_previous_solid_tool_mount = Transform3D.IDENTITY
+	_previous_solid_world = Transform3D.IDENTITY
+	_applied_support_wrench.clear()
+	_reset_support_response(true)
+
+
+func set_solid_tool_mount(mount: Transform3D) -> void:
+	if mount.is_finite():
+		_solid_tool_mount = mount
+		if _previous_solid_world == Transform3D.IDENTITY:
+			_previous_solid_tool_mount = mount
+
+
 func _physics_process(delta: float) -> void:
 	if not configured or not has_body():
 		return
@@ -193,7 +204,7 @@ func _physics_process(delta: float) -> void:
 	_update_terrain_identity()
 	_clear_tick_telemetry()
 	_apply_pending_payload()
-	_apply_queued_support_wrench()
+	_applied_support_wrench.clear()
 	_update_joint_actuators(delta)
 	var tracks_usec := 0
 	if (enabled or uses_wheels()) and _terrain_identity_valid:
@@ -267,6 +278,10 @@ func configure(
 
 func teardown() -> void:
 	_static_map_root = null
+	solid_tool_identity = ""
+	solid_tool_acceptor = Callable()
+	_solid_tool_mount = Transform3D.IDENTITY
+	_previous_solid_tool_mount = Transform3D.IDENTITY
 	configured = false
 	enabled = false
 	set_commands(0.0, 0.0)
@@ -836,6 +851,9 @@ func stop_motion() -> void:
 	set_commands(0.0, 0.0)
 	set_equipment_commands(Vector4.ZERO)
 	_assist_pipeline.reset("stop_motion")
+	_queued_support_wrench.clear()
+	_applied_support_wrench.clear()
+	_reset_support_response(true)
 
 
 func set_bucket_ground_mode(value: String) -> bool:
@@ -962,6 +980,8 @@ func _build_rig() -> bool:
 	_assist_configured = _assist_pipeline.configure(_descriptor, _soil_contract, model_id)
 	for stage_name in _assist_enable.keys():
 		_assist_pipeline.set_stage_enabled(String(stage_name), bool(_assist_enable[stage_name]))
+	if not _solid_contacts.configure(_soil_contract, _layer_mask(int(_descriptor["collision_layers"]["terrain"]))):
+		return false
 	return _bucket_sweeper.configure(
 		model_id,
 		_soil_contract,
@@ -1027,8 +1047,7 @@ func _update_joint_actuators(delta: float) -> void:
 	for flag in proposal.get("quality_flags", []):
 		_quality_flags.append(String(flag))
 	var accepted_fraction := 1.0
-	_support_contact_observed = false
-	var previous_frames := _articulation.accepted_frames()
+	var previous_frames := _articulation.frames_at_chassis(_body.global_transform)
 	var candidate_frames := proposal.get("frames", {}) as Dictionary
 	if previous_frames.has("bucket_link") and candidate_frames.has("bucket_link"):
 		_bucket_query_submitted_count += 1
@@ -1051,69 +1070,83 @@ func _update_joint_actuators(delta: float) -> void:
 		if passthrough_frames.has("bucket_link"):
 			_bucket_query["accepted_bucket_transform"] = passthrough_frames["bucket_link"]
 		return
-	if _terrain_identity_valid and previous_frames.has("bucket_link") and candidate_frames.has("bucket_link"):
+	var solid: Dictionary = {"contacts": [], "accepted_fraction": 1.0}
+	var current_tool := Transform3D.IDENTITY
+	var candidate_tool := Transform3D.IDENTITY
+	if previous_frames.has("bucket_link") and candidate_frames.has("bucket_link"):
 		_bucket_motion_sequence += 1
 		_bucket_query_executed_count += 1
-		_bucket_query = _bucket_sweeper.sweep(
-			get_world_3d(),
-			previous_frames["bucket_link"] as Transform3D,
-			candidate_frames["bucket_link"] as Transform3D,
-			_terrain_identity,
-			_physics_tick,
-			_authority_epoch,
-			_bucket_motion_sequence,
-		)
-		_bucket_query["previous_bucket_transform"] = previous_frames["bucket_link"]
-		_bucket_query["candidate_bucket_transform"] = candidate_frames["bucket_link"]
-		# Analytic engagement never depends on query validity: a stale or
-		# disarmed query must not disable the resistance stall while chunks lag.
+		current_tool = (previous_frames["bucket_link"] as Transform3D) * _previous_solid_tool_mount
+		candidate_tool = (candidate_frames["bucket_link"] as Transform3D) * _solid_tool_mount
+		solid = _solid_contacts.query_contacts(get_world_3d().direct_space_state,
+			current_tool, candidate_tool, _body,
+			Callable(self, "_accept_bucket_solid_hit"), _previous_solid_world)
+		accepted_fraction = float(solid["accepted_fraction"])
+		_bucket_query = {
+			"valid": true, "accepted_fraction": accepted_fraction, "contacts": [],
+			"model_id": model_id, "proxy_version": "solid-contact-v1:" + model_id,
+			"terrain_generation": _terrain_identity.x, "terrain_revision": _terrain_identity.y,
+			"physics_tick": _physics_tick, "authority_epoch": _authority_epoch,
+			"motion_sequence": _bucket_motion_sequence, "quality_flags": [],
+			"previous_bucket_transform": previous_frames["bucket_link"],
+			"candidate_bucket_transform": candidate_frames["bucket_link"],
+		}
+		for value in solid["contacts"]:
+			var contact := (value as Dictionary).duplicate()
+			contact["contact_id"] = "%d:%d:%s" % [_physics_tick, _bucket_motion_sequence, contact["region_id"]]
+			contact["query_source"] = "solid_collider"
+			contact["point_valid"] = true
+			contact["initial_overlap"] = false
+			contact["travel_fraction"] = accepted_fraction
+			contact["quality"] = "solid_contact"
+			contact["classification"] = "blocked"
+			_bucket_query["contacts"].append(contact)
+		# Voxel cutting retains its independent analytic resistance. Solid contacts
+		# never use tooth direction or surface-up thresholds to choose collision.
 		var raw_engagement := 0.0
 		if _terrain_world != null and _terrain_world.terrain_state != null:
 			_cut_probe_executed_count += 1
-			raw_engagement = clampf(
-				_bucket_sweeper.probe_cut_penetration(
-					candidate_frames["bucket_link"] as Transform3D,
-					_terrain_world.terrain_state
-				) / _max_cut_depth_m(),
-				0.0,
-				1.0
-			)
-		_cut_engagement = lerpf(
-			_cut_engagement,
-			raw_engagement,
-			clampf(1.0 - exp(-CUT_ENGAGEMENT_SMOOTH_HZ * delta), 0.0, 1.0)
-		)
-		var support_queued := false
-		var support_evidence := _has_noninitial_support_contact()
-		if bool(_bucket_query.get("valid", false)) or support_evidence:
-			accepted_fraction = float(_bucket_query.get("accepted_fraction", 1.0))
-			support_queued = _queue_support_wrench(previous_frames, candidate_frames, accepted_fraction)
-		if not support_queued and not _support_contact_observed:
-			_reset_support_response()
-		for flag in _bucket_query.get("quality_flags", []):
-			_quality_flags.append(String(flag))
+			var bucket: Transform3D = candidate_frames["bucket_link"]
+			if solid["contacts"].is_empty():
+				raw_engagement = clampf(_bucket_sweeper.probe_cut_penetration(bucket,
+					_terrain_world.terrain_state) / _max_cut_depth_m(), 0.0, 1.0)
+		_cut_engagement = lerpf(_cut_engagement, raw_engagement,
+			clampf(1.0 - exp(-CUT_ENGAGEMENT_SMOOTH_HZ * delta), 0.0, 1.0))
+		if not solid["contacts"].is_empty():
+			_cut_engagement = 0.0
 	else:
-		_cut_engagement = lerpf(_cut_engagement, 0.0, clampf(1.0 - exp(-CUT_ENGAGEMENT_SMOOTH_HZ * delta), 0.0, 1.0))
-		_set_invalid_bucket_query(
-			"bucket_query_terrain_identity_mismatch",
-			previous_frames.get("bucket_link", Transform3D.IDENTITY) as Transform3D,
-			candidate_frames.get("bucket_link", Transform3D.IDENTITY) as Transform3D,
-		)
+		_set_invalid_bucket_query("bucket_query_unavailable")
 	_articulation.accept_step(proposal, accepted_fraction)
+	if accepted_fraction < 1.0 and solid_tool_acceptor.is_valid():
+		var accepted_mount: Variant = solid_tool_acceptor.call(accepted_fraction)
+		if accepted_mount is Transform3D:
+			_solid_tool_mount = accepted_mount
 	var accepted_frames := _articulation.accepted_frames()
 	if not _bucket_query.is_empty() and accepted_frames.has("bucket_link"):
 		_bucket_query["accepted_bucket_transform"] = accepted_frames["bucket_link"]
+	var accepted_tool: Transform3D = accepted_frames.get("bucket_link", Transform3D.IDENTITY) * _solid_tool_mount
+	if enabled and not solid["contacts"].is_empty():
+		var response := _solid_contacts.solve(solid["contacts"], current_tool, accepted_tool, _body, delta)
+		_apply_solid_contact_response(response, solid["contacts"])
+	else:
+		_reset_support_response()
+	_previous_solid_world = accepted_tool
+	_previous_solid_tool_mount = _solid_tool_mount
 
 
-func _has_noninitial_support_contact() -> bool:
-	for contact_value in _bucket_query.get("contacts", []):
-		var contact := contact_value as Dictionary
-		if (
-			["shell", "rear_support"].has(String(contact.get("proxy_role", "")))
-			and not bool(contact.get("initial_overlap", false))
-		):
-			return true
-	return false
+func _accept_bucket_solid_hit(hit: Dictionary) -> bool:
+	var collider := instance_from_id(int(hit.get("collider_id", 0))) as Node
+	# Voxel chunks share the environment layer, but remain exclusively soil-owned.
+	var ancestor := collider
+	while ancestor != null:
+		if ancestor.is_class("VoxelTerrain") or ancestor.is_class("VoxelLodTerrain"):
+			return false
+		ancestor = ancestor.get_parent()
+	if collider == _body or (collider != null and is_ancestor_of(collider)):
+		return false
+	if collider != null and _terrain_collider != null and _terrain_collider.is_ancestor_of(collider):
+		return _terrain_identity_valid
+	return true
 
 
 func _max_cut_depth_m() -> float:
@@ -1225,7 +1258,7 @@ func _collect_bucket_query_contacts() -> void:
 			"point": contact.get("point_world", Vector3.ZERO),
 			"normal": contact.get("normal_world", Vector3.UP),
 			"impulse_n_s": 0.0,
-			"penetration_m": 0.0,
+			"penetration_m": float(contact.get("penetration_m", 0.0)),
 			"proxy_role": String(contact.get("proxy_role", "")),
 			"travel_fraction": float(contact.get("travel_fraction", 1.0)),
 			"support_source": String(contact.get("query_source", "unknown")),
@@ -1283,160 +1316,49 @@ func _set_invalid_bucket_query(
 	}
 
 
-func _queue_support_wrench(previous_frames: Dictionary, candidate_frames: Dictionary, accepted_fraction: float) -> bool:
-	if accepted_fraction >= 0.999999 or not _queued_support_wrench.is_empty():
-		return false
-	var support_contact: Dictionary = {}
-	var support_diagnostics: Array[Dictionary] = []
-	for contact_value in _bucket_query.get("contacts", []):
-		var contact := contact_value as Dictionary
-		if ["shell", "rear_support"].has(String(contact.get("proxy_role", ""))):
-			var diagnostic := {
-				"role": String(contact.get("proxy_role", "")),
-				"initial_overlap": bool(contact.get("initial_overlap", false)),
-				"eligible": false,
-			}
-			if bool(diagnostic["initial_overlap"]):
-				diagnostic["rejection"] = "initial_overlap"
-				support_diagnostics.append(diagnostic)
-				continue
-			var normal := contact.get("normal_world", Vector3.UP) as Vector3
-			if not normal.is_finite() or normal.length_squared() < 0.5:
-				diagnostic["rejection"] = "invalid_normal"
-				support_diagnostics.append(diagnostic)
-				continue
-			var normalized_normal := normal.normalized()
-			diagnostic["normal_up_dot"] = normalized_normal.dot(Vector3.UP)
-			var role := String(contact.get("proxy_role", ""))
-			var proxy := (_soil_contract.get("proxies", {}) as Dictionary).get(role, {}) as Dictionary
-			if proxy.is_empty():
-				diagnostic["rejection"] = "missing_proxy"
-				support_diagnostics.append(diagnostic)
-				continue
-			var local_center := _vector3(proxy.get("center_godot", [0.0, 0.0, 0.0]))
-			var previous_point := (previous_frames.get("bucket_link", Transform3D.IDENTITY) as Transform3D) * local_center
-			var candidate_point := (candidate_frames.get("bucket_link", Transform3D.IDENTITY) as Transform3D) * local_center
-			var motion_into_surface := -(candidate_point - previous_point).dot(normalized_normal)
-			diagnostic["motion_into_surface_m"] = motion_into_surface
-			if float(diagnostic["normal_up_dot"]) < MIN_SUPPORT_NORMAL_UP_DOT:
-				diagnostic["rejection"] = "normal_direction"
-				support_diagnostics.append(diagnostic)
-				continue
-			if motion_into_surface < MIN_SUPPORT_INTO_SURFACE_M:
-				diagnostic["rejection"] = "motion_direction"
-				support_diagnostics.append(diagnostic)
-				continue
-			diagnostic["eligible"] = true
-			support_diagnostics.append(diagnostic)
-			support_contact = contact.duplicate(true)
-			support_contact["classification"] = "support"
-			support_contact["motion_into_surface_m"] = motion_into_surface
-			break
-	_bucket_query["support_diagnostics"] = support_diagnostics
-	if support_contact.is_empty():
-		return false
-	_support_contact_observed = true
-	if _support_contact_ticks >= MAX_SUPPORT_DURATION_TICKS:
-		_quality_flags.append("support_wrench_duration_capped")
-		return false
+func _apply_solid_contact_response(response: Dictionary, contacts: Array) -> void:
+	if not enabled or _bucket_ground_bypassed() or not has_body():
+		return
+	var request_id := "%s:%d:%d" % [_authority_epoch, _physics_tick, _bucket_motion_sequence]
+	if request_id == _last_applied_support_request_id:
+		return
+	var force: Vector3 = response["force"]
+	var torque: Vector3 = response["torque"]
+	if not force.is_finite() or not torque.is_finite():
+		_quality_flags.append("solid_contact_invalid_response")
+		return
 	_support_contact_ticks += 1
-	var previous_bucket := previous_frames.get("bucket_link", Transform3D.IDENTITY) as Transform3D
-	var candidate_bucket := candidate_frames.get("bucket_link", Transform3D.IDENTITY) as Transform3D
-	var blocked_distance := previous_bucket.origin.distance_to(candidate_bucket.origin) * (1.0 - accepted_fraction)
-	var normal := support_contact.get("normal_world", Vector3.UP) as Vector3
-	if not normal.is_finite() or normal.length_squared() < 0.5:
-		normal = Vector3.UP
-	var point := support_contact.get("point_world", candidate_bucket.origin) as Vector3
-	if not point.is_finite() or point.is_zero_approx():
-		point = candidate_bucket.origin
-	var target_force := normal.normalized() * minf(MAX_SUPPORT_FORCE_N, blocked_distance * SUPPORT_FORCE_PER_BLOCKED_M_N)
-	var force := _last_support_force.move_toward(target_force, MAX_SUPPORT_FORCE_DELTA_N_PER_TICK)
-	var torque := (point - _body.global_position).cross(force)
-	if torque.length() > MAX_SUPPORT_TORQUE_NM:
-		torque = torque.normalized() * MAX_SUPPORT_TORQUE_NM
-	torque = _last_support_torque.move_toward(torque, MAX_SUPPORT_TORQUE_DELTA_NM_PER_TICK)
-	_last_support_force = force
-	_last_support_torque = torque
-	_queued_support_wrench = {
-		"request_id": "%s:%d:%d" % [_authority_epoch, _physics_tick, _bucket_motion_sequence],
-		"authority_epoch": _authority_epoch,
-		"source_physics_tick": _physics_tick,
-		"eligible_apply_tick": _physics_tick + 1,
-		"expiry_tick": _physics_tick + SUPPORT_REQUEST_LIFETIME_TICKS,
-		"model_id": model_id,
-		"terrain_generation": _terrain_identity.x,
-		"terrain_revision": _terrain_identity.y,
-		"point_world": point,
-		"normal_world": normal.normalized(),
-		"blocked_distance_m": blocked_distance,
-		"requested_force": force,
-		"requested_torque": torque,
-		"classification": "support",
-		"support_contact_ticks": _support_contact_ticks,
-	}
-	_support_queued_count += 1
-	return true
-
-
-func _apply_queued_support_wrench() -> void:
-	_applied_support_wrench.clear()
-	if _queued_support_wrench.is_empty():
-		return
-	if _bucket_ground_bypassed():
-		_support_bypassed_count += 1
-		_queued_support_wrench.clear()
-		return
-	var eligible_tick := int(_queued_support_wrench.get("eligible_apply_tick", -1))
-	var expiry_tick := int(_queued_support_wrench.get("expiry_tick", -1))
-	if _physics_tick < eligible_tick:
-		return
-	if (
-		_physics_tick > expiry_tick
-		or String(_queued_support_wrench.get("authority_epoch", "")) != _authority_epoch
-		or String(_queued_support_wrench.get("model_id", "")) != model_id
-		or int(_queued_support_wrench.get("terrain_generation", -1)) != _terrain_identity.x
-		or int(_queued_support_wrench.get("terrain_revision", -1)) != _terrain_identity.y
-	):
-		_quality_flags.append("support_wrench_stale_rejected")
-		_queued_support_wrench.clear()
-		return
-	var request_id := String(_queued_support_wrench.get("request_id", ""))
-	if request_id.is_empty() or request_id == _last_applied_support_request_id:
-		_quality_flags.append("support_wrench_duplicate_rejected")
-		_queued_support_wrench.clear()
-		return
-	var force := _queued_support_wrench.get("requested_force", Vector3.ZERO) as Vector3
-	var torque := _queued_support_wrench.get("requested_torque", Vector3.ZERO) as Vector3
-	var point := _queued_support_wrench.get("point_world", _body.global_position) as Vector3
-	if not force.is_finite() or not torque.is_finite() or not point.is_finite():
-		_quality_flags.append("support_wrench_invalid_rejected")
-		_queued_support_wrench.clear()
-		return
-	if _body.linear_velocity.dot(Vector3.UP) >= MAX_SUPPORT_HEAVE_SPEED_M_S and force.dot(Vector3.UP) > 0.0:
-		force -= Vector3.UP * force.dot(Vector3.UP)
-	var tilt_rate := Vector2(_body.angular_velocity.x, _body.angular_velocity.z).length()
-	if tilt_rate >= MAX_SUPPORT_TILT_RATE_RAD_S:
-		torque.x = 0.0
-		torque.z = 0.0
 	_body.apply_central_force(force)
 	_body.apply_torque(torque)
-	_applied_support_wrench = _queued_support_wrench.duplicate(true)
-	_applied_support_wrench["applied_physics_tick"] = _physics_tick
-	_applied_support_wrench["applied_force"] = force
-	_applied_support_wrench["applied_torque"] = torque
+	for value in response["forces"]:
+		var reaction := value as Dictionary
+		var other := instance_from_id(int(reaction["collider_id"])) as RigidBody3D
+		if other != null and not other.freeze and other.get_rid() == reaction["rid"]:
+			var opposite: Vector3 = -reaction["force"]
+			var lever: Vector3 = reaction["point"] - _solid_contacts.center_of_mass_world(other)
+			other.apply_central_force(opposite)
+			other.apply_torque(lever.cross(opposite))
+	var contact := contacts[0] as Dictionary
+	_applied_support_wrench = {
+		"request_id": request_id, "authority_epoch": _authority_epoch, "model_id": model_id,
+		"source_physics_tick": _physics_tick, "eligible_apply_tick": _physics_tick,
+		"expiry_tick": _physics_tick, "applied_physics_tick": _physics_tick,
+		"terrain_generation": _terrain_identity.x, "terrain_revision": _terrain_identity.y,
+		"point_world": contact["point_world"], "normal_world": contact["normal_world"],
+		"blocked_distance_m": contact["penetration_m"], "classification": "support",
+		"applied_force": force, "applied_torque": torque, "support_contact_ticks": _support_contact_ticks,
+	}
 	_last_applied_support_request_id = request_id
 	_support_wrench_apply_count += 1
 	_support_applied_count += 1
-	_queued_support_wrench.clear()
 
 
 func _reset_support_response(clear_request_identity := false) -> void:
 	_support_contact_ticks = 0
-	_support_contact_observed = false
-	_last_support_force = Vector3.ZERO
-	_last_support_torque = Vector3.ZERO
 	if clear_request_identity:
 		_last_applied_support_request_id = ""
+		_previous_solid_world = Transform3D.IDENTITY
+		_previous_solid_tool_mount = _solid_tool_mount
 
 
 func _apply_track_forces() -> void:

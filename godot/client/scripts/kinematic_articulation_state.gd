@@ -221,6 +221,11 @@ func effective_joint_limits(joint_name: String) -> Array:
 	return limits
 
 
+## Same coordinates on the current chassis, excluding chassis travel from joint demand.
+func frames_at_chassis(chassis_transform: Transform3D) -> Dictionary:
+	return _compute_frames(chassis_transform, _positions)
+
+
 func accepted_frames() -> Dictionary:
 	return _accepted_frames.duplicate(true)
 

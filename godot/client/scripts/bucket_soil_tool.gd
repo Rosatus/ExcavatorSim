@@ -92,8 +92,8 @@ func compose_snapshot(
 			if candidate_motion.length_squared() > motion.length_squared():
 				motion = candidate_motion
 		var center := _vector3(region["center_godot"])
-		var previous_transform := previous_bucket_frame * _debug_local_transform(region)
-		var current_transform := current_bucket_frame * _debug_local_transform(region)
+		var previous_transform := previous_bucket_frame * region_local_transform(region)
+		var current_transform := current_bucket_frame * region_local_transform(region)
 		composed.append({
 			"order": order,
 			"region_id": String(region["region_id"]),
@@ -328,7 +328,7 @@ func _local_sample_points(region: Dictionary) -> Array[Vector3]:
 		_:
 			var raw_size := shape.get("size_m", [0.1, 0.1, 0.1]) as Array
 			var half := Vector3(float(raw_size[0]), float(raw_size[1]), float(raw_size[2])) * 0.5
-			var local_transform := _debug_local_transform(region)
+			var local_transform := region_local_transform(region)
 			points.append(local_transform.origin)
 			for x_sign in [-1.0, 1.0]:
 				for y_sign in [-1.0, 1.0]:
@@ -337,7 +337,7 @@ func _local_sample_points(region: Dictionary) -> Array[Vector3]:
 	return points
 
 
-func _debug_local_transform(region: Dictionary) -> Transform3D:
+func region_local_transform(region: Dictionary) -> Transform3D:
 	if not _mouth_geometry.is_empty():
 		if region.get("region_id") == "opening":
 			return _mouth_geometry.transform

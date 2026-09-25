@@ -1,0 +1,32 @@
+{
+  "id": "bucket-solid-support",
+  "name": "bucket-solid-support",
+  "title": "Rebuild bucket solid-ground support",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "rosatus",
+  "assignee": "rosatus",
+  "createdAt": "2026-09-24",
+  "completedAt": "2026-09-24",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "godot/client/scripts/bucket_solid_contact_solver.gd",
+    "godot/client/scripts/jolt_chassis_track_runtime.gd",
+    "godot/client/scripts/attachment_rig.gd",
+    "godot/client/scripts/motion_presentation.gd",
+    "godot/client/tests/bucket_solid_support_test.gd"
+  ],
+  "notes": "",
+  "meta": {}
+}

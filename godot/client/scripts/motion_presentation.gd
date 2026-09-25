@@ -245,6 +245,22 @@ func get_active_attachment_id() -> String:
 	return _attachment_id
 
 
+## Only mount-local transforms cross into collision authoring. World/render
+## poses never become a second physical chassis or articulation writer.
+func get_solid_tool_mount_transform() -> Variant:
+	if _attachment_id.is_empty():
+		return Transform3D.IDENTITY if native_tool_available() else null
+	if _attachment_contract.is_empty() or not is_instance_valid(_attachment_tool_node):
+		return null
+	var frame := get_frame_node("bucket_link")
+	var current := _attachment_tool_node
+	var local := Transform3D.IDENTITY
+	while current != null and current != frame:
+		local = current.transform * local
+		current = current.get_parent() as Node3D
+	return local if current == frame else null
+
+
 func set_attachment_context(tool_node: Node3D, contract: Dictionary, attachment_id: String) -> bool:
 	_attachment_tool_node = tool_node
 	_attachment_id = attachment_id

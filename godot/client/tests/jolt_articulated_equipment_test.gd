@@ -147,77 +147,16 @@ func _test_model(model_id: String) -> void:
 	if not is_equal_approx(runtime._body.mass, chassis_base_mass) or runtime._bodies.has("bucket"):
 		failures.append("%s payload mutated dynamic mass or created a bucket body" % model_id)
 
-	var accepted_frames := runtime._articulation.accepted_frames()
-	var candidate_frames := accepted_frames.duplicate(true)
-	runtime._queued_support_wrench.clear()
-	var candidate_bucket := candidate_frames["bucket_link"] as Transform3D
-	candidate_bucket.origin += Vector3(0.0, -0.2, 0.0)
-	candidate_frames["bucket_link"] = candidate_bucket
-	runtime._bucket_query = {
-		"contacts": [{
-			"proxy_role": "rear_support",
-			"point_world": runtime._body.global_position + Vector3(0.0, 0.0, -1.0),
-			"normal_world": Vector3.UP,
-			"initial_overlap": false,
-		}],
-	}
-	runtime._queue_support_wrench(accepted_frames, candidate_frames, 0.25)
-	var queued_wrench := runtime._queued_support_wrench.duplicate(true)
-	if queued_wrench.is_empty() or int(queued_wrench.get("eligible_apply_tick", -1)) != runtime._physics_tick + 1:
-		failures.append("%s support evidence did not queue a next-tick chassis wrench" % model_id)
-	else:
-		if (queued_wrench.get("requested_force", Vector3.ZERO) as Vector3).length() > JoltChassisTrackRuntime.MAX_SUPPORT_FORCE_DELTA_N_PER_TICK + 0.01:
-			failures.append("%s first support request exceeded its force rate cap" % model_id)
-		if (queued_wrench.get("requested_torque", Vector3.ZERO) as Vector3).length() > JoltChassisTrackRuntime.MAX_SUPPORT_TORQUE_DELTA_NM_PER_TICK + 0.01:
-			failures.append("%s first support request exceeded its torque rate cap" % model_id)
-		runtime._physics_tick = int(queued_wrench["eligible_apply_tick"])
-		runtime._apply_queued_support_wrench()
-		runtime._capture_post_step_snapshot()
-		if runtime._applied_support_wrench.is_empty() or not runtime._queued_support_wrench.is_empty():
-			failures.append("%s eligible support wrench was not applied exactly once" % model_id)
-		elif int(runtime.get_status_snapshot().get("support_wrench_apply_count", -1)) != 1:
-			failures.append("%s support wrench application was not counted" % model_id)
-		elif (
-			(runtime._applied_support_wrench.get("applied_force", Vector3.ZERO) as Vector3).length() > JoltChassisTrackRuntime.MAX_SUPPORT_FORCE_N + 0.01
-			or (runtime._applied_support_wrench.get("applied_torque", Vector3.ZERO) as Vector3).length() > JoltChassisTrackRuntime.MAX_SUPPORT_TORQUE_NM + 0.01
-		):
-			failures.append("%s applied support wrench exceeded its caps" % model_id)
-		runtime._queued_support_wrench = queued_wrench.duplicate(true)
-		runtime._apply_queued_support_wrench()
-		if not (runtime._quality_flags as Array).has("support_wrench_duplicate_rejected"):
-			failures.append("%s duplicate support request identity was not rejected" % model_id)
-
+	# Solid support is covered by gravity-on command/query integration in
+	# bucket_solid_support_test. Keep identity/lifecycle coverage here.
+	var response := {"force": Vector3.UP * 1000.0, "torque": Vector3.ZERO, "forces": []}
+	var contacts := [{"point_world": Vector3.ZERO, "normal_world": Vector3.UP, "penetration_m": 0.01}]
+	var before_apply := runtime._support_wrench_apply_count
+	runtime._apply_solid_contact_response(response, contacts)
+	runtime._apply_solid_contact_response(response, contacts)
+	if runtime._support_wrench_apply_count != before_apply + 1:
+		failures.append("%s repeated contact solve applied twice in one motion tick" % model_id)
 	runtime._reset_support_response(true)
-	runtime._queued_support_wrench.clear()
-	runtime._bucket_query = {
-		"contacts": [{
-			"proxy_role": "shell",
-			"point_world": runtime._body.global_position + Vector3.RIGHT,
-			"normal_world": Vector3.RIGHT,
-			"initial_overlap": false,
-		}],
-	}
-	if runtime._queue_support_wrench(accepted_frames, candidate_frames, 0.25):
-		failures.append("%s lateral shell scrape was misclassified as support" % model_id)
-	runtime._bucket_query = {
-		"contacts": [{
-			"proxy_role": "rear_support",
-			"point_world": runtime._body.global_position + Vector3(0.0, 0.0, -1.0),
-			"normal_world": Vector3.UP,
-			"initial_overlap": false,
-		}],
-	}
-	runtime._support_contact_ticks = JoltChassisTrackRuntime.MAX_SUPPORT_DURATION_TICKS
-	if runtime._queue_support_wrench(accepted_frames, candidate_frames, 0.25):
-		failures.append("%s continuous support exceeded its duration cap" % model_id)
-	if not runtime._support_contact_observed:
-		failures.append("%s duration-capped support did not stay locked until contact loss" % model_id)
-	runtime._support_contact_observed = false
-	if not runtime._queued_support_wrench.is_empty():
-		failures.append("%s duration-capped support queued an unexpected wrench" % model_id)
-	runtime._reset_support_response()
-	if runtime._support_contact_ticks != 0 or runtime._support_contact_observed:
-		failures.append("%s support state did not reset after contact loss" % model_id)
 	runtime._queued_support_wrench = {
 		"request_id": "stale-before-bypass",
 		"eligible_apply_tick": runtime._physics_tick + 1,

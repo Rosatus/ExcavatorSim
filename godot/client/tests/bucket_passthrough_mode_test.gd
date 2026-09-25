@@ -201,6 +201,25 @@ func _exercise_mode(
 		_fail("normal restore continued counting bypassed bucket queries")
 	chassis.clear_equipment_commands_for_test()
 	chassis.set_test_input_focus_bypass_for_test(false)
+	# Exercise the real session -> attachment -> controller -> runtime handoff.
+	if not session.request_tool_switch("gb12"):
+		_fail("solid-contact tool switch failed")
+	await physics_frame
+	await physics_frame
+	var runtime := chassis._jolt_runtime
+	var presentation := chassis._motion_presentation
+	if not runtime.solid_tool_identity.contains("xtr13+gb12") or runtime._solid_contacts.parts.is_empty():
+		_fail("runtime did not replace native collision geometry with GB12")
+	if not runtime._solid_tool_mount.is_equal_approx(presentation.get_solid_tool_mount_transform()):
+		_fail("runtime collision mount differs from active attachment")
+	if not runtime.solid_tool_acceptor.is_valid():
+		_fail("attachment candidate has no collision acceptance owner")
+	if not session.request_tool_switch("no_tool"):
+		_fail("no-tool switch failed")
+	await physics_frame
+	await physics_frame
+	if not runtime._solid_contacts.parts.is_empty() or not runtime._applied_support_wrench.is_empty():
+		_fail("no-tool selection retained collision geometry or support force")
 
 
 func _assert_same_terrain(before: Dictionary, after: Dictionary, label: String) -> void:

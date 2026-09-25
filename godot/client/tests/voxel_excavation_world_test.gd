@@ -77,7 +77,14 @@ func _run() -> void:
 		0.05,
 	)
 	var transaction := ((result.get("voxel_excavation", {}) as Dictionary).get("last_transaction", {}) as Dictionary)
-	_expect(bool(result.get("changed", false)), "fixed snapshot reaches the voxel commit scheduler (%s; %s; %s)" % [
+	# Production prepares cuts in a worker. Acceptance/queueing is not a commit:
+	# wait for the actual positive-mass transaction with a bounded deadline.
+	for _frame in 120:
+		if int(transaction.get("accepted_mass_q", 0)) > 0:
+			break
+		await physics_frame
+		transaction = excavation.get_status_snapshot().get("voxel_excavation", {}).get("last_transaction", {})
+	_expect(not transaction.is_empty(), "fixed snapshot reaches the voxel commit scheduler (%s; %s; %s)" % [
 		JSON.stringify(result.get("terrain_commit_result", {})),
 		String(result.get("interaction_state", "")),
 		JSON.stringify((result.get("voxel_excavation", {}) as Dictionary).get("last_cutter_result", {})),

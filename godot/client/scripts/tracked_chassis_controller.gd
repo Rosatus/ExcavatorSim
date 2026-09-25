@@ -880,6 +880,17 @@ func _step_authoritative_chassis(delta: float) -> void:
 	_jolt_runtime.set_attachment_bucket_limits(
 		_motion_presentation.get_active_attachment_id() if _motion_presentation != null else ""
 	)
+	if _motion_presentation != null:
+		var attachment_rig := get_node_or_null("../AttachmentRig") as AttachmentRig
+		_jolt_runtime.solid_tool_acceptor = Callable(attachment_rig, "accept_solid_contact_fraction") if attachment_rig != null else Callable()
+		var mount: Variant = _motion_presentation.get_solid_tool_mount_transform()
+		var tool_identity := "%s:%s:%s" % [active_model_id,
+			_motion_presentation.get_active_attachment_id(), mount != null]
+		if _jolt_runtime.solid_tool_identity != tool_identity:
+			_jolt_runtime.configure_solid_tool(tool_identity,
+				_motion_presentation.get_soil_contract() if mount != null else {})
+		if mount is Transform3D:
+			_jolt_runtime.set_solid_tool_mount(mount)
 	_refresh_slope_preview(delta)
 	var scaled_axes := equipment_axes
 	if _bucket_ground_bypassed():

@@ -8,7 +8,8 @@ extends Node3D
 ## coupler GLB subtree mounts unchanged at identity (per 装配与动画说明.md),
 ## the tool mounts at identity under the coupler's socket, and the baked
 ## passive-mechanism table drives cylinders and hoses under tilt. Tilt/rotate
-## are presentation-level DOFs: the physics rig keeps the native curl body.
+## are bounded kinematic DOFs: solid contact can accept a fraction of their
+## candidate step, while this owner alone updates the joints/passive mechanism.
 
 const CATALOG_PATH := "res://resources/models/attachment_catalog.json"
 const DIRECT_PIN_COUPLER_ID := "none"
@@ -52,6 +53,9 @@ var _rotate_sign := 1.0
 
 var _tilt_deg := 0.0
 var _rotate_deg := 0.0
+var _contact_previous_angles := Vector2.ZERO
+var _contact_candidate_angles := Vector2.ZERO
+var _contact_step_tick := -1
 var _use_test_axes := false
 var _test_axes := Vector2.ZERO
 var _remount_pending := false
@@ -60,6 +64,8 @@ var _remount_tool_id := ""
 
 
 func _ready() -> void:
+	# Session input -> attachment candidate -> controller context -> contact solve.
+	process_physics_priority = -25
 	_presentation = get_node_or_null(motion_presentation_path) as MotionPresentation
 	_product_session = get_node_or_null(product_session_path) as ProductSession
 	_motion_client = get_node_or_null(motion_client_path) as MotionClient
@@ -74,6 +80,9 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	if _tilt_node == null and _rotate_node == null:
 		return
+	_contact_step_tick = Engine.get_physics_frames()
+	_contact_previous_angles = Vector2(_tilt_deg, _rotate_deg)
+	_contact_candidate_angles = _contact_previous_angles
 	var axes := _test_axes if _use_test_axes else _read_session_axes()
 	if not axes.is_finite():
 		return
@@ -87,6 +96,17 @@ func _physics_process(delta: float) -> void:
 		_tilt_deg = next_tilt
 		_rotate_deg = next_rotate
 		_apply_pose()
+	_contact_candidate_angles = Vector2(_tilt_deg, _rotate_deg)
+
+
+func accept_solid_contact_fraction(fraction: float) -> Variant:
+	if _contact_step_tick == Engine.get_physics_frames() and is_finite(fraction):
+		var accepted := clampf(fraction, 0.0, 1.0)
+		_tilt_deg = lerpf(_contact_previous_angles.x, _contact_candidate_angles.x, accepted)
+		var rotate_delta := wrapf(_contact_candidate_angles.y - _contact_previous_angles.y, -180.0, 180.0)
+		_rotate_deg = wrapf(_contact_previous_angles.y + rotate_delta * accepted, -180.0, 180.0)
+		_apply_pose()
+	return _presentation.get_solid_tool_mount_transform() if _presentation != null else null
 
 
 ## Switch the tool side. The tool's supported_couplers list is the contract:
@@ -462,6 +482,7 @@ func _release_foreign_children() -> void:
 
 
 func _clear_attachment() -> void:
+	_contact_step_tick = -1
 	_release_foreign_children()
 	if _mount_root != null and is_instance_valid(_mount_root):
 		_mount_root.free()

@@ -399,15 +399,28 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
 - Track raycasts may hit only the project `TerrainCollider`, and forces activate
   only when its applied `(world_generation, terrain_revision)` matches the
   current `TerrainState`. The heightfield remains the logical terrain authority.
-- `BucketProxySweeper` owns no scene body. It segments previous-to-candidate
-  bucket motion, uses `cast_motion` plus endpoint overlap/rest queries, and
-  accepts hits only from the exact applied `TerrainCollider`. Cutting edge,
-  opening, cavity, shell, and rear-support proxies come from the selected model
-  soil contract; only cutting/shell/rear can block motion.
+- `bucket_solid_contact_solver.gd` owns no scene body. It queries the physical
+  teeth, side cutters, floor and outer plates from the active tool contract.
+  Native buckets use identity mount; attachments supply only the local transform
+  under `bucket_link`, never rendered world pose. No-tool selections clear the
+  shapes. Attachment candidates run after session input and before chassis input;
+  collision acceptance returns to `AttachmentRig`, the sole writer of tilt/rotate
+  and passive mechanisms. Base articulation and attachment axes share the accepted
+  fraction. The retained `BucketProxySweeper` is a legacy query fixture and an
+  analytic penetration helper, not the authoritative solid-contact path.
+- All environment-layer non-voxel bodies are solid regardless of cutting angle or
+  normal direction. Explicitly exclude self and VoxelTerrain/VoxelLodTerrain
+  ancestors. The project TerrainCollider still requires current applied identity;
+  independent solid objects do not depend on a voxel revision. Filter RID before
+  pairing contact witnesses; assign modified PhysicsShapeQueryParameters3D.exclude
+  arrays back to the property (mutating its getter does not update the query).
+  Query overlaps AND segmented translation/rotation sweeps, including the previous
+  world tool pose for chassis motion. Use a separate current-chassis frame for
+  articulation velocity so chassis velocity is not counted twice.
 - One query result is immutable and carries authority epoch, physics tick,
   terrain generation/revision, bucket motion sequence, proxy version, accepted
   fraction, contact IDs/roles and quality. Queries arbitrate rigid-body
-  semantics only: shell/rear support evidence and obstacle blocking. Soil
+  semantics only: solid contact evidence and obstacle blocking. Soil
   cutting is an analytic material-removal loop that never depends on query
   records — every fixed tick `ExcavationWorld` samples the authoritative
   heightfield bilinearly under the kinematic tooth line (center plus both
@@ -455,10 +468,10 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
   a validated in-band query
   contact point remains a supplementary trigger for mesh contacts the samples
   cannot see, and such cuts land on the validated contact point. Query
-  failures, stale terrain identity, or initial overlap can never disarm or
-  block cutting — they only gate support transactions. Only
-  `shell`/`rear_support` are motion-blocking proxies; terrain contact never
-  reduces the accepted fraction of the cutting edge. Digging resistance is a
+  failures, stale terrain identity, or initial overlap can never disarm voxel
+  cutting. Non-voxel solid collisions constrain every physical bucket plate and
+  tooth; voxel soil is excluded from this collision solve. Solid contact does not
+  enter cutting-angle classification or analytic cut resistance. Digging resistance is a
   saturating speed load computed analytically as well: the runtime low-passes
   cutting-edge penetration below grade into an engagement value that scales
   dig-direction work-equipment command velocity toward `MIN_CUT_SPEED_SCALE`
@@ -473,25 +486,27 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
   the brush center receive bilinear-weight-compensated amounts so the sampled
   surface drops exactly the requested depth — rasterized falloff alone would
   yield a fraction of it and break the yield-equals-press invariant.
-  Support may use
-  a non-initial shell/rear contact from the same segmented sweep when that
-  load-bearing proxy has an upward normal, bounded accepted fraction, and motion
-  into the surface; initial overlap on the load-bearing proxy still disarms that
-  contact. Invalid results retain current identity; canonical truth is published
-  only when the query epoch/tick exactly equals the enclosing post-step snapshot.
+  Shallow solid overlap remains usable contact evidence after chassis settling.
+  Canonical truth is published only when query epoch/tick exactly equals the
+  enclosing post-step snapshot.
 - `ExcavationWorld` reduces one query result to one idempotent interaction key
   `(authority_epoch, physics_tick, terrain_generation, terrain_revision,
   bucket_motion_sequence)`. Precedence remains `dump -> spill -> cutting ->
   carry`; the accepted batch queues at most one existing
   `BucketSoilState`/`TerrainCommitScheduler` transaction.
-- Valid shell/rear evidence may queue one chassis support request for
-  `source_tick + 1`. The runtime validates model/authority/terrain identity and
-  expiry, clamps force to 180 kN and torque to 320 kNm, limits per-tick changes
-  to 30 kN/60 kNm, and applies one Jolt wrench. Support also requires an
-  upward-facing normal and bucket motion into the surface, stops after 45
-  continuous ticks, and stays duration-locked until contact loss. Heave and
-  tilt-rate guards prevent sustained support from accelerating without bound.
-  Work-equipment free motion and bucket payload do not react on the chassis.
+- Solid support solves and applies once in the same physics callback from fresh
+  contacts; no deferred support queue is replayed. The telemetry queue field stays
+  empty for compatibility; applied source/eligible/expiry ticks are the current
+  tick. Effective contact mass includes chassis and contacted dynamic-body inertia.
+  Actual PhysicsDirectBodyState3D COM is required for auto-COM objects. A unilateral
+  implicit spring/damper (12 Hz, damping ratio 1) reacts at the contact witness with
+  180 kN force and 320 kNm torque budgets. Inward articulation is limited at 6 cm
+  compression; separation always remains possible. This is compliant contact, not
+  a claim of zero penetration or calibrated hydraulics. Fresh overlap evidence
+  sustains neutral support without a duration cutoff; contact loss releases it.
+  Movable objects receive the equal/opposite force and torque about their own COM.
+  Reset, stop, bypass, disable and tool changes clear contact history. Free equipment
+  motion and payload alone never inject a chassis reaction.
 - `TrackedChassisController` may materialize the collider only during initial
   rig activation and world reset. `TerrainCommitScheduler` remains the sole
   normal terrain-revision writer for render/collider derivatives; the Jolt
@@ -518,7 +533,7 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
   only the five-body `jolt_shadow` observation shape and rejects authoritative
   hybrid truth before schema admission.
 - The legacy `BucketGroundLiftReaction` must be disabled in authoritative mode;
-  query-derived later-tick chassis wrench is the only lift path.
+  fresh solid-contact chassis wrench is the only authoritative bucket lift path.
 - SY205/SY135 mass, inertia and collision proxy values remain provisional tuning
   evidence. The hybrid profile validates bounded gameplay behavior, not
   production hydraulic fidelity, force transmission or per-grain soil.
@@ -534,7 +549,7 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
 | Non-neutral first command after rebuild | Hold zero effort until a neutral sample arrives |
 | Stale equipment command identity | Ignore without changing current command state |
 | Invalid payload mass/COM/identity | Reject without changing the applied motion-load factor |
-| Bucket query initial overlap/failure | Accept bounded recovery motion; support requires independent non-initial shell/rear evidence; cutting is unaffected (analytic) |
+| Solid query shallow overlap | Keep physical contact response; limit inward equipment travel and allow separation; voxel cutting stays separately owned |
 | Shallow cutting-edge/opening start overlap | Query stays valid; contacts carry `shallow_overlap` quality; cutting never depended on it |
 | Cutting-edge terrain contact during a stroke | Never blocks motion; analytic penetration drives cuts and the saturating resistance load (swing included), stalling at `maximum_cut_depth_m`; retraction unaffected |
 | Slow micro-trim or swing-drag stroke below the per-tick sweep threshold | Engaged tooth plus an active work-equipment command queues a cut every tick; no query needed |
@@ -546,7 +561,7 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
 | Parcel result/commit is delayed | Preserve the frozen sequence/transfer identity until an explicit commit or rejection; never timer-retry it |
 | Cut arrives while the parcel body pool is full | Add its volume to the bounded aggregate cut backlog and drain into the next free carrier; never steal an authoritative parcel |
 | Model activation changes cavity dimensions | Retarget floor/back/side barrier shapes before the new model can transport parcels |
-| Early/late/stale support request | Drop it without applying force or changing chassis transform |
+| Repeated contact solve / reset or bypass | Apply once per authority/tick/motion identity; retain no delayed force or world anchor |
 | Track command outside `[-1,1]` | Clamp before force calculation |
 | Missing `tracks.local_forward_axis` | Use backward-compatible `-Z` |
 | Axis outside `-Z` / `+Z` | Reject the descriptor before building a rig |
@@ -586,8 +601,11 @@ adapter allowed to copy its body transform onto `ChassisMotionRoot`.
   command directions, limits, target/actual telemetry, neutral re-arm, stale
   identity, payload slowdown and zero residual runtime nodes for both models.
 - Query/gameplay tests assert actual Jolt terrain hits, segmented motion,
-  accepted fraction, stale/initial-overlap failure, duplicate batch rejection,
-  one soil transaction, and next-tick bounded chassis wrench.
+  accepted fraction, voxel/self exclusion, body motion sweeps, auto-COM reactions,
+  and same-tick bounded wrench. `bucket_solid_support_test.gd` drives real SY135
+  commands with gravity on over flat ground and an independent raised object,
+  checks lift, >120-frame support, 180-frame neutral hold, bounded compression and
+  retraction/settling. Synthetic force injection alone cannot prove self-lifting.
 - Parcel tests throw real rigid bodies against floor/back/side plates and out
   the open mouth, assert progressive absorption at an intermediate tick,
   preserve `ledger + visible remainder`, retarget model-specific extents, and
@@ -619,7 +637,7 @@ Wrong: presentation and truth independently sample live physics/query nodes
 Correct: both consume the runtime's single post-step snapshot
 
 Wrong: kinematic bucket RigidBody3D pushes the chassis with uncapped impulse
-Correct: query evidence queues one identity-checked, capped next-tick chassis wrench
+Correct: fresh physical tool contact -> one bounded same-tick chassis wrench + opposite dynamic-object reaction
 
 Wrong: poured parcel settles through queue_deposit_volume and debits the bucket twice
 Correct: parcel sequence -> queue_parcel_deposit_volume -> matching terrain transfer commit -> recycle only that parcel volume
