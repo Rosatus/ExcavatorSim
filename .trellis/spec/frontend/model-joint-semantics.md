@@ -208,6 +208,10 @@ Other models keep that legacy offset. Do not enlarge the SY155W authority bucket
 limits to compensate for attachment orientation. Its absent native bucket is omitted
 from selection. Host physics soil proxies include the neutral XTR13 socket offset;
 active fill/cutting use the existing mounted GB12 frame and contract.
+`AttachmentRig` also mounts outside `ProductSession` request paths (model-activation
+defaults, cross-model remounts); the session resyncs `active_coupler_id`/`active_tool_id`
+from every `attachment_activated` emission and once at startup — the menu selectors
+guard on the session pair, so a stale pair silently no-ops the matching option.
 
 | Case | Result |
 |---|---|

@@ -57,6 +57,9 @@ func _ready() -> void:
 		_chassis.set_race_mode(race_mode_enabled)
 	_excavation = get_node_or_null(excavation_world_path) as ExcavationWorld
 	_attachment_rig = get_node_or_null(attachment_rig_path) as AttachmentRig
+	if _attachment_rig != null:
+		_attachment_rig.attachment_activated.connect(_on_attachment_activated)
+		_sync_attachment_ids()
 	call_deferred("_activate_initial_model")
 
 
@@ -208,12 +211,33 @@ func _request_attachment_switch(coupler_id: String, tool_id: String) -> bool:
 		}
 		status_changed.emit(get_status_snapshot())
 		return false
-	active_coupler_id = _attachment_rig.active_coupler_id()
-	active_tool_id = _attachment_rig.active_tool_id()
+	_sync_attachment_ids()
 	last_error.clear()
 	attachment_changed.emit(_attachment_rig.active_attachment_id())
 	status_changed.emit(get_status_snapshot())
 	return true
+
+
+func _on_attachment_activated(_attachment_id: String) -> void:
+	_sync_attachment_ids()
+
+
+## The rig also changes state outside request paths — model-activation
+## defaults and cross-model remounts — while the UI guards selections on
+## the session's recorded pair. A stale pair makes the matching option a
+## no-op, so resync on every activation signal (and once at startup, in
+## case the rig mounted before this node was ready).
+func _sync_attachment_ids() -> void:
+	if _attachment_rig == null:
+		return
+	var coupler := _attachment_rig.active_coupler_id()
+	var tool := _attachment_rig.active_tool_id()
+	if coupler == active_coupler_id and tool == active_tool_id:
+		return
+	active_coupler_id = coupler
+	active_tool_id = tool
+	attachment_changed.emit(active_attachment_id())
+	status_changed.emit(get_status_snapshot())
 
 
 func active_attachment_id() -> String:

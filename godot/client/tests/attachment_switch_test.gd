@@ -311,6 +311,48 @@ func _run() -> void:
 			"xtr13+no_tool should keep the host soil contract") != 0:
 		return _finish(host, 1)
 
+	# Cross-model lifecycle (user bug report): mounting steelwrist on sy155w,
+	# switching to sy135neo, then releasing to the native bucket used to fail
+	# because the session's recorded pair went stale whenever the rig mounted
+	# outside a request path — selector no-ops followed. The session must
+	# resync from every attachment_activated emission.
+	if _check(session.request_model_switch("sy155w"), "model switch to sy155w failed: %s" % [session.last_error]) != 0:
+		return _finish(host, 1)
+	await process_frame
+	await process_frame
+	if _check(presentation.get_active_model_id() == "sy155w", "sy155w did not activate") != 0:
+		return _finish(host, 1)
+	if _check(bool(rig.joint_state_for_test().get("mounted", false)),
+			"sy155w default attachment did not mount") != 0:
+		return _finish(host, 1)
+	if _check(session.active_coupler_id == "xtr13" and session.active_tool_id == "gb12",
+			"session did not track the sy155w default attachment: %s+%s" % [session.active_coupler_id, session.active_tool_id]) != 0:
+		return _finish(host, 1)
+	if _check(session.request_model_switch("sy135neo"), "model switch to sy135neo failed: %s" % [session.last_error]) != 0:
+		return _finish(host, 1)
+	await process_frame
+	await process_frame
+	if _check(presentation.get_active_model_id() == "sy135neo", "sy135neo did not activate") != 0:
+		return _finish(host, 1)
+	if _check(session.active_coupler_id == "xtr13" and session.active_tool_id == "gb12",
+			"session lost sync after the cross-model remount: %s+%s" % [session.active_coupler_id, session.active_tool_id]) != 0:
+		return _finish(host, 1)
+	if _check(session.request_coupler_switch("none"),
+			"sy135neo could not release the coupler: %s" % [session.last_error]) != 0:
+		return _finish(host, 1)
+	if _check(session.active_coupler_id == "none" and session.active_tool_id == "standard_bucket",
+			"sy135neo did not restore the native bucket: %s+%s" % [session.active_coupler_id, session.active_tool_id]) != 0:
+		return _finish(host, 1)
+	if _check(not bool(rig.joint_state_for_test().get("mounted", true)),
+			"mount was not released on sy135neo") != 0:
+		return _finish(host, 1)
+	var neo_restored := false
+	for visual in presentation.get_frame_visual_nodes("bucket_link"):
+		if visual.visible:
+			neo_restored = true
+	if _check(neo_restored, "native bucket visuals were not restored on sy135neo") != 0:
+		return _finish(host, 1)
+
 	print("attachment switch contract passed.")
 	_finish(host, 0)
 
