@@ -19,6 +19,11 @@ const WORK_JOINTS := ["boom_joint", "arm_joint", "bucket_joint"]
 ## 0 reproduces the pure-P limit cycle observed near kinematic toggles, 1
 ## approaches critical damping. 0.5 damps the ring without slowing recovery.
 const VELOCITY_DAMPING := 0.5
+## Kinematic reach below this fraction of the demanded rate counts as
+## starvation for relaxed mode: the strict solve is still nominally feasible
+## but can only crawl toward a bound, so the pitch constraint is released
+## instead of waiting for a hard block that the braking law never produces.
+const RELAXED_STARVATION_SCALE := 0.1
 
 var horizontal_speed_m_s := 1.0
 var input_deadband := 0.05
@@ -222,7 +227,30 @@ func step(ctx: RefCounted, commands: Vector4) -> Dictionary:
 	_debug_v0 = debug.get("v0", Vector3.ZERO)
 	_debug_blocked = String(debug.get("blocked_joint", ""))
 	var blocked := int(solved.get("blocked", Solver.BLOCKED_NONE))
-	if blocked == Solver.BLOCKED_KINEMATIC and relaxed_attitude:
+	var strict_scale := float(solved.get("scale", 0.0))
+	# Relaxed mode engages on a hard kinematic block AND on kinematic
+	# starvation: near a joint limit the braking/position bounds shrink the
+	# executable window toward zero without ever reporting a block, so the
+	# strict solve would crawl at ~zero scale forever with the pitch row
+	# still held. kin_lo/kin_hi are the pure kinematic bounds — the momentum
+	# window doesn't count, since releasing attitude cannot buy headroom
+	# against the accel/jerk chain.
+	var starved := blocked == Solver.BLOCKED_KINEMATIC
+	if not starved and relaxed_attitude and blocked == Solver.BLOCKED_NONE:
+		var kin_los := debug.get("kin_lo", Vector3.ZERO) as Vector3
+		var kin_his := debug.get("kin_hi", Vector3.ZERO) as Vector3
+		var kin_lo_list := [kin_los.x, kin_los.y, kin_los.z]
+		var kin_hi_list := [kin_his.x, kin_his.y, kin_his.z]
+		var rate_list0 := [rates.x, rates.y, rates.z]
+		for index in WORK_JOINTS.size():
+			var rate := float(rate_list0[index])
+			if absf(rate) <= Solver.RATE_EPS:
+				continue
+			var kin_reach: float = float(kin_hi_list[index]) / rate if rate > 0.0 else float(kin_lo_list[index]) / rate
+			if kin_reach <= RELAXED_STARVATION_SCALE:
+				starved = true
+				break
+	if starved and relaxed_attitude:
 		# Relaxed mode: the pitch row demanded a joint past its bound, so
 		# drop it and re-solve height+intent only — the bucket angle floats
 		# free (continuously, via DLS's least-norm rates) and the pass keeps
@@ -238,10 +266,18 @@ func step(ctx: RefCounted, commands: Vector4) -> Dictionary:
 			var free_rates := Solver.solve_dls_2x3(j_relaxed, desired2, dls_lambda)
 			var free := Solver.rates_to_commands(free_rates, ctx, WORK_JOINTS)
 			if int(free.get("blocked", Solver.BLOCKED_KINEMATIC)) == Solver.BLOCKED_NONE:
-				solved = free
-				blocked = Solver.BLOCKED_NONE
-				_attitude_ref = ctx.bucket_attitude_rad()
-				flags.append("%s_relaxed" % flag_prefix)
+				# Hard-blocked strict: any feasible fallback wins. Starved
+				# strict: adopt only when dropping the pitch row actually
+				# clears the starvation band — a fallback that still crawls
+				# at a similar scale would just leak the attitude hold for
+				# no real travel gain.
+				var free_scale := float(free.get("scale", 0.0))
+				if blocked == Solver.BLOCKED_KINEMATIC \
+					or free_scale > maxf(strict_scale * 1.25, RELAXED_STARVATION_SCALE):
+					solved = free
+					blocked = Solver.BLOCKED_NONE
+					_attitude_ref = ctx.bucket_attitude_rad()
+					flags.append("%s_relaxed" % flag_prefix)
 				break
 			var free_debug := free.get("debug", {}) as Dictionary
 			var free_lo := free_debug.get("lo", Vector3.ZERO) as Vector3

@@ -125,6 +125,8 @@ static func rates_to_commands(rates: Vector3, ctx: RefCounted, work_joints: Arra
 	var rate_list := [rates.x, rates.y, rates.z]
 	var lo := [0.0, 0.0, 0.0]
 	var hi := [0.0, 0.0, 0.0]
+	var kin_lo_v := [0.0, 0.0, 0.0]
+	var kin_hi_v := [0.0, 0.0, 0.0]
 	var scale := 1.0
 	var active := false
 	var limit_blocked := false
@@ -162,6 +164,8 @@ static func rates_to_commands(rates: Vector3, ctx: RefCounted, work_joints: Arra
 		var hi_v: float = minf(v0 + step_pos, kin_hi)
 		lo[index] = lo_v
 		hi[index] = hi_v
+		kin_lo_v[index] = kin_lo
+		kin_hi_v[index] = kin_hi
 		var rate := float(rate_list[index])
 		if absf(rate) <= RATE_EPS:
 			continue
@@ -180,6 +184,8 @@ static func rates_to_commands(rates: Vector3, ctx: RefCounted, work_joints: Arra
 		"rates": rates,
 		"lo": Vector3(lo[0], lo[1], lo[2]),
 		"hi": Vector3(hi[0], hi[1], hi[2]),
+		"kin_lo": Vector3(kin_lo_v[0], kin_lo_v[1], kin_lo_v[2]),
+		"kin_hi": Vector3(kin_hi_v[0], kin_hi_v[1], kin_hi_v[2]),
 		"v0": Vector3(
 			float(ctx.joint_velocities.get(work_joints[0], 0.0)),
 			float(ctx.joint_velocities.get(work_joints[1], 0.0)),

@@ -620,6 +620,8 @@ func _rebuild_menu_theme() -> void:
 	_refresh_prompt_copy()
 	_sync_test_graphics_toggle()
 	_sync_race_mode_toggle()
+	_sync_relaxed_assist_toggle()
+	_sync_simple_digging_toggle()
 	_refresh()
 	_refresh_model_selector()
 	_refresh_capture_status()

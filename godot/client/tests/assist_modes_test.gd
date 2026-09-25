@@ -21,6 +21,7 @@ func _run() -> void:
 	var failures: Array[String] = []
 	_check_relaxed_assist_contracts(failures)
 	_check_relaxed_assist_at_bound(failures)
+	_check_relaxed_propagation(failures)
 	await _check_simple_digging(failures)
 	for failure in failures:
 		push_error(failure)
@@ -122,15 +123,17 @@ func _drive_at_bound(failures: Array[String], relaxed: bool) -> Dictionary:
 	var pipeline := fixture["pipeline"] as EquipmentAssistPipeline
 	var articulation := fixture["articulation"] as KinematicArticulationState
 	var chassis := Transform3D(Basis.IDENTITY, Vector3(0.0, 1.0, 0.0))
-	# Park the bucket at its full-curl bound with the arm mid-range: pushing
-	# out while holding pitch demands more bucket travel than remains — the
-	# classic corner the relaxed mode exists for. Boom/arm stay mid-range so
-	# the 2x3 fallback retains a feasible height+intent combination.
+	# Park the bucket just above its full-curl bound with the arm mid-range:
+	# pushing out while holding pitch first crawls through the starvation band
+	# (the braking law squeezes the reachable window without a hard block),
+	# then hits the position bound — the classic corner the relaxed mode
+	# exists for. Boom/arm stay mid-range so the 2x3 fallback retains a
+	# feasible height+intent combination.
 	var positions := {
 		"swing_joint": 0.0,
 		"boom_joint": 0.0,
 		"arm_joint": -0.4,
-		"bucket_joint": _joint_position_at_fraction(articulation, "bucket_joint", 0.0),
+		"bucket_joint": _joint_position_at_fraction(articulation, "bucket_joint", 0.005),
 	}
 	_teleport(articulation, chassis, positions)
 	# Arm the integrator's neutral handshake: proposals stay stationary until
@@ -169,6 +172,40 @@ func _drive_at_bound(failures: Array[String], relaxed: bool) -> Dictionary:
 		stats["max_attitude_step_rad"] = maxf(float(stats["max_attitude_step_rad"]), absf(attitude - last_attitude))
 		last_attitude = attitude
 	return stats
+
+
+## Propagation contract: the chassis flag must persist even while the Jolt
+## runtime is absent so the runtime-rebuild path can re-inject it, and
+## ProductSession must keep the requested value instead of reading back a
+## cleared flag. A bare chassis has no runtime — the setter returns false but
+## the flag stays set for the next configure().
+func _check_relaxed_propagation(failures: Array[String]) -> void:
+	var chassis := TrackedChassisController.new()
+	var set_result := chassis.set_relaxed_assist_enabled(true)
+	_expect(not set_result, "relaxed: chassis reports no live runtime to inject", failures)
+	_expect(
+		chassis.relaxed_assist_enabled,
+		"relaxed: chassis flag persists across runtime-less calls",
+		failures,
+	)
+	_expect(
+		chassis.set_relaxed_assist_enabled(false) or not chassis.relaxed_assist_enabled,
+		"relaxed: chassis flag clears on disable",
+		failures,
+	)
+	chassis.free()
+	var session := ProductSession.new()
+	_expect(
+		session.request_relaxed_assist(true) and session.relaxed_assist_enabled,
+		"relaxed: session keeps the enabled state without a chassis",
+		failures,
+	)
+	_expect(
+		session.request_simple_digging(true) and session.simple_digging_enabled,
+		"simple digging: session keeps the enabled state without a world",
+		failures,
+	)
+	session.free()
 
 
 func _joint_position_at_fraction(articulation: KinematicArticulationState, joint_name: String, fraction: float) -> float:

@@ -41,3 +41,22 @@ black-hole mode
 `slope_grade_assist_test.gd` fails on sy205 (no along-axis progress / tooth
 off bench) — reproduced identically with the change stashed.
 `operator_ui_test.gd` retains the known soil-timing failure.
+
+## Follow-up fixes (propagation + starvation)
+
+- Relaxed assist never engaged in the real scene: the persisted option sets
+  the chassis flag before the deferred Jolt runtime exists, and
+  `_configure_jolt_runtime` never re-injected `relaxed_attitude` — every
+  model build/switch silently dropped it. Runtime creation now re-pushes the
+  params to both guided stages when the chassis flag is set.
+- Hard-block-only triggering missed the real failure mode: near a joint
+  limit the braking law shrinks the kinematic window toward zero so the
+  strict solve crawls asymptotically without ever reporting
+  `BLOCKED_KINEMATIC`. The solver now exposes `kin_lo`/`kin_hi` and the
+  stage treats reach below `RELAXED_STARVATION_SCALE` as a release
+  candidate, adopting the 2x3 solve only when it clears that band.
+- `_rebuild_menu_theme` resynced race/test-graphics toggles but not the two
+  new advanced toggles, so a theme switch left the relaxed/simple-digging
+  buttons showing stale state (the visible-off / runtime-on desync reported
+  as 'simple digging cannot be turned off'). Both sync helpers now run on
+  rebuild.

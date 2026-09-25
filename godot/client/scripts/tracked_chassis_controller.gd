@@ -988,6 +988,9 @@ func _configure_jolt_runtime(catalog_entry: Dictionary) -> bool:
 		digging_response_enabled and _digging_response.configured and not _bucket_ground_bypassed()
 	)
 	_jolt_runtime.set_equipment_assist_enabled("bucket_level", level_assist_enabled)
+	if relaxed_assist_enabled:
+		_jolt_runtime.set_equipment_assist_params("bucket_level", {"relaxed_attitude": true})
+		_jolt_runtime.set_equipment_assist_params("slope_grade", {"relaxed_attitude": true})
 	_on_jolt_post_step_snapshot(_jolt_runtime.get_post_step_snapshot())
 	return true
 

@@ -51,6 +51,16 @@ pixi run python backend/scripts/sync_sy205_joint_contract.py [--check]
   becomes `<prefix>_relaxed`, the bucket angle floats continuously, and the
   attitude reference re-latches to the live angle every relaxed tick so a
   later strict solve cannot snap. Strict (default) keeps the 3x3 stall.
+  The fallback also fires on *kinematic starvation*: the braking law squeezes
+  the pure-kinematic rate bound (`kin_lo`/`kin_hi` in the solver debug) toward
+  zero near a limit without ever reporting a block, so when a demanded joint
+  direction reaches below `RELAXED_STARVATION_SCALE` the 2x3 solve is tried
+  too — adopted only if it actually clears the starvation band (momentum
+  windows never count; releasing attitude cannot buy headroom against the
+  accel/jerk chain). The chassis flag must persist while no Jolt runtime
+  exists: `set_relaxed_assist_enabled` returns false without one but keeps
+  the flag, and `_configure_jolt_runtime` re-injects `relaxed_attitude` into
+  both stages so model switches cannot silently drop the option.
 - The assist tracks constraints by *integrator inversion*, not blind rate
   commands: `EquipmentKinematicsContext` mirrors `propose_step`'s cut/limit
   multipliers and the accel/jerk `move_toward` chain, and the stage scales
