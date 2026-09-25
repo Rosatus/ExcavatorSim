@@ -536,6 +536,10 @@ func _activate_model(model_id: String) -> bool:
 			previous.queue_free()
 	_active_model_id = model_id
 	_restore_rest_pose()
+	# A model swap teleports every frame node; without the reset, physics
+	# interpolation would smear one tick of motion from the stale position.
+	_asset_root.reset_physics_interpolation()
+	_asset_root.propagate_call("reset_physics_interpolation")
 	BucketVisualMaterials.apply(_asset_root, _manifest, model_id)
 	model_activated.emit(model_id, _asset_root)
 	return true

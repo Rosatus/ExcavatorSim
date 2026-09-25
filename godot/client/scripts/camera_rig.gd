@@ -104,6 +104,9 @@ var _cab_material_overrides: Array[Dictionary] = []
 
 func _ready() -> void:
 	_ensure_input_actions()
+	# The rig re-places the camera every render frame; physics interpolation
+	# would only add a frame of lag, so keep this node on raw transforms.
+	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	_presentation = get_node_or_null(motion_presentation_path) as MotionPresentation
 	if _presentation != null:
 		_presentation.model_activated.connect(_on_model_activated)

@@ -279,11 +279,6 @@ static func build(ui: CanvasLayer, variant: String = GameSkin.VARIANT_DEBUG) -> 
 	fps_limit_selector.name = "FpsLimitSelector"
 	fps_limit_selector.custom_minimum_size.y = 42
 	video.add_child(fps_limit_selector)
-	var video_note := Label.new()
-	video_note.text = "无边框全屏适合频繁切换应用窗口；高于 60 的帧率上限需要高刷新率显示器。选项立即生效并记住。"
-	video_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	video_note.add_theme_color_override("font_color", GameSkin.MUTED)
-	video.add_child(video_note)
 	var completion := old.get_node("Completion") as Control
 	move(completion, completion_parent)
 	if completion_parent != body:
