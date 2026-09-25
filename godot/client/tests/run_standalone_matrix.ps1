@@ -20,6 +20,7 @@ $tests = @(
     "equipment_command_mapper_test.gd",
     "pad_layer_input_test.gd",
     "control_input_hud_test.gd",
+    "video_settings_test.gd",
     "ict_status_indicator_test.gd",
     "can_gateway_ict_result_test.gd",
     # operator_ui_test.gd / motion_client_test.gd: pre-existing failures

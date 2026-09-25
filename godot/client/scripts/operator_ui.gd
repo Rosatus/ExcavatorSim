@@ -13,6 +13,12 @@ const CONFIG_SECTION := "onboarding"
 const CONFIG_GUIDE_DISMISSED := "guide_dismissed"
 const CONFIG_SECTION_UI := "ui"
 const CONFIG_UI_THEME := "theme"
+const CONFIG_SECTION_VIDEO := "video"
+const CONFIG_VIDEO_WINDOW_MODE := "window_mode"
+const CONFIG_VIDEO_FPS_LIMIT := "fps_limit"
+const WINDOW_MODE_FULLSCREEN := "fullscreen"
+const WINDOW_MODE_BORDERLESS := "borderless"
+const WINDOW_MODE_WINDOWED := "windowed"
 
 @export var motion_client_path := NodePath("../MotionClient")
 @export var product_session_path := NodePath("../ProductSession")
@@ -256,6 +262,7 @@ func _ready() -> void:
 	var can_bridge := _can_bridge()
 	if can_bridge != null and can_bridge.has_signal("ict_link_status_changed"):
 		can_bridge.connect("ict_link_status_changed", _on_pc001_link_status_changed)
+	_apply_saved_video_settings()
 	_menu = MenuLayout.build(self, _ui_theme)
 	_wire_built_menu()
 	_build_capture_controls()
@@ -403,6 +410,7 @@ func _wire_built_menu() -> void:
 	_configure_attachment_selector()
 	_configure_map_selector()
 	_configure_theme_selector()
+	_configure_video_selectors()
 	var dock := _menu.get("hardware") as Control
 	if dock != null:
 		dock.resized.connect(_layout_menu)
@@ -454,6 +462,107 @@ func _apply_ui_theme(variant: String) -> void:
 	config.set_value(CONFIG_SECTION_UI, CONFIG_UI_THEME, variant)
 	config.save(CONFIG_PATH)
 	_rebuild_menu_theme()
+
+
+## Video settings live on their own page and persist next to the theme in
+## operator_ui.cfg; applied once at startup (saved values) and live on every
+## selection. Window mode maps to exclusive fullscreen / borderless fullscreen
+## / windowed; fps limit writes Engine.max_fps (0 = uncapped).
+func _apply_saved_video_settings() -> void:
+	var config := ConfigFile.new()
+	config.load(CONFIG_PATH)
+	_apply_window_mode(String(config.get_value(CONFIG_SECTION_VIDEO, CONFIG_VIDEO_WINDOW_MODE, WINDOW_MODE_WINDOWED)))
+	_apply_fps_limit(int(config.get_value(CONFIG_SECTION_VIDEO, CONFIG_VIDEO_FPS_LIMIT, 60)))
+
+
+func _configure_video_selectors() -> void:
+	var window_selector := _menu.get("window_mode_selector") as OptionButton
+	if window_selector != null:
+		window_selector.add_item("显示模式：窗口")
+		window_selector.set_item_metadata(0, WINDOW_MODE_WINDOWED)
+		window_selector.add_item("显示模式：无边框全屏")
+		window_selector.set_item_metadata(1, WINDOW_MODE_BORDERLESS)
+		window_selector.add_item("显示模式：全屏")
+		window_selector.set_item_metadata(2, WINDOW_MODE_FULLSCREEN)
+		window_selector.tooltip_text = "窗口 / 无边框全屏 / 独占全屏，立即生效并记住选择。无边框全屏切换应用窗口更顺畅。"
+		window_selector.item_selected.connect(_on_window_mode_selected)
+	var fps_selector := _menu.get("fps_limit_selector") as OptionButton
+	if fps_selector != null:
+		fps_selector.add_item("帧率上限：60 FPS")
+		fps_selector.set_item_metadata(0, 60)
+		fps_selector.add_item("帧率上限：120 FPS")
+		fps_selector.set_item_metadata(1, 120)
+		fps_selector.add_item("帧率上限：不限制")
+		fps_selector.set_item_metadata(2, 0)
+		fps_selector.tooltip_text = "限制渲染帧率上限；高于 60 需要高刷新率显示器。"
+		fps_selector.item_selected.connect(_on_fps_limit_selected)
+	_refresh_video_selectors()
+
+
+func _refresh_video_selectors() -> void:
+	var window_selector := _menu.get("window_mode_selector") as OptionButton
+	if window_selector != null:
+		var mode := _current_window_mode_id()
+		for index in range(window_selector.item_count):
+			if String(window_selector.get_item_metadata(index)) == mode:
+				window_selector.select(index)
+				break
+	var fps_selector := _menu.get("fps_limit_selector") as OptionButton
+	if fps_selector != null:
+		for index in range(fps_selector.item_count):
+			if int(fps_selector.get_item_metadata(index)) == Engine.max_fps:
+				fps_selector.select(index)
+				break
+
+
+func _current_window_mode_id() -> String:
+	match DisplayServer.window_get_mode():
+		DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN:
+			return WINDOW_MODE_FULLSCREEN
+		DisplayServer.WINDOW_MODE_FULLSCREEN:
+			return WINDOW_MODE_BORDERLESS
+	return WINDOW_MODE_WINDOWED
+
+
+func _on_window_mode_selected(index: int) -> void:
+	var selector := _menu.get("window_mode_selector") as OptionButton
+	var mode_id := String(selector.get_item_metadata(index))
+	_apply_window_mode(mode_id)
+	_save_video_config(mode_id, Engine.max_fps)
+
+
+func _apply_window_mode(mode_id: String) -> void:
+	match mode_id:
+		WINDOW_MODE_FULLSCREEN:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)
+		WINDOW_MODE_BORDERLESS:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+		_:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+			var screen := DisplayServer.screen_get_position(DisplayServer.window_get_current_screen())
+			screen += DisplayServer.screen_get_size() / 2
+			DisplayServer.window_set_position(screen - DisplayServer.window_get_size() / 2)
+
+
+func _on_fps_limit_selected(index: int) -> void:
+	var selector := _menu.get("fps_limit_selector") as OptionButton
+	var limit := int(selector.get_item_metadata(index))
+	_apply_fps_limit(limit)
+	_save_video_config(_current_window_mode_id(), limit)
+
+
+func _apply_fps_limit(limit: int) -> void:
+	Engine.max_fps = maxi(limit, 0)
+
+
+## Persist the requested state, not the observed one: a window manager may
+## refuse or defer a mode change, but the user's choice is what reloads.
+func _save_video_config(window_mode_id: String, fps_limit: int) -> void:
+	var config := ConfigFile.new()
+	config.load(CONFIG_PATH)
+	config.set_value(CONFIG_SECTION_VIDEO, CONFIG_VIDEO_WINDOW_MODE, window_mode_id)
+	config.set_value(CONFIG_SECTION_VIDEO, CONFIG_VIDEO_FPS_LIMIT, fps_limit)
+	config.save(CONFIG_PATH)
 
 
 ## Runtime theme switch: the two variants compose different menu structures
@@ -579,6 +688,9 @@ func get_control_for_test(id: String) -> Control:
 		"performance_status": _capture_status,
 		"control_hint": _control_hint,
 		"controls_page": (_menu["tabs"] as TabContainer).get_tab_control(1),
+		"video_page": (_menu["tabs"] as TabContainer).get_tab_control(3),
+		"window_mode_selector": _menu.get("window_mode_selector"),
+		"fps_limit_selector": _menu.get("fps_limit_selector"),
 	}.get(id) as Control
 
 

@@ -133,7 +133,7 @@ static func build(ui: CanvasLayer, variant: String = GameSkin.VARIANT_DEBUG) -> 
 		boot_rail.append(resume)
 		var rail_sep := HSeparator.new()
 		rail_body.add_child(rail_sep)
-		var nav_titles := ["设备与设置", "操作说明", "高级工具"]
+		var nav_titles := ["设备与设置", "操作说明", "高级工具", "视频设置"]
 		for index in nav_titles.size():
 			var item := Button.new()
 			item.name = "Nav%d" % index
@@ -201,6 +201,7 @@ static func build(ui: CanvasLayer, variant: String = GameSkin.VARIANT_DEBUG) -> 
 	var settings := page(tabs, "设备与设置")
 	var controls := page(tabs, "操作说明")
 	var advanced := page(tabs, "高级工具")
+	var video := page(tabs, "视频设置")
 	settings.add_child(section_heading("当前设备", variant))
 	move(old.get_node("Header"), settings)
 	var coupler_selector := OptionButton.new()
@@ -268,6 +269,21 @@ static func build(ui: CanvasLayer, variant: String = GameSkin.VARIANT_DEBUG) -> 
 	# Session readouts belong to the advanced menu, not a persistent driving panel.
 	for key in ["Operation", "BucketStatus", "BucketFill", "Warning"]:
 		move(old.get_node(key), advanced)
+	video.add_child(section_heading("显示模式", variant))
+	var window_mode_selector := OptionButton.new()
+	window_mode_selector.name = "WindowModeSelector"
+	window_mode_selector.custom_minimum_size.y = 42
+	video.add_child(window_mode_selector)
+	video.add_child(section_heading("帧率上限", variant))
+	var fps_limit_selector := OptionButton.new()
+	fps_limit_selector.name = "FpsLimitSelector"
+	fps_limit_selector.custom_minimum_size.y = 42
+	video.add_child(fps_limit_selector)
+	var video_note := Label.new()
+	video_note.text = "无边框全屏适合频繁切换应用窗口；高于 60 的帧率上限需要高刷新率显示器。选项立即生效并记住。"
+	video_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	video_note.add_theme_color_override("font_color", GameSkin.MUTED)
+	video.add_child(video_note)
 	var completion := old.get_node("Completion") as Control
 	move(completion, completion_parent)
 	if completion_parent != body:
@@ -279,7 +295,7 @@ static func build(ui: CanvasLayer, variant: String = GameSkin.VARIANT_DEBUG) -> 
 	if not nav.is_empty():
 		nav[0].set_pressed_no_signal(true)
 	old.get_parent().queue_free()
-	return {"root": root, "panel": panel, "resume": resume, "tabs": tabs, "hardware": hardware, "atmosphere": atmosphere, "coupler_selector": coupler_selector, "attachment_selector": attachment_selector, "map_selector": map_selector, "theme_selector": theme_selector, "nav": nav, "page_title": page_title, "backdrop": backdrop, "boot": {"rail": boot_rail, "right": boot_right, "fade": boot_fade}, "variant": variant}
+	return {"root": root, "panel": panel, "resume": resume, "tabs": tabs, "hardware": hardware, "atmosphere": atmosphere, "coupler_selector": coupler_selector, "attachment_selector": attachment_selector, "map_selector": map_selector, "theme_selector": theme_selector, "window_mode_selector": window_mode_selector, "fps_limit_selector": fps_limit_selector, "nav": nav, "page_title": page_title, "backdrop": backdrop, "boot": {"rail": boot_rail, "right": boot_right, "fade": boot_fade}, "variant": variant}
 
 static func section_heading(text: String, variant: String) -> Control:
 	var label := Label.new()
