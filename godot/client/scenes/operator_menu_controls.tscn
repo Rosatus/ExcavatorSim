@@ -282,10 +282,9 @@ layout_mode = 2
 text = "宽松辅助控制"
 tooltip_text = "辅助模式不再强制保持铲斗角度：到达运动学边界时逐步放开角度约束，以延长沿平面/坡面的辅助行程"
 
-[node name="SimpleDigging" type="CheckButton" parent="StatusPanel/Margin/VBox/AdvancedPanel"]
+[node name="SimpleDigging" type="OptionButton" parent="StatusPanel/Margin/VBox/AdvancedPanel"]
 layout_mode = 2
-text = "简易挖掘（只切不卸）"
-tooltip_text = "铲斗只负责切削：装满后不会阻止继续切削，且土壤在任何姿态下都不会从铲斗中卸出"
+tooltip_text = "铲斗只负责切削：生效期间装满不会阻止继续切削，且土壤在任何姿态下都不会从铲斗中卸出。可选择始终生效或仅在辅助模式激活时生效"
 
 [node name="BucketVolume" type="Label" parent="StatusPanel/Margin/VBox/AdvancedPanel" unique_id=2114908316]
 layout_mode = 2

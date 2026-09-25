@@ -30,6 +30,15 @@ authority rebuilds (re-applied on configure) and re-enabling restores the normal
 gate. This is a production mode, distinct from the test-only
 `set_voxel_unlimited_bucket_for_testing` capacity override.
 
+The option is a three-state scope on `ProductSession` (`simple_digging_mode`:
+OFF / ALWAYS / ASSIST_ONLY; the legacy bool request maps on->ALWAYS). The
+session recomputes the effective flag every physics tick — chassis-side assist
+toggles (level assist key, slope preview Enter/Esc) bypass the session, so
+polling is the only complete observation path — and pushes it to
+`ExcavationWorld` only on change. ASSIST_ONLY counts level assist enabled or
+slope mode ACTIVE; the slope PREVIEW phase does not drive the bucket, so the
+gate stays open there. Legacy bool config values migrate to ALWAYS/OFF on load.
+
 ### Receiving surface (2026-09-18)
 
 Route incoming material from the column below the release point over the current

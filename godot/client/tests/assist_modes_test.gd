@@ -206,6 +206,45 @@ func _check_relaxed_propagation(failures: Array[String]) -> void:
 		failures,
 	)
 	session.free()
+	# Scoped mode: ASSIST_ONLY engages only while an assist actually drives.
+	var chassis2 := TrackedChassisController.new()
+	var world := ExcavationWorld.new()
+	var scoped := ProductSession.new()
+	scoped._chassis = chassis2
+	scoped._excavation = world
+	scoped.request_simple_digging_mode(ProductSession.SIMPLE_DIGGING_ASSIST_ONLY)
+	_expect(
+		not scoped.simple_digging_enabled and not world.simple_digging_enabled,
+		"simple digging assist-scoped stays off without an active assist",
+		failures,
+	)
+	chassis2.level_assist_enabled = true
+	scoped._apply_simple_digging()
+	_expect(
+		scoped.simple_digging_enabled and world.simple_digging_enabled,
+		"simple digging assist-scoped engages with level assist",
+		failures,
+	)
+	chassis2.level_assist_enabled = false
+	chassis2._slope_mode = TrackedChassisController.SLOPE_MODE_PREVIEW
+	scoped._apply_simple_digging()
+	_expect(
+		not world.simple_digging_enabled,
+		"simple digging assist-scoped ignores the slope preview phase",
+		failures,
+	)
+	chassis2._slope_mode = TrackedChassisController.SLOPE_MODE_ACTIVE
+	scoped._apply_simple_digging()
+	_expect(world.simple_digging_enabled, "simple digging assist-scoped engages on active slope", failures)
+	scoped.request_simple_digging_mode(ProductSession.SIMPLE_DIGGING_ALWAYS)
+	chassis2._slope_mode = TrackedChassisController.SLOPE_MODE_OFF
+	scoped._apply_simple_digging()
+	_expect(world.simple_digging_enabled, "simple digging always-on ignores assist state", failures)
+	scoped.request_simple_digging_mode(ProductSession.SIMPLE_DIGGING_OFF)
+	_expect(not world.simple_digging_enabled, "simple digging off clears the world gate", failures)
+	chassis2.free()
+	world.free()
+	scoped.free()
 
 
 func _joint_position_at_fraction(articulation: KinematicArticulationState, joint_name: String, fraction: float) -> float:

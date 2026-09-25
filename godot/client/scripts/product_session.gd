@@ -39,6 +39,14 @@ var bucket_ground_transition_sequence := 0
 var level_assist_enabled := false
 var race_mode_enabled := false
 var relaxed_assist_enabled := false
+## Simple digging scope: off, always on, or only while an assist mode is
+## actually driving (level assist enabled or slope assist in ACTIVE — the
+## preview phase does not drive the bucket, so it does not count).
+const SIMPLE_DIGGING_OFF := 0
+const SIMPLE_DIGGING_ALWAYS := 1
+const SIMPLE_DIGGING_ASSIST_ONLY := 2
+var simple_digging_mode := SIMPLE_DIGGING_OFF
+var _simple_digging_pushed := false
 var simple_digging_enabled := false
 
 var _presentation: MotionPresentation
@@ -60,8 +68,7 @@ func _ready() -> void:
 	if _chassis != null and relaxed_assist_enabled:
 		_chassis.set_relaxed_assist_enabled(relaxed_assist_enabled)
 	_excavation = get_node_or_null(excavation_world_path) as ExcavationWorld
-	if _excavation != null and simple_digging_enabled:
-		_excavation.set_simple_digging_enabled(simple_digging_enabled)
+	_apply_simple_digging()
 	_attachment_rig = get_node_or_null(attachment_rig_path) as AttachmentRig
 	if _attachment_rig != null:
 		_attachment_rig.attachment_activated.connect(_on_attachment_activated)
@@ -71,6 +78,10 @@ func _ready() -> void:
 
 func _physics_process(_delta: float) -> void:
 	_apply_pending_bucket_ground_mode()
+	# Assist toggles also live on chassis-side input paths (the Y key and the
+	# slope preview's Enter/Esc never route through the session), so the
+	# assist-scoped simple-digging gate is re-evaluated here every tick.
+	_apply_simple_digging()
 	if lifecycle_input_enabled:
 		if Input.is_action_just_pressed("motion_start"):
 			request_start()
@@ -304,14 +315,39 @@ func request_relaxed_assist(enabled: bool) -> bool:
 ## Simple-digging option: contained soil can never leave the bucket and a
 ## full bucket never blocks cutting (overflow is discarded mass), so the tool
 ## behaves as a cut-only black hole. Applies to the voxel authority path.
+## Scoped by simple_digging_mode — the legacy bool request maps on->ALWAYS.
 func request_simple_digging(enabled: bool) -> bool:
-	simple_digging_enabled = enabled
-	if _excavation != null:
-		_excavation.set_simple_digging_enabled(enabled)
-		simple_digging_enabled = _excavation.simple_digging_enabled
+	return request_simple_digging_mode(
+		SIMPLE_DIGGING_ALWAYS if enabled else SIMPLE_DIGGING_OFF
+	)
+
+
+func request_simple_digging_mode(mode: int) -> bool:
+	simple_digging_mode = clampi(mode, SIMPLE_DIGGING_OFF, SIMPLE_DIGGING_ASSIST_ONLY)
+	_apply_simple_digging()
 	last_error.clear()
 	status_changed.emit(get_status_snapshot())
 	return true
+
+
+## Recomputes and pushes the effective gate state; cheap enough to poll every
+## physics tick since it only writes when the pushed value would change.
+func _apply_simple_digging() -> void:
+	var effective := simple_digging_mode == SIMPLE_DIGGING_ALWAYS \
+		or (simple_digging_mode == SIMPLE_DIGGING_ASSIST_ONLY and _assist_mode_active())
+	if effective != _simple_digging_pushed or (
+		_excavation != null and _excavation.simple_digging_enabled != effective
+	):
+		_simple_digging_pushed = effective
+		if _excavation != null:
+			_excavation.set_simple_digging_enabled(effective)
+	simple_digging_enabled = effective
+
+
+func _assist_mode_active() -> bool:
+	return _chassis != null and (
+		_chassis.level_assist_enabled or _chassis.slope_mode_state() == "active"
+	)
 
 
 ## Slope-assist state machine mirror of the chassis controller: advance moves
@@ -381,6 +417,7 @@ func get_status_snapshot() -> Dictionary:
 		"race_mode_enabled": _chassis.race_mode_enabled if _chassis != null else race_mode_enabled,
 		"relaxed_assist_enabled": _chassis.relaxed_assist_enabled if _chassis != null else relaxed_assist_enabled,
 		"simple_digging_enabled": _excavation.simple_digging_enabled if _excavation != null else simple_digging_enabled,
+		"simple_digging_mode": simple_digging_mode,
 		"slope_assist": _chassis.slope_status_snapshot() if _chassis != null else {"state": "off"},
 		"assist_menu": _chassis.assist_menu_snapshot() if _chassis != null else {"open": false, "index": 0, "entries": []},
 		"assist_view": _chassis.assist_view_snapshot() if _chassis != null else {},

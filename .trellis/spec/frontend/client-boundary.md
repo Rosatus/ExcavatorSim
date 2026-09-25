@@ -322,6 +322,7 @@ ProductSession.close_assist_menu() -> void
 ProductSession.activate_assist_entry(index: int) -> String
 ProductSession.request_relaxed_assist(enabled: bool) -> bool
 ProductSession.request_simple_digging(enabled: bool) -> bool
+ProductSession.request_simple_digging_mode(mode: int) -> bool
 TrackedChassisController.set_relaxed_assist_enabled(enabled: bool) -> bool
 ExcavationWorld.set_simple_digging_enabled(enabled: bool) -> bool
 VoxelExcavationAuthority.set_dump_gate_enabled(enabled: bool) -> void

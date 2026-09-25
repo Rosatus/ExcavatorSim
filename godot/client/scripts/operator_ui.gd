@@ -102,7 +102,7 @@ var _unlimited_bucket_button: CheckButton
 var _cutting_diagnostics_button: CheckButton
 var _race_mode_button: CheckButton
 var _relaxed_assist_button: CheckButton
-var _simple_digging_button: CheckButton
+var _simple_digging_selector: OptionButton
 
 const GATEWAY_CONFIG_PATH := "user://ict_config.cfg"
 var _bucket_volume_label: Label
@@ -188,7 +188,7 @@ func _bind_controls() -> void:
 	_cutting_diagnostics_button = $StatusPanel/Margin/VBox/AdvancedPanel/CuttingDiagnostics
 	_race_mode_button = $StatusPanel/Margin/VBox/AdvancedPanel/RaceMode
 	_relaxed_assist_button = $StatusPanel/Margin/VBox/AdvancedPanel/RelaxedAssist
-	_simple_digging_button = $StatusPanel/Margin/VBox/AdvancedPanel/SimpleDigging
+	_simple_digging_selector = $StatusPanel/Margin/VBox/AdvancedPanel/SimpleDigging
 	_bucket_volume_label = $StatusPanel/Margin/VBox/AdvancedPanel/BucketVolume
 	_advanced_panel = $StatusPanel/Margin/VBox/AdvancedPanel
 	_reset_button = $StatusPanel/Margin/VBox/Actions/Reset
@@ -219,7 +219,7 @@ func _connect_controls() -> void:
 	_cutting_diagnostics_button.toggled.connect(_on_cutting_diagnostics_toggled)
 	_race_mode_button.toggled.connect(_on_race_mode_toggled)
 	_relaxed_assist_button.toggled.connect(_on_relaxed_assist_toggled)
-	_simple_digging_button.toggled.connect(_on_simple_digging_toggled)
+	_configure_simple_digging_selector()
 	_can_output_button.pressed.connect(_on_can_output_pressed)
 	_gateway_button.pressed.connect(_on_gateway_restart_pressed)
 	_timed_can_button.pressed.connect(_on_timed_can_pressed)
@@ -621,7 +621,7 @@ func _rebuild_menu_theme() -> void:
 	_sync_test_graphics_toggle()
 	_sync_race_mode_toggle()
 	_sync_relaxed_assist_toggle()
-	_sync_simple_digging_toggle()
+	_sync_simple_digging_selector()
 	_refresh()
 	_refresh_model_selector()
 	_refresh_capture_status()
@@ -701,7 +701,7 @@ func get_control_for_test(id: String) -> Control:
 		"window_mode_selector": _menu.get("window_mode_selector"),
 		"fps_limit_selector": _menu.get("fps_limit_selector"),
 		"relaxed_assist": _relaxed_assist_button,
-		"simple_digging": _simple_digging_button,
+		"simple_digging": _simple_digging_selector,
 	}.get(id) as Control
 
 
@@ -970,22 +970,43 @@ func _sync_relaxed_assist_toggle() -> void:
 	)
 
 
-func _on_simple_digging_toggled(enabled: bool) -> void:
+## Items are (re)populated on every menu-controls rebuild — the AdvancedPanel
+## is re-instantiated by _instantiate_menu_controls, not just reparented.
+func _configure_simple_digging_selector() -> void:
+	if _simple_digging_selector == null:
+		return
+	_simple_digging_selector.add_item("简易挖掘：关闭")
+	_simple_digging_selector.set_item_metadata(0, ProductSession.SIMPLE_DIGGING_OFF)
+	_simple_digging_selector.add_item("简易挖掘：始终生效")
+	_simple_digging_selector.set_item_metadata(1, ProductSession.SIMPLE_DIGGING_ALWAYS)
+	_simple_digging_selector.add_item("简易挖掘：仅辅助模式")
+	_simple_digging_selector.set_item_metadata(2, ProductSession.SIMPLE_DIGGING_ASSIST_ONLY)
+	_simple_digging_selector.item_selected.connect(_on_simple_digging_selected)
+
+
+func _on_simple_digging_selected(index: int) -> void:
+	var mode := int(_simple_digging_selector.get_item_metadata(index))
 	var config := ConfigFile.new()
 	config.load(CONFIG_PATH)
-	config.set_value(CONFIG_SECTION_UI, "simple_digging", enabled)
+	config.set_value(CONFIG_SECTION_UI, "simple_digging", mode)
 	config.save(CONFIG_PATH)
 	if _product_session != null:
-		_product_session.request_simple_digging(enabled)
-	_sync_simple_digging_toggle()
+		_product_session.request_simple_digging_mode(mode)
+	_sync_simple_digging_selector()
 
 
-func _sync_simple_digging_toggle() -> void:
-	if _simple_digging_button == null:
+func _sync_simple_digging_selector() -> void:
+	if _simple_digging_selector == null:
 		return
-	_simple_digging_button.set_pressed_no_signal(
-		_product_session != null and _product_session.simple_digging_enabled
+	var mode := (
+		_product_session.simple_digging_mode
+		if _product_session != null
+		else ProductSession.SIMPLE_DIGGING_OFF
 	)
+	for index in range(_simple_digging_selector.item_count):
+		if int(_simple_digging_selector.get_item_metadata(index)) == mode:
+			_simple_digging_selector.select(index)
+			return
 
 
 ## Persisted race-mode choice is applied once the product session exists; the
@@ -1008,10 +1029,18 @@ func _load_assist_options() -> void:
 	if _product_session != null:
 		if bool(config.get_value(CONFIG_SECTION_UI, "relaxed_assist", false)):
 			_product_session.request_relaxed_assist(true)
-		if bool(config.get_value(CONFIG_SECTION_UI, "simple_digging", false)):
-			_product_session.request_simple_digging(true)
+		# Legacy saves stored a bool: true maps to ALWAYS, false to OFF.
+		var stored: Variant = config.get_value(
+			CONFIG_SECTION_UI, "simple_digging", ProductSession.SIMPLE_DIGGING_OFF
+		)
+		var digging_mode := (
+			ProductSession.SIMPLE_DIGGING_ALWAYS if stored is bool and stored
+			else clampi(int(stored), 0, ProductSession.SIMPLE_DIGGING_ASSIST_ONLY)
+		)
+		if digging_mode != ProductSession.SIMPLE_DIGGING_OFF:
+			_product_session.request_simple_digging_mode(digging_mode)
 	_sync_relaxed_assist_toggle()
-	_sync_simple_digging_toggle()
+	_sync_simple_digging_selector()
 
 
 func _sync_cutting_diagnostics_toggle() -> void:

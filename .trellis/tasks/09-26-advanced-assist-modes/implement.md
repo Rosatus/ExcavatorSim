@@ -60,3 +60,16 @@ off bench) — reproduced identically with the change stashed.
   buttons showing stale state (the visible-off / runtime-on desync reported
   as 'simple digging cannot be turned off'). Both sync helpers now run on
   rebuild.
+
+## Simple digging scope selector (three-state)
+
+The toggle became an OptionButton with OFF / ALWAYS / ASSIST_ONLY
+(`ProductSession.SIMPLE_DIGGING_*`). The session owns
+`simple_digging_mode` and recomputes the effective gate every
+`_physics_process` tick because chassis-side assist toggles bypass the
+session (`_assist_mode_active` = level assist enabled or slope mode
+ACTIVE; preview does not count). `ExcavationWorld` still takes only the
+effective bool, so gate/cutting semantics are unchanged. UI stores the int
+under the same `simple_digging` config key; legacy bool values migrate
+true->ALWAYS, false->OFF. Selector items are repopulated in
+`_connect_controls` since the menu rebuild re-instantiates the panel.
