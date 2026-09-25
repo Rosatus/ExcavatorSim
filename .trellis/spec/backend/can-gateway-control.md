@@ -74,7 +74,32 @@ TCP server currently stores a client accepted after `who` / `PC001`.
   resets heartbeat freshness, then spawns with the new endpoint.
 - A replacement is not online and ICT is not active until a post-spawn heartbeat
   arrives. A stale heartbeat from the old child cannot complete startup.
-- Forced termination is limited to the exact PID returned by
+- Frozen gateway builds are PyInstaller onefile bundles: the PID returned by
+  `OS.create_process` is the launcher, and the real gateway runs as its child,
+  so two `gateway.exe` entries are normal. Forced termination on Windows must
+  use `taskkill /PID <pid> /T /F` (`_kill_gateway_tree`); terminating the
+  launcher alone orphans the child holding every port. Never scan or kill by
+  process name or port.
+- A dead launcher does not prove a dead gateway: while STARTING, the
+  supervisor keeps the deadline open and lets heartbeats decide. When the
+  tracked PID is absent but heartbeats flow, the port owner is *adopted* as
+  detached (`_gateway_detached`) — status may report ONLINE and restart is not
+  flagged as required. Heartbeats observed with no spawn attempt at all adopt
+  the source likewise. Heartbeat freshness resuming after FAILED self-heals
+  back to IDLE the same way.
+- Detached gateways have no PID to wait on: shutdown is proven by heartbeats
+  going quiet (missing ~two 0.5 s intervals, `GATEWAY_HEARTBEAT_QUIET_MS`),
+  with the grace deadline extended so a responsive owner stops before failure
+  is declared. `is_gateway_online()`/`is_gateway_restart_required()` treat a
+  detached fresh-heartbeat owner as healthy.
+- The ACK socket must be bound for heartbeats to exist at all; when the
+  desired `ack_port` is held by a stale process, `_ensure_ack_bound` scans
+  forward and the actually bound port (`_ack_port_bound`) is what spawn argv
+  passes as `--ack-port`. Headless runs skip the auto-bind unless a gateway is
+  involved; tests bind explicitly. `spawn_gateway` also emits a fire-and-forget
+  SHUTDOWN first so a port-owning orphan is reclaimed before the new child
+  binds.
+- Forced termination is limited to the exact PID tree returned by
   `OS.create_process`; never scan or kill by process name or port.
 - Windows native and Python-development launch paths share the same gateway
   argument builder and include `--sink tcp --tcp-host HOST --tcp-port PORT`.
@@ -147,9 +172,12 @@ TCP server currently stores a client accepted after `who` / `PC001`.
 | Host is not IPv4/`localhost`, or port is not `1..65535` | Return `false`; do not mutate desired endpoint, child, or ICT state |
 | Valid endpoint submitted through Gateway action | Persist it, stop the exact owned PID if present, spawn new argv, await a fresh heartbeat |
 | Invalid endpoint submitted through Gateway action | Do not persist, mutate desired endpoint, or restart |
-| Child ignores graceful shutdown | Kill only that owned PID after the bounded grace period |
+| Child ignores graceful shutdown | Kill only that owned PID tree (`taskkill /T` on Windows) after the bounded grace period |
 | Child still exists after termination grace | Enter explicit failed state; do not forget PID or start a competing listener |
 | Child exits or never heartbeats during startup | Keep ICT inactive and expose an actionable gateway error |
+| Launcher PID dies but heartbeats keep arriving | Adopt the port owner as detached; report ONLINE; do not require restart |
+| Respawn requested while a heartbeat source owns the ports | Send SHUTDOWN first and wait for heartbeat silence; never blind-spawn a child that cannot bind |
+| Desired ack port is held by another process | Bind the next free port and pass it as `--ack-port`; never run heartbeat-deaf |
 | Timed trigger while gateway offline | Return `false`; emit no control packet |
 | Timed trigger while active | Reset to one new window; no overlapping burst |
 | Gateway loop is late | Emit at most one current frame, skip missed slots, stop at 10 seconds |

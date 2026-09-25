@@ -29,7 +29,12 @@ const HEARTBEAT_FLAG_ICT_HANDSHAKE := 0x04
 const HEARTBEAT_TIMEOUT_MS := 2500
 const GATEWAY_SHUTDOWN_GRACE_MS := 1500
 const GATEWAY_KILL_GRACE_MS := 1000
-const GATEWAY_STARTUP_TIMEOUT_MS := 5000
+# Frozen (PyInstaller onefile) gateways need several seconds to unpack and
+# boot; 5 s was short enough to kill healthy cold starts and orphan the child.
+const GATEWAY_STARTUP_TIMEOUT_MS := 20000
+# > 2 heartbeat intervals (0.5 s): long enough to prove a port owner stopped,
+# short enough to fit the shutdown grace period.
+const GATEWAY_HEARTBEAT_QUIET_MS := 1200
 const ICT_RESULT_TIMEOUT_MS := 5000
 
 enum GatewayStatus { OFFLINE, ONLINE, RECORDING }
@@ -51,6 +56,11 @@ enum GatewayLifecycle { IDLE, STARTING, STOPPING, FAILED }
 var _udp: PacketPeerUDP = null
 var _ack: PacketPeerUDP = null
 var _ack_bound := false
+## The port the ACK socket actually bound: a stale instance (crashed game,
+## orphaned headless run) may still hold ack_port, and without this socket no
+## heartbeat can ever arrive — a permanent offline failure. The bound port is
+## what gets passed to the spawned gateway as --ack-port.
+var _ack_port_bound := -1
 var _last_bind_try_ms := -10000
 var _presentation: Node = null
 var _chassis: Node = null
@@ -76,6 +86,12 @@ var _gateway_lifecycle := GatewayLifecycle.IDLE
 var _gateway_deadline_ms := -1
 var _restart_after_stop := false
 var _forced_kill_sent := false
+## True while the port owner heartbeats but no live spawned pid exists. The
+## frozen gateway spawns as a *child* of the launcher pid OS.create_process
+## returns, so a dead launcher does not imply a dead gateway — and killing the
+## launcher alone orphans the child holding every port. Detached gateways are
+## adopted via heartbeats and reclaimed through the UDP SHUTDOWN packet.
+var _gateway_detached := false
 var _last_gateway_error := ""
 var _control_seq := 0
 var _last_segment_path := ""
@@ -98,14 +114,25 @@ func _ensure_ack_bound() -> bool:
 	if _ack_bound:
 		return true
 	_ack = PacketPeerUDP.new()
-	if _ack.bind(ack_port) != OK:
-		return false
-	_ack_bound = true
-	return true
+	# The desired port may be held by a stale instance; scan a small range so
+	# the spawned gateway has a heartbeat destination we actually receive.
+	for offset in range(17):
+		if _ack.bind(ack_port + offset) == OK:
+			_ack_port_bound = ack_port + offset
+			_ack_bound = true
+			return true
+	return false
 
 
 func _physics_process(delta: float) -> void:
-	if not _ack_bound and Time.get_ticks_msec() - _last_bind_try_ms > 2000:
+	# Headless runs never auto-spawn; skipping the auto-bind keeps tests from
+	# squatting on the production heartbeat port. Tests opt in by spawning
+	# explicitly or calling _ensure_ack_bound() themselves.
+	var wants_ack := DisplayServer.get_name() != "headless" \
+		or _gateway_pid > 0 or _gateway_detached \
+		or _gateway_lifecycle != GatewayLifecycle.IDLE
+	if wants_ack and not _ack_bound \
+			and Time.get_ticks_msec() - _last_bind_try_ms > 2000:
 		_last_bind_try_ms = Time.get_ticks_msec()
 		_ensure_ack_bound()
 	_poll_heartbeats()
@@ -135,7 +162,8 @@ func _physics_process(delta: float) -> void:
 func _exit_tree() -> void:
 	# Send SHUTDOWN via a throwaway peer: reusing _udp during teardown has
 	# crashed the engine (access violation after peer teardown began).
-	if _gateway_pid > 0:
+	# Detached gateways have no pid to check but still own the control port.
+	if _gateway_pid > 0 or _gateway_detached:
 		var peer := PacketPeerUDP.new()
 		peer.set_dest_address(remote_host, remote_port)
 		peer.put_packet(_build_control_packet(CMD_SHUTDOWN, 0))
@@ -146,10 +174,15 @@ func _exit_tree() -> void:
 
 ## --- public API for the operator panel ---
 
+func _heartbeat_fresh(window_ms := HEARTBEAT_TIMEOUT_MS) -> bool:
+	return _last_heartbeat_ms >= 0 \
+		and Time.get_ticks_msec() - _last_heartbeat_ms <= window_ms
+
+
 func get_status() -> int:
-	var stale := _last_heartbeat_ms < 0 \
-		or Time.get_ticks_msec() - _last_heartbeat_ms > HEARTBEAT_TIMEOUT_MS
-	if _gateway_pid <= 0 or _gateway_lifecycle != GatewayLifecycle.IDLE or stale:
+	if (_gateway_pid <= 0 and not _gateway_detached) \
+			or _gateway_lifecycle != GatewayLifecycle.IDLE \
+			or not _heartbeat_fresh():
 		return GatewayStatus.OFFLINE
 	if _heartbeat_recording:
 		return GatewayStatus.RECORDING
@@ -162,7 +195,7 @@ func is_gateway_online() -> bool:
 
 func set_recording(enabled: bool) -> void:
 	if enabled:
-		if _gateway_pid <= 0:
+		if _gateway_pid <= 0 and not _gateway_detached:
 			spawn_gateway()
 		_send_control(CMD_RECORD_START)
 	else:
@@ -223,7 +256,8 @@ func set_ict_connected(enabled: bool) -> void:
 		_ict_pending_seq = -1
 		_ict_active_seq = -1
 		_ict_result_deadline_ms = -1
-		if _gateway_pid > 0 and _gateway_lifecycle != GatewayLifecycle.STOPPING:
+		if (_gateway_pid > 0 or _gateway_detached) \
+				and _gateway_lifecycle != GatewayLifecycle.STOPPING:
 			_send_control(CMD_ICT_STOP)
 		return
 	_last_gateway_error = ""
@@ -232,11 +266,16 @@ func set_ict_connected(enabled: bool) -> void:
 		return
 	if _gateway_lifecycle != GatewayLifecycle.IDLE:
 		return
-	if _gateway_pid <= 0 or not OS.is_process_running(_gateway_pid):
+	if not _gateway_detached and (
+		_gateway_pid <= 0 or not OS.is_process_running(_gateway_pid)
+	):
 		_gateway_pid = -1
 		spawn_gateway()
 		return
-	if _spawned_tcp_host != tcp_host or _spawned_tcp_port != tcp_port:
+	if _gateway_detached \
+		or _spawned_tcp_host != tcp_host or _spawned_tcp_port != tcp_port:
+		# A heartbeat-adopted gateway's spawn endpoint is unverified — reclaim
+		# it via SHUTDOWN + respawn before trusting it with the ICT link.
 		_begin_gateway_restart()
 		return
 	if is_gateway_online():
@@ -260,7 +299,14 @@ func respawn_gateway() -> bool:
 		return true
 	if _gateway_lifecycle == GatewayLifecycle.FAILED:
 		if _gateway_pid <= 0 or not OS.is_process_running(_gateway_pid):
+			if _heartbeat_fresh():
+				# A heartbeat source still owns the ports (e.g. an orphaned
+				# frozen-gateway child); SHUTDOWN reclaims it where a blind
+				# respawn would die on the port bind.
+				_begin_gateway_restart()
+				return true
 			_gateway_pid = -1
+			_gateway_detached = false
 			_gateway_lifecycle = GatewayLifecycle.IDLE
 			return spawn_gateway()
 		_begin_gateway_restart()
@@ -268,7 +314,11 @@ func respawn_gateway() -> bool:
 	if _gateway_pid > 0 and OS.is_process_running(_gateway_pid):
 		_begin_gateway_restart()
 		return true
+	if _heartbeat_fresh():
+		_begin_gateway_restart()
+		return true
 	_gateway_pid = -1
+	_gateway_detached = false
 	return spawn_gateway()
 
 
@@ -293,9 +343,11 @@ func is_gateway_restart_required() -> bool:
 		return false
 	# Heartbeats alone do not establish ownership: an older/external Gateway
 	# can still broadcast after this instance's child failed to bind its ports.
+	# They only count once _poll_heartbeats marks the owner as detached.
+	var process_ok := _gateway_detached \
+		or (_gateway_pid > 0 and OS.is_process_running(_gateway_pid))
 	return _gateway_lifecycle == GatewayLifecycle.FAILED \
-		or _gateway_pid <= 0 or not OS.is_process_running(_gateway_pid) \
-		or not is_gateway_online()
+		or not process_ok or not is_gateway_online()
 
 
 ## --- process supervision ---
@@ -328,10 +380,11 @@ func _gateway_arguments() -> PackedStringArray:
 
 
 func _gateway_arguments_for_platform(_platform_name: String) -> PackedStringArray:
+	var heartbeat_port := _ack_port_bound if _ack_port_bound > 0 else ack_port
 	var argv := PackedStringArray([
 		"--host", remote_host,
 		"--port", str(remote_port),
-		"--ack-port", str(ack_port),
+		"--ack-port", str(heartbeat_port),
 		"--web-port", str(web_port),
 		"--out", _resolve_output_dir(),
 		"--model", model_id,
@@ -361,7 +414,14 @@ func spawn_gateway() -> bool:
 	_drain_ack_packets()
 	_last_heartbeat_ms = -1
 	_heartbeat_recording = false
+	_gateway_detached = false
 	_set_ict_link_state(false, false)
+	# Bind before resolving argv so --ack-port carries the live port.
+	_ensure_ack_bound()
+	# Reclaim the control port from a leftover owner (e.g. an orphaned gateway
+	# child): SHUTDOWN is port-addressed and needs no heartbeat feedback, and a
+	# frozen child takes seconds to reach its bind — plenty of slack.
+	_send_control(CMD_SHUTDOWN)
 	var argv := _resolve_gateway_command()
 	if argv.is_empty():
 		_set_gateway_error("CanTelemetryBridge: no gateway executable/script found")
@@ -390,6 +450,10 @@ func _begin_gateway_restart() -> void:
 	_restart_after_stop = true
 	_gateway_lifecycle = GatewayLifecycle.STOPPING
 	_gateway_deadline_ms = Time.get_ticks_msec() + GATEWAY_SHUTDOWN_GRACE_MS
+	if _gateway_detached:
+		# No pid to reap — SHUTDOWN only provably lands once the port owner's
+		# heartbeats go quiet, which lags its exit by the missed-interval window.
+		_gateway_deadline_ms += GATEWAY_HEARTBEAT_QUIET_MS
 	_forced_kill_sent = false
 	_send_control(CMD_ICT_STOP)
 	_send_control(CMD_SHUTDOWN)
@@ -398,48 +462,75 @@ func _begin_gateway_restart() -> void:
 func _service_gateway_lifecycle() -> void:
 	var now_ms := Time.get_ticks_msec()
 	if _gateway_lifecycle == GatewayLifecycle.STARTING:
-		if _gateway_pid <= 0 or not OS.is_process_running(_gateway_pid):
+		if _gateway_pid > 0 and not OS.is_process_running(_gateway_pid):
+			# The spawned pid is only the launcher (PyInstaller onefile forks
+			# the real gateway as its child), so it dying proves nothing: the
+			# child may still be booting, or an older instance already owns the
+			# ports. Keep waiting — _poll_heartbeats adopts any heartbeat source.
 			_gateway_pid = -1
-			_gateway_lifecycle = GatewayLifecycle.FAILED
+			_gateway_detached = true
+		if now_ms >= _gateway_deadline_ms:
 			_ict_requested = false
 			_ict_active = false
 			_set_ict_link_state(false, false)
-			_set_gateway_error(
-				(
-					"CAN gateway exited before its first heartbeat; verify TCP endpoint %s:%s "
-					+ "is available (external port owners are not terminated)"
-				) % [tcp_host, tcp_port]
-			)
-		elif now_ms >= _gateway_deadline_ms:
-			OS.kill(_gateway_pid)
-			_ict_requested = false
-			_ict_active = false
-			_set_ict_link_state(false, false)
-			_restart_after_stop = false
-			_forced_kill_sent = true
-			_gateway_lifecycle = GatewayLifecycle.STOPPING
-			_gateway_deadline_ms = now_ms + GATEWAY_KILL_GRACE_MS
-			_set_gateway_error("CAN gateway did not become ready before timeout")
+			if _gateway_pid > 0:
+				_kill_gateway_tree(_gateway_pid)
+				_restart_after_stop = false
+				_forced_kill_sent = true
+				_gateway_lifecycle = GatewayLifecycle.STOPPING
+				_gateway_deadline_ms = now_ms + GATEWAY_KILL_GRACE_MS
+				_set_gateway_error("CAN gateway did not become ready before timeout")
+			else:
+				_gateway_detached = false
+				_gateway_lifecycle = GatewayLifecycle.FAILED
+				_set_gateway_error(
+					(
+						"CAN gateway exited before its first heartbeat; verify TCP endpoint %s:%s "
+						+ "is available (external port owners are not terminated)"
+					) % [tcp_host, tcp_port]
+				)
 	elif _gateway_lifecycle == GatewayLifecycle.STOPPING:
-		if _gateway_pid <= 0 or not OS.is_process_running(_gateway_pid):
+		var process_gone := _gateway_pid <= 0 \
+			or not OS.is_process_running(_gateway_pid)
+		# A detached gateway has no pid to reap; its SHUTDOWN only provably
+		# lands once heartbeats miss a couple of intervals.
+		var link_down := process_gone and (
+			not _gateway_detached
+			or not _heartbeat_fresh(GATEWAY_HEARTBEAT_QUIET_MS)
+		)
+		if link_down:
 			_gateway_pid = -1
+			_gateway_detached = false
 			_gateway_lifecycle = GatewayLifecycle.IDLE
 			_forced_kill_sent = false
 			if _restart_after_stop:
 				_restart_after_stop = false
 				spawn_gateway()
 		elif now_ms >= _gateway_deadline_ms:
-			if not _forced_kill_sent:
-				OS.kill(_gateway_pid)
+			if _gateway_pid > 0 and not _forced_kill_sent:
+				_kill_gateway_tree(_gateway_pid)
 				_forced_kill_sent = true
 				_gateway_deadline_ms = now_ms + GATEWAY_KILL_GRACE_MS
-			else:
+			elif _forced_kill_sent or _gateway_pid <= 0:
 				_restart_after_stop = false
+				_gateway_detached = false
 				_gateway_lifecycle = GatewayLifecycle.FAILED
 				_ict_requested = false
 				_ict_active = false
 				_set_ict_link_state(false, false)
 				_set_gateway_error("CAN gateway process did not stop after termination request")
+
+
+## Kills the spawned gateway process. Frozen Windows builds are PyInstaller
+## onefile bundles: the tracked pid is a bootloader whose child is the real
+## gateway, so TerminateProcess alone orphans the child holding every port.
+func _kill_gateway_tree(pid: int) -> void:
+	if pid <= 0:
+		return
+	if OS.get_name() == "Windows":
+		OS.execute("taskkill", PackedStringArray(["/PID", str(pid), "/T", "/F"]), [])
+	else:
+		OS.kill(pid)
 
 
 func _activate_ict() -> void:
@@ -606,17 +697,34 @@ func _resolve_output_dir() -> String:
 
 
 func _poll_heartbeats() -> void:
+	if _ack == null or not _ack_bound:
+		return
 	while _ack.get_available_packet_count() > 0:
 		var packet := _ack.get_packet()
 		if packet.size() == 16 and _read_u32(packet, 0) == HEARTBEAT_MAGIC \
 				and packet[4] == PROTOCOL_VERSION:
 			_heartbeat_recording = (packet[5] & HEARTBEAT_FLAG_RECORDING) != 0
 			_last_heartbeat_ms = Time.get_ticks_msec()
+			if _gateway_pid <= 0:
+				# Heartbeats flowing without a tracked process: an orphaned
+				# gateway child (or external instance) owns the ports — adopt
+				# it; SHUTDOWN still reaches it over the control socket.
+				_gateway_detached = true
+			elif not OS.is_process_running(_gateway_pid):
+				# The launcher died but the port owner heartbeats — with
+				# frozen builds the real gateway is the launcher's child.
+				_gateway_pid = -1
+				_gateway_detached = true
 			if _gateway_lifecycle == GatewayLifecycle.STARTING:
 				_gateway_lifecycle = GatewayLifecycle.IDLE
 				_gateway_deadline_ms = -1
 				_last_gateway_error = ""
 				_activate_ict()
+			elif _gateway_lifecycle == GatewayLifecycle.FAILED:
+				# Self-heal: the port owner is reachable again.
+				_gateway_lifecycle = GatewayLifecycle.IDLE
+				_gateway_deadline_ms = -1
+				_last_gateway_error = ""
 			_set_ict_link_state(
 				(packet[5] & HEARTBEAT_FLAG_ICT_HANDSHAKE) != 0,
 				(packet[5] & HEARTBEAT_FLAG_PLATFORM_LINUX) != 0,
