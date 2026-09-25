@@ -71,7 +71,7 @@ func _check_input_contract(camera: CameraRig) -> void:
 	if not reset_events.any(func(event: InputEvent) -> bool: return event is InputEventKey) or not reset_events.any(func(event: InputEvent) -> bool: return event is InputEventJoypadButton):
 		_fail("camera reset lacks keyboard/gamepad bindings")
 	var operator_key := InputEventKey.new()
-	operator_key.keycode = KEY_1
+	operator_key.keycode = KEY_5
 	operator_key.pressed = true
 	camera._unhandled_input(operator_key)
 	if camera.get_mode() != CameraRig.MODE_OPERATOR:
@@ -80,20 +80,23 @@ func _check_input_contract(camera: CameraRig) -> void:
 	chase_pad.button_index = JOY_BUTTON_BACK
 	chase_pad.pressed = true
 	camera._unhandled_input(chase_pad)
+	if camera.get_mode() != CameraRig.MODE_CAB:
+		_fail("gamepad cycle did not wrap from operator to cab view")
+	camera._unhandled_input(chase_pad)
 	if camera.get_mode() != CameraRig.MODE_CHASE:
 		_fail("gamepad cycle event did not advance to chase view")
 	camera._unhandled_input(chase_pad)
 	if camera.get_mode() != CameraRig.MODE_WORK_TOOL:
 		_fail("gamepad cycle event did not advance to work-tool view")
 	var cab_key := InputEventKey.new()
-	cab_key.keycode = KEY_5
+	cab_key.keycode = KEY_1
 	cab_key.pressed = true
 	camera._unhandled_input(cab_key)
 	if camera.get_mode() != CameraRig.MODE_CAB:
 		_fail("keyboard mode event did not select cab view")
 	camera._unhandled_input(chase_pad)
-	if camera.get_mode() != CameraRig.MODE_OPERATOR:
-		_fail("gamepad cycle did not wrap from cab to operator view")
+	if camera.get_mode() != CameraRig.MODE_CHASE:
+		_fail("gamepad cycle did not advance from cab to chase view")
 
 
 func _check_model_modes(camera: CameraRig, session: ProductSession, presentation: MotionPresentation, model_id: String) -> void:

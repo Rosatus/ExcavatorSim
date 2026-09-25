@@ -19,14 +19,14 @@ const MODE_NAMES := {
 ## Direct presets stay keyboard-only; on gamepad the View button cycles
 ## through CYCLE_ORDER while the D-pad belongs to the attachment pad layer.
 const CAMERA_ACTIONS := {
-	"camera_view_operator": {"key": KEY_1, "joy": -1, "mode": MODE_OPERATOR},
+	"camera_view_operator": {"key": KEY_5, "joy": -1, "mode": MODE_OPERATOR},
 	"camera_view_chase": {"key": KEY_2, "joy": -1, "mode": MODE_CHASE},
 	"camera_view_work_tool": {"key": KEY_3, "joy": -1, "mode": MODE_WORK_TOOL},
 	"camera_view_inspection": {"key": KEY_4, "joy": -1, "mode": MODE_INSPECTION},
-	"camera_view_cab": {"key": KEY_5, "joy": -1, "mode": MODE_CAB},
+	"camera_view_cab": {"key": KEY_1, "joy": -1, "mode": MODE_CAB},
 }
 const CYCLE_ACTION := "camera_cycle_view"
-const CYCLE_ORDER := [MODE_OPERATOR, MODE_CHASE, MODE_WORK_TOOL, MODE_INSPECTION, MODE_CAB]
+const CYCLE_ORDER := [MODE_CAB, MODE_CHASE, MODE_WORK_TOOL, MODE_INSPECTION, MODE_OPERATOR]
 const RESET_ACTION := "camera_reset_view"
 const PRESETS := {
 	"sy155w": {
