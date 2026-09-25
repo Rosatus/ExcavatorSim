@@ -32,12 +32,14 @@ func _run() -> void:
 	check(fwd_l.position.y < rev_l.position.y and fwd_r.position.y < rev_r.position.y,
 			"keyboard travel keys are not column-shaped")
 	check(fwd_l.position.x < fwd_r.position.x, "left track key not left of right track key")
-	check(not hud._dpad_section.visible, "D-pad layer section shown for keyboard")
+	check(not hud._pad_box.visible, "gamepad widgets shown for keyboard")
+	check(hud._kb_box.visible, "keyboard key tiles hidden for keyboard")
 	for action in ControlInputHUD.GROUP_ACTIONS[0]:
 		check(hud._captions[action].text != "", "stick tile missing function caption: " + action)
 	hud.set_prompt_mode("gamepad")
-	check(hud._keys["operator_arm_extend"].text == "L ↑", "gamepad prompt did not switch")
-	check(hud._dpad_section.visible, "D-pad layer section hidden for gamepad")
+	check(hud._keys["operator_arm_extend"].text == "↑", "gamepad prompt did not switch")
+	check(hud._pad_box.visible, "gamepad widgets hidden for gamepad")
+	check(not hud._kb_box.visible, "keyboard key tiles shown for gamepad")
 	for action in ControlInputHUD.DPAD_TILE_ACTIONS:
 		check(hud._tiles.has(action), "missing D-pad tile: " + action)
 	# Held D-pad modifiers relabel the borrowed right-stick tiles.

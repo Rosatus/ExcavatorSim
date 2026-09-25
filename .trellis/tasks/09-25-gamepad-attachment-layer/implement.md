@@ -43,12 +43,17 @@
 - `attachment_catalog.json` XTR13 controls gained `pad_*` fields.
 - `operator_ui_strings.gd`/`control_input_hud.gd`: guide, hints and footer
   rewritten for the new layout.
-- `control_input_hud.gd` layout split by prompt mode (2026-09-25 HUD rework):
-  keyboard shows a 2x2 travel grid (R/Y over F/H) + WASD/IJKL crosses with
-  per-key function captions; gamepad adds a D-pad cross (up=fold, down=
-  tiltrotator, left=boom swing, right reserved) and live-relabels the
-  borrowed right-stick tiles while a modifier is held (`_sync_layer_captions`
-  + `PAD_LAYER_OVERRIDES`).
+- `control_input_hud.gd` layout split by prompt mode (2026-09-25 HUD rework,
+  revised after first iteration): keyboard keeps the classic key-tile
+  crosses (WASD/IJKL keycaps + captions); gamepad switches to drawn
+  `_PadWidget`s — a plus-silhouette D-pad with pressed-arm fill and layer
+  captions, and octagonal-gate stick widgets whose nub tilts with live
+  `Input.get_axis` while direction petals light on press. Captions live
+  around the widget edges; per-mode registries (`_kb_reg`/`_pad_reg`) feed
+  `_tiles`/`_keys`/`_captions`, and zero-size anchor Controls at petal
+  positions keep the `is_action_highlighted_for_test`/`_tiles` hooks.
+  `_sync_layer_captions` + `PAD_LAYER_OVERRIDES` relabel borrowed
+  right-stick arms while a D-pad modifier is held.
 
 ### Final gamepad map
 
