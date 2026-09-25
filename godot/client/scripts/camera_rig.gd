@@ -249,14 +249,18 @@ func _step_camera(delta: float, snap: bool) -> void:
 		return
 	var focus := _resolve_focus()
 	var reference := _reference if is_instance_valid(_reference) else _target
-	var rear := reference.global_basis.z
+	# Anchors ride physics-driven frame nodes; the raw global transform steps
+	# at the physics rate, so read the render-interpolated one — otherwise the
+	# per-frame camera itself inherits the 60 Hz stepping while slewing.
+	var reference_xf := reference.get_global_transform_interpolated()
+	var rear := reference_xf.basis.z
 	# SY205 faces +Z, as declared by its tracks and cab. Orbit around the
 	# actual vehicle rear/right instead of assuming every asset faces -Z.
 	var heading_sign := -1.0 if _active_model_id == "sy205" else 1.0
 	rear *= heading_sign
 	rear.y = 0.0
 	rear = rear.normalized() if rear.length_squared() > 0.0001 else Vector3.BACK
-	var right := reference.global_basis.x
+	var right := reference_xf.basis.x
 	right *= heading_sign
 	right.y = 0.0
 	right = right.normalized() if right.length_squared() > 0.0001 else Vector3.RIGHT
@@ -290,7 +294,8 @@ func _step_cab_camera() -> void:
 	var preset := _current_preset()
 	var local_position := preset.get("cab_position", Vector3.ZERO) as Vector3
 	var local_rotation := preset.get("cab_rotation", Vector3.ZERO) as Vector3
-	var anchor := Transform3D(_target.global_basis.orthonormalized(), _target.global_position)
+	var target_xf := _target.get_global_transform_interpolated()
+	var anchor := Transform3D(target_xf.basis.orthonormalized(), target_xf.origin)
 	global_transform = anchor * Transform3D(Basis.from_euler(local_rotation), local_position)
 	_desired_position = global_position
 	_resolved_position = global_position
@@ -306,7 +311,7 @@ func _resolve_focus() -> Vector3:
 		var contact: Variant = _presentation.get_bucket_contact_world()
 		if contact is Vector3:
 			return (contact as Vector3) + Vector3.UP * _focus_height_m
-	return _target.global_position + Vector3.UP * _focus_height_m
+	return _target.get_global_transform_interpolated().origin + Vector3.UP * _focus_height_m
 
 
 func _resolve_occlusion(focus: Vector3, desired: Vector3) -> Vector3:

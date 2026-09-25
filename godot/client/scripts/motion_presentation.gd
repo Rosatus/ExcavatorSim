@@ -415,13 +415,15 @@ func get_bucket_contact_world() -> Variant:
 		if _asset_root != null:
 			node = _asset_root.get_node_or_null(NodePath(path)) as Node3D
 		if node != null:
-			return node.global_position
+			# Camera-facing query: report the render-interpolated pose so the
+			# rig's focus point does not step at the physics rate.
+			return node.get_global_transform_interpolated().origin
 		return null
 	if mode == "frame_offset":
 		var frame := get_soil_frame_node(String(contact.get("frame", "bucket_link")))
 		var raw_offset: Variant = contact.get("offset_godot", [0.0, 0.0, 0.0])
 		if frame != null and raw_offset is Array and (raw_offset as Array).size() == 3:
-			return frame.global_transform * Vector3(float(raw_offset[0]), float(raw_offset[1]), float(raw_offset[2]))
+			return frame.get_global_transform_interpolated() * Vector3(float(raw_offset[0]), float(raw_offset[1]), float(raw_offset[2]))
 	return null
 
 
