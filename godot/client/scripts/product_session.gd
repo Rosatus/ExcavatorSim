@@ -166,15 +166,21 @@ func get_equipment_input_axes() -> Vector4:
 func get_attachment_input_axes() -> Vector2:
 	if lifecycle != LIFECYCLE_RUNNING or not focused or _motion_client == null:
 		return Vector2.ZERO
+	if _chassis != null and _chassis.input_axes_suspended():
+		return Vector2.ZERO
 	return _motion_client.get_attachment_input_axes()
 
 
 ## Model-local presentation axis input in [-1, 1] (e.g. SY80U boom offset).
-## Gated on lifecycle/focus like the authoritative equipment axes.
-func get_local_axis_input(negative_action: String, positive_action: String) -> float:
+## Gated on lifecycle/focus like the authoritative equipment axes; while the
+## chassis suspends operator axes (assist picker, slope preview) the local
+## axes stay neutral so a menu D-pad press cannot jog the attachment layer.
+func get_local_axis_input(axis_id: String, negative_action: String, positive_action: String) -> float:
 	if lifecycle != LIFECYCLE_RUNNING or not focused or _motion_client == null:
 		return 0.0
-	return _motion_client.get_local_axis_input(negative_action, positive_action)
+	if _chassis != null and _chassis.input_axes_suspended():
+		return 0.0
+	return _motion_client.get_local_axis_input(axis_id, negative_action, positive_action)
 
 
 func request_coupler_switch(coupler_id: String) -> bool:

@@ -38,13 +38,19 @@
           "modifier_key": "KEY_Q",
           "negative_action": "operator_bucket_curl",
           "positive_action": "operator_bucket_dump",
-          "masked_axis": 3
+          "masked_axis": 3,
+          "pad_modifier_action": "pad_layer_dpad_down",
+          "pad_negative_action": "operator_boom_lower",
+          "pad_positive_action": "operator_boom_raise"
         },
         "rotate": {
           "modifier_key": "KEY_O",
           "negative_action": "operator_swing_left",
           "positive_action": "operator_swing_right",
-          "masked_axis": 0
+          "masked_axis": 0,
+          "pad_modifier_action": "pad_layer_dpad_down",
+          "pad_negative_action": "operator_bucket_curl",
+          "pad_positive_action": "operator_bucket_dump"
         }
       },
       "hidden_frame": "bucket_link"

@@ -180,7 +180,12 @@ pixi run python backend/scripts/sync_sy205_joint_contract.py [--check]
   `INPUT_ACTIONS` entry), registered by `MotionClient`, gated through
   `ProductSession.get_local_axis_input`, and integrated in
   `MotionPresentation._physics_process` with reset on rest-pose restore,
-  pose clear, and model switch. Soil cutting and bucket fill follow the
+  pose clear, and model switch. On gamepad they ride the pad layer:
+  `AttachmentInputMapper.LOCAL_PAD_LAYERS` maps `boom_swing` to D-pad-Left +
+  right-stick X and `boom_fold` to D-pad-Up + right-stick Y, masking the
+  borrowed base axis while the modifier is held; `MotionPresentation`
+  registers the active model's axis ids and clears them on model switch.
+  Soil cutting and bucket fill follow the
   visual node transforms, so the offset is already reflected in digging.
 
 ## 4. Validation / Error Matrix

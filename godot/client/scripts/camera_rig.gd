@@ -16,13 +16,17 @@ const MODE_NAMES := {
 	MODE_INSPECTION: "Inspection",
 	MODE_CAB: "Cab / First Person",
 }
+## Direct presets stay keyboard-only; on gamepad the View button cycles
+## through CYCLE_ORDER while the D-pad belongs to the attachment pad layer.
 const CAMERA_ACTIONS := {
-	"camera_view_operator": {"key": KEY_1, "joy": JOY_BUTTON_DPAD_UP, "mode": MODE_OPERATOR},
-	"camera_view_chase": {"key": KEY_2, "joy": JOY_BUTTON_DPAD_RIGHT, "mode": MODE_CHASE},
-	"camera_view_work_tool": {"key": KEY_3, "joy": JOY_BUTTON_DPAD_DOWN, "mode": MODE_WORK_TOOL},
-	"camera_view_inspection": {"key": KEY_4, "joy": JOY_BUTTON_DPAD_LEFT, "mode": MODE_INSPECTION},
+	"camera_view_operator": {"key": KEY_1, "joy": -1, "mode": MODE_OPERATOR},
+	"camera_view_chase": {"key": KEY_2, "joy": -1, "mode": MODE_CHASE},
+	"camera_view_work_tool": {"key": KEY_3, "joy": -1, "mode": MODE_WORK_TOOL},
+	"camera_view_inspection": {"key": KEY_4, "joy": -1, "mode": MODE_INSPECTION},
 	"camera_view_cab": {"key": KEY_5, "joy": -1, "mode": MODE_CAB},
 }
+const CYCLE_ACTION := "camera_cycle_view"
+const CYCLE_ORDER := [MODE_OPERATOR, MODE_CHASE, MODE_WORK_TOOL, MODE_INSPECTION, MODE_CAB]
 const RESET_ACTION := "camera_reset_view"
 const PRESETS := {
 	"sy155w": {
@@ -138,6 +142,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.is_action_pressed(action):
 			set_mode(String((CAMERA_ACTIONS[action] as Dictionary)["mode"]))
 			return
+	if event.is_action_pressed(CYCLE_ACTION):
+		cycle_mode()
+		return
 	if event.is_action_pressed(RESET_ACTION):
 		reset_view()
 		return
@@ -169,6 +176,14 @@ func set_mode(value: String) -> bool:
 	_sync_cab_transparency()
 	mode_changed.emit(_mode, get_mode_display_name())
 	return true
+
+
+## Gamepad preset rotation: one View-button press steps to the next mode in
+## CYCLE_ORDER, wrapping from Cab back to Operator.
+func cycle_mode() -> String:
+	var index := CYCLE_ORDER.find(_mode)
+	set_mode(String(CYCLE_ORDER[wrapi(index + 1, 0, CYCLE_ORDER.size())]))
+	return _mode
 
 
 func reset_view() -> void:
@@ -430,9 +445,19 @@ func _ensure_input_actions() -> void:
 	for action in CAMERA_ACTIONS:
 		var binding := CAMERA_ACTIONS[action] as Dictionary
 		_ensure_action(action)
+		# The D-pad belongs to the attachment pad layer now; strip stale
+		# joypad bindings left over from older runtime layouts.
+		for existing in InputMap.action_get_events(action):
+			if existing is InputEventJoypadButton:
+				InputMap.action_erase_event(action, existing)
 		_add_event_once(action, _key_event(int(binding["key"])))
 		if int(binding["joy"]) >= 0:
 			_add_event_once(action, _joy_button_event(int(binding["joy"])))
+	_ensure_action(CYCLE_ACTION)
+	for existing in InputMap.action_get_events(CYCLE_ACTION):
+		if existing is InputEventJoypadButton:
+			InputMap.action_erase_event(CYCLE_ACTION, existing)
+	_add_event_once(CYCLE_ACTION, _joy_button_event(JOY_BUTTON_BACK))
 	_ensure_action(RESET_ACTION)
 	_add_event_once(RESET_ACTION, _key_event(KEY_C))
 	_add_event_once(RESET_ACTION, _joy_button_event(JOY_BUTTON_RIGHT_STICK))

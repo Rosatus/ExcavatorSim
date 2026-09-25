@@ -60,6 +60,7 @@ var _menu_tween: Tween
 var _close_tween: Tween
 var _quality_before_test := "balanced"
 var _ignore_quality_toggle := false
+var _menu_nav_joy_latch := 0
 
 var _status_panel: PanelContainer
 var _panel_toggle_button: Button
@@ -220,6 +221,7 @@ func _connect_controls() -> void:
 func _ready() -> void:
 	_motion_client = get_node_or_null(motion_client_path) as MotionClient
 	_product_session = get_node_or_null(product_session_path) as ProductSession
+	_ensure_ui_pad_bindings()
 	_excavation_world = get_node_or_null(excavation_world_path) as ExcavationWorld
 	_attachment_rig = get_node_or_null(attachment_rig_path) as AttachmentRig
 	_chassis = get_node_or_null(chassis_path) as TrackedChassisController
@@ -330,7 +332,7 @@ func _build_assist_menu() -> void:
 	_assist_menu_rows_box.name = "Rows"
 	box.add_child(_assist_menu_rows_box)
 	_assist_menu_hint = Label.new()
-	_assist_menu_hint.text = "W/S 选择 · Enter 确认 · T/Esc 关闭"
+	_assist_menu_hint.text = UIStrings.ASSIST_MENU_HINT_KEYBOARD
 	_assist_menu_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_assist_menu_hint.add_theme_font_size_override("font_size", 11)
 	box.add_child(_assist_menu_hint)
@@ -610,9 +612,30 @@ func _input(event: InputEvent) -> void:
 	elif not _panel_collapsed and not _confirmation.visible and _menu_navigation_direction(event) != 0:
 		_move_menu_focus(_menu_navigation_direction(event))
 		get_viewport().set_input_as_handled()
+	elif not _panel_collapsed and not _confirmation.visible and event is InputEventJoypadMotion and event.axis == JOY_AXIS_LEFT_Y and absf(event.axis_value) >= 0.3:
+		# Left-stick deflection is consumed by the curated focus list; letting
+		# it fall through to the engine ui_* actions would double-navigate.
+		get_viewport().set_input_as_handled()
 	elif event is InputEventKey and event.keycode == KEY_F8 and event.pressed and not event.echo:
 		get_viewport().set_input_as_handled()
 		_on_reset_pressed()
+
+
+## The engine ui_accept/ui_cancel defaults ship without joypad buttons, so
+## A confirms and B cancels in menus are bound here once; existing entries
+## are kept and only the missing button is appended.
+func _ensure_ui_pad_bindings() -> void:
+	_bind_joy_button_once("ui_accept", JOY_BUTTON_A)
+	_bind_joy_button_once("ui_cancel", JOY_BUTTON_B)
+
+
+func _bind_joy_button_once(action: String, button_index: JoyButton) -> void:
+	for existing in InputMap.action_get_events(action):
+		if existing is InputEventJoypadButton and (existing as InputEventJoypadButton).button_index == button_index:
+			return
+	var event := InputEventJoypadButton.new()
+	event.button_index = button_index
+	InputMap.action_add_event(action, event)
 
 
 func _menu_navigation_direction(event: InputEvent) -> int:
@@ -621,6 +644,17 @@ func _menu_navigation_direction(event: InputEvent) -> int:
 			return 1
 		if event.button_index == JOY_BUTTON_DPAD_UP:
 			return -1
+	if event is InputEventJoypadMotion and event.axis == JOY_AXIS_LEFT_Y:
+		# One move per deflection: the latch holds until the stick comes back
+		# toward center so a full push cannot skip multiple entries.
+		if absf(event.axis_value) < 0.3:
+			_menu_nav_joy_latch = 0
+		elif absf(event.axis_value) >= 0.5:
+			var direction := 1 if event.axis_value > 0.0 else -1
+			if _menu_nav_joy_latch == direction:
+				return 0
+			_menu_nav_joy_latch = direction
+			return direction
 	if event is InputEventKey and event.pressed:
 		if event.keycode == KEY_DOWN or (event.keycode == KEY_TAB and not event.shift_pressed):
 			return 1
@@ -1781,6 +1815,9 @@ func _sync_assist_menu() -> void:
 		for i in entries.size():
 			var row := Button.new()
 			row.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			# Activation is owned by the chassis picker state (A/Y/Enter);
+			# unfocusable rows cannot double-dispatch through ui_accept.
+			row.focus_mode = Control.FOCUS_NONE
 			if console:
 				GameSkin.apply_nav_button(row, GameSkin.accent_for(_ui_theme))
 			var index := i
@@ -1982,7 +2019,10 @@ func _refresh_prompt_copy() -> void:
 		_hud.set_prompt_mode(_prompt_mode)
 	var tiltrotator_active := _attachment_rig != null and _attachment_rig.is_tiltrotator_active()
 	var keyboard_hint := UIStrings.CONTROL_HINT_ATTACHMENT_KEYBOARD if tiltrotator_active else UIStrings.CONTROL_HINT_KEYBOARD
-	_control_hint.text = UIStrings.CONTROL_HINT_GAMEPAD if _prompt_mode == "gamepad" else keyboard_hint
+	var gamepad_hint := UIStrings.CONTROL_HINT_ATTACHMENT_GAMEPAD if tiltrotator_active else UIStrings.CONTROL_HINT_GAMEPAD
+	_control_hint.text = gamepad_hint if _prompt_mode == "gamepad" else keyboard_hint
+	if _assist_menu_hint != null:
+		_assist_menu_hint.text = UIStrings.ASSIST_MENU_HINT_GAMEPAD if _prompt_mode == "gamepad" else UIStrings.ASSIST_MENU_HINT_KEYBOARD
 	_guide_device_label.text = "当前输入：手柄" if _prompt_mode == "gamepad" else "当前输入：键盘与鼠标"
 	_guide_controls_label.text = UIStrings.GUIDE_GAMEPAD if _prompt_mode == "gamepad" else UIStrings.GUIDE_KEYBOARD
 	if wheeled:
@@ -1990,8 +2030,8 @@ func _refresh_prompt_copy() -> void:
 			_control_hint.text = keyboard_hint.replace("R/F、Y/H  履带", "G 前 · V 左 · B 后 · N 右 · 空格刹车")
 			_guide_controls_label.text = UIStrings.GUIDE_KEYBOARD.replace("R / F   左履带前进 / 后退     Y / H   右履带前进 / 后退", "G   前进     V   左转     B   后退     N   右转     空格   刹车\n松开行驶键自动驻车；转向需要车辆移动。")
 		else:
-			_control_hint.text = UIStrings.CONTROL_HINT_GAMEPAD.replace("扳机与肩键  履带", "LT/LB 前后行驶 · RT/RB 右/左转")
-			_guide_controls_label.text = UIStrings.GUIDE_GAMEPAD.replace("LT / LB   左履带前进 / 后退\nRT / RB   右履带前进 / 后退", "LT / LB   前进 / 后退\nRT / RB   右转 / 左转\n松开行驶输入自动驻车。")
+			_control_hint.text = gamepad_hint.replace("扳机与肩键  履带", "RT 前进 · LT 后退 · LB/RB 转向")
+			_guide_controls_label.text = UIStrings.GUIDE_GAMEPAD.replace("LT / LB   左履带前进 / 后退\nRT / RB   右履带前进 / 后退", "RT   前进     LT   后退\nLB / RB   左转 / 右转\n松开行驶输入自动驻车。")
 
 
 func set_prompt_mode_for_test(value: String) -> void:

@@ -62,6 +62,11 @@ func _check_input_contract(camera: CameraRig) -> void:
 		var expects_joy := int((CameraRig.CAMERA_ACTIONS[action] as Dictionary)["joy"]) >= 0
 		if not has_key or (expects_joy and not has_joy):
 			_fail("camera action lacks its declared bindings: %s" % action)
+		if has_joy and not expects_joy:
+			_fail("camera preset still claims a joypad button (D-pad owns the pad layer): %s" % action)
+	var cycle_events := InputMap.action_get_events(CameraRig.CYCLE_ACTION)
+	if not cycle_events.any(func(event: InputEvent) -> bool: return event is InputEventJoypadButton and event.button_index == JOY_BUTTON_BACK):
+		_fail("camera cycle view lacks the View-button binding")
 	var reset_events := InputMap.action_get_events(CameraRig.RESET_ACTION)
 	if not reset_events.any(func(event: InputEvent) -> bool: return event is InputEventKey) or not reset_events.any(func(event: InputEvent) -> bool: return event is InputEventJoypadButton):
 		_fail("camera reset lacks keyboard/gamepad bindings")
@@ -72,17 +77,23 @@ func _check_input_contract(camera: CameraRig) -> void:
 	if camera.get_mode() != CameraRig.MODE_OPERATOR:
 		_fail("keyboard mode event did not select operator view")
 	var chase_pad := InputEventJoypadButton.new()
-	chase_pad.button_index = JOY_BUTTON_DPAD_RIGHT
+	chase_pad.button_index = JOY_BUTTON_BACK
 	chase_pad.pressed = true
 	camera._unhandled_input(chase_pad)
 	if camera.get_mode() != CameraRig.MODE_CHASE:
-		_fail("gamepad mode event did not select chase view")
+		_fail("gamepad cycle event did not advance to chase view")
+	camera._unhandled_input(chase_pad)
+	if camera.get_mode() != CameraRig.MODE_WORK_TOOL:
+		_fail("gamepad cycle event did not advance to work-tool view")
 	var cab_key := InputEventKey.new()
 	cab_key.keycode = KEY_5
 	cab_key.pressed = true
 	camera._unhandled_input(cab_key)
 	if camera.get_mode() != CameraRig.MODE_CAB:
 		_fail("keyboard mode event did not select cab view")
+	camera._unhandled_input(chase_pad)
+	if camera.get_mode() != CameraRig.MODE_OPERATOR:
+		_fail("gamepad cycle did not wrap from cab to operator view")
 
 
 func _check_model_modes(camera: CameraRig, session: ProductSession, presentation: MotionPresentation, model_id: String) -> void:

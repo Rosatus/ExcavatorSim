@@ -132,7 +132,9 @@ func _physics_process(delta: float) -> void:
 			input = _test_local_input
 		elif _product_session != null:
 			input = _product_session.get_local_axis_input(
-				String(axis["negative_action"]), String(axis["positive_action"])
+				String(axis["axis_id"]),
+				String(axis["negative_action"]),
+				String(axis["positive_action"])
 			)
 		_integrate_local_axis(axis, clampf(input, -1.0, 1.0), delta)
 	_hydraulics.update()
@@ -560,6 +562,8 @@ func _clear_contract_state() -> void:
 	_hydraulics = PassiveHydraulics.new()
 	_local_axis_defs.clear()
 	_local_axis_nodes.clear()
+	if _motion_client != null:
+		_motion_client.configure_local_axis_layers([])
 	clear_bucket_pose_history()
 	_pivot_reasons.clear()
 	_pivot_last_warning_reasons.clear()
@@ -790,6 +794,11 @@ func _load_local_axis_contract(manifest: Dictionary, model_id: String) -> bool:
 			"rest_transform": node.transform,
 		})
 		_local_axis_nodes[axis_id] = node
+	var axis_ids: Array = []
+	for axis in _local_axis_defs:
+		axis_ids.append(String(axis["axis_id"]))
+	if _motion_client != null:
+		_motion_client.configure_local_axis_layers(axis_ids)
 	return true
 
 

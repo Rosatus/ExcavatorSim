@@ -9,7 +9,7 @@ const INPUT_ACTIONS := {
 	"track_right_reverse": {"key": KEY_H, "joy_button": JOY_BUTTON_RIGHT_SHOULDER},
 }
 const TOGGLE_ACTIONS := {
-	"operator_assist": [KEY_T],
+	"operator_assist": {"keys": [KEY_T], "joy_button": JOY_BUTTON_Y},
 }
 const SlopePreviewVisual := preload("res://scripts/slope_cut_preview_visual.gd")
 
@@ -478,7 +478,14 @@ func assist_menu_snapshot() -> Dictionary:
 	}
 
 
+## While the picker is open the machine is frozen, so the pad-layer D-pad
+## actions can double as just_pressed navigation without touching the
+## modifier semantics they carry during driving.
 func _navigate_assist_menu(axis: float) -> void:
+	if InputMap.has_action("pad_layer_dpad_up") and Input.is_action_just_pressed("pad_layer_dpad_up"):
+		axis = 1.0
+	elif InputMap.has_action("pad_layer_dpad_down") and Input.is_action_just_pressed("pad_layer_dpad_down"):
+		axis = -1.0
 	var count := ASSIST_MENU_ENTRIES.size()
 	if count == 0:
 		return
@@ -490,6 +497,12 @@ func _navigate_assist_menu(axis: float) -> void:
 	_menu_nav_axis = axis
 	if direction != 0:
 		_assist_menu_index = (_assist_menu_index + direction + count) % count
+
+
+## True while operator axes are repurposed by the assist picker or the slope
+## preview; ProductSession parks attachment and local-axis reads on it.
+func input_axes_suspended() -> bool:
+	return _assist_menu_open or _slope_mode == SLOPE_MODE_PREVIEW
 
 
 func _adjust_slope_params(equipment_axes: Vector4, delta: float) -> void:
@@ -1167,10 +1180,13 @@ func _ensure_input_actions() -> void:
 		if not InputMap.has_action(action):
 			InputMap.add_action(action, 0.08)
 		for existing in InputMap.action_get_events(action):
-			if existing is InputEventKey:
+			if existing is InputEventKey or existing is InputEventJoypadButton:
 				InputMap.action_erase_event(action, existing)
-		for keycode in TOGGLE_ACTIONS[action]:
+		var definition: Dictionary = TOGGLE_ACTIONS[action]
+		for keycode in definition["keys"]:
 			_add_key_event(action, keycode)
+		if definition.has("joy_button"):
+			_add_joy_button_event(action, int(definition["joy_button"]))
 
 
 func _add_key_event(action: String, keycode: int) -> void:

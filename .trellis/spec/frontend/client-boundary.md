@@ -2362,8 +2362,11 @@ CameraRig.get_view_snapshot_for_test() -> Dictionary
   Model/authority generation reset restores the current mode preset and clears
   drag/occlusion transients. A queued-for-free visual node is never followed.
 - Camera actions are runtime-registered: 1/2/3/4 select external modes, 5 selects
-  cab, and gamepad D-pad selects the four external modes; C and
-  right-stick-click reset. Middle-drag and wheel retain orbit/zoom outside cab. Input
+  cab, and the gamepad View button cycles
+  `operator -> chase -> work_tool -> inspection -> cab`; C and
+  right-stick-click reset. The D-pad is reserved for the attachment pad layer
+  (tiltrotator/local axes), so preset actions carry no joypad bindings.
+  Middle-drag and wheel retain orbit/zoom outside cab. Input
   remains `_unhandled_input`, so events consumed by product UI do not move it.
 - Occlusion performs one read-only terrain/machine-mask ray from outside the
   mode minimum radius. A hit shortens to a clearance; inward correction is

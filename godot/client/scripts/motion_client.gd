@@ -367,6 +367,12 @@ func clear_attachment_profile() -> void:
 	_attachment_input_mapper.clear()
 
 
+## Registers the pad layer for the model's manifest-declared local axes;
+## models without local axes clear it so D-pad directions stay inert.
+func configure_local_axis_layers(axis_ids: Array) -> void:
+	_attachment_input_mapper.configure_local_axes(axis_ids)
+
+
 ## Attachment command axes (tilt, rotate) in [-1, 1]; zero while no attachment
 ## profile is configured or the window is unfocused.
 func get_attachment_input_axes() -> Vector2:
@@ -377,10 +383,12 @@ func get_attachment_input_axes() -> Vector2:
 
 ## Model-local presentation axis input in [-1, 1] (e.g. SY80U boom offset).
 ## Zero while unfocused; the presentation layer owns activation per model.
-func get_local_axis_input(negative_action: String, positive_action: String) -> float:
+## While the axis's pad modifier is held, the mapper redirects the
+## configured right-stick pair instead of the base keyboard actions.
+func get_local_axis_input(axis_id: String, negative_action: String, positive_action: String) -> float:
 	if not _focused:
 		return 0.0
-	return Input.get_axis(negative_action, positive_action)
+	return _attachment_input_mapper.read_local_axis(axis_id, negative_action, positive_action)
 
 
 func get_status_snapshot() -> Dictionary:
@@ -1012,6 +1020,16 @@ func _ensure_input_actions() -> void:
 				InputMap.action_erase_event(action, existing)
 		for keycode in definition["keys"]:
 			_add_key_event(action, int(keycode))
+	for action in AttachmentInputMapper.PAD_LAYER_ACTIONS:
+		# One D-pad button per pad-layer action; menus may also poll the same
+		# actions for just_pressed navigation. Stale joypad bindings are
+		# replaced so a previous layout cannot linger.
+		if not InputMap.has_action(action):
+			InputMap.add_action(action)
+		for existing in InputMap.action_get_events(action):
+			if existing is InputEventJoypadButton:
+				InputMap.action_erase_event(action, existing)
+		_add_joy_button_event(action, int(AttachmentInputMapper.PAD_LAYER_ACTIONS[action]))
 	for action in COMMAND_ACTIONS:
 		if not InputMap.has_action(action):
 			InputMap.add_action(action)
@@ -1036,6 +1054,15 @@ func _add_joy_axis_event(action: String, axis: int, axis_value: float) -> void:
 	var event := InputEventJoypadMotion.new()
 	event.axis = axis as JoyAxis
 	event.axis_value = axis_value
+	InputMap.action_add_event(action, event)
+
+
+func _add_joy_button_event(action: String, button_index: int) -> void:
+	for existing in InputMap.action_get_events(action):
+		if existing is InputEventJoypadButton and (existing as InputEventJoypadButton).button_index == button_index:
+			return
+	var event := InputEventJoypadButton.new()
+	event.button_index = button_index as JoyButton
 	InputMap.action_add_event(action, event)
 
 

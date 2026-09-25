@@ -116,6 +116,11 @@ func _run() -> void:
 	if _check(presentation.get_soil_frame_node("bucket_link") == tool,
 			"soil frame does not resolve to the mounted tool") != 0:
 		return _finish(host, 1)
+	var solid_mount: Variant = presentation.get_solid_tool_mount_transform()
+	if _check(solid_mount is Transform3D and
+			(bucket_link.global_transform * solid_mount).is_equal_approx(tool.global_transform),
+			"solid geometry mount does not resolve to active tool") != 0:
+		return _finish(host, 1)
 	var contract := presentation.get_soil_contract()
 	if _check(String(contract.get("model_id", "")) == "sy135" and not (contract.get("bucket_tool", {}) as Dictionary).is_empty(),
 			"attachment soil contract is not active for sy135") != 0:
@@ -149,6 +154,20 @@ func _run() -> void:
 	var rest_piston_pos := piston_l.position
 	var rest_pin_gap := minf(piston_l.global_position.distance_to(pin_l.global_position),
 			piston_l.global_position.distance_to(pin_r.global_position))
+	# Contact accepts the same candidate axes without another joint writer.
+	rig.set_axes_for_test(Vector2(1.0, 1.0))
+	rig._physics_process(1.0 / 60.0)
+	var candidate_angles := rig.joint_state_for_test()
+	rig.accept_solid_contact_fraction(0.25)
+	var clipped_angles := rig.joint_state_for_test()
+	if _check(is_equal_approx(clipped_angles.tilt_deg, candidate_angles.tilt_deg * 0.25)
+			and is_equal_approx(clipped_angles.rotate_deg, candidate_angles.rotate_deg * 0.25),
+			"solid contact did not constrain attachment tilt and rotation") != 0:
+		return _finish(host, 1)
+	rig.accept_solid_contact_fraction(0.0)
+	if _check(presentation.get_solid_tool_mount_transform().is_equal_approx(solid_mount),
+			"zero accepted attachment motion did not restore its complete mount") != 0:
+		return _finish(host, 1)
 	rig.set_axes_for_test(Vector2(1.0, 0.0))
 	await _drive_frames(140)
 	state = rig.joint_state_for_test()
@@ -247,6 +266,9 @@ func _run() -> void:
 	if _check(presentation.get_soil_frame_node("bucket_link") == presentation.get_frame_node("bucket_link"),
 			"soil frame did not fall back to the native bucket_link") != 0:
 		return _finish(host, 1)
+	if _check(presentation.get_solid_tool_mount_transform() == Transform3D.IDENTITY,
+			"native bucket collision did not restore its local frame") != 0:
+		return _finish(host, 1)
 	if _check(String(presentation.get_soil_contract().get("model_id", "")) == "sy205",
 			"host soil contract was not restored") != 0:
 		return _finish(host, 1)
@@ -274,6 +296,9 @@ func _run() -> void:
 		return _finish(host, 1)
 	if _check(session.active_coupler_id == "xtr13" and session.active_tool_id == "no_tool",
 			"no_tool did not keep the xtr13 coupler: %s+%s" % [session.active_coupler_id, session.active_tool_id]) != 0:
+		return _finish(host, 1)
+	if _check(presentation.get_solid_tool_mount_transform() == null,
+			"no-tool selection retained a ghost bucket collision") != 0:
 		return _finish(host, 1)
 	state = rig.joint_state_for_test()
 	if _check(bool(state.get("mounted", false)) and not bool(state.get("tool_node", true)),
@@ -327,18 +352,28 @@ func _check_input_mask() -> bool:
 	var mapper := AttachmentInputMapper.new()
 	mapper.configure({
 		"tilt": {"modifier_key": "KEY_Q", "negative_action": "operator_bucket_curl",
-				"positive_action": "operator_bucket_dump", "masked_axis": 3},
+				"positive_action": "operator_bucket_dump", "masked_axis": 3,
+				"pad_modifier_action": "pad_layer_dpad_down",
+				"pad_negative_action": "operator_boom_lower",
+				"pad_positive_action": "operator_boom_raise"},
 		"rotate": {"modifier_key": "KEY_O", "negative_action": "operator_swing_left",
-				"positive_action": "operator_swing_right", "masked_axis": 0},
+				"positive_action": "operator_swing_right", "masked_axis": 0,
+				"pad_modifier_action": "pad_layer_dpad_down",
+				"pad_negative_action": "operator_bucket_curl",
+				"pad_positive_action": "operator_bucket_dump"},
 	})
 	if _check(mapper.is_active(), "configured mapper is not active") != 0:
 		return false
 	var held := {"KEY_Q": false, "KEY_O": false}
+	var pad_held := {"pad_layer_dpad_down": false}
 	var pressed := {"operator_bucket_curl|operator_bucket_dump": 1.0,
-			"operator_swing_left|operator_swing_right": -1.0}
+			"operator_swing_left|operator_swing_right": -1.0,
+			"operator_boom_lower|operator_boom_raise": -0.5}
 	mapper.input_probe = func(kind: String, probe_name: String) -> float:
 		if kind == "key":
 			return 1.0 if bool(held.get(probe_name, false)) else 0.0
+		if kind == "pad":
+			return 1.0 if bool(pad_held.get(probe_name, false)) else 0.0
 		return float(pressed.get(probe_name, 0.0))
 	var idle_axes := mapper.read_attachment_axes()
 	var idle_mask := mapper.mask_operator_axes(Vector4(0.5, -0.5, 0.25, -0.25))
@@ -362,6 +397,19 @@ func _check_input_mask() -> bool:
 		return false
 	if _check(both_mask == Vector4(0.0, -0.5, 0.25, 0.0),
 			"Q+O did not mask only swing and bucket: %s" % both_mask) != 0:
+		return false
+	held["KEY_Q"] = false
+	held["KEY_O"] = false
+	# D-pad layer: while held, right-stick pairs redirect to tilt (Y) and
+	# rotate (X) and both base axes are masked.
+	pad_held["pad_layer_dpad_down"] = true
+	var pad_axes := mapper.read_attachment_axes()
+	var pad_mask := mapper.mask_operator_axes(Vector4(0.5, -0.5, 0.25, -0.25))
+	if _check(is_equal_approx(pad_axes.x, -0.5) and is_equal_approx(pad_axes.y, 1.0),
+			"D-pad layer did not produce pad tilt/rotate: %s" % pad_axes) != 0:
+		return false
+	if _check(pad_mask == Vector4(0.5, 0.0, 0.25, 0.0),
+			"D-pad layer did not mask boom and bucket: %s" % pad_mask) != 0:
 		return false
 	return true
 

@@ -100,12 +100,13 @@ func reset_motion() -> void:
 		_animator.reset_animation()
 
 ## Independent wheel actions keep keyboard steering separate from tracked travel.
-## Product and standalone demo share G/V/B/N. Gamepad travel remains LT/LB, RT/RB.
+## Product and standalone demo share G/V/B/N. Gamepad follows the driving layout:
+## RT drives forward, LT reverses, LB/RB steer left/right.
 const INPUT_ACTIONS := {
-	"wheel_forward": {"key": KEY_G, "axis": JOY_AXIS_TRIGGER_LEFT},
-	"wheel_reverse": {"key": KEY_B, "button": JOY_BUTTON_LEFT_SHOULDER},
-	"wheel_right": {"key": KEY_N, "axis": JOY_AXIS_TRIGGER_RIGHT},
-	"wheel_left": {"key": KEY_V, "button": JOY_BUTTON_RIGHT_SHOULDER},
+	"wheel_forward": {"key": KEY_G, "axis": JOY_AXIS_TRIGGER_RIGHT},
+	"wheel_reverse": {"key": KEY_B, "axis": JOY_AXIS_TRIGGER_LEFT},
+	"wheel_right": {"key": KEY_N, "button": JOY_BUTTON_RIGHT_SHOULDER},
+	"wheel_left": {"key": KEY_V, "button": JOY_BUTTON_LEFT_SHOULDER},
 	"wheel_drift": {"key": KEY_SHIFT, "button": JOY_BUTTON_A},
 }
 

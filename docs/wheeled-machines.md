@@ -9,7 +9,10 @@ rear axle. It is not an articulated-steering or four-wheel-steering solver.
 
 SY155W automatically selects the wheel solver in the authoritative runtime:
 G = forward, V = left, B = reverse, N = right; Space = brake.
-Gamepad: LT/LB = forward/reverse; RT/RB = right/left steering.
+Gamepad: RT = forward, LT = reverse, LB/RB = left/right steering. The two-piece
+boom fold axis (E/U on keyboard) rides the pad layer: hold D-pad Up and push
+the right stick up/down to unfold/fold; while held, the base boom axis is
+masked.
 Released travel input applies a bounded parking brake. Steering alone cannot
 pivot the machine. Work equipment controls remain unchanged. Focus loss,
 menus, pause and reset clear commands and require neutral before resuming.

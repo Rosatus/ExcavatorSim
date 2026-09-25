@@ -14,13 +14,44 @@ const ACTIONS := [
 	"operator_boom_lower", "operator_bucket_curl", "operator_boom_raise", "operator_bucket_dump",
 	"track_left_forward", "track_left_reverse", "track_right_forward", "track_right_reverse",
 ]
+## Function captions under each key/stick tile, in ACTIONS order.
+const FUNCTION_CAPTIONS := [
+	"臂伸", "回左", "臂收", "回右",
+	"臂降", "斗收", "臂升", "斗翻",
+	"左前进", "左后退", "右前进", "右后退",
+]
+## D-pad hold-modifier layer shown in gamepad mode. Direction order in the
+## cross matches the stick crosses: [up, left, down, right].
+const DPAD_TILE_ACTIONS := [
+	"pad_layer_dpad_up", "pad_layer_dpad_left",
+	"pad_layer_dpad_down", "pad_layer_dpad_right",
+]
+const DPAD_GLYPHS := ["↑", "←", "↓", "→"]
+const DPAD_CAPTIONS := ["双截", "偏摆", "倾旋", "—"]
+## While a D-pad modifier is held, the borrowed right-stick tiles (ACTIONS
+## indices 4..7 = up/left/down/right) relabel to the layer function. Applied
+## in listing order so the tiltrotator layer wins its shared bucket pair.
+const PAD_LAYER_OVERRIDES := {
+	"pad_layer_dpad_up": {4: "展开", 6: "折叠"},
+	"pad_layer_dpad_left": {5: "偏摆左", 7: "偏摆右"},
+	"pad_layer_dpad_down": {4: "后倾", 5: "左旋", 6: "前倾", 7: "右旋"},
+}
 var _prompt_mode := "keyboard"
 const WHEEL_ACTIONS := {
 	"track_left_forward": "wheel_forward", "track_left_reverse": "wheel_reverse",
 	"track_right_forward": "wheel_right", "track_right_reverse": "wheel_left",
 }
+const TRAVEL_ACTIONS := [
+	"track_left_forward", "track_left_reverse",
+	"track_right_forward", "track_right_reverse",
+]
+const WHEEL_CAPTIONS := {"track_left_forward": "前进", "track_left_reverse": "后退",
+	"track_right_forward": "右转", "track_right_reverse": "左转"}
+const TRACK_CAPTIONS := {"track_left_forward": "左前进", "track_left_reverse": "左后退",
+	"track_right_forward": "右前进", "track_right_reverse": "右后退"}
 var _wheeled := false
-var _travel_captions: Array[Label] = []
+var _captions: Dictionary = {}
+var _dpad_section: Control
 var _theme_variant := GameSkin.VARIANT_DEBUG
 var _keys: Dictionary = {}
 var _tiles: Dictionary = {}
@@ -140,39 +171,60 @@ func _ready() -> void:
 	add_child(column)
 	_title = _label("操纵辅助 · ISO", 12)
 	column.add_child(_title)
-	var tracks := HBoxContainer.new()
+	# Travel keys as a 2x2 grid: forward keys on the top row, reverse keys
+	# below — R/Y over F/H matches keyboard columns, and for pads it stacks
+	# the triggers above the bumpers.
+	var tracks := GridContainer.new()
 	tracks.name = "Tracks"
+	tracks.columns = 2
+	tracks.add_theme_constant_override("h_separation", 6)
+	tracks.add_theme_constant_override("v_separation", 4)
 	column.add_child(tracks)
-	for index in range(8, 12):
-		tracks.add_child(_tile(index, ["左前进", "左后退", "右前进", "右后退"][index - 8]))
+	for index in [8, 10, 9, 11]:
+		tracks.add_child(_action_tile(ACTIONS[index], "", FUNCTION_CAPTIONS[index]))
 	var sticks := HBoxContainer.new()
 	sticks.name = "Sticks"
+	sticks.add_theme_constant_override("separation", 10)
 	column.add_child(sticks)
-	for side in range(2):
-		var stick := VBoxContainer.new()
-		stick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		sticks.add_child(stick)
-		stick.add_child(_label("回转 / 小臂" if side == 0 else "大臂 / 铲斗", 13))
-		var grid := GridContainer.new()
-		grid.columns = 3
-		grid.add_theme_constant_override("h_separation", 4)
-		grid.add_theme_constant_override("v_separation", 4)
-		stick.add_child(grid)
-		for cell in range(9):
-			var direction: int = {1: 0, 3: 1, 7: 2, 5: 3}.get(cell, -1)
-			if direction >= 0:
-				grid.add_child(_tile(side * 4 + direction))
-			else:
-				var empty := _label("L" if side == 0 else "R", 12) if cell == 4 else Control.new()
-				empty.custom_minimum_size = Vector2(48, 32)
-				grid.add_child(empty)
+	# D-pad hold-modifier cross; only meaningful on a gamepad, hidden
+	# otherwise. Each direction shows the layer it arms.
+	_dpad_section = _cross_section("十字键 层", "✚", DPAD_TILE_ACTIONS, DPAD_GLYPHS, DPAD_CAPTIONS)
+	_dpad_section.visible = false
+	sticks.add_child(_dpad_section)
+	sticks.add_child(_cross_section("回转 / 小臂", "L", ACTIONS.slice(0, 4), [], FUNCTION_CAPTIONS.slice(0, 4)))
+	sticks.add_child(_cross_section("大臂 / 铲斗", "R", ACTIONS.slice(4, 8), [], FUNCTION_CAPTIONS.slice(4, 8)))
 	_footer = _label("", 12)
 	column.add_child(_footer)
 	set_prompt_mode(_prompt_mode)
 	_sync_variant_chrome()
 	_ignore_mouse(self)
 
-func _tile(index: int, caption: String = "") -> PanelContainer:
+
+## One directional cross: cells 1/3/7/5 hold up/left/down/right tiles,
+## center shows the cluster glyph.
+func _cross_section(header_text: String, center_text: String, direction_actions: Array, glyphs: Array, captions: Array) -> VBoxContainer:
+	var section := VBoxContainer.new()
+	section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	section.add_child(_label(header_text, 13))
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 4)
+	grid.add_theme_constant_override("v_separation", 4)
+	section.add_child(grid)
+	for cell in range(9):
+		var direction: int = {1: 0, 3: 1, 7: 2, 5: 3}.get(cell, -1)
+		if direction >= 0:
+			var glyph: String = glyphs[direction] if direction < glyphs.size() else ""
+			var caption: String = captions[direction] if direction < captions.size() else ""
+			grid.add_child(_action_tile(String(direction_actions[direction]), glyph, caption))
+		else:
+			var empty := _label(center_text, 12) if cell == 4 else Control.new()
+			empty.custom_minimum_size = Vector2(48, 32)
+			grid.add_child(empty)
+	return section
+
+
+func _action_tile(action: String, glyph: String, caption: String) -> PanelContainer:
 	var tile := PanelContainer.new()
 	tile.custom_minimum_size = Vector2(48, 32)
 	tile.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -180,15 +232,14 @@ func _tile(index: int, caption: String = "") -> PanelContainer:
 	var content := VBoxContainer.new()
 	content.add_theme_constant_override("separation", 2)
 	tile.add_child(content)
-	var key := _label("", 15)
+	var key := _label(glyph, 15)
 	key.add_theme_color_override("font_color", GameSkin.accent_for(_theme_variant))
 	content.add_child(key)
-	if not caption.is_empty():
-		var caption_label := _label(caption, 11)
-		content.add_child(caption_label)
-		_travel_captions.append(caption_label)
-	_keys[ACTIONS[index]] = key
-	_tiles[ACTIONS[index]] = tile
+	var caption_label := _label(caption, 11)
+	content.add_child(caption_label)
+	_captions[action] = caption_label
+	_keys[action] = key
+	_tiles[action] = tile
 	return tile
 
 func _label(copy: String, font_size: int) -> Label:
@@ -204,14 +255,21 @@ func set_prompt_mode(mode: String) -> void:
 	if _keys.is_empty():
 		return
 	var copy: Array = (KEY_COPY if mode == "keyboard" else PAD_COPY).duplicate()
-	if _wheeled and mode == "keyboard":
+	if _wheeled:
+		# Tiles sit in track slots: [forward, reverse, right, left].
+		# Keyboard G/B/N/V; pad RT drives, LT reverses, RB/LB steer.
+		var travel := ["G", "B", "N", "V"] if mode == "keyboard" else ["RT", "LT", "RB", "LB"]
 		for index in 4:
-			copy[index + 8] = ["G", "B", "N", "V"][index]
+			copy[index + 8] = travel[index]
 	for index in range(ACTIONS.size()):
 		(_keys[ACTIONS[index]] as Label).text = copy[index]
-	_footer.text = "1–5 切换视角 · C 复位" if mode == "keyboard" else "十字键 切换视角 · R3 复位"
+	if _dpad_section != null:
+		_dpad_section.visible = mode == "gamepad"
+	_footer.text = "1–5 切换视角 · C 复位" if mode == "keyboard" else "View 循环视角 · R3 复位 · Y 辅助 · 按住十字键+右摇杆 属具层"
 	if _wheeled and mode == "keyboard":
 		_footer.text += " · 空格刹车 · Shift 漂移"
+	elif _wheeled:
+		_footer.text += " · A 漂移"
 
 func _process(_delta: float) -> void:
 	refresh_input_state_for_test()
@@ -233,6 +291,21 @@ func refresh_input_state_for_test() -> void:
 				var tween := create_tween()
 				tween.tween_property(tile, "scale", Vector2.ONE, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 				tile.set_meta("pop", tween)
+	_sync_layer_captions()
+
+
+## While a D-pad modifier is held, the borrowed right-stick tiles relabel to
+## the layer's functions so the operator sees what the stick now drives.
+func _sync_layer_captions() -> void:
+	var overrides := {}
+	for pad_action in ["pad_layer_dpad_up", "pad_layer_dpad_left", "pad_layer_dpad_down"]:
+		if InputMap.has_action(pad_action) and Input.is_action_pressed(pad_action):
+			for tile_index in PAD_LAYER_OVERRIDES[pad_action]:
+				overrides[int(tile_index)] = PAD_LAYER_OVERRIDES[pad_action][tile_index]
+	for index in range(8):
+		var label := _captions.get(ACTIONS[index]) as Label
+		if label != null:
+			label.text = String(overrides.get(index, FUNCTION_CAPTIONS[index]))
 
 func is_action_highlighted_for_test(action: String) -> bool:
 	return _tiles.has(action) and bool((_tiles[action] as Control).get_meta("active", false))
@@ -264,8 +337,10 @@ class _Brackets:
 
 func set_wheeled_mode(value: bool) -> void:
 	_wheeled = value
-	var copy := ["前进", "后退", "右转", "左转"] if value else ["左前进", "左后退", "右前进", "右后退"]
-	for index in _travel_captions.size():
-		_travel_captions[index].text = copy[index]
+	var copy: Dictionary = WHEEL_CAPTIONS if value else TRACK_CAPTIONS
+	for action in TRAVEL_ACTIONS:
+		var label := _captions.get(action) as Label
+		if label != null:
+			label.text = copy[action]
 	if _footer != null:
 		set_prompt_mode(_prompt_mode)

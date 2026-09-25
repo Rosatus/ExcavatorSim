@@ -83,7 +83,11 @@ forward/reverse to `Y/H`. XInput-compatible controllers feed the same actions:
 LT/LB control the left track forward/reverse and RT/RB control the right track
 forward/reverse. Work equipment follows the ISO excavator pattern without
 changing the four-axis command order: left stick X/Y controls swing/arm and
-right stick Y/X controls boom/bucket. MotionClient owns one fixed set of
+right stick Y/X controls boom/bucket. Secondary axes ride a pad layer on the
+D-pad: holding a direction redirects the right stick — Down drives the
+tiltrotator (X = rotate, Y = tilt), Left drives the SY80U offset boom, Up
+drives the SY155W boom fold — while the borrowed base axis is masked. Y opens
+the assist picker and the View button cycles camera presets. MotionClient owns one fixed set of
 explicit operator actions for keyboard and gamepad. The canonical vector's
 positive meanings are right rotation, boom raise, arm extend, and bucket curl;
 ProductSession maps it once through the selected model's shared equipment
