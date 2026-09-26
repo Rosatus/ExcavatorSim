@@ -1,21 +1,9 @@
-[gd_scene load_steps=3 format=3 uid="uid://dpb1jxwli2gds"]
+[gd_scene load_steps=2 format=3 uid="uid://dpb1jxwli2gds"]
 
 [ext_resource type="PackedScene" uid="uid://cyd4kxh7jupe" path="res://maps/urban/Engine/BasicShapes/Cube.glb" id="1_bswxi"]
 [ext_resource type="Material" uid="uid://n8gsve28x1k3" path="res://maps/urban/UrbanCity/Materials/Tileable/asphault_Inst.tres" id="2_coe84"]
-
-[sub_resource type="BoxShape3D" id="0_c31wo"]
-size = Vector3(1.000000, 1.000000, 1.000000)
 
 [node name = "Cube" instance = ExtResource("1_bswxi")]
 
 [node name="Mesh" parent="." index="0"]
 surface_material_override/0 = ExtResource("2_coe84")
-
-[node name="StaticBody" type="StaticBody3D" parent="." ]
-
-
-[node name="Box0" type="CollisionShape3D" parent="StaticBody" ]
-transform = Transform3D(1.000000, 0.000000, 0.000000, 0.000000, 0.000000, -1.000000, 0.000000, 1.000000, 0.000000, 0.000000, 0.000000, 0.000000)
-shape = SubResource("0_c31wo")
-debug_fill = false
-

@@ -33,15 +33,15 @@
 
 ## 路面标高（2026-09 修复后）
 
-整张图的可行驶面只有一个 `GroundPlane`（1200m BoxShape，顶面 **y=1.08**）；`SplineMeshComponent_*` 节点是 UE 迁移残留的空标记，没有几何。路口、斑马线、井盖等都是叠在平面上的独立件：
+整张图的可行驶面只有一个 `GroundPlane`（1200m BoxShape，顶面 **y=1.08**）；`SplineMeshComponent_*` 节点是 UE 迁移残留的空标记，没有几何。路口、斑马线、井盖等都是叠在平面上的独立件。**契约：这些路面件是纯视觉道具，保留原始摆放高度（井盖突起等为刻意保留的观感），一律不带碰撞体**——行驶面物理上就是平整的 GroundPlane，压过去不再有台阶：
 
-- `Intersection1/2`（`Prefabs/Cube.tscn` 沥青平板，厚 0.1）：节点 y=1.035，顶面 1.085。
-- `prp_manhole*`（4cm 圆盘，底部枢轴）：路面上统一 y=1.044，盖顶 1.084。
-- `prp_sewerGrate*`（1cm 篦子，底部枢轴）：路面上统一 y=1.074。
-- `CrssWk_*`（零厚度斑马线面片）：y≈1.073（面上 +3mm）。
-- 统一规则：**顶面 = 脚下支撑面 + 3~5mm**，正好避开 z-fighting。路缘/人行道区的篦子（y≈1.336/1.359）在路缘石高度上，属正常，不要往路面高度拉。
-- `GroundArea1_9809_Cube_*`（y=1.297 混凝土铺装块）是抬高的人行广场，不是路面。
+- `Intersection1/2`（`Prefabs/Cube.tscn` 沥青平板，厚 0.1）：节点 y=1.09，顶面 1.14，比路面高 6cm——视觉上是一块略厚的沥青补丁，物理上无碰撞。
+- `prp_manhole*`（4cm 圆盘，底部枢轴）：路面上 y≈1.2（悬空摆放，无碰撞）。
+- `prp_sewerGrate*`（1cm 篦子）：路面上 y≈1.159；路缘/人行道区的篦子（y≈1.336/1.359）在路缘石高度上，属正常。
+- `CrssWk_*`（零厚度斑马线面片）：y≈1.15。
+- `Cube.tscn`/`CrssWk_4L.tscn`/`CrssWk_1L_Pk.tscn` 三个 prefab 里的 `StaticBody`/`CollisionShape3D` 已删除——**不要给这些 prefab 加回碰撞体**，加了就会重新出现路面台阶。井盖/篦子本来就没有碰撞体。
+- `GroundArea1_9809_Cube_*`（y=1.297 混凝土铺装块）是抬高的人行广场（Cube_1.tscn，保留碰撞体），不是路面。
 
-验证脚本 `tests/test_road_survey.gd`：对全部路面件向下 raycast 计算 顶面-支撑面 间隙，结果写 `tests/_road_survey.json`；`test_apply_fix` 会把间隙在 3~25cm 的件一次性贴回支撑面（可走编辑器撤销，幂等）。改路面后重跑 `test_survey` 即可回归检查。
+验证脚本 `tests/test_road_survey.gd`：`test_survey` 对全部路面件向下 raycast 写 `tests/_road_survey.json`；`test_props_are_collision_ghosts` 断言射线穿过道具命中下方支撑面（即道具自身无碰撞）；`test_intersection_drive_surface` 断言两个交叉口 footprint 内行驶面恒为 ~1.08。改路面后跑整个 `road_survey` 套件即可回归。
 
 **保存陷阱**：`MultiMeshInstance3D` 的旧版 `mesh = ExtResource` 写法在加载时不会迁移到 `multimesh.mesh`，编辑器再次保存会把植被网格引用丢掉。现在 `mesh =` 已写在 `[sub_resource MultiMesh]` 块内（正确位置），之后的保存不会再丢。如果植被突然消失，检查 `MM_flg_*` 块里有没有 `mesh` 行。

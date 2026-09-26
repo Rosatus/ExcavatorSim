@@ -48,3 +48,16 @@ Urban-City 地图中心 Intersection2 与四个方向的街道存在高差；井
   无失败；UID fallback 警告为既有噪声）。
 
 待办：人工目视检查交叉口过渡观感与驾驶手感。
+
+## 修订（同日，用户反馈后）
+
+原方案把所有路面件降到支撑面+3~5mm，结果视觉被地面吞没（井盖只剩 4mm 薄片、斑马线沉入路面）。按用户要求改为：**保留原始突起观感，移除碰撞**。
+
+- 恢复全部 143 个节点的原始 transform（`git checkout 099c102` 回滚 + 重放 foliage 补丁）。
+- `Cube.tscn`/`CrssWk_4L.tscn`/`CrssWk_1L_Pk.tscn` 三个 prefab 删除 `StaticBody`+`CollisionShape3D`+`BoxShape3D`——交叉口 6cm 台阶和斑马线浮空薄片碰撞消失，轮胎走 GroundPlane (y=1.08)。
+- `prp_manhole`/`prp_sewerGrate` 本就无碰撞体，纯恢复高度即可。
+- `Cube_1.tscn`（人行广场）保留碰撞体。
+- 测试改为新契约：`test_props_are_collision_ghosts`（射线穿过道具）+ `test_intersection_drive_surface`（交叉口 footprint 内行驶面恒 ~1.08）。headless `_verify_flat.gd`：157 个道具实例 0 碰撞体，交叉口网格探测全平——PASS。
+- 重建 `urban.pck`（SHA256 94ac3670…），`urban_pack_test` PASS（2579 static bodies = 2588−9 个被删碰撞体）。
+
+坑：手工改写 CrssWk_1L_Pk.tscn 时把 instance id 抄成了 4L 的 `1_bkush`，导致场景加载失败弹"加载错误"模态框阻塞 MCP；headless 预检脚本 `check_tscn_parse.gd` 定位。改 prefab 文件后务必 headless 验证再重载场景。

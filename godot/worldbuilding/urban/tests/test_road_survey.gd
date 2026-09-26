@@ -1,11 +1,13 @@
 @tool
 extends McpTestSuite
 
-## Road-furniture height survey for Urban-City.tscn.
-## Measures every road-surface prop (manholes, sewer grates, crosswalks,
-## asphalt slabs) against the physics surface actually supporting it,
-## plus a coarse raycast grid over the road area to map all collision
-## height anomalies. Writes res://tests/_road_survey.json.
+## Road-furniture contract for Urban-City.tscn.
+## Road props (manholes, sewer grates, crosswalks, asphalt slabs) are
+## VISUAL ONLY — authored heights are kept (raised covers are intended);
+## their prefabs carry no colliders so the drivable surface stays flat.
+## test_survey writes res://tests/_road_survey.json (diagnostic);
+## test_props_are_collision_ghosts / test_intersection_drive_surface
+## are the regression contract.
 
 const OUT_PATH := "res://tests/_road_survey.json"
 const TARGET_PREFABS := [
@@ -127,9 +129,6 @@ func test_survey() -> void:
 	assert_true(report.targets.size() > 0, "no targets found")
 
 
-const EPS := {"CrssWk_4L.tscn": 0.003, "CrssWk_1L_Pk.tscn": 0.003,
-	"Cube.tscn": 0.005, "prp_sewerGrate.tscn": 0.004, "prp_manhole.tscn": 0.004}
-
 func _collect_targets(root: Node) -> Array[Node3D]:
 	var out: Array[Node3D] = []
 	var stack: Array[Node] = [root]
@@ -145,37 +144,60 @@ func _collect_targets(root: Node) -> Array[Node3D]:
 	return out
 
 
-## One undoable action: drop every road-furniture node whose visual top sits
-## more than ~3 cm proud of the collidable support below it (and less than
-## 25 cm — larger gaps are curb/sidewalk-zone props at intentional height).
-## Idempotent: fixed nodes end up at gap <= EPS and are skipped on rerun.
-func test_apply_fix() -> void:
+## A ray dropped through the centre of any road prop must reach the surface
+## BELOW it — i.e. the prop itself must not be the first collider hit.
+func test_props_are_collision_ghosts() -> void:
 	var root := EditorInterface.get_edited_scene_root() as Node3D
 	assert_true(root != null, "no edited scene root (or root is not Node3D)")
 	if root == null:
 		return
 	var world: World3D = root.get_world_3d()
-	var ur := EditorInterface.get_editor_undo_redo()
-	ur.create_action("Align road props to road surface", 0, root)
-	var moved := 0
+	var fails := 0
 	for n: Node3D in _collect_targets(root):
 		var box := _visual_aabb(n)
-		var top_y := box.position.y + box.size.y
-		var sup := _support_y(world, box.get_center().x, box.get_center().z,
-			top_y + 2.0, _own_collider_rids(n))
-		if sup.is_empty():
+		var c := box.get_center()
+		var hit: Dictionary = world.direct_space_state.intersect_ray(
+			PhysicsRayQueryParameters3D.create(
+				Vector3(c.x, box.position.y + box.size.y + 2.0, c.z),
+				Vector3(c.x, box.position.y + box.size.y - 40.0, c.z)))
+		if hit.is_empty():
 			continue
-		var gap := top_y - float(sup.y)
-		if gap < 0.03 or gap > 0.25:
+		var col := hit.get("collider") as Node
+		if col != null and (col == n or n.is_ancestor_of(col)):
+			fails += 1
+			push_error("%s still collides (ray hit %s at y=%.3f)" %
+				[n.name, col.name, hit.position.y])
+	assert_true(fails == 0, "%d road props still have colliders" % fails)
+
+
+## Wheels must ride the flat GroundPlane across both intersections:
+## every probe inside the slab footprint (20% margin) must report the
+## drivable surface near y=1.08, regardless of the raised slab visual.
+func test_intersection_drive_surface() -> void:
+	var root := EditorInterface.get_edited_scene_root() as Node3D
+	assert_true(root != null, "no edited scene root (or root is not Node3D)")
+	if root == null:
+		return
+	var world: World3D = root.get_world_3d()
+	for iname in [&"Intersection1", &"Intersection2"]:
+		var n := root.find_child(String(iname), true, false) as Node3D
+		assert_true(n != null, "%s not found" % iname)
+		if n == null:
 			continue
-		var eps: float = EPS.get(n.scene_file_path.get_file(), 0.004)
-		var new_y := float(sup.y) + eps - (top_y - n.global_position.y)
-		var old_pos := n.position
-		var new_pos := Vector3(old_pos.x, new_y, old_pos.z)
-		ur.add_do_property(n, "position", new_pos)
-		ur.add_undo_property(n, "position", old_pos)
-		moved += 1
-	if moved > 0:
-		ur.commit_action()
-	print("road fix moved ", moved, " nodes")
-	assert_true(moved > 0, "no nodes needed fixing")
+		var box := _visual_aabb(n)
+		var bad := 0
+		var samples := 0
+		var x := box.position.x + box.size.x * 0.2
+		while x <= box.position.x + box.size.x * 0.8:
+			var z := box.position.z + box.size.z * 0.2
+			while z <= box.position.z + box.size.z * 0.8:
+				var s := _support_y(world, x, z, 12.0, [])
+				samples += 1
+				if s.is_empty() or s.y < 1.05 or s.y > 1.12:
+					bad += 1
+					push_error("%s drive probe (%.1f, %.1f): %s" %
+						[iname, x, z, s])
+				z += 2.5
+			x += 2.5
+		assert_true(bad == 0,
+			"%s: %d/%d probes off the flat road surface" % [iname, bad, samples])
