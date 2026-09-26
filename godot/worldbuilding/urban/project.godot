@@ -14,6 +14,14 @@ config/name="Urban Map Workbench"
 run/main_scene="res://preview.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 
+[autoload]
+
+_mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg")
+
 [importer_defaults]
 
 texture={

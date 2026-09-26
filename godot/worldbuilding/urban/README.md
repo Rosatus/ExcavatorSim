@@ -1,4 +1,4 @@
-# Urban 地图工程
+﻿# Urban 地图工程
 
 城市地图独立维护在此处。主项目只保存地图选择与加载逻辑；本目录的模型、贴图不进入精简版。
 
@@ -30,3 +30,18 @@
 ## 来源
 
 `source_manifest.json` 记录从 `E:/projects/unreal/godot/urban` 复制的源路径、字节数和 SHA-256。源工程由 UnrealToGodot 从 UE4 资产包导出并修复（碰撞变换泄漏、植被 MultiMesh 化、发光材质、天空强度 2915 归一等）。原始目录未改动。
+
+## 路面标高（2026-09 修复后）
+
+整张图的可行驶面只有一个 `GroundPlane`（1200m BoxShape，顶面 **y=1.08**）；`SplineMeshComponent_*` 节点是 UE 迁移残留的空标记，没有几何。路口、斑马线、井盖等都是叠在平面上的独立件：
+
+- `Intersection1/2`（`Prefabs/Cube.tscn` 沥青平板，厚 0.1）：节点 y=1.035，顶面 1.085。
+- `prp_manhole*`（4cm 圆盘，底部枢轴）：路面上统一 y=1.044，盖顶 1.084。
+- `prp_sewerGrate*`（1cm 篦子，底部枢轴）：路面上统一 y=1.074。
+- `CrssWk_*`（零厚度斑马线面片）：y≈1.073（面上 +3mm）。
+- 统一规则：**顶面 = 脚下支撑面 + 3~5mm**，正好避开 z-fighting。路缘/人行道区的篦子（y≈1.336/1.359）在路缘石高度上，属正常，不要往路面高度拉。
+- `GroundArea1_9809_Cube_*`（y=1.297 混凝土铺装块）是抬高的人行广场，不是路面。
+
+验证脚本 `tests/test_road_survey.gd`：对全部路面件向下 raycast 计算 顶面-支撑面 间隙，结果写 `tests/_road_survey.json`；`test_apply_fix` 会把间隙在 3~25cm 的件一次性贴回支撑面（可走编辑器撤销，幂等）。改路面后重跑 `test_survey` 即可回归检查。
+
+**保存陷阱**：`MultiMeshInstance3D` 的旧版 `mesh = ExtResource` 写法在加载时不会迁移到 `multimesh.mesh`，编辑器再次保存会把植被网格引用丢掉。现在 `mesh =` 已写在 `[sub_resource MultiMesh]` 块内（正确位置），之后的保存不会再丢。如果植被突然消失，检查 `MM_flg_*` 块里有没有 `mesh` 行。
