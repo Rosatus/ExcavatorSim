@@ -53,8 +53,10 @@ func _enter_tree() -> void:
 	if area != null and area.get_meta("status", "") == "voxel":
 		var zone := $TerrainRoot/VoxelWorkZone
 		zone.layout.configure_area(area.global_position, area.get_meta("size_m"))
-		# Start with level, undisturbed soil; digging creates the pit.
-		zone.starter_pit = false
+		# Start as a half-excavated foundation pit: the approach half is already
+		# dug with a machinery ramp, the far half remains at grade for digging.
+		# Depth travels with the map so other voxel maps stay undisturbed.
+		zone.starter_pit_depth_m = float(area.get_meta("starter_pit_depth_m", 0.0))
 		zone.initialize_on_ready = true
 		# Only the finite voxel surface is visible; training meshes and walls
 		# are not part of the construction map.

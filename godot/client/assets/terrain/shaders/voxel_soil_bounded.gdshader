@@ -4,7 +4,6 @@ uniform sampler2D texture_albedo : source_color, filter_linear_mipmap_anisotropi
 uniform sampler2D texture_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform vec4 soil_bounds;
 uniform float initial_surface_y = 0.0;
-uniform float starter_pit_depth = 0.0;
 uniform float texture_scale = 0.5; // The scan covers 2 x 2 metres.
 uniform vec3 subsoil_tint : source_color = vec3(0.80, 0.75, 0.68);
 uniform float layer_start_m = 0.18;
@@ -66,11 +65,10 @@ void fragment() {
  vec4 bump_x = texture(texture_normal, p.zy);
  vec4 bump_y = texture(texture_normal, p.xz);
  vec4 bump_z = texture(texture_normal, p.xy);
- // Match the immutable generator's optional starter-pit profile. Excavation
- // never moves this datum; color is presentation, not material inventory.
- vec2 edge = min(soil_world.xz - soil_bounds.xy, soil_bounds.zw - soil_world.xz);
- float surface_y = initial_surface_y - starter_pit_depth * smoothstep(1.5, 3.0, min(edge.x, edge.y));
- float depth = surface_y - soil_world.y;
+ // Depth below the original ground grade. Excavation never moves this datum;
+ // color is presentation, not material inventory. Pre-dug starter terrain
+ // (the construction foundation pit) reads as cut subsoil for the same reason.
+ float depth = initial_surface_y - soil_world.y;
  float irregularity = (soil_noise(soil_world.xz * 1.3) - 0.5) * 0.12;
  float lower_layer = smoothstep(layer_start_m, layer_end_m, depth + irregularity);
  float macro_variation = mix(0.94, 1.04, soil_noise(soil_world.xz * 0.23));

@@ -22,17 +22,20 @@ func _run() -> void:
 	var editable: AABB = zone.layout.editable_world_bounds(zone.voxel_scale_m)
 	var map_rid: RID = scene.get_node("StaticMap/Ground").collision.get_rid()
 	var hard_remnants := 0
-	var uneven_samples := 0
+	var off_profile_samples := 0
+	var generator = zone.terrain.generator
 	for z in range(ceili(editable.position.z), floori(editable.end.z)):
 		for x in range(ceili(editable.position.x), floori(editable.end.x)):
-			var interior_ray := PhysicsRayQueryParameters3D.create(Vector3(x, 1, z), Vector3(x, -2, z), 1)
+			var interior_ray := PhysicsRayQueryParameters3D.create(Vector3(x, 1, z), Vector3(x, -5, z), 1)
 			var interior_hit: Dictionary = space.intersect_ray(interior_ray)
 			if interior_hit.is_empty() or interior_hit.get("rid", RID()) == map_rid:
 				hard_remnants += 1
-			elif absf(interior_hit.position.y - center.y) > 0.1:
-				uneven_samples += 1
+			else:
+				var expected_y: float = center.y + generator.surface_height_m(x - center.x, z - center.z)
+				if absf(interior_hit.position.y - expected_y) > 0.35:
+					off_profile_samples += 1
 	_expect(hard_remnants == 0, "editable interior has no missing soil or retained Terrain3D collision", failures)
-	_expect(uneven_samples == 0, "initial soil is level across the editable interior", failures)
+	_expect(off_profile_samples == 0, "initial soil matches the starter foundation-pit profile", failures)
 	_expect(zone.layout.owns_world_position(center) and not zone.layout.owns_world_position(Vector3(0, 0, 24)), "map owns only translated zone", failures)
 	_expect(scene.get_node("StaticMap/WorkArea/ExcavationArea").get_child_count() == 4, "only ground warning lines remain", failures)
 	var excavation = scene.get_node("TerrainRoot/ExcavationWorld")
@@ -40,7 +43,7 @@ func _run() -> void:
 	var contract := SoilContractDescriptor.load_for_model("sy135").to_dictionary()
 	var authority := Authority.new()
 	_expect(authority.configure(zone, contract, zone.readiness.generation), "translated authority configures", failures)
-	var pose := _pose(contract, Vector3(center.x, _bucket_origin_y(contract, center.y - 0.05), center.z), Vector3(0, -0.04, 0.06), "construction-cut")
+	var pose := _pose(contract, Vector3(center.x, _bucket_origin_y(contract, center.y - 0.05), center.z + 4.0), Vector3(0, -0.04, 0.06), "construction-cut")
 	var submitted := authority.submit_pose(pose, _identity(zone.readiness.generation, 10, 1))
 	var result := authority.flush_for_test()
 	print("CONSTRUCTION_CUT accepted=", submitted.get("accepted", false), " volume=", result.get("transaction", {}).get("accepted_volume_m3", 0))
@@ -48,7 +51,7 @@ func _run() -> void:
 	var payload := authority.get_payload_snapshot()
 	_expect(int(payload.get("bucket_mass_q", 0)) > 0, "cut credits bucket mass", failures)
 	_expect(int(payload.get("conservation_error_q", 1)) == 0, "cut conserves mass", failures)
-	var dump_pose := _dump_pose(contract, Vector3(center.x + 4, 0.8, center.z), "construction-dump")
+	var dump_pose := _dump_pose(contract, Vector3(center.x + 4, 0.8, center.z + 4.0), "construction-dump")
 	for tick in 3:
 		authority.submit_pose(dump_pose, _identity(zone.readiness.generation, 20 + tick, 2 + tick), 0.06)
 	for tick in 8:
@@ -59,7 +62,7 @@ func _run() -> void:
 	_expect(int(authority.get_payload_snapshot().get("conservation_error_q", 1)) == 0, "dump conserves mass", failures)
 	authority.clear()
 	var chassis = scene.get_node("ChassisMotionRoot")
-	chassis.map_spawn_position = center
+	chassis.map_spawn_position = center + Vector3(0, 0, 4.0)
 	chassis.reset_for_test()
 	for frame in 120:
 		await physics_frame
@@ -74,7 +77,7 @@ func _run() -> void:
 	_expect(not reset_hit.is_empty() and absf(reset_hit.position.y - center.y) < 0.1, "reset restores level soil without hard ground", failures)
 	# Exercise the real operator -> Jolt query -> automatic ExcavationWorld
 	# path. Direct Authority.submit_pose above cannot catch map-identity gates.
-	chassis.map_spawn_position = Vector3(center.x, center.y, center.z - 5.5)
+	chassis.map_spawn_position = Vector3(center.x, center.y, center.z + 5.5)
 	chassis.reset_for_test()
 	chassis.set_test_input_focus_bypass_for_test(true)
 	_expect(scene.get_node("ProductSession").request_start(), "resume after product reset", failures)

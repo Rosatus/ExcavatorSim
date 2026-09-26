@@ -8,17 +8,17 @@ func _initialize() -> void:
 	var zone := Zone.new()
 	zone.initialize_on_ready = false
 	zone.layout.configure_area(Vector3(37.0, 12.0, -19.0), Vector2(24.0, 32.0))
-	zone.starter_pit = true
+	zone.starter_pit_depth_m = 3.0
 	var material: ShaderMaterial = zone._make_soil_material()
 	assert(material.get_shader_parameter("initial_surface_y") == 12.0, "layers follow relocated map datum")
-	assert(is_equal_approx(material.get_shader_parameter("starter_pit_depth"), 0.6))
+	assert(material.get_shader_parameter("starter_pit_depth") == null, "subsoil layering follows the grade datum, not a starter profile")
 	assert(material.get_shader_parameter("soil_bounds") == Vector4(25.0, -35.0, 49.0, -3.0))
 	assert(material.get_shader_parameter("texture_albedo") == Visuals.ALBEDO)
 	assert(material.get_shader_parameter("texture_normal") == Visuals.NORMAL_ROUGHNESS)
 	var uniforms := material.shader.get_shader_uniform_list()
 	assert(not uniforms.is_empty(), "shader parses and exposes uniforms")
-	zone.starter_pit = false
-	assert(zone._make_soil_material().get_shader_parameter("starter_pit_depth") == 0.0)
+	zone.starter_pit_depth_m = 0.0
+	assert(zone._make_soil_material().get_shader_parameter("initial_surface_y") == 12.0, "undisturbed start keeps the same datum")
 	var fill := Visuals.surface_material()
 	assert(fill.albedo_texture == Visuals.ALBEDO and fill.normal_texture == Visuals.NORMAL_ROUGHNESS)
 	assert(fill.roughness_texture == fill.normal_texture)

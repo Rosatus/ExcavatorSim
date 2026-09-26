@@ -25,6 +25,7 @@ metadata/axis_snap_tolerance_degrees = 10.0
 position = Vector3(38.301582, -0.02, 53.5)
 metadata/size_m = Vector2(18, 28)
 metadata/status = "voxel"
+metadata/starter_pit_depth_m = 1.5
 
 [node name="NearEdge" type="MeshInstance3D" parent="ExcavationArea"]
 position = Vector3(0, 0.025, -14)

@@ -19,6 +19,10 @@ func _ready() -> void:
 				var point := Vector3(x, 0, z)
 				data.set_control(point, data.get_control(point) | 4)
 		data.update_maps(Terrain3DRegion.TYPE_CONTROL)
+		# Control-map updates only rebuild the visual mesh; the native
+		# collider keeps stale triangles without an explicit rebuild.
+		if collision != null:
+			collision.update()
 	# Terrain3D 1.0.2 creates its collision object on tree entry. Setting legacy
 	# aliases before that point does not reliably survive PackedScene generation.
 	collision.set_mode(3)

@@ -12,10 +12,13 @@ const CollisionReadiness = preload("res://scripts/voxel_collision_readiness.gd")
 ## coordinate configuration, derivative readiness and reset/teardown.
 @export_range(0.1, 0.25, 0.005) var voxel_scale_m := WorkZoneConfig.DEFAULT_VOXEL_SCALE_M
 @export var initialize_on_ready := true
-@export var starter_pit := false
+## Depth of the designed starter foundation pit (approach-side half). 0 keeps
+## the initial soil level with the surrounding grade.
+@export_range(0.0, 5.0, 0.1) var starter_pit_depth_m := 0.0
 @export var collision_viewer_target_path := NodePath("../../ChassisMotionRoot")
 
 var terrain: VoxelTerrain
+var _generator: VoxelGeneratorScript
 var zone_viewer: VoxelViewer
 var collision_viewer: VoxelViewer
 var readiness := CollisionReadiness.new()
@@ -52,10 +55,11 @@ func build_runtime() -> bool:
 
 	var format := VoxelFormat.new()
 	format.set_channel_depth(VoxelBuffer.CHANNEL_SDF, VoxelBuffer.DEPTH_16_BIT)
-	var generator = preload("res://scripts/voxel_pit_generator.gd").new()
-	generator.scale_m = voxel_scale_m
-	generator.half_size = Vector2(layout.SIZE_WORLD_M.x, layout.SIZE_WORLD_M.z) * 0.5
-	generator.depth_m = 0.6 if starter_pit else 0.0
+	_generator = preload("res://scripts/voxel_pit_generator.gd").new()
+	_generator.scale_m = voxel_scale_m
+	_generator.half_size = Vector2(layout.SIZE_WORLD_M.x, layout.SIZE_WORLD_M.z) * 0.5
+	_generator.depth_m = starter_pit_depth_m
+	var generator := _generator
 	# Native block bounds round outward. Generate a finite apron under hard
 	# ground and clip its presentation to the exact semantic rectangle.
 	# Terrain3D heightmap holes also remove neighboring collision triangles.
@@ -200,7 +204,8 @@ func _try_acknowledge_surface(ticket: Dictionary, world_position: Vector3) -> bo
 	if hit.is_empty():
 		return false
 	var hit_position: Variant = hit.get("position")
-	var expected_y := layout.INITIAL_SURFACE_Y - (0.6 if starter_pit else 0.0)
+	var expected_y: float = layout.INITIAL_SURFACE_Y \
+		+ (_generator.surface_height_m(0.0, 0.0) if _generator != null else 0.0)
 	if not hit_position is Vector3 or absf((hit_position as Vector3).y - expected_y) > 0.15:
 		return false
 	return readiness.acknowledge_query(ticket)
@@ -219,6 +224,7 @@ func _teardown_runtime() -> void:
 		remove_child(terrain)
 		terrain.queue_free()
 		terrain = null
+	_generator = null
 	initial_ticket = {}
 	latest_ticket = {}
 
@@ -231,7 +237,6 @@ func _make_soil_material() -> ShaderMaterial:
 	material.set_shader_parameter("texture_normal", visuals.NORMAL_ROUGHNESS)
 	material.set_shader_parameter("soil_bounds", Vector4(layout.MIN_WORLD.x, layout.MIN_WORLD.z, layout.MAX_WORLD.x, layout.MAX_WORLD.z))
 	material.set_shader_parameter("initial_surface_y", layout.INITIAL_SURFACE_Y)
-	material.set_shader_parameter("starter_pit_depth", 0.6 if starter_pit else 0.0)
 	return material
 
 
