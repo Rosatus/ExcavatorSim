@@ -48,7 +48,7 @@
 
 **植被实例删除**：`Foliage` 节点下的 `flg_bush_*`/`flg_groundLeaves`/`flg_plane*`/`flg_tree_*` 是 MultiMeshInstance3D——单个草丛/落叶堆/树在编辑器里无法点选删除，只能从 `MM_flg_*` 的 `transform_array`（PackedVector3Array，每实例 12 个数=9 基向量+3 原点）按坐标剔除对应实例并同步 `instance_count`。花坛内的绿篱草是 `flg_bush_01` 实例（y≈2.10 在花坛土层高度）。
 
-**人行道砖删除（spline 合并网格）**：`sidewalk_Straight_Splines_0` 整块城市路面是一条**合并 ArrayMesh**（GLB 内只有 1 个 Mesh 子节点，surface 0=人行道/路缘、surface 1=车行道），砖块没有独立节点，编辑器里无法选中单删。删法：`tools/trim_spline_tiles.gd`（headless）按"三角面质心落入矩形"剔除 surface 0 的三角形，另存 `maps/urban/sidewalk_Straight_Splines_0_trimmed.res`；prefab `Prefabs/sidewalk_Straight_Splines_0.tscn` 里用 `mesh = ExtResource` 覆盖挂上（GLB 源资产不动，删 `mesh` 行即回退）。**切割边界用三角形裁剪可对任意 x 齐平**（顶点逐属性插值新增，不必对齐砖缝；相邻砖 x 接缝见脚本注释）。z 带宽 [27.45, 29.65] 覆盖路缘立面/黄色 curb 顶面/人行道砖，避开上层人行道（z≥30.6）与车行道 surface 1。已删区段：B6 左边缘（x=14.82，跨砖内平面裁剪）至 Tall107 绿篱（x=39.47 砖缝）的 **8.5 块砖 + 整段黄色 curb**；缺口内 `groundLeaves`/`flg_tree_01`/`flg_plane` 各删 1 个悬空实例，草簇（基座已在地面层）与路面下水道篦子保留。
+**人行道砖删除（spline 合并网格）**：`sidewalk_Straight_Splines_0` 整块城市路面是一条**合并 ArrayMesh**（GLB 内只有 1 个 Mesh 子节点，surface 0=人行道/路缘、surface 1=车行道），砖块没有独立节点，编辑器里无法选中单删。删法：`tools/trim_spline_tiles.gd`（headless）按"三角面质心落入矩形"剔除 surface 0 的三角形，另存 `maps/urban/sidewalk_Straight_Splines_0_trimmed.res`；prefab `Prefabs/sidewalk_Straight_Splines_0.tscn` 里用 `mesh = ExtResource` 覆盖挂上（GLB 源资产不动，删 `mesh` 行即回退）。**切割边界用三角形裁剪可对任意 x 齐平**（顶点逐属性插值新增，不必对齐砖缝；相邻砖 x 接缝见脚本注释）。z 带宽 [27.45, 29.65] 覆盖路缘立面/黄色 curb 顶面/人行道砖，避开上层人行道（z≥30.6）与车行道 surface 1。已删区段：x∈[23.97, 39.47] 的 **5 块砖 + 同段黄色 curb**（B6 旁 21.07–23.97 砖及其 curb 保留，hedge107 所在砖保留）；缺口内 `flg_plane` 删 1 个落叶实例，草簇（基座已在地面层）与路面下水道篦子保留。
 
 ## 风摆着色器（2026-09 修复后）
 

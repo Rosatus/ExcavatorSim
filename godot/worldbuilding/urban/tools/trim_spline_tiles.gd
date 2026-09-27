@@ -12,11 +12,11 @@ extends SceneTree
 #   15.09 | 18.10 | 21.07 | 23.97 | 26.72 | 28.75 | 32.08 | 35.41 | 39.47
 # Section profile (z): curb face 27.59 / yellow curb top 27.59-27.86 /
 #   riser 27.86 / flat tiles 27.86-29.59 / upper strip 30.6+ (kept).
-# Flush cut x=14.82 = gardenPlanter_B6 west face (mid-tile inside
-#   [12.86,15.09]); east end stays on seam 39.47 (hedge107 tile kept).
+# West end starts just inside seam 23.97 (tile 21.07-23.97 next to B6
+#   kept); east end stays on seam 39.47 (hedge107 tile kept).
 
 const GLB_PATH := "res://maps/urban/sidewalk_Straight_Splines_0.glb"
-const CUT_X0 := 14.82
+const CUT_X0 := 23.96
 const CUT_X1 := 39.48
 const CUT_Z0 := 27.45
 const CUT_Z1 := 29.65
