@@ -53,8 +53,8 @@ auto_reconnect=false
 [physics]
 
 3d/physics_engine="Jolt Physics"
-common/physics_interpolation=true
 jolt_physics_3d/limits/max_bodies=32768
+common/physics_interpolation=true
 
 [rendering]
 

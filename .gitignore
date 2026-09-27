@@ -55,3 +55,6 @@ godot/worldbuilding/**/*.zip
 
 # Preview renders and one-off visual audit output (local-only)
 /reports/
+
+# Agent diagnostic scratch scripts (regenerated per task, never committed)
+/.trellis/tmp/
