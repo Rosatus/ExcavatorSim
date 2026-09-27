@@ -1,6 +1,6 @@
 [gd_resource type="VisualShader" format=3 uid="uid://bwejct4j3skh0"]
 
-[ext_resource type="Texture2D" uid="uid://rub5e1i23c06" path="res://maps/urban/UrbanCity/Textures/Props/usaflag.png" id="1_hgaxy"]
+[ext_resource type="Texture2D" uid="uid://cgmnuqxowa7gm" path="res://maps/urban/UrbanCity/Textures/Props/usaflag.png" id="1_hgaxy"]
 
 [sub_resource type="VisualShaderNodeTexture" id="VisualShaderNodeTexture_bh8rb7ujs1gd0"]
 expanded_output_ports = [0]

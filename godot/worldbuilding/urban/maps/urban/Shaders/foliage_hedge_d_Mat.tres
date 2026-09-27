@@ -1,6 +1,6 @@
 [gd_resource type="VisualShader" format=3 uid="uid://dafeo5130fhsp"]
 
-[ext_resource type="Texture2D" uid="uid://dif1rjhbbabfn" path="res://maps/urban/UrbanCity/Textures/Foliage/foliage_hedge_d.png" id="1_o0iyo"]
+[ext_resource type="Texture2D" uid="uid://ekvgta1qmjsd" path="res://maps/urban/UrbanCity/Textures/Foliage/foliage_hedge_d.png" id="1_o0iyo"]
 
 [sub_resource type="VisualShaderNodeMix" id="VisualShaderNodeMix_ciyhnaqchndqc"]
 default_input_values = [0, Vector3(1, 1, 1), 1, Vector3(-1, -1, -1), 2, Vector3(0.5, 0.5, 0.5)]

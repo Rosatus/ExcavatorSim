@@ -1,6 +1,6 @@
 [gd_resource type="VisualShader" format=3 uid="uid://b01tskmtjtr25"]
 
-[ext_resource type="Texture2D" uid="uid://cj6w2fo6aieoq" path="res://maps/urban/UrbanCity/Textures/Tileable/mask_grunge_tileable.png" id="1_dd3ep"]
+[ext_resource type="Texture2D" uid="uid://dq5fftcwnuiaq" path="res://maps/urban/UrbanCity/Textures/Tileable/mask_grunge_tileable.png" id="1_dd3ep"]
 
 [sub_resource type="VisualShaderNodeTexture" id="VisualShaderNodeTexture_0s2yed1sio2s"]
 expanded_output_ports = [0]

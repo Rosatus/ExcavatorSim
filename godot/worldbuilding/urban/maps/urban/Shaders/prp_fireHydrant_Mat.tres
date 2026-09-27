@@ -1,9 +1,9 @@
 [gd_resource type="VisualShader" format=3 uid="uid://bg1p5n2yujwho"]
 
-[ext_resource type="Texture2D" uid="uid://d177m5xautsit" path="res://maps/urban/UrbanCity/Textures/Props/prp_fireHydrant_a.png" id="1_vouud"]
-[ext_resource type="Texture2D" uid="uid://c3unapxjyp22n" path="res://maps/urban/UrbanCity/Textures/Props/prp_fireHydrant_m.png" id="3_cavw7"]
-[ext_resource type="Texture2D" uid="uid://bgrrkxi3wi5ug" path="res://maps/urban/UrbanCity/Textures/Props/prp_fireHydrant_r.png" id="4_dl7gu"]
-[ext_resource type="Texture2D" uid="uid://case7jlxc0sy5" path="res://maps/urban/UrbanCity/Textures/Props/prp_fireHydrant_ao.png" id="5_0hnw2"]
+[ext_resource type="Texture2D" uid="uid://bl4t4geg0gbt8" path="res://maps/urban/UrbanCity/Textures/Props/prp_fireHydrant_a.png" id="1_vouud"]
+[ext_resource type="Texture2D" uid="uid://bwda0tw3ldum8" path="res://maps/urban/UrbanCity/Textures/Props/prp_fireHydrant_m.png" id="3_cavw7"]
+[ext_resource type="Texture2D" uid="uid://cqvt5snnyyvfw" path="res://maps/urban/UrbanCity/Textures/Props/prp_fireHydrant_r.png" id="4_dl7gu"]
+[ext_resource type="Texture2D" uid="uid://c78fnpywcu1gn" path="res://maps/urban/UrbanCity/Textures/Props/prp_fireHydrant_ao.png" id="5_0hnw2"]
 
 [sub_resource type="VisualShaderNodeClamp" id="VisualShaderNodeClamp_dbqdc4krgj0h3"]
 default_input_values = [0, Vector3(0, 0, 0), 1, Vector3(0, 0, 0), 2, Vector3(1, 1, 1)]

@@ -1,6 +1,6 @@
 [gd_resource type="VisualShader" format=3 uid="uid://dwrpyxcl6tjn0"]
 
-[ext_resource type="Texture2D" uid="uid://ddr6rhdjvlt3c" path="res://maps/urban/UrbanCity/Textures/Tileable/clouds.png" id="1_blh7j"]
+[ext_resource type="Texture2D" uid="uid://d3tygx7u07w02" path="res://maps/urban/UrbanCity/Textures/Tileable/clouds.png" id="1_blh7j"]
 
 [sub_resource type="VisualShaderNodeTexture2DParameter" id="VisualShaderNodeTexture2DParameter_b7cw3fqxla3ic"]
 parameter_name = "UTG_2nd_UV_set_Texture"

@@ -1,8 +1,8 @@
 [gd_resource type="VisualShader" format=3 uid="uid://gd5372ie601t"]
 
-[ext_resource type="Texture2D" uid="uid://bvbfm51h6lsk7" path="res://maps/urban/UrbanCity/Textures/Props/prp_pylons_a.png" id="1_b5bt8"]
-[ext_resource type="Texture2D" uid="uid://0t3teh6uus6v" path="res://maps/urban/UrbanCity/Textures/Props/prp_pylons_ao.png" id="2_tkprw"]
-[ext_resource type="Texture2D" uid="uid://y458es3sfpbh" path="res://maps/urban/UrbanCity/Textures/Props/prp_pylons_r.png" id="4_c263b"]
+[ext_resource type="Texture2D" uid="uid://dh230krr2ql4m" path="res://maps/urban/UrbanCity/Textures/Props/prp_pylons_a.png" id="1_b5bt8"]
+[ext_resource type="Texture2D" uid="uid://ddiruwdqwnp0k" path="res://maps/urban/UrbanCity/Textures/Props/prp_pylons_ao.png" id="2_tkprw"]
+[ext_resource type="Texture2D" uid="uid://kbifywi568tr" path="res://maps/urban/UrbanCity/Textures/Props/prp_pylons_r.png" id="4_c263b"]
 
 [sub_resource type="VisualShaderNodeClamp" id="VisualShaderNodeClamp_dbqdc4krgj0h3"]
 default_input_values = [0, Vector3(0, 0, 0), 1, Vector3(0, 0, 0), 2, Vector3(1, 1, 1)]

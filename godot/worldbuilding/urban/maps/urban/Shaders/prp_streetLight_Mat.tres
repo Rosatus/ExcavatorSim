@@ -1,10 +1,10 @@
 [gd_resource type="VisualShader" format=3 uid="uid://dgki883kw3fq4"]
 
-[ext_resource type="Texture2D" uid="uid://bfgmd4180q7kq" path="res://maps/urban/UrbanCity/Textures/Props/prp_streetLight_a.png" id="1_dg06e"]
-[ext_resource type="Texture2D" uid="uid://dqpm5bhew1wu2" path="res://maps/urban/UrbanCity/Textures/Props/prp_streetLights_e.png" id="2_c0gnl"]
-[ext_resource type="Texture2D" uid="uid://c5obe4j7yofam" path="res://maps/urban/UrbanCity/Textures/Props/prp_streetLight_m.png" id="4_83umr"]
-[ext_resource type="Texture2D" uid="uid://bdgivwstn8lij" path="res://maps/urban/UrbanCity/Textures/Props/prp_streetLight_r.png" id="5_csoyi"]
-[ext_resource type="Texture2D" uid="uid://dvxxvgo44ivrf" path="res://maps/urban/UrbanCity/Textures/Props/prp_streetLight_ao.png" id="6_wy8du"]
+[ext_resource type="Texture2D" uid="uid://crd8bdy30jsat" path="res://maps/urban/UrbanCity/Textures/Props/prp_streetLight_a.png" id="1_dg06e"]
+[ext_resource type="Texture2D" uid="uid://33xxh6tsr42c" path="res://maps/urban/UrbanCity/Textures/Props/prp_streetLights_e.png" id="2_c0gnl"]
+[ext_resource type="Texture2D" uid="uid://obvd3tk7c2js" path="res://maps/urban/UrbanCity/Textures/Props/prp_streetLight_m.png" id="4_83umr"]
+[ext_resource type="Texture2D" uid="uid://13kbvg20jgnl" path="res://maps/urban/UrbanCity/Textures/Props/prp_streetLight_r.png" id="5_csoyi"]
+[ext_resource type="Texture2D" uid="uid://ciyl1nsd3ucv0" path="res://maps/urban/UrbanCity/Textures/Props/prp_streetLight_ao.png" id="6_wy8du"]
 
 [sub_resource type="VisualShaderNodeTexture" id="VisualShaderNodeTexture_dvp0r1hmhr78s"]
 expanded_output_ports = [0]

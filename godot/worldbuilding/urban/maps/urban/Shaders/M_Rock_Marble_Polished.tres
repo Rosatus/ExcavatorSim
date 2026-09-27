@@ -1,7 +1,7 @@
 [gd_resource type="VisualShader" format=3 uid="uid://br5qqexmptxti"]
 
-[ext_resource type="Texture2D" uid="uid://b0rva0gcakn11" path="res://maps/urban/UrbanCity/StarterContent/Textures/T_Rock_Marble_Polished_D.png" id="1_d21mi"]
-[ext_resource type="Texture2D" uid="uid://dn2gjyefugyji" path="res://maps/urban/UrbanCity/StarterContent/Textures/T_Perlin_Noise_M.png" id="2_cgdiy"]
+[ext_resource type="Texture2D" uid="uid://dcnr0a4yw6pvg" path="res://maps/urban/UrbanCity/StarterContent/Textures/T_Rock_Marble_Polished_D.png" id="1_d21mi"]
+[ext_resource type="Texture2D" uid="uid://bm2k7cqsv0rr" path="res://maps/urban/UrbanCity/StarterContent/Textures/T_Perlin_Noise_M.png" id="2_cgdiy"]
 
 [sub_resource type="VisualShaderNodeVectorOp" id="VisualShaderNodeVectorOp_ddts8povndqu8"]
 default_input_values = [0, Vector3(0, 0, 0), 1, Vector3(0.2134, 0.2134, 0.2134)]

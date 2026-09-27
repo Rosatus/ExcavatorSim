@@ -1,6 +1,6 @@
 [gd_resource type="VisualShader" format=3 uid="uid://c72p1cp8nimvd"]
 
-[ext_resource type="Texture2D" uid="uid://br2t02ecx181i" path="res://maps/urban/Engine/EngineMaterials/T_Default_Material_Grid_M.png" id="1_mu74o"]
+[ext_resource type="Texture2D" uid="uid://df3xq28v682m3" path="res://maps/urban/Engine/EngineMaterials/T_Default_Material_Grid_M.png" id="1_mu74o"]
 
 [sub_resource type="VisualShaderNodeVectorOp" id="VisualShaderNodeVectorOp_5ssfuqib0sje"]
 default_input_values = [0, Vector3(1, 1, 1), 1, Vector3(0.1, 0.1, 0.1)]

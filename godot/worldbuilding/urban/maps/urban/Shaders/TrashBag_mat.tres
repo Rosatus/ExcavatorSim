@@ -1,7 +1,7 @@
 [gd_resource type="VisualShader" format=3 uid="uid://unwa8hyjuq5f"]
 
-[ext_resource type="Texture2D" uid="uid://btaeeedpyukhi" path="res://maps/urban/UrbanCity/Textures/Props/TrashBag_A.png" id="1_brnt7"]
-[ext_resource type="Texture2D" uid="uid://bxy7sm5kogs0o" path="res://maps/urban/UrbanCity/Textures/Props/TrashBag_C.png" id="3_bo0ds"]
+[ext_resource type="Texture2D" uid="uid://bliw6hh4n38cq" path="res://maps/urban/UrbanCity/Textures/Props/TrashBag_A.png" id="1_brnt7"]
+[ext_resource type="Texture2D" uid="uid://dc2nlu1vcu68g" path="res://maps/urban/UrbanCity/Textures/Props/TrashBag_C.png" id="3_bo0ds"]
 
 [sub_resource type="VisualShaderNodeClamp" id="VisualShaderNodeClamp_bsl5etqaae7ft"]
 default_input_values = [0, Vector3(0, 0, 0), 1, Vector3(0, 0, 0), 2, Vector3(1, 1, 1)]

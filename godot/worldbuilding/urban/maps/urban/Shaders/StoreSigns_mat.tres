@@ -1,8 +1,8 @@
 [gd_resource type="VisualShader" format=3 uid="uid://dfjvhgstdle"]
 
-[ext_resource type="Texture2D" uid="uid://dq4k0hxbmew0v" path="res://maps/urban/UrbanCity/Textures/Props/StoreSigns_A.png" id="1_b4pij"]
-[ext_resource type="Texture2D" uid="uid://dyivttall3jex" path="res://maps/urban/UrbanCity/Textures/Props/StoreSigns_E.png" id="2_c6kpe"]
-[ext_resource type="Texture2D" uid="uid://y41f2ksvag4d" path="res://maps/urban/UrbanCity/Textures/Props/StoreSigns_C.png" id="4_cbjtt"]
+[ext_resource type="Texture2D" uid="uid://p15wp3tj1sji" path="res://maps/urban/UrbanCity/Textures/Props/StoreSigns_A.png" id="1_b4pij"]
+[ext_resource type="Texture2D" uid="uid://bjxb02cvfno3j" path="res://maps/urban/UrbanCity/Textures/Props/StoreSigns_E.png" id="2_c6kpe"]
+[ext_resource type="Texture2D" uid="uid://bu4f4yhyv08id" path="res://maps/urban/UrbanCity/Textures/Props/StoreSigns_C.png" id="4_cbjtt"]
 
 [sub_resource type="VisualShaderNodeClamp" id="VisualShaderNodeClamp_dbqdc4krgj0h3"]
 default_input_values = [0, Vector3(0, 0, 0), 1, Vector3(0, 0, 0), 2, Vector3(1, 1, 1)]

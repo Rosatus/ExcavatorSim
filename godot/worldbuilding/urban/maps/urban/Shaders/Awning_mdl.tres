@@ -1,6 +1,6 @@
 [gd_resource type="VisualShader" format=3 uid="uid://cfkq2de1nlfkq"]
 
-[ext_resource type="Texture2D" uid="uid://b5b05ixo6db8s" path="res://maps/urban/UrbanCity/Textures/Props/Awning_A.png" id="1_dr4hm"]
+[ext_resource type="Texture2D" uid="uid://cls6b3rdqv1ec" path="res://maps/urban/UrbanCity/Textures/Props/Awning_A.png" id="1_dr4hm"]
 
 [sub_resource type="VisualShaderNodeClamp" id="VisualShaderNodeClamp_dtf4n16adj36k"]
 default_input_values = [0, Vector3(0, 0, 0), 1, Vector3(0, 0, 0), 2, Vector3(1, 1, 1)]

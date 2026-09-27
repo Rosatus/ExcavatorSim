@@ -1,8 +1,8 @@
 [gd_resource type="VisualShader" format=3 uid="uid://cs2j7u6gsyq48"]
 
-[ext_resource type="Texture2D" uid="uid://cv88x28d6hvby" path="res://maps/urban/UrbanCity/Textures/Props/prp_cementBarrier_a.png" id="1_dcaa8"]
-[ext_resource type="Texture2D" uid="uid://bg2cvsqt3n8o4" path="res://maps/urban/UrbanCity/Textures/Props/prp_cementBarrier_ao.png" id="2_dgheo"]
-[ext_resource type="Texture2D" uid="uid://cadmysy6mg3jb" path="res://maps/urban/UrbanCity/Textures/Props/prp_cementBarrier_r.png" id="4_6aygl"]
+[ext_resource type="Texture2D" uid="uid://vki407rco0gx" path="res://maps/urban/UrbanCity/Textures/Props/prp_cementBarrier_a.png" id="1_dcaa8"]
+[ext_resource type="Texture2D" uid="uid://bbybtqor4hi5u" path="res://maps/urban/UrbanCity/Textures/Props/prp_cementBarrier_ao.png" id="2_dgheo"]
+[ext_resource type="Texture2D" uid="uid://qqkg8yxidk8a" path="res://maps/urban/UrbanCity/Textures/Props/prp_cementBarrier_r.png" id="4_6aygl"]
 
 [sub_resource type="VisualShaderNodeFloatConstant" id="VisualShaderNodeFloatConstant_3acha7sh2bw1"]
 constant = 0.380531

@@ -1,7 +1,7 @@
 [gd_resource type="VisualShader" format=3 uid="uid://cv4f6hx8peic8"]
 
-[ext_resource type="Texture2D" uid="uid://cq5k4t2etwwsg" path="res://maps/urban/UrbanCity/Textures/Foliage/decal_DeadLeaves_d.png" id="1_4fbe0"]
-[ext_resource type="Texture2D" uid="uid://bjutswkado777" path="res://maps/urban/UrbanCity/Textures/Foliage/decal_DeadLeaves_r.png" id="3_f4ji6"]
+[ext_resource type="Texture2D" uid="uid://bjo22y7nmm6jq" path="res://maps/urban/UrbanCity/Textures/Foliage/decal_DeadLeaves_d.png" id="1_4fbe0"]
+[ext_resource type="Texture2D" uid="uid://cx2vw6iv20e8a" path="res://maps/urban/UrbanCity/Textures/Foliage/decal_DeadLeaves_r.png" id="3_f4ji6"]
 
 [sub_resource type="VisualShaderNodeTexture" id="VisualShaderNodeTexture_bcstts01o8ke4"]
 expanded_output_ports = [0]

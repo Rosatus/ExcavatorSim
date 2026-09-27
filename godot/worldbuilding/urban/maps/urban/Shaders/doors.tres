@@ -1,7 +1,7 @@
 [gd_resource type="VisualShader" format=3 uid="uid://bb1f5vqwvqhj2"]
 
-[ext_resource type="Texture2D" uid="uid://ba1c2xa150s8m" path="res://maps/urban/UrbanCity/Textures/Props/doors_d.png" id="1_b71ng"]
-[ext_resource type="Texture2D" uid="uid://cviyjrjldjng3" path="res://maps/urban/UrbanCity/Textures/Props/doors_r.png" id="3_djs0y"]
+[ext_resource type="Texture2D" uid="uid://c5gq1tog6pai4" path="res://maps/urban/UrbanCity/Textures/Props/doors_d.png" id="1_b71ng"]
+[ext_resource type="Texture2D" uid="uid://8o21ji7wuydd" path="res://maps/urban/UrbanCity/Textures/Props/doors_r.png" id="3_djs0y"]
 
 [sub_resource type="VisualShaderNodeExpression" id="VisualShaderNodeExpression_dkqcjabdcxy12"]
 size = Vector2(980, 1250)

@@ -1,7 +1,7 @@
 [gd_resource type="VisualShader" format=3 uid="uid://y3sht3in1vhn"]
 
-[ext_resource type="Texture2D" uid="uid://cuyfgomxlurf1" path="res://maps/urban/UrbanCity/Textures/Props/prp_tarp_a.png" id="1_jw33g"]
-[ext_resource type="Texture2D" uid="uid://bkij4nvj7j2b0" path="res://maps/urban/UrbanCity/Textures/Props/prp_tarp_ao.png" id="3_dgn5q"]
+[ext_resource type="Texture2D" uid="uid://diryfy87mm3en" path="res://maps/urban/UrbanCity/Textures/Props/prp_tarp_a.png" id="1_jw33g"]
+[ext_resource type="Texture2D" uid="uid://bkx3f760kb5xv" path="res://maps/urban/UrbanCity/Textures/Props/prp_tarp_ao.png" id="3_dgn5q"]
 
 [sub_resource type="VisualShaderNodeFloatParameter" id="VisualShaderNodeFloatParameter_ckbd4nxddmaxx"]
 parameter_name = "NormalStrength"

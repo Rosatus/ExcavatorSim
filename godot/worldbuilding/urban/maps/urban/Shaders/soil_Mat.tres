@@ -1,6 +1,6 @@
 [gd_resource type="VisualShader" format=3 uid="uid://ccgwd6wanxdxk"]
 
-[ext_resource type="Texture2D" uid="uid://cj8astbutywem" path="res://maps/urban/UrbanCity/Textures/Tileable/soil_d.png" id="1_nhowc"]
+[ext_resource type="Texture2D" uid="uid://dcpvt21s7iimr" path="res://maps/urban/UrbanCity/Textures/Tileable/soil_d.png" id="1_nhowc"]
 
 [sub_resource type="VisualShaderNodeClamp" id="VisualShaderNodeClamp_sryn6a135gak"]
 default_input_values = [0, Vector3(0, 0, 0), 1, Vector3(0, 0, 0), 2, Vector3(1, 1, 1)]
