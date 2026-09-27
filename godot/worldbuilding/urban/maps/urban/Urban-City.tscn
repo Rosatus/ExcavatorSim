@@ -13347,5 +13347,77 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.0667, 0)
 
 [node name="WorkArea" parent="." unique_id=1899074040 instance=ExtResource("workarea")]
 
-[node name="prp_roadworkBarrier" parent="." instance=ExtResource("171_rwbar")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 1.075, 10)
+[node name="prp_roadworkBarrier" parent="." unique_id=1761955755 instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.8241, 1.324630, 19.2705)
+
+[node name="prp_roadworkBarrier2" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.0217, 1.324630, 19.2705)
+
+[node name="prp_roadworkBarrier3" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.2192, 1.324630, 19.2705)
+
+[node name="prp_roadworkBarrier4" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.4168, 1.324630, 19.2705)
+
+[node name="prp_roadworkBarrier5" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.6143, 1.324630, 19.2705)
+
+[node name="prp_roadworkBarrier6" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.8119, 1.324630, 19.2705)
+
+[node name="prp_roadworkBarrier7" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.0095, 1.324630, 19.2705)
+
+[node name="prp_roadworkBarrier8" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21.2070, 1.324630, 19.2705)
+
+[node name="prp_roadworkBarrier9" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22.4046, 1.324630, 19.2705)
+
+[node name="prp_roadworkBarrier10" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 23.6021, 1.324630, 19.2705)
+
+[node name="prp_roadworkBarrier11" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.7997, 1.324630, 19.2705)
+
+[node name="prp_roadworkBarrier12" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.9972, 1.324630, 19.2705)
+
+[node name="prp_roadworkBarrier13" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 27.1948, 1.324630, 19.2705)
+
+[node name="prp_roadworkBarrier14" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.3924, 1.324630, 19.2705)
+
+[node name="prp_roadworkBarrier15" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.5899, 1.324630, 19.2705)
+
+[node name="prp_roadworkBarrier16" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30.7875, 1.324630, 19.2705)
+
+[node name="prp_roadworkBarrier17" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 31.9850, 1.324630, 19.2705)
+
+[node name="prp_roadworkBarrier18" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 33.1826, 1.324630, 19.2705)
+
+[node name="prp_roadworkBarrier19" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 34.3802, 1.324630, 19.2705)
+
+[node name="prp_roadworkBarrier20" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 35.5777, 1.324630, 19.2705)
+
+[node name="prp_roadworkBarrier21" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36.7753, 1.324630, 19.2705)
+
+[node name="prp_roadworkBarrier22" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 37.9728, 1.324630, 19.2705)
+
+[node name="prp_roadworkBarrier23" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 39.1704, 1.324630, 19.2705)
+
+[node name="prp_roadworkBarrier24" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.3679, 1.324630, 19.2705)
+
+[node name="prp_roadworkBarrier25" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 41.5655, 1.324630, 19.2705)
