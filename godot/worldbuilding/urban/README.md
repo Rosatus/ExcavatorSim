@@ -53,3 +53,7 @@ UE `SimpleGrassWind` 迁移出的 VisualShader 里，世界坐标曾被错译为
 - 受影响且已修复：`Shaders/Flag_Inst.tres`、`Shaders/Foliage_01_Inst.tres`、`Shaders/prp_tarp_mat.tres`。
 - **契约**：`vertex()` 阶段的世界坐标必须用 `MODEL_MATRIX`；`INV_VIEW_MATRIX * VERTEX` 只在 `fragment()` 阶段合法（那里 `VERTEX` 本就是视图空间）。其他 `MI_*`/天空材质里的同名片段都在 fragment 阶段，勿动。
 - 回归检查：`tests/_check_wind_shader.gd`（headless）遍历三个 VisualShader 的表达式节点，断言无 `INV_VIEW_MATRIX * vec4( VERTEX` 且有 `MODEL_MATRIX`。
+
+## 里程碑
+
+- **本提交（包含本条目的文档提交）标记为体素地图编辑工作开始前的最后一次提交。** 此前城市地图为纯静态布景（无 `ExcavationArea`、无 voxel 挖掘）；此后的体素相关改动均以此为分界基线。
