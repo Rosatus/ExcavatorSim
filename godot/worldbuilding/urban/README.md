@@ -45,3 +45,11 @@
 验证脚本 `tests/test_road_survey.gd`：`test_survey` 对全部路面件向下 raycast 写 `tests/_road_survey.json`；`test_props_are_collision_ghosts` 断言射线穿过道具命中下方支撑面（即道具自身无碰撞）；`test_intersection_drive_surface` 断言两个交叉口 footprint 内行驶面恒为 ~1.08。改路面后跑整个 `road_survey` 套件即可回归。
 
 **保存陷阱**：`MultiMeshInstance3D` 的旧版 `mesh = ExtResource` 写法在加载时不会迁移到 `multimesh.mesh`，编辑器再次保存会把植被网格引用丢掉。现在 `mesh =` 已写在 `[sub_resource MultiMesh]` 块内（正确位置），之后的保存不会再丢。如果植被突然消失，检查 `MM_flg_*` 块里有没有 `mesh` 行。
+
+## 风摆着色器（2026-09 修复后）
+
+UE `SimpleGrassWind` 迁移出的 VisualShader 里，世界坐标曾被错译为 `INV_VIEW_MATRIX * vec4(VERTEX, 1.0)`——`VERTEX` 在 `vertex()` 阶段是模型空间，乘逆视图矩阵把相机位置混进风摆相位，表现为**车开越快旗子/树叶摆得越快**。已改为 `MODEL_MATRIX * vec4(VERTEX, 1.0)`（含实例变换，世界相位稳定）。
+
+- 受影响且已修复：`Shaders/Flag_Inst.tres`、`Shaders/Foliage_01_Inst.tres`、`Shaders/prp_tarp_mat.tres`。
+- **契约**：`vertex()` 阶段的世界坐标必须用 `MODEL_MATRIX`；`INV_VIEW_MATRIX * VERTEX` 只在 `fragment()` 阶段合法（那里 `VERTEX` 本就是视图空间）。其他 `MI_*`/天空材质里的同名片段都在 fragment 阶段，勿动。
+- 回归检查：`tests/_check_wind_shader.gd`（headless）遍历三个 VisualShader 的表达式节点，断言无 `INV_VIEW_MATRIX * vec4( VERTEX` 且有 `MODEL_MATRIX`。

@@ -215,7 +215,7 @@ operator = 3
 [sub_resource type="VisualShaderNodeExpression" id="VisualShaderNodeExpression_c7iqfsxh38fcw"]
 size = Vector2(980, 670)
 expression = "//WorldPosition:49(SimpleGrassWind)
-output0 = ( INV_VIEW_MATRIX * vec4( VERTEX, 1.0)).xyz;
+output0 = ( MODEL_MATRIX * vec4( VERTEX, 1.0)).xyz;
 //UE has cm units and thinks Z is up, this fixes it
 output0 = output0 * 100.0;
 output0 = output0.xzy;
@@ -285,7 +285,7 @@ operator = 3
 [sub_resource type="VisualShaderNodeExpression" id="VisualShaderNodeExpression_brb5fcb474le7"]
 size = Vector2(980, 670)
 expression = "//WorldPosition:68(SimpleGrassWind)
-output0 = ( INV_VIEW_MATRIX * vec4( VERTEX, 1.0)).xyz;
+output0 = ( MODEL_MATRIX * vec4( VERTEX, 1.0)).xyz;
 //UE has cm units and thinks Z is up, this fixes it
 output0 = output0 * 100.0;
 output0 = output0.xzy;
@@ -588,7 +588,7 @@ nodes/vertex/49/size = Vector2(980, 670)
 nodes/vertex/49/input_ports = ""
 nodes/vertex/49/output_ports = "0,4,output0;1,3,output1;2,0,output2;"
 nodes/vertex/49/expression = "//WorldPosition:49(SimpleGrassWind)
-output0 = ( INV_VIEW_MATRIX * vec4( VERTEX, 1.0)).xyz;
+output0 = ( MODEL_MATRIX * vec4( VERTEX, 1.0)).xyz;
 //UE has cm units and thinks Z is up, this fixes it
 output0 = output0 * 100.0;
 output0 = output0.xzy;
@@ -637,7 +637,7 @@ nodes/vertex/68/size = Vector2(980, 670)
 nodes/vertex/68/input_ports = ""
 nodes/vertex/68/output_ports = "0,4,output0;1,3,output1;2,0,output2;"
 nodes/vertex/68/expression = "//WorldPosition:68(SimpleGrassWind)
-output0 = ( INV_VIEW_MATRIX * vec4( VERTEX, 1.0)).xyz;
+output0 = ( MODEL_MATRIX * vec4( VERTEX, 1.0)).xyz;
 //UE has cm units and thinks Z is up, this fixes it
 output0 = output0 * 100.0;
 output0 = output0.xzy;
