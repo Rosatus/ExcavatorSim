@@ -56,6 +56,17 @@ UE `SimpleGrassWind` 迁移出的 VisualShader 里，世界坐标曾被错译为
 - **契约**：`vertex()` 阶段的世界坐标必须用 `MODEL_MATRIX`；`INV_VIEW_MATRIX * VERTEX` 只在 `fragment()` 阶段合法（那里 `VERTEX` 本就是视图空间）。其他 `MI_*`/天空材质里的同名片段都在 fragment 阶段，勿动。
 - 回归检查：`tests/_check_wind_shader.gd`（headless）遍历三个 VisualShader 的表达式节点，断言无 `INV_VIEW_MATRIX * vec4( VERTEX` 且有 `MODEL_MATRIX`。
 
+## 道具落地（2026-09 修复）
+
+同源于 UE 迁移标高不统一：大量**独立道具**（绿篱、草丛、桌椅、垃圾桶、护栏、花坛、电线杆、标识牌等 40+ 类）的网格底部悬空于支撑面 5–32cm。与建筑不同，这些道具没有堆叠上层，**直接降 transform 落地**即可：
+
+- 普查方式：对全场景实例化 Node3D 做"视觉 AABB 底 vs 向下 raycast 支撑面"对比，gap>2cm 标记（`tests/test_prop_grounding.gd`）。
+- 处理：612 个道具按 raycast 命中的支撑面下落（植被嵌入 3cm 模拟栽种，硬质道具嵌入 5mm）；堆叠件先降支撑再降其上物件（迭代至收敛）。
+- **挂墙件不降**：`Awning_mdl`/`StoreSign_*`/`prp_flag`/`prp_vent_*`/`prp_powerlines` 整类跳过；`prp_ac_*` 按单项判定（gap>0.6m 视为挂墙）。
+- **花坛连带**：`gardenPlanter_*` 自身落地时，`MM_flg_*` transform_array 中落在其 footprint 内的灌木/树实例按相同 dy 平移（花盆内 y-band 约束，地面植被不受影响）。
+- 排除：建筑套件全部（F1 由基座覆盖、F2/F3 堆叠属预期）、路面纯视觉道具（井盖/斑马线等，见路面标高节）。
+- 契约：`prop_grounding` 套件断言全场景 lower=0；新摆的道具若悬空会被回归抓住。报告写 `tests/_prop_grounding.json`（已 gitignore）。
+
 ## 里程碑
 
 - **本提交（包含本条目的文档提交）标记为体素地图编辑工作开始前的最后一次提交。** 此前城市地图为纯静态布景（无 `ExcavationArea`、无 voxel 挖掘）；此后的体素相关改动均以此为分界基线。
@@ -66,7 +77,7 @@ UE 迁移的地面层建筑模块（`B*_F1_*`、`door_*`/`Door*_mdl`、`Building
 
 修复方式：场景根部新增 `BuildingPlinths`（MultiMeshInstance3D），为每个地面层模块（原点 y<2）垫一块与立面齐平的混凝土基座盒——footprint 每边外延 5cm、顶面嵌入模块底 2.5cm、下探至原点下 80cm。材质用广场铺装同款 `concrete_ground_01_Inst.tres`。**纯视觉、无碰撞体**（建筑立面碰撞原本就在）。
 
-- 校验：	ests/test_building_plinths.gd——每个地面层模块必须有匹配基座（origin/basis 容差 0.01），且不允许碰撞体；uilding_plinths 套件可回归。
+- 校验：`tests/test_building_plinths.gd`——每个地面层模块必须有匹配基座（origin/basis 容差 0.01），且不允许碰撞体；`building_plinths` 套件可回归。
 - 埋在地里的模块（基座低于地表）基座同样生成，只是不可见，属预期。
 
 **手工编辑 tscn 的 Transform3D 陷阱**：本文件（及本引擎写出的 tscn/PackedVector3Array transform_array）的 9 个 basis 浮点是**按行存储**的——`Transform3D(a,b,c, d,e,f, g,h,i, ox,oy,oz)` 的基向量列 = (a,d,g)/(b,e,h)/(c,f,i)。按 GDScript `Basis(x,y,z)` 列序解读会把 ±90° 旋转的模块转置错向（对称旋转恰好无感）。写 transform_array 时也要写成行序。

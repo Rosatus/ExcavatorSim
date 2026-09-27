@@ -58,3 +58,6 @@ godot/worldbuilding/**/*.zip
 
 # Agent diagnostic scratch scripts (regenerated per task, never committed)
 /.trellis/tmp/
+
+# generated prop-grounding survey report
+godot/worldbuilding/urban/tests/_prop_grounding.json
