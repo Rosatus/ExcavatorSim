@@ -163,6 +163,7 @@
 [ext_resource type="PackedScene" uid="uid://bws8cv7kwxgln" path="res://maps/urban/Prefabs/prp_powerlines_Splines_7.tscn" id="168_6a6ix"]
 [ext_resource type="PackedScene" uid="uid://dcp8s8rnk7eya" path="res://maps/urban/Prefabs/prp_powerlines_Splines_8.tscn" id="169_6a58p"]
 [ext_resource type="PackedScene" uid="uid://dbbeq4jwg3egn" path="res://maps/urban/WorldEnvironment.tscn" id="170_dx7tv"]
+[ext_resource type="PackedScene" path="res://maps/urban/Prefabs/prp_roadworkBarrier.tscn" id="171_rwbar"]
 [ext_resource type="Script" uid="uid://bnlqtjdaxsce7" path="res://maps/urban/ground_runtime.gd" id="998_groundrt"]
 [ext_resource type="Material" uid="uid://cke4xha2id866" path="res://maps/urban/UrbanCity/Materials/Tileable/concrete_ground_01_Inst.tres" id="999_plinth"]
 [ext_resource type="ArrayMesh" path="res://maps/urban/Prefabs/_foliage/flg_bush_01.res" id="fol_flg_bush_01"]
@@ -13345,3 +13346,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.0667, 0)
 [node name="prp_powerlines_Splines_8" parent="." unique_id=615738132 instance=ExtResource("169_6a58p")]
 
 [node name="WorkArea" parent="." unique_id=1899074040 instance=ExtResource("workarea")]
+
+[node name="prp_roadworkBarrier" parent="." instance=ExtResource("171_rwbar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 1.075, 10)
