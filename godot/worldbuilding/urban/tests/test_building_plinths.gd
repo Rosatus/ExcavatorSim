@@ -9,6 +9,12 @@ extends McpTestSuite
 ## under every ground-floor module: footprint + 5cm margin, top embedded
 ## 2.5cm into the module, bottom 80cm below the module origin. Visual
 ## only -- the node must carry no colliders.
+##
+## The same MultiMesh also carries courtyard/interior infill slabs
+## (instances beyond the module count): sealed/enclosed ground regions
+## where the lowered GroundPlane mesh would otherwise show as a dark
+## void. Infill slabs top out at y=1.075, just above the lowered
+## GroundPlane visual surface, and use the shared sidewalk material.
 
 const GROUND_FLOOR_MAX_Y := 2.0
 const TOP_EMBED := 0.025
@@ -80,7 +86,8 @@ func test_every_ground_floor_module_has_plinth() -> void:
 	var mm := pl.multimesh
 	var modules := _ground_floor_modules(root)
 	print("ground-floor modules=", modules.size(), " plinths=", mm.instance_count)
-	assert_true(mm.instance_count == modules.size(), "plinth count must match ground-floor module count")
+	assert_true(mm.instance_count >= modules.size(),
+		"plinth count must cover ground-floor module count (extra instances are courtyard infill)")
 
 	# verify each module's expected plinth transform exists in the array
 	var ta := mm.transform_array
