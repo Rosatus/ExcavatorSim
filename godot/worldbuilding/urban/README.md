@@ -59,3 +59,14 @@ UE `SimpleGrassWind` 迁移出的 VisualShader 里，世界坐标曾被错译为
 ## 里程碑
 
 - **本提交（包含本条目的文档提交）标记为体素地图编辑工作开始前的最后一次提交。** 此前城市地图为纯静态布景（无 `ExcavationArea`、无 voxel 挖掘）；此后的体素相关改动均以此为分界基线。
+
+## 建筑基座（BuildingPlinths，2026-09 修复）
+
+UE 迁移的地面层建筑模块（`B*_F1_*`、`door_*`/`Door*_mdl`、`Building_*_0*`）网格底部就在节点原点（局部 y=0），而原点标高不统一（1.0/1.15/1.25/1.3/1.35/1.36），多数落在路面 y=1.08 或人行道铺装 y=1.297 **之上 3~30cm**——表现为"建筑悬空"。F2/F3 楼层模块是绝对堆叠的，**降 F1 会在楼层间开缝，不能动 transform**。
+
+修复方式：场景根部新增 `BuildingPlinths`（MultiMeshInstance3D），为每个地面层模块（原点 y<2）垫一块与立面齐平的混凝土基座盒——footprint 每边外延 5cm、顶面嵌入模块底 2.5cm、下探至原点下 80cm。材质用广场铺装同款 `concrete_ground_01_Inst.tres`。**纯视觉、无碰撞体**（建筑立面碰撞原本就在）。
+
+- 校验：	ests/test_building_plinths.gd——每个地面层模块必须有匹配基座（origin/basis 容差 0.01），且不允许碰撞体；uilding_plinths 套件可回归。
+- 埋在地里的模块（基座低于地表）基座同样生成，只是不可见，属预期。
+
+**手工编辑 tscn 的 Transform3D 陷阱**：本文件（及本引擎写出的 tscn/PackedVector3Array transform_array）的 9 个 basis 浮点是**按行存储**的——`Transform3D(a,b,c, d,e,f, g,h,i, ox,oy,oz)` 的基向量列 = (a,d,g)/(b,e,h)/(c,f,i)。按 GDScript `Basis(x,y,z)` 列序解读会把 ±90° 旋转的模块转置错向（对称旋转恰好无感）。写 transform_array 时也要写成行序。
