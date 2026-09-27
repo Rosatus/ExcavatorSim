@@ -2,8 +2,9 @@ extends SceneTree
 
 # Trim sidewalk tiles from the merged spline mesh.
 # Removes surface-0 triangles whose centroid lies inside the cut rect:
-#   x in [CUT_X0, CUT_X1]  (6 full tiles between gardenPlanter_B6 and
-#                           Flg_hedge_Tall107)
+#   x in [CUT_X0, CUT_X1]  (5 full tiles between gardenPlanter_B6 and
+#                           Flg_hedge_Tall107; the 21.07-23.97 tile
+#                           adjacent to B6 is kept)
 #   z > CUT_Z             (flat paver surface; curb/gutter faces at
 #                           z<=27.86 are kept)
 # Writes the trimmed mesh to a new resource; the source GLB is untouched.
@@ -12,7 +13,7 @@ extends SceneTree
 #   18.10 | 21.07 | 23.97 | 26.72 | 28.75 | 32.08 | 35.41 | 39.47 | 43.54
 # Paver strips per tile (z): curb face 27.59-27.86, flat 27.86-29.59.
 
-const CUT_X0 := 21.06
+const CUT_X0 := 23.96
 const CUT_X1 := 39.48
 const CUT_Z := 27.87
 const OUT_PATH := "res://maps/urban/sidewalk_Straight_Splines_0_trimmed.res"
