@@ -57,6 +57,8 @@ func _enter_tree() -> void:
 		# dug with a machinery ramp, the far half remains at grade for digging.
 		# Depth travels with the map so other voxel maps stay undisturbed.
 		zone.starter_pit_depth_m = float(area.get_meta("starter_pit_depth_m", 0.0))
+		# Maps whose strip runs along the street split along X instead of Z.
+		zone.starter_pit_axis_x = bool(area.get_meta("starter_pit_axis_x", false))
 		zone.initialize_on_ready = true
 		# Only the finite voxel surface is visible; training meshes and walls
 		# are not part of the construction map.

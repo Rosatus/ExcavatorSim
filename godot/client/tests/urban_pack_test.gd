@@ -28,13 +28,20 @@ func run() -> void:
 	var map := scene.get_node("StaticMap") as Node3D
 	var spawn_point := map.get_node("WorkArea/SpawnPoint") as Node3D
 	check(spawn_point != null, "Urban map lost the spawn marker")
-	check(map.get_node_or_null("WorkArea/ExcavationArea") == null, "Urban map unexpectedly opts into voxel soil")
+	check(map.get_node_or_null("WorkArea/ExcavationArea") != null, "Urban map lost its voxel work-zone marker")
 	check(map.get_node_or_null("WorldEnvironment") == null, "Urban map duplicates product environment")
 	check(scene.get_node("WorldEnvironment") is Sky3D, "Product Sky3D unavailable")
 	for light in map.find_children("*", "DirectionalLight3D"):
 		check(not light.visible, "Urban map directional light stayed enabled")
 	check(not scene.get_node("TerrainRoot/TerrainCollider").enabled, "Training collider leaked into urban map")
-	check(scene.get_node("TerrainRoot/VoxelWorkZone").terrain == null, "Urban map enabled voxel soil without an opted-in area")
+	var zone = scene.get_node("TerrainRoot/VoxelWorkZone")
+	check(zone.terrain != null, "Urban voxel work zone did not initialize")
+	if zone.terrain != null:
+		var ready_frames := 0
+		while not zone.readiness.is_ready(zone.initial_ticket) and ready_frames < 1200:
+			await physics_frame
+			ready_frames += 1
+		check(zone.readiness.is_ready(zone.initial_ticket), "Urban voxel collision never became ready")
 	var bodies := map.find_children("*", "StaticBody3D", true, false).size()
 	check(bodies > 0, "Urban map lost its static collisions")
 	var world := map.get_world_3d()

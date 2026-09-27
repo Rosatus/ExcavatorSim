@@ -181,6 +181,7 @@
 [ext_resource type="PackedScene" uid="uid://dcp8s8rnk7eya" path="res://maps/urban/Prefabs/prp_powerlines_Splines_8.tscn" id="169_6a58p"]
 
 [ext_resource type="Material" uid="uid://cke4xha2id866" path="res://maps/urban/UrbanCity/Materials/Tileable/concrete_ground_01_Inst.tres" id="999_plinth"]
+[ext_resource type="Script" path="res://maps/urban/ground_runtime.gd" id="998_groundrt"]
 
 [sub_resource type="MultiMesh" id="MM_flg_bush_01"]
 mesh = ExtResource("fol_flg_bush_01")
@@ -239,6 +240,18 @@ roughness = 0.97
 
 [sub_resource type="BoxShape3D" id="ground_plane_shape"]
 size = Vector3(1200, 0.1, 1200)
+
+[sub_resource type="BoxShape3D" id="ground_hole_south"]
+size = Vector3(1200, 0.1, 617.45)
+
+[sub_resource type="BoxShape3D" id="ground_hole_north"]
+size = Vector3(1200, 0.1, 577.0)
+
+[sub_resource type="BoxShape3D" id="ground_hole_west"]
+size = Vector3(638.8, 0.1, 5.55)
+
+[sub_resource type="BoxShape3D" id="ground_hole_east"]
+size = Vector3(545.4, 0.1, 5.55)
 
 [sub_resource type="BoxMesh" id="BM_plinth"]
 material = ExtResource("999_plinth")
@@ -4221,22 +4234,6 @@ omni_range = 10.0
 
 [node name="StaticMesh1_prp_light_02_Blueprint13#prp_light_02" type="Node3D" parent="." unique_id=2139517096]
 
-[node name="prp_light_02_Blueprint12" type="Node3D" parent="." unique_id=931117740]
-
-[node name="StaticMesh1" type="Node3D" parent="prp_light_02_Blueprint12" unique_id=1347690641]
-
-[node name="PointLight1" type="Node3D" parent="prp_light_02_Blueprint12" unique_id=2057377517]
-
-[node name="OmniLight3D" type="OmniLight3D" parent="prp_light_02_Blueprint12/PointLight1" unique_id=338099048]
-visible = false
-transform = Transform3D(0, -1e-06, 1, -1, 0, 0, 0, -1, -1e-06, 29.239998, 4.054967, 30.046526)
-light_intensity_lumens = 20106.193
-light_color = Color(1, 0.901961, 0.788235, 1)
-light_energy = 16.0
-omni_range = 10.0
-
-[node name="StaticMesh1_prp_light_02_Blueprint12#prp_light_02" type="Node3D" parent="." unique_id=1581418732]
-
 [node name="prp_light_02_Blueprint17" type="Node3D" parent="." unique_id=907163345]
 
 [node name="StaticMesh1" type="Node3D" parent="prp_light_02_Blueprint17" unique_id=1419130008]
@@ -4268,22 +4265,6 @@ light_energy = 16.0
 omni_range = 10.0
 
 [node name="StaticMesh1_prp_light_02_Blueprint10#prp_light_02" type="Node3D" parent="." unique_id=1668717880]
-
-[node name="prp_light_02_Blueprint11" type="Node3D" parent="." unique_id=41639409]
-
-[node name="StaticMesh1" type="Node3D" parent="prp_light_02_Blueprint11" unique_id=1703043346]
-
-[node name="PointLight1" type="Node3D" parent="prp_light_02_Blueprint11" unique_id=676080432]
-
-[node name="OmniLight3D" type="OmniLight3D" parent="prp_light_02_Blueprint11/PointLight1" unique_id=2009892512]
-visible = false
-transform = Transform3D(0, -1e-06, 1, -1, 0, 0, 0, -1, -1e-06, 34.739998, 4.054967, 30.046526)
-light_intensity_lumens = 20106.193
-light_color = Color(1, 0.901961, 0.788235, 1)
-light_energy = 16.0
-omni_range = 10.0
-
-[node name="StaticMesh1_prp_light_02_Blueprint11#prp_light_02" type="Node3D" parent="." unique_id=1451503005]
 
 [node name="prp_light_02_Blueprint18" type="Node3D" parent="." unique_id=1760313194]
 
@@ -13497,16 +13478,37 @@ custom_aabb = AABB(-800, -50, -800, 1600, 200, 1600)
 multimesh = SubResource("MM_buildingPlinths")
 custom_aabb = AABB(-800, -50, -800, 1600, 200, 1600)
 
-[node name="GroundPlane" type="StaticBody3D" parent="."]
+[node name="Ground" type="StaticBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 1.03, 10)
+script = ExtResource("998_groundrt")
 
-[node name="Mesh" type="MeshInstance3D" parent="GroundPlane"]
+[node name="Mesh" type="MeshInstance3D" parent="Ground"]
 position = Vector3(0, -0.0314701, 0)
 mesh = SubResource("ground_plane_mesh")
 surface_material_override/0 = SubResource("ground_plane_mat")
 
-[node name="Box0" type="CollisionShape3D" parent="GroundPlane"]
+[node name="Box0" type="CollisionShape3D" parent="Ground"]
 shape = SubResource("ground_plane_shape")
+
+[node name="HoleSouth" type="CollisionShape3D" parent="Ground"]
+position = Vector3(0, 0, -291.275)
+disabled = true
+shape = SubResource("ground_hole_south")
+
+[node name="HoleNorth" type="CollisionShape3D" parent="Ground"]
+position = Vector3(0, 0, 311.5)
+disabled = true
+shape = SubResource("ground_hole_north")
+
+[node name="HoleWest" type="CollisionShape3D" parent="Ground"]
+position = Vector3(-280.6, 0, 20.225)
+disabled = true
+shape = SubResource("ground_hole_west")
+
+[node name="HoleEast" type="CollisionShape3D" parent="Ground"]
+position = Vector3(327.3, 0, 20.225)
+disabled = true
+shape = SubResource("ground_hole_east")
 
 [node name="sidewalk_Straight_Splines_0" parent="." instance=ExtResource("161_6lxbd")]
 position = Vector3(0, -0.0667, 0)

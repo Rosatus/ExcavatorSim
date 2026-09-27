@@ -15,6 +15,8 @@ const CollisionReadiness = preload("res://scripts/voxel_collision_readiness.gd")
 ## Depth of the designed starter foundation pit (approach-side half). 0 keeps
 ## the initial soil level with the surrounding grade.
 @export_range(0.0, 5.0, 0.1) var starter_pit_depth_m := 0.0
+## When true the starter pit occupies the -X half of the zone instead of -Z.
+@export var starter_pit_axis_x := false
 @export var collision_viewer_target_path := NodePath("../../ChassisMotionRoot")
 
 var terrain: VoxelTerrain
@@ -59,6 +61,7 @@ func build_runtime() -> bool:
 	_generator.scale_m = voxel_scale_m
 	_generator.half_size = Vector2(layout.SIZE_WORLD_M.x, layout.SIZE_WORLD_M.z) * 0.5
 	_generator.depth_m = starter_pit_depth_m
+	_generator.pit_on_x_half = starter_pit_axis_x
 	var generator := _generator
 	# Native block bounds round outward. Generate a finite apron under hard
 	# ground and clip its presentation to the exact semantic rectangle.

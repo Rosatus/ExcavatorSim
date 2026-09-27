@@ -17,6 +17,7 @@ func _initialize() -> void:
 	_check_dig_face(gen)
 	_check_side_walls(gen)
 	_check_x_symmetry(gen)
+	_check_x_half_variant()
 	print("voxel_starter_pit_profile_test: ", "PASS" if _failures.is_empty() else "FAIL")
 	for failure in _failures:
 		push_error(failure)
@@ -115,3 +116,23 @@ func _check_x_symmetry(gen) -> void:
 				is_equal_approx(gen.surface_height_m(x, z), gen.surface_height_m(-x, z)),
 				"profile symmetric about the centre axis"
 			)
+
+
+func _check_x_half_variant() -> void:
+	# Street-edge strips split along their length: the dug half is local -X,
+	# the midline work front faces +X, and the z rims stay level.
+	var gen = Generator.new()
+	gen.half_size = Vector2(9, 14)
+	gen.depth_m = 1.5
+	gen.pit_on_x_half = true
+	_expect(is_equal_approx(gen.surface_height_m(-5.0, 0.0), -1.5), "x-half pit floor at -1.5 m")
+	_expect(is_zero_approx(gen.surface_height_m(5.0, 0.0)), "east half stays at grade")
+	_expect(is_zero_approx(gen.surface_height_m(-9.0, 0.0)), "west rim stays at grade")
+	_expect(is_zero_approx(gen.surface_height_m(0.0, 0.0)), "unexcavated midline edge at grade")
+	_expect(is_equal_approx(gen.surface_height_m(-0.5, 0.0), -1.5), "x dig face reaches floor")
+	# Default keeps the original -Z approach pit untouched.
+	var gen_z = Generator.new()
+	gen_z.half_size = Vector2(9, 14)
+	gen_z.depth_m = 1.5
+	_expect(is_equal_approx(gen_z.surface_height_m(0.0, -5.0), -1.5), "default still digs the -Z half")
+	_expect(is_zero_approx(gen_z.surface_height_m(0.0, 5.0)), "default +Z half stays at grade")

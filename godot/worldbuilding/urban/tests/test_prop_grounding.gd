@@ -19,6 +19,7 @@ const SKIP_PREFABS := [
 	"Prefabs/Cube.tscn", "Prefabs/Cube_1.tscn",
 	"Prefabs/prp_manhole.tscn", "Prefabs/prp_sewerGrate.tscn",
 	"CrssWk_4L.tscn", "CrssWk_1L_Pk.tscn",
+	"WorkArea.tscn",
 ]
 const WALL_MOUNTED := ["Awning_mdl", "StoreSign_", "prp_flag", "prp_vent_",
 	"prp_powerlines"]
