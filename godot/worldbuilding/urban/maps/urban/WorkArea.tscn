@@ -3,7 +3,7 @@
 [node name="WorkArea" type="Node3D"]
 
 [node name="SpawnPoint" type="Node3D" parent="."]
-transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -15, 1.14, 20)
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 6.2604, 1.148, 25.2)
 
 [node name="ExcavationArea" type="Node3D" parent="."]
 position = Vector3(31.7, 1.3, 30.225)
