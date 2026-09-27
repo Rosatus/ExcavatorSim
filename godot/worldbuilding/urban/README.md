@@ -46,6 +46,8 @@
 
 **保存陷阱**：`MultiMeshInstance3D` 的旧版 `mesh = ExtResource` 写法在加载时不会迁移到 `multimesh.mesh`，编辑器再次保存会把植被网格引用丢掉。现在 `mesh =` 已写在 `[sub_resource MultiMesh]` 块内（正确位置），之后的保存不会再丢。如果植被突然消失，检查 `MM_flg_*` 块里有没有 `mesh` 行。
 
+**植被实例删除**：`Foliage` 节点下的 `flg_bush_*`/`flg_groundLeaves`/`flg_plane*`/`flg_tree_*` 是 MultiMeshInstance3D——单个草丛/落叶堆/树在编辑器里无法点选删除，只能从 `MM_flg_*` 的 `transform_array`（PackedVector3Array，每实例 12 个数=9 基向量+3 原点）按坐标剔除对应实例并同步 `instance_count`。花坛内的绿篱草是 `flg_bush_01` 实例（y≈2.10 在花坛土层高度）。
+
 ## 风摆着色器（2026-09 修复后）
 
 UE `SimpleGrassWind` 迁移出的 VisualShader 里，世界坐标曾被错译为 `INV_VIEW_MATRIX * vec4(VERTEX, 1.0)`——`VERTEX` 在 `vertex()` 阶段是模型空间，乘逆视图矩阵把相机位置混进风摆相位，表现为**车开越快旗子/树叶摆得越快**。已改为 `MODEL_MATRIX * vec4(VERTEX, 1.0)`（含实例变换，世界相位稳定）。
