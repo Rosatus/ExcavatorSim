@@ -13501,6 +13501,7 @@ custom_aabb = AABB(-800, -50, -800, 1600, 200, 1600)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 1.03, 10)
 
 [node name="Mesh" type="MeshInstance3D" parent="GroundPlane"]
+position = Vector3(0, -0.0314701, 0)
 mesh = SubResource("ground_plane_mesh")
 surface_material_override/0 = SubResource("ground_plane_mat")
 
