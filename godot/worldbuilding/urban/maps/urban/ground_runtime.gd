@@ -1,3 +1,4 @@
+@tool
 extends StaticBody3D
 
 ## Urban ground slab. Solid by default so standalone workbench previews and

@@ -54,7 +54,7 @@ func _run() -> void:
 		_expect(not ground.get_node(edge).disabled, "hole frame collision %s active" % edge, failures)
 	var road_ray := PhysicsRayQueryParameters3D.create(Vector3(31.7, 4.0, 26.0), Vector3(31.7, -2.0, 26.0), 1)
 	_expect(not space.intersect_ray(road_ray).is_empty(), "road surface still collides outside the zone", failures)
-	_expect(scene.get_node("StaticMap/WorkArea/ExcavationArea").get_child_count() == 4, "only ground warning lines remain", failures)
+	_expect(scene.get_node("StaticMap/WorkArea/ExcavationArea").get_child_count() == 0, "voxel strip carries no warning-line geometry", failures)
 	var excavation = scene.get_node("TerrainRoot/ExcavationWorld")
 	_expect(excavation.is_soil_runtime_ready(), "product excavation authority is enabled", failures)
 	# A real bucket sweep cuts the waiting east half of the strip.

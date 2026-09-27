@@ -54,7 +54,8 @@
 
 被裁掉的人行道缺口整段替换为**有限体素区**：`WorkArea/ExcavationArea` 中心 (31.7, 1.3, 30.225)、`size_m=Vector2(15.8, 5.55)`，世界范围 x∈[23.8, 39.6] × z∈[27.45, 33.0]——从马路路缘起一直伸进 `B2_F1_*` 首层建筑立面（z≈31.1）下方约 2m。客户端 `main_map.gd` 读到 `metadata/status="voxel"` 后生成 0.125m 体素 `VoxelTerrain` + 施工同款土壤材质；`starter_pit_axis_x=true` 令基坑剖面**沿 X 轴分半**：西半（靠 gardenPlanter_B6）已挖成 `starter_pit_depth_m=2.5` 深的市政沟槽（含机械坡道、平底、陡直作业面），东半保持原地面等待施工。
 
-- `Ground`（原 `GroundPlane` 改名，挂 `maps/urban/ground_runtime.gd`）：默认整板实心；体素启用时 `Box0` 停用、四块 `Hole*` 框形碰撞接管洞外硬地面，`Mesh` 换 `urban_ground_seam.gdshader` 在视觉网格上开洞。**未启用体素时必须保持实心地面**——独立预览与旧宿主不受影响。
+- `ExcavationArea` 纯标记无警示线网格（施工区才保留四条黄线）；缺口边缘就是体素区边界。
+- `Ground`（原 `GroundPlane` 改名，挂 `maps/urban/ground_runtime.gd`）：默认整板实心；体素启用时 `Box0` 停用、四块 `Hole*` 框形碰撞接管洞外硬地面，`Mesh` 换 `urban_ground_seam.gdshader` 在视觉网格上开洞。**未启用体素时必须保持实心地面**——独立预览与旧宿主不受影响。脚本为 `@tool`：编辑器里勾选 `Ground` 的 `excavation_enabled` 可预览开洞（勾选状态不要随场景保存，保存后 workbench 预览会露出空洞）。
 - 体素区内的路灯杆定位器（`prp_light_02` Blueprint11/12 两组）已删；草簇基座本在地面层、落入坑内属预期杂草效果；`prp_sewerGrate*` 在路面侧不受影响。
 - 可编辑区四边内缩 1.5m 保护壳（`perimeter_inset_m`），铲斗扫掠包围盒须整体落在 x∈[25.3, 38.1] × z∈[28.95, 31.5]——窄条内应沿 X 长轴方向扫。
 - 回归：客户端 `tests/urban_voxel_test.gd`（坑剖面/地面开洞/真实铲斗切土/履带支撑/重置），`urban_pack_test.gd` 断言体素标记存在；`voxel_starter_pit_profile_test.gd` 覆盖 `axis_x` 剖面。
