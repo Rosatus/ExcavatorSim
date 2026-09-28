@@ -67,6 +67,8 @@ var solid_tool_identity := ""
 var solid_tool_acceptor := Callable()
 var _solid_tool_mount := Transform3D.IDENTITY
 var _previous_solid_tool_mount := Transform3D.IDENTITY
+var _previous_assist_tool_mount := Transform3D.IDENTITY
+var _assist_mount_initialized := false
 var _previous_solid_world := Transform3D.IDENTITY
 var _assist_pipeline := AssistPipeline.new()
 var _assist_context: Dictionary = {}
@@ -179,6 +181,8 @@ func set_attachment_bucket_limits(attachment_id: String) -> void:
 
 func configure_solid_tool(identity: String, contract: Dictionary) -> void:
 	solid_tool_identity = identity
+	_assist_pipeline.set_tool_geometry(contract)
+	_assist_mount_initialized = false
 	_solid_contacts.parts.clear()
 	if not contract.is_empty():
 		_solid_contacts.configure(contract, _layer_mask(int(_descriptor["collision_layers"]["terrain"])))
@@ -194,6 +198,10 @@ func set_solid_tool_mount(mount: Transform3D) -> void:
 		_solid_tool_mount = mount
 		if _previous_solid_world == Transform3D.IDENTITY:
 			_previous_solid_tool_mount = mount
+		if not _assist_mount_initialized:
+			_previous_assist_tool_mount = mount
+			_assist_mount_initialized = true
+		_assist_pipeline.set_tool_mount(mount, _previous_assist_tool_mount)
 
 
 func _physics_process(delta: float) -> void:
@@ -280,6 +288,8 @@ func configure(
 func teardown() -> void:
 	_static_map_root = null
 	solid_tool_identity = ""
+	_assist_mount_initialized = false
+	_previous_assist_tool_mount = Transform3D.IDENTITY
 	solid_tool_acceptor = Callable()
 	_solid_tool_mount = Transform3D.IDENTITY
 	_previous_solid_tool_mount = Transform3D.IDENTITY
@@ -1042,7 +1052,9 @@ func _update_joint_actuators(delta: float) -> void:
 			_body.global_transform,
 			delta,
 			_assist_context,
-			_body.linear_velocity,
+			# RigidBody velocity is measured at COM; context transport starts
+			# at chassis origin, which differs while the chassis rocks.
+			_body.linear_velocity - _body.angular_velocity.cross(_body.global_basis * _body.center_of_mass),
 			_body.angular_velocity,
 		)
 		var effective := assist.get("commands", _equipment_commands) as Vector4
@@ -1076,6 +1088,7 @@ func _update_joint_actuators(delta: float) -> void:
 			candidate_frames.get("bucket_link", Transform3D.IDENTITY) as Transform3D,
 		)
 		_articulation.accept_step(proposal, 1.0)
+		_previous_assist_tool_mount = _solid_tool_mount
 		var passthrough_frames := _articulation.accepted_frames()
 		if passthrough_frames.has("bucket_link"):
 			_bucket_query["accepted_bucket_transform"] = passthrough_frames["bucket_link"]
@@ -1142,6 +1155,7 @@ func _update_joint_actuators(delta: float) -> void:
 		_reset_support_response()
 	_previous_solid_world = accepted_tool
 	_previous_solid_tool_mount = _solid_tool_mount
+	_previous_assist_tool_mount = _solid_tool_mount
 
 
 func _accept_bucket_solid_hit(hit: Dictionary) -> bool:

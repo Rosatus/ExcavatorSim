@@ -280,7 +280,7 @@ tooltip_text = "大幅提高履带/轮式行驶速度并提供高速操控辅助
 [node name="RelaxedAssist" type="CheckButton" parent="StatusPanel/Margin/VBox/AdvancedPanel"]
 layout_mode = 2
 text = "宽松辅助控制"
-tooltip_text = "辅助模式不再强制保持铲斗角度：到达运动学边界时逐步放开角度约束，以延长沿平面/坡面的辅助行程"
+tooltip_text = "辅助模式只保持切削线贴合作业平面/坡面，铲斗角度全程自由变化；接近关节限位时自动协调其余关节，优先贴面并延长作业行程"
 
 [node name="SimpleDigging" type="OptionButton" parent="StatusPanel/Margin/VBox/AdvancedPanel"]
 layout_mode = 2

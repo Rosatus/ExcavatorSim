@@ -19,12 +19,6 @@ const WORK_JOINTS := ["boom_joint", "arm_joint", "bucket_joint"]
 ## 0 reproduces the pure-P limit cycle observed near kinematic toggles, 1
 ## approaches critical damping. 0.5 damps the ring without slowing recovery.
 const VELOCITY_DAMPING := 0.5
-## Kinematic reach below this fraction of the demanded rate counts as
-## starvation for relaxed mode: the strict solve is still nominally feasible
-## but can only crawl toward a bound, so the pitch constraint is released
-## instead of waiting for a hard block that the braking law never produces.
-const RELAXED_STARVATION_SCALE := 0.1
-
 var horizontal_speed_m_s := 1.0
 var input_deadband := 0.05
 var height_gain_hz := 4.0
@@ -37,10 +31,7 @@ var dls_lambda := 0.08
 ## Flag namespace emitted by this stage ("level_assist", "slope_assist");
 ## concrete stages set it in configure before calling super.
 var flag_prefix := "assist"
-## Relaxed mode: when the held-attitude solve hits a kinematic bound, the
-## pitch row is dropped and the 2x3 fallback keeps riding the surface while
-## the bucket angle floats free. The attitude reference tracks the measured
-## angle on relaxed ticks so re-engaging the constraint cannot snap.
+## Relaxed mode tracks the cutting edge from the first tick, with no pitch task.
 var relaxed_attitude := false
 
 var _attitude_ref := 0.0
@@ -57,6 +48,7 @@ var _debug_lo := Vector3.ZERO
 var _debug_hi := Vector3.ZERO
 var _debug_v0 := Vector3.ZERO
 var _debug_blocked := ""
+var _edge_plane_span_m := 0.0
 
 
 func configure(_descriptor: Dictionary, _soil_contract: Dictionary, params: Dictionary) -> bool:
@@ -87,7 +79,10 @@ func configure(_descriptor: Dictionary, _soil_contract: Dictionary, params: Dict
 ## confirmed profile on top of these.
 func apply_params(params: Dictionary) -> bool:
 	if params.has("relaxed_attitude"):
-		relaxed_attitude = bool(params.get("relaxed_attitude"))
+		var requested := bool(params.get("relaxed_attitude"))
+		if requested != relaxed_attitude:
+			relaxed_attitude = requested
+			reset("tracking_mode_changed")
 	return true
 
 
@@ -97,6 +92,7 @@ func reset(_reason := "reset") -> void:
 	_last_error_m = 0.0
 	_last_attitude_error_rad = 0.0
 	_last_flags = []
+	_edge_plane_span_m = 0.0
 
 
 ## --- Concrete-stage hooks -------------------------------------------------
@@ -134,9 +130,16 @@ func step(ctx: RefCounted, commands: Vector4) -> Dictionary:
 	if not enabled or not configured:
 		return {"commands": commands, "scale": 1.0, "flags": []}
 	var out := commands
-	var flags: Array = []
 	for index in _extra_locked_channels():
 		out[int(index)] = 0.0
+	if not ctx.cutting_edge_available:
+		_active = false
+		_last_flags = ["%s_no_cutting_edge" % flag_prefix]
+		out.y = 0.0
+		out.z = 0.0
+		out.w = 0.0
+		return {"commands": out, "scale": 1.0, "flags": _last_flags}
+	var flags: Array = []
 	# While the assist owns the work equipment, only the arm channel carries
 	# operator intent (W pushes out, S pulls in); boom/bucket operator input
 	# is fully overridden and any locked extra channel is silenced above.
@@ -163,7 +166,8 @@ func step(ctx: RefCounted, commands: Vector4) -> Dictionary:
 		ctx.bucket_attitude_rad() - max_attitude_error_rad,
 		ctx.bucket_attitude_rad() + max_attitude_error_rad,
 	)
-	_clamp_refs(ctx)
+	if not relaxed_attitude:
+		_clamp_refs(ctx)
 	var target := _surface_target(ctx)
 	var height_error := clampf(
 		float(target.get("height", 0.0)) - ctx.bucket_ref_world.y,
@@ -189,7 +193,7 @@ func step(ctx: RefCounted, commands: Vector4) -> Dictionary:
 	# rigid-body term the joints cannot see, so the solve must counter it in
 	# the same tick — otherwise the held pose chases chassis rocking through
 	# the feedback path a tick late.
-	var chassis: Vector3 = ctx.chassis_point_velocity(ctx.bucket_ref_world)
+	var chassis: Vector3 = ctx.chassis_point_velocity(ctx.bucket_ref_world) + ctx.tool_point_velocity
 	var axis := _intent_axis(ctx)
 	var intent_speed := intent * horizontal_speed_m_s
 	var desired := Vector3(
@@ -217,9 +221,29 @@ func step(ctx: RefCounted, commands: Vector4) -> Dictionary:
 			ctx.pitch_coeff("bucket_joint"),
 		],
 	]
-	var rates := Solver.solve_dls(jacobian, desired, dls_lambda)
+	var solved: Dictionary
+	if relaxed_attitude:
+		# Solve the surface-normal velocity, not an absolute vertical demand
+		# based on requested travel: actual travel may be actuator-limited.
+		var grade := float(target.get("grade", 0.0))
+		var normal: Vector3 = ctx.up - grade * axis
+		_edge_plane_span_m = 2.0 * absf(normal.dot(ctx.bucket_edge_half_world)) / normal.length()
+		if _edge_plane_span_m > 0.02:
+			flags.append("%s_edge_tilt" % flag_prefix)
+		var normal_row := Vector3.ZERO
+		var tangent_row := Vector3.ZERO
+		for index in 3:
+			normal_row[index] = (columns[WORK_JOINTS[index]] as Vector3).dot(normal)
+			tangent_row[index] = (columns[WORK_JOINTS[index]] as Vector3).dot(axis)
+		var normal_speed := clampf(height_gain_hz * height_error, -max_height_correction_m_s, max_height_correction_m_s) - chassis.dot(normal)
+		solved = Solver.solve_surface(normal_row, tangent_row, normal_speed, intent_speed - chassis.dot(axis), dls_lambda, ctx, WORK_JOINTS)
+		_attitude_ref = ctx.bucket_attitude_rad()
+		_last_attitude_error_rad = 0.0
+		flags.append("%s_relaxed" % flag_prefix)
+	else:
+		var rates := Solver.solve_dls(jacobian, desired, dls_lambda)
+		solved = Solver.rates_to_commands(rates, ctx, WORK_JOINTS)
 	_solve_count += 1
-	var solved := Solver.rates_to_commands(rates, ctx, WORK_JOINTS)
 	var debug := solved.get("debug", {}) as Dictionary
 	_debug_rates = debug.get("rates", Vector3.ZERO)
 	_debug_lo = debug.get("lo", Vector3.ZERO)
@@ -227,76 +251,6 @@ func step(ctx: RefCounted, commands: Vector4) -> Dictionary:
 	_debug_v0 = debug.get("v0", Vector3.ZERO)
 	_debug_blocked = String(debug.get("blocked_joint", ""))
 	var blocked := int(solved.get("blocked", Solver.BLOCKED_NONE))
-	var strict_scale := float(solved.get("scale", 0.0))
-	# Relaxed mode engages on a hard kinematic block AND on kinematic
-	# starvation: near a joint limit the braking/position bounds shrink the
-	# executable window toward zero without ever reporting a block, so the
-	# strict solve would crawl at ~zero scale forever with the pitch row
-	# still held. kin_lo/kin_hi are the pure kinematic bounds — the momentum
-	# window doesn't count, since releasing attitude cannot buy headroom
-	# against the accel/jerk chain.
-	var starved := blocked == Solver.BLOCKED_KINEMATIC
-	if not starved and relaxed_attitude and blocked == Solver.BLOCKED_NONE:
-		var kin_los := debug.get("kin_lo", Vector3.ZERO) as Vector3
-		var kin_his := debug.get("kin_hi", Vector3.ZERO) as Vector3
-		var kin_lo_list := [kin_los.x, kin_los.y, kin_los.z]
-		var kin_hi_list := [kin_his.x, kin_his.y, kin_his.z]
-		var rate_list0 := [rates.x, rates.y, rates.z]
-		for index in WORK_JOINTS.size():
-			var rate := float(rate_list0[index])
-			if absf(rate) <= Solver.RATE_EPS:
-				continue
-			var kin_reach: float = float(kin_hi_list[index]) / rate if rate > 0.0 else float(kin_lo_list[index]) / rate
-			if kin_reach <= RELAXED_STARVATION_SCALE:
-				starved = true
-				break
-	if starved and relaxed_attitude:
-		# Relaxed mode: the pitch row demanded a joint past its bound, so
-		# drop it and re-solve height+intent only — the bucket angle floats
-		# free (continuously, via DLS's least-norm rates) and the pass keeps
-		# extending along the surface. Any joint whose solved rate pushes past
-		# a kinematic bound (reach <= 0) is also removed from the fallback
-		# Jacobian — least-norm rates would otherwise still push it into its
-		# limit and re-block — and the solve retries until it passes or no
-		# saturated column remains. Adopting the live attitude as the
-		# reference keeps re-engagement snap-free when the corner clears.
-		var j_relaxed: Array = [(jacobian[0] as Array).duplicate(), (jacobian[1] as Array).duplicate()]
-		var desired2 := Vector2(desired.x, desired.y)
-		for _attempt in WORK_JOINTS.size():
-			var free_rates := Solver.solve_dls_2x3(j_relaxed, desired2, dls_lambda)
-			var free := Solver.rates_to_commands(free_rates, ctx, WORK_JOINTS)
-			if int(free.get("blocked", Solver.BLOCKED_KINEMATIC)) == Solver.BLOCKED_NONE:
-				# Hard-blocked strict: any feasible fallback wins. Starved
-				# strict: adopt only when dropping the pitch row actually
-				# clears the starvation band — a fallback that still crawls
-				# at a similar scale would just leak the attitude hold for
-				# no real travel gain.
-				var free_scale := float(free.get("scale", 0.0))
-				if blocked == Solver.BLOCKED_KINEMATIC \
-					or free_scale > maxf(strict_scale * 1.25, RELAXED_STARVATION_SCALE):
-					solved = free
-					blocked = Solver.BLOCKED_NONE
-					_attitude_ref = ctx.bucket_attitude_rad()
-					flags.append("%s_relaxed" % flag_prefix)
-				break
-			var free_debug := free.get("debug", {}) as Dictionary
-			var free_lo := free_debug.get("lo", Vector3.ZERO) as Vector3
-			var free_hi := free_debug.get("hi", Vector3.ZERO) as Vector3
-			var rate_list := [free_rates.x, free_rates.y, free_rates.z]
-			var lo_list := [free_lo.x, free_lo.y, free_lo.z]
-			var hi_list := [free_hi.x, free_hi.y, free_hi.z]
-			var dropped := false
-			for index in WORK_JOINTS.size():
-				var rate := float(rate_list[index])
-				if absf(rate) <= Solver.RATE_EPS:
-					continue
-				var reach: float = float(hi_list[index]) / rate if rate > 0.0 else float(lo_list[index]) / rate
-				if reach <= Solver.SINGULAR_EPS:
-					j_relaxed[0][index] = 0.0
-					j_relaxed[1][index] = 0.0
-					dropped = true
-			if not dropped:
-				break
 	if blocked != Solver.BLOCKED_NONE:
 		# Stopping at a real kinematic bound must not deadlock the corner:
 		# relatching collapses the correction terms to zero, so the next solve
@@ -309,7 +263,7 @@ func step(ctx: RefCounted, commands: Vector4) -> Dictionary:
 			if blocked == Solver.BLOCKED_MOMENTUM
 			else "%s_infeasible" % flag_prefix
 		)
-		if blocked == Solver.BLOCKED_KINEMATIC:
+		if blocked == Solver.BLOCKED_KINEMATIC and not relaxed_attitude:
 			_latch(ctx)
 		_last_scale = 0.0
 		_last_flags = flags
@@ -352,4 +306,5 @@ func get_status_snapshot() -> Dictionary:
 	snapshot["feasible_scale"] = _last_scale
 	snapshot["flags"] = _last_flags.duplicate()
 	snapshot["solve_count"] = _solve_count
+	snapshot["edge_plane_span_m"] = _edge_plane_span_m
 	return snapshot

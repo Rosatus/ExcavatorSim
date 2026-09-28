@@ -23,6 +23,9 @@ var joint_pivot_world: Dictionary = {}
 var joint_ceiling: Dictionary = {}
 var joint_limits: Dictionary = {}
 
+var cutting_edge_available := true
+var bucket_edge_half_world := Vector3.ZERO
+var tool_point_velocity := Vector3.ZERO
 var bucket_link := Transform3D.IDENTITY
 var bucket_ref_world := Vector3.ZERO
 var bucket_ref_dir_world := Vector3.FORWARD
@@ -100,3 +103,32 @@ func velocity_step_bound(joint_name: String, direction: float) -> float:
 	var target := signf(direction) * limits.x
 	var accel := float(joint_accelerations.get(joint_name, 0.0))
 	return absf(move_toward(accel, target, limits.y * delta)) * delta
+
+
+## Exact command response of propose_step, including its absolute-acceleration
+## move_toward rule. Needed for relaxed bounded control during reversals.
+func velocity_for_command(joint_name: String, command: float) -> float:
+	var current := float(joint_velocities.get(joint_name, 0.0))
+	if delta <= 0.0:
+		return current
+	var desired := command * effective_ceiling(joint_name, command)
+	var limits := joint_accel_limits.get(joint_name, Vector2.ZERO) as Vector2
+	var acceleration := move_toward(
+		float(joint_accelerations.get(joint_name, 0.0)),
+		clampf((desired - current) / delta, -limits.x, limits.x), limits.y * delta,
+	)
+	return move_toward(current, desired, maxf(absf(acceleration), 0.000001) * delta)
+
+
+## Bracket inversion is also valid when the response has a local extremum
+## inside the interval (the acceleration can cross zero on a reversal).
+func command_for_velocity(joint_name: String, velocity: float) -> float:
+	var low := -1.0
+	var high := 1.0
+	for iteration in 24:
+		var middle := (low + high) * 0.5
+		if velocity_for_command(joint_name, middle) < velocity:
+			low = middle
+		else:
+			high = middle
+	return (low + high) * 0.5

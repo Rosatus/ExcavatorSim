@@ -42,26 +42,34 @@ pixi run python backend/scripts/sync_sy205_joint_contract.py [--check]
   one tick — is `level_assist_reversing`: the same zero output brakes it, but
   setpoints are held so feedback pulls the coast excursion back instead of
   ratifying it. Neither state latches; every tick is re-judged.
-- Relaxed assist (advanced settings opt-in, `relaxed_attitude` stage knob via
-  `set_stage_params`, forwarded by both guided stages) changes only the
-  kinematic-bound response: on `BLOCKED_KINEMATIC` the pitch row is dropped
-  and a damped 2x3 solve keeps tracking surface height + along-axis intent
-  (`Solver.solve_dls_2x3`); any joint whose least-norm rate would still push
-  past a bound has its Jacobian column zeroed and the solve retried. The flag
-  becomes `<prefix>_relaxed`, the bucket angle floats continuously, and the
-  attitude reference re-latches to the live angle every relaxed tick so a
-  later strict solve cannot snap. Strict (default) keeps the 3x3 stall.
-  The fallback also fires on *kinematic starvation*: the braking law squeezes
-  the pure-kinematic rate bound (`kin_lo`/`kin_hi` in the solver debug) toward
-  zero near a limit without ever reporting a block, so when a demanded joint
-  direction reaches below `RELAXED_STARVATION_SCALE` the 2x3 solve is tried
-  too — adopted only if it actually clears the starvation band (momentum
-  windows never count; releasing attitude cannot buy headroom against the
-  accel/jerk chain). The chassis flag must persist while no Jolt runtime
-  exists: `set_relaxed_assist_enabled` returns false without one but keeps
-  the flag, and `_configure_jolt_runtime` re-injects `relaxed_attitude` into
-  both stages so model switches cannot silently drop the option.
-- The assist tracks constraints by *integrator inversion*, not blind rate
+- Relaxed assist (advanced opt-in `relaxed_attitude`, strict remains default)
+  never constrains bucket pitch. `solve_surface` computes three executable
+  joint rates inside per-tick actuator/limit bounds: surface-normal velocity
+  has priority, then along-surface intent plus a small joint-centering cost.
+  The 27 active sets solve the box-constrained problem without globally
+  slowing every joint for one saturated direction. For slopes the normal row
+  is `J_up - grade * J_along`; reduced travel therefore cannot request the
+  height change of full-speed travel. Level reference stays fixed during a
+  continuous stroke, including unreachable poses; only strict mode uses
+  bounded reference drift and kinematic-block relatching.
+  Exact command-response inversion mirrors the articulation's absolute-
+  acceleration move_toward rule (including loaded direction changes). Bounds
+  cannot invent braking rates outside the reachable interval. Relaxed mode
+  emits `<prefix>_relaxed`; pitch reference follows current pose, and changing
+  the tracking mode resets the stage for fresh latching.
+  Context FK uses the current chassis transform and active tool mount/contract.
+  Chassis transport converts COM velocity to origin velocity; mount-induced
+  point velocity is subtracted alongside chassis transport.
+  Relaxed guidance uses the outer teeth segment sampled by BucketSoilTool
+  (region center + outward normal * radius), not its capsule center. No active
+  cutting edge produces `<prefix>_no_cutting_edge` with work channels zero.
+  Edge midpoint tracking enforces the whole line only when its direction is
+  tangent to the surface. Roll/attachment tilt beyond 2cm endpoint normal span
+  emits `<prefix>_edge_tilt` and reports `edge_plane_span_m`; the three coplanar
+  work joints cannot correct arbitrary transverse edge tilt.
+  The chassis flag persists across runtime/model rebuilds and re-injects the
+  option into both stages.
+- Strict assist tracks constraints by *integrator inversion*, not blind rate
   commands: `EquipmentKinematicsContext` mirrors `propose_step`'s cut/limit
   multipliers and the accel/jerk `move_toward` chain, and the stage scales
   the solved joint triplet uniformly into each joint's reachable velocity

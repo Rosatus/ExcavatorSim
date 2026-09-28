@@ -217,3 +217,93 @@ static func rates_to_commands(rates: Vector3, ctx: RefCounted, work_joints: Arra
 			continue
 		result[index] = clampf(v_exec / ceiling, -1.0, 1.0)
 	return {"commands": result, "scale": scale, "blocked": BLOCKED_NONE, "debug": debug}
+
+
+## Three-variable box-constrained differential IK. Surface-normal velocity
+## has lexicographic priority: clamp only to its physically reachable range,
+## then optimize travel and a small joint-centering regularizer on that plane.
+## Enumerating 3^3 active sets is bounded and avoids iterative QP convergence
+## or removing an entire joint simply because one direction is saturated.
+static func solve_surface(normal: Vector3, tangent: Vector3, normal_speed: float, travel_speed: float, lambda: float, ctx: RefCounted, joints: Array) -> Dictionary:
+	var low := Vector3.ZERO
+	var high := Vector3.ZERO
+	var preferred := Vector3.ZERO
+	var current := Vector3.ZERO
+	for index in 3:
+		var joint: String = joints[index]
+		current[index] = float(ctx.joint_velocities.get(joint, 0.0))
+		var reachable_low: float = ctx.velocity_for_command(joint, -1.0)
+		var reachable_high: float = ctx.velocity_for_command(joint, 1.0)
+		var safe_low: float = -ctx.effective_ceiling(joint, -1.0)
+		var safe_high: float = ctx.effective_ceiling(joint, 1.0)
+		if ctx.joint_limits.has(joint) and ctx.delta > 0.0:
+			var limits := ctx.joint_limits[joint] as Vector2
+			var position := float(ctx.joint_positions.get(joint, 0.0))
+			var accel := (ctx.joint_accel_limits.get(joint, Vector2.ZERO) as Vector2).x
+			var brake := LIMIT_APPROACH_SAFETY * sqrt(2.0 * maxf(accel, 0.0))
+			safe_low = maxf(safe_low, -brake * sqrt(maxf(position - limits.x, 0.0)))
+			safe_high = minf(safe_high, brake * sqrt(maxf(limits.y - position, 0.0)))
+			safe_low = maxf(safe_low, (limits.x - position) / ctx.delta)
+			safe_high = minf(safe_high, (limits.y - position) / ctx.delta)
+			preferred[index] = 0.12 * ((limits.x + limits.y) * 0.5 - position) / maxf((limits.y - limits.x) * 0.5, 0.01)
+		# If momentum already violates the safe envelope, fastest achievable
+		# braking is the only choice. Never invent a velocity the plant cannot do.
+		low[index] = clampf(safe_low, reachable_low, reachable_high)
+		high[index] = clampf(safe_high, reachable_low, reachable_high)
+	var normal_low := 0.0
+	var normal_high := 0.0
+	for index in 3:
+		normal_low += normal[index] * (low[index] if normal[index] >= 0.0 else high[index])
+		normal_high += normal[index] * (high[index] if normal[index] >= 0.0 else low[index])
+	var attainable := clampf(normal_speed, normal_low, normal_high)
+	var rates := bounded_surface_rates(normal, tangent, attainable, travel_speed, low, high, preferred, lambda)
+	var commands := Vector3.ZERO
+	for index in 3:
+		commands[index] = ctx.command_for_velocity(joints[index], rates[index])
+	var scale := clampf(tangent.dot(rates) / travel_speed, 0.0, 1.0) if absf(travel_speed) > RATE_EPS else 1.0
+	return {"commands": commands, "scale": scale, "blocked": BLOCKED_NONE,
+		"debug": {"rates": rates, "lo": low, "hi": high, "v0": current,
+			"normal_residual": attainable - normal_speed}}
+
+
+static func bounded_surface_rates(normal: Vector3, tangent: Vector3, normal_speed: float, travel_speed: float, low: Vector3, high: Vector3, preferred: Vector3, lambda: float) -> Vector3:
+	var best := low
+	var best_cost := INF
+	var regularizer := maxf(lambda * lambda, 0.000001)
+	for active_set in 27:
+		var code: int = active_set
+		var fixed := Vector3.ZERO
+		var free_normal := normal
+		var free_tangent := tangent
+		var free_preferred := preferred
+		var free_mask := Vector3.ONE
+		for index in 3:
+			var state: int = code % 3
+			code = code / 3
+			if state != 0:
+				fixed[index] = low[index] if state == 1 else high[index]
+				free_normal[index] = 0.0
+				free_tangent[index] = 0.0
+				free_preferred[index] = 0.0
+				free_mask[index] = 0.0
+		var denominator := regularizer + free_tangent.length_squared()
+		var free := free_preferred + free_tangent * ((travel_speed - tangent.dot(fixed) - free_tangent.dot(free_preferred)) / denominator)
+		var inverse_normal := (free_normal - free_tangent * (free_tangent.dot(free_normal) / denominator)) / regularizer
+		var normal_gain := free_normal.dot(inverse_normal)
+		var error := normal_speed - normal.dot(fixed) - free_normal.dot(free)
+		if normal_gain > 0.00000001:
+			free += inverse_normal * (error / normal_gain)
+		elif absf(error) > 0.000001:
+			continue
+		var candidate := fixed + free * free_mask
+		var feasible := true
+		for index in 3:
+			if candidate[index] < low[index] - 0.000001 or candidate[index] > high[index] + 0.000001:
+				feasible = false
+		if not feasible or absf(normal.dot(candidate) - normal_speed) > 0.00001:
+			continue
+		var cost := pow(tangent.dot(candidate) - travel_speed, 2.0) + regularizer * candidate.distance_squared_to(preferred)
+		if cost < best_cost:
+			best_cost = cost
+			best = candidate.clamp(low, high)
+	return best

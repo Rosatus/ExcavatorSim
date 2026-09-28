@@ -1,8 +1,8 @@
 extends "res://tests/voxel_excavation_authority_test.gd"
 
 ## Advanced assist modes contract:
-## - relaxed assist: the guided stages drop the held bucket-pitch row when the
-##   3x3 solve hits a kinematic bound, so surface tracking keeps extending
+## - relaxed assist: the guided stages leave bucket pitch free throughout
+##   the pass, so surface tracking keeps extending
 ##   while the bucket angle floats free (flag "<stage>_relaxed"). Strict mode
 ##   stays the default and keeps reporting "<stage>_infeasible" with zeroed
 ##   commands at the same pose.
@@ -168,9 +168,10 @@ func _drive_at_bound(failures: Array[String], relaxed: bool) -> Dictionary:
 		var s: float = (ctx.bucket_ref_world - Vector3.ZERO).dot(ctx.horizontal)
 		stats["progress_m"] = maxf(float(stats["progress_m"]), s - start_s)
 		var attitude := ctx.bucket_attitude_rad()
-		stats["attitude_drift_rad"] = absf(attitude - start_attitude)
-		stats["max_attitude_step_rad"] = maxf(float(stats["max_attitude_step_rad"]), absf(attitude - last_attitude))
+		stats["attitude_drift_rad"] = absf(wrapf(attitude - start_attitude, -PI, PI))
+		stats["max_attitude_step_rad"] = maxf(float(stats["max_attitude_step_rad"]), absf(wrapf(attitude - last_attitude, -PI, PI)))
 		last_attitude = attitude
+	print("assist bound relaxed=%s %s" % [relaxed, JSON.stringify(stats)])
 	return stats
 
 

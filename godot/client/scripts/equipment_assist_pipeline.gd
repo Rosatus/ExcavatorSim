@@ -25,6 +25,9 @@ var last_error := ""
 
 var _descriptor: Dictionary = {}
 var _soil_contract: Dictionary = {}
+var _tool_contract: Dictionary = {}
+var _tool_mount := Transform3D.IDENTITY
+var _previous_tool_mount := Transform3D.IDENTITY
 var _joint_descriptors: Dictionary = {}
 var _body_frames: Dictionary = {}
 var _stage_order: Array = []
@@ -37,6 +40,9 @@ func configure(descriptor: Dictionary, soil_contract: Dictionary, requested_mode
 	_stage_order.clear()
 	_descriptor = descriptor.duplicate(true)
 	_soil_contract = soil_contract.duplicate(true)
+	_tool_contract = _soil_contract
+	_tool_mount = Transform3D.IDENTITY
+	_previous_tool_mount = Transform3D.IDENTITY
 	_joint_descriptors.clear()
 	_body_frames.clear()
 	for body_value in _descriptor.get("bodies", []):
@@ -67,6 +73,19 @@ func configure(descriptor: Dictionary, soil_contract: Dictionary, requested_mode
 	configured = true
 	last_error = ""
 	return true
+
+
+## Geometry follows the active mount, independently of the solid-contact solver.
+func set_tool_geometry(contract: Dictionary) -> void:
+	_tool_contract = contract.duplicate(true)
+	_tool_mount = Transform3D.IDENTITY
+	_previous_tool_mount = Transform3D.IDENTITY
+	reset("tool_changed")
+
+
+func set_tool_mount(mount: Transform3D, previous_mount: Variant = null) -> void:
+	_tool_mount = mount
+	_previous_tool_mount = previous_mount if previous_mount is Transform3D else mount
 
 
 func reset(reason := "reset") -> void:
@@ -180,7 +199,7 @@ func build_context(
 	ctx.external = external
 	ctx.cut_engagement = articulation.cut_engagement
 	ctx.motion_load_factor = articulation.motion_load_factor
-	var frames := articulation.accepted_frames()
+	var frames := articulation.frames_at_chassis(chassis_transform)
 	for state_value in articulation.joint_states():
 		var state := state_value as Dictionary
 		var joint_name := String(state.get("name", ""))
@@ -205,11 +224,32 @@ func build_context(
 			var limits := articulation.effective_joint_limits(joint_name)
 			if limits.size() == 2:
 				ctx.joint_limits[joint_name] = Vector2(float(limits[0]), float(limits[1]))
-	ctx.bucket_link = frames.get("bucket_link", Transform3D.IDENTITY) as Transform3D
-	var edge := (_soil_contract.get("proxies", {}) as Dictionary).get("cutting_edge", {}) as Dictionary
+	ctx.bucket_link = (frames.get("bucket_link", Transform3D.IDENTITY) as Transform3D) * _tool_mount
+	var edge := (_tool_contract.get("proxies", {}) as Dictionary).get("cutting_edge", {}) as Dictionary
 	var ref_local := _vector3(edge.get("center_godot", [0.0, 0.0, 0.0]))
 	var dir_local := _vector3(edge.get("direction_godot", [0.0, 0.0, -1.0]))
+	ctx.cutting_edge_available = not edge.is_empty()
+	var half_edge := Vector3.RIGHT * float(edge.get("half_width_m", 0.0))
+	# Relaxed guidance follows the same outer tooth segment used by cutting,
+	# not the radius center, whose offset rotates when pitch is released.
+	var relaxed := false
+	for stage in _stage_order:
+		if stage.enabled and stage.relaxed_attitude:
+			relaxed = true
+	if relaxed:
+		for region in (_tool_contract.get("bucket_tool", {}) as Dictionary).get("regions", []):
+			var shape := (region as Dictionary).get("shape", {}) as Dictionary
+			if String(region.get("kind", "")) != "teeth" or String(shape.get("kind", "")) != "segment":
+				continue
+			var outward := _vector3(region.get("outward_normal_godot", [0.0, 0.0, -1.0])).normalized()
+			ref_local = _vector3(region.get("center_godot", [0.0, 0.0, 0.0])) + outward * float(shape.get("radius_m", 0.0))
+			half_edge = _vector3(shape.get("axis_godot", [1.0, 0.0, 0.0])).normalized() * float(shape.get("half_length_m", 0.0))
+			break
+	ctx.bucket_edge_half_world = ctx.bucket_link.basis * half_edge
 	ctx.bucket_ref_world = ctx.bucket_link * ref_local
+	if delta > 0.0:
+		var host := frames.get("bucket_link", Transform3D.IDENTITY) as Transform3D
+		ctx.tool_point_velocity = host.basis * ((_tool_mount * ref_local) - (_previous_tool_mount * ref_local)) / delta
 	ctx.bucket_ref_dir_world = (ctx.bucket_link.basis * dir_local).normalized()
 	ctx.hinge_normal = ctx.joint_axis_world.get("bucket_joint", Vector3.RIGHT) as Vector3
 	var flat := ctx.up.cross(ctx.hinge_normal)
