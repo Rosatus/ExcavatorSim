@@ -11,7 +11,7 @@
 <joint name="boom_joint" type="revolute">
 <parent link="upper_structure_link"/><child link="boom_link"/>
 <origin xyz="0.2300000000 0.6500000000 0.3900000000" rpy="1.0122909661 0.0000000000 0.0000000000"/>
-<axis xyz="1 0 0"/><limit lower="-0.12217304763960307" upper="0.12217304763960307" effort="1000000" velocity="1"/>
+<axis xyz="1 0 0"/><limit lower="-0.3839724354387525" upper="0.29670597283903605" effort="1000000" velocity="1"/>
 </joint>
 <link name="arm_link"/>
 <joint name="arm_joint" type="revolute">

@@ -222,11 +222,12 @@ are provisional, not manufacturer hard stops. `PassiveHydraulics` updates five
 cylinder pairs and twelve multi-target hoses after driven poses; it never accepts
 operator commands or writes authority frames. The source small-arm four-bar
 (BUCKET_ROCKER/BUCKET_COUPLER) and the whole bucket-cylinder assembly that drove
-it are removed at import (the stick keeps only its welded base ears);
+it are removed at import, including the welded base ears/pin on the stick;
 non-planar cylinder pins are still rejected atomically. The arm authority joint extends +30 deg beyond
 the demonstrated source range (rig `arm_joint` limit [-9,+39] deg; positive joint =
-arm_extend per the shared sign profile), and `bucket_joint` was widened to
-[-40,+40] deg at user request (source demonstration covered only +-15). At the authority neutral the GB12 cutting
+arm_extend per the shared sign profile), `bucket_joint` was widened to
+[-40,+40] deg, and `boom_joint` to [-22,+17] deg (lower/raise), both at user
+request beyond the demonstrated source range. At the authority neutral the GB12 cutting
 edge sits level with the chassis origin, so SY155W seeds a carry pose instead:
 each joint may declare `initial_rad` (optional, must lie inside `limit_rad`),
 and `KinematicArticulationState` seeds positions/targets from it at configure and

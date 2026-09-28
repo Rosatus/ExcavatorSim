@@ -31,6 +31,7 @@ func _run() -> void:
 	_check(asset.find_children("BUCKET_ROCKER", "", true, false).is_empty(), "four-bar rocker is absent")
 	_check(asset.find_children("BUCKET_COUPLER", "", true, false).is_empty(), "four-bar coupler is absent")
 	_check(asset.find_children("BUCKET_CYLINDER*", "", true, false).is_empty(), "four-bar bucket cylinder is absent")
+	_check(asset.find_children("Bucket cylinder base*", "", true, false).is_empty(), "bucket cylinder mounts are absent")
 	_check(asset.find_children("*", "AnimationPlayer", true, false).is_empty(), "no animation authority remains")
 	_check(hydraulics.snapshot().cylinder_count == 5 and hydraulics.snapshot().hose_count == 12, "all cylinders and hoses resolve")
 	# Independently authored source samples, converted Blender -> glTF -> -Z forward.
@@ -63,7 +64,7 @@ func _run() -> void:
 				_check(absf(mesh.get_blend_shape_value(index) - float(expected[index])) < 0.001, "source hose match: %s:%d" % [name, index])
 		_assert_pins(hydraulics)
 	# Independent joint extremes (source Work_Cycle alone couples all inputs).
-	for boom in [-7., 0., 7.]:
+	for boom in [-22., 0., 17.]:
 		for folding in [-10., 0., 10.]:
 			for arm in [-9., 0., 39.]:
 				for bucket in [-40., 0., 40.]:

@@ -153,12 +153,15 @@ def main():
 
     descendants(by_name["BUCKET_ROOT"])
     # The small-arm four-bar is deleted along with the whole bucket cylinder
-    # assembly that used to drive it (barrel/rod subtrees); the welded base
-    # ears on the stick stay.
+    # assembly that used to drive it (barrel/rod subtrees) and the welded
+    # base ears/pin that held the barrel on the stick.
     descendants(by_name["BUCKET_ROCKER"])
     descendants(by_name["BUCKET_COUPLER"])
     descendants(by_name["BUCKET_CYLINDER_BARREL"])
     descendants(by_name["BUCKET_CYLINDER_ROD"])
+    for index, n in enumerate(nodes):
+        if str(n.get("name", "")).startswith("Bucket cylinder base"):
+            descendants(index)
     for n in nodes:
         if "children" in n:
             n["children"] = [i for i in n["children"] if i not in remove]
@@ -410,8 +413,9 @@ def main():
         body["shape"] = {"kind": "box", "center_m": centers[idx], "size_m": sizes[idx]}
     # Arm extension gains +30 deg: without the four-bar chain the stick can
     # travel further out. Limits stay asymmetric about the neutral. The
-    # bucket pair was widened +-25 deg per side at user request.
-    limits = [[-180, 180], [-7, 7], [-9, 39], [-40, 40]]
+    # bucket pair was widened +-25 deg per side, and the boom pair gained
+    # +15 deg lower / +10 deg raise, both at user request.
+    limits = [[-180, 180], [-22, 17], [-9, 39], [-40, 40]]
     # Carry-pose seed: at the source neutral the GB12 cutting edge sits
     # level with the chassis origin (on the ground). Lift each joint inside
     # its limits so the bucket starts clear of the terrain.
