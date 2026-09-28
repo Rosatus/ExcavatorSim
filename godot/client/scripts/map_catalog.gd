@@ -7,12 +7,12 @@ const MAP_SCENES := {
 	"urban": URBAN_SCENE,
 }
 const MAP_LOAD_ERRORS := {
-	"construction": "施工大地图包加载失败",
-	"urban": "城市地图包加载失败",
+	"construction": "土方工地包加载失败",
+	"urban": "市政施工地图包加载失败",
 }
 const MAP_MISSING_ERRORS := {
-	"construction": "未安装施工大地图包",
-	"urban": "未安装城市地图包",
+	"construction": "未安装土方工地包",
+	"urban": "未安装市政施工地图包",
 }
 var active_map_id := "training"
 var retained_model_id := ""

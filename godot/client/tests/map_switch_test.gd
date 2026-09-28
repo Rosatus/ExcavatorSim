@@ -40,6 +40,7 @@ func run() -> void:
 	var ui := scene.get_node("OperatorUI") as MotionOperatorUI
 	var selector := ui.get_control_for_test("map_selector") as OptionButton
 	check(selector != null and selector.selected == 1, "Menu does not reflect active map")
+	check(selector.get_item_text(1) == "地图：土方工地" and selector.get_item_text(2) == "地图：市政施工（未安装）", "Map names do not match product labels")
 	ui._set_panel_collapsed(false)
 	ui._on_map_selected(0)
 	check(ui._confirmation.visible and catalog.active_map_id == "construction", "Map changed before confirmation")

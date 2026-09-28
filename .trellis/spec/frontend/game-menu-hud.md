@@ -18,6 +18,29 @@ CAN supervision runs while paused: heartbeat, shutdown/start deadlines and ICT r
 
 ## Verification
 
+User preferences in `operator_ui.cfg` survive map scene reloads: audio mute
+(fresh-install default true), camera mode, quality profile and pre-test profile,
+level assist, unlimited bucket, cutting diagnostics, plus the existing theme,
+video, race, relaxed assist, simple digging and performance overlay choices.
+Save explicit menu changes, and save level-assist changes from the controller
+picker only when the value changes. Theme rebuild synchronizes the mute checkbox
+from runtime state. Quality changes must restore the selected FPS limit.
+An explicit `ui.bucket_ground_mode` overrides the map's initial policy; absent
+that preference, training still defaults to passthrough and work maps to normal.
+Do not persist world-space slope targets or attachment joint poses as preferences.
+Camera mode persists but camera placement still resets to each machine's preset.
+Attachment combinations retain the existing machine compatibility/default rules
+(SY155W default remains XTR13 + GB12); these are not global preferences yet.
+Focused transition test: `menu_preferences_test.gd` uses a fresh config, checks
+model/map/theme transitions and restores the original user config afterward.
+
+The transparent slew indicator sits 20 px left of the ISO HUD, bottom-aligned,
+and inherits its visibility. The chassis silhouette stays fixed (tracks or four
+wheels); the themed upper arrow and shortest arc show relative rotation in
+[-180, 180] degrees. `MotionOperatorUI` reads the interpolated `base_link` and
+`upper_structure_link` bases, cancelling chassis attitude before projecting the
+heading. Missing frames display an unavailable mark. This is presentation-only.
+
 Focused contracts: `operator_ui_test.gd`, `control_input_hud_test.gd`, `camera_workflow_test.gd`, `ict_status_indicator_test.gd`, `gateway_restart_ui_test.gd`. UI bounds cover 1280x720, 1920x1080 and 2560x1080. Smaller phone-sized viewports are outside this desktop product target.
 
 Manual acceptance: restart the main scene, drive immediately, open/close with Esc and controller Start; navigate all pages and reset dialog using only gamepad; reset and drive again; inspect HUD readability over bright and dark terrain. Aesthetic and control-feel acceptance remains human-owned per validation-budget.md.

@@ -109,6 +109,8 @@ var _bucket_volume_label: Label
 var _advanced_panel: VBoxContainer
 var _reset_button: Button
 var _mute_audio_button: CheckButton
+var _menu_preferences_loaded := false
+var _saved_level_assist := false
 var _test_graphics_button: CheckButton
 var _bucket_passthrough_button: CheckButton
 var _level_assist_button: CheckButton
@@ -244,6 +246,8 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_ui_theme = _load_ui_theme()
 	_bind_controls()
+	if _feedback != null:
+		_mute_audio_button.set_pressed_no_signal(_feedback.is_muted())
 	_connect_controls()
 	_apply_dialog_theme()
 	_apply_static_copy()
@@ -281,6 +285,7 @@ func _ready() -> void:
 	_sync_test_graphics_toggle()
 	_load_race_mode()
 	_load_assist_options()
+	_load_menu_preferences()
 	_guide_panel.visible = false
 	_build_assist_menu()
 	_build_slope_side_view()
@@ -539,6 +544,10 @@ func _on_window_mode_selected(index: int) -> void:
 
 
 func _apply_window_mode(mode_id: String) -> void:
+	# Scene reloads recreate this UI, but keep the OS window. Reapplying
+	# WINDOWED restores a maximized window and recenters a manually sized one.
+	if mode_id == _current_window_mode_id():
+		return
 	match mode_id:
 		WINDOW_MODE_FULLSCREEN:
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)
@@ -602,6 +611,8 @@ func _rebuild_menu_theme() -> void:
 	_instantiate_menu_controls()
 	_bind_controls()
 	_connect_controls()
+	if _feedback != null:
+		_mute_audio_button.set_pressed_no_signal(_feedback.is_muted())
 	_apply_dialog_theme()
 	_apply_static_copy()
 	_configure_model_selector()
@@ -644,7 +655,7 @@ func _apply_static_copy() -> void:
 	_mute_audio_button.text = UIStrings.BUTTON_MUTE_AUDIO
 	_test_graphics_button.text = UIStrings.BUTTON_TEST_GRAPHICS
 	_test_graphics_button.tooltip_text = "Use an untextured black/white terrain grid and hide site dressing."
-	_bucket_passthrough_button.tooltip_text = "开启后铲斗可穿透地面，不进行挖土或卸土。切换开关会清空斗内土量和待处理的土方作业。进入训练场时默认开启，进入施工大地图时默认关闭。"
+	_bucket_passthrough_button.tooltip_text = "开启后铲斗可穿透地面，不进行挖土或卸土。切换开关会清空斗内土量和待处理的土方作业。进入训练场时默认开启，进入土方工地时默认关闭。"
 	_level_assist_button.tooltip_text = "平地辅助（T 菜单选择）。开启后大臂与铲斗交由系统保持对地高度与角度，W 推远、S 拉近铲斗，回转不受影响；I/K/J/L 在此期间不生效。"
 	_slope_assist_button.tooltip_text = "修坡辅助（T 菜单选择）。进入预览后整机冻结，W/S 调坡脚距离、A/D 调坡角，闪烁楔体为将削去的土；T/Enter 确认开坡，Esc 取消；作业中回转与大臂铲斗交由系统，W/S 沿坡面推拉。"
 	_unlimited_bucket_button.tooltip_text = "Testing only: raise collection capacity while keeping the visible full-bucket level at the model contract capacity."
@@ -665,6 +676,7 @@ func _start_product_gameplay() -> void:
 
 func _process(delta: float) -> void:
 	if _panel_collapsed:
+		_refresh_slew_orientation()
 		return
 	_menu_visual_time += delta
 	(_menu["atmosphere"] as ShaderMaterial).set_shader_parameter("ui_time", _menu_visual_time)
@@ -674,6 +686,20 @@ func _process(delta: float) -> void:
 	if _menu_refresh_elapsed >= 0.2:
 		_menu_refresh_elapsed = 0.0
 		_refresh_can_status()
+
+
+func _refresh_slew_orientation() -> void:
+	if _hud == null or _hud.orientation_hud == null:
+		return
+	var presentation := get_node_or_null("../MotionPresentation") as MotionPresentation
+	var base := presentation.get_frame_node("base_link") if presentation != null else null
+	var upper := presentation.get_frame_node("upper_structure_link") if presentation != null else null
+	if not is_instance_valid(base) or not is_instance_valid(upper):
+		_hud.orientation_hud.clear_orientation()
+		return
+	_hud.orientation_hud.set_orientation(
+		base.get_global_transform_interpolated().basis,
+		upper.get_global_transform_interpolated().basis)
 
 
 func get_control_for_test(id: String) -> Control:
@@ -883,6 +909,10 @@ func _on_test_graphics_toggled(enabled: bool) -> void:
 		requested = "balanced"
 	if not _visual_quality.apply_profile(requested):
 		_sync_test_graphics_toggle()
+	else:
+		_save_menu_preference("quality_profile", requested)
+		_save_menu_preference("quality_before_test", _quality_before_test)
+		_apply_saved_video_settings()
 
 
 func _on_bucket_passthrough_toggled(enabled: bool) -> void:
@@ -896,6 +926,8 @@ func _on_bucket_passthrough_toggled(enabled: bool) -> void:
 	)
 	if not _product_session.request_bucket_ground_mode(requested):
 		_sync_bucket_passthrough_toggle()
+	else:
+		_save_menu_preference("bucket_ground_mode", requested)
 
 
 func _on_level_assist_toggled(enabled: bool) -> void:
@@ -903,6 +935,7 @@ func _on_level_assist_toggled(enabled: bool) -> void:
 		_sync_level_assist_toggle()
 		return
 	_product_session.request_level_assist(enabled)
+	_save_menu_preference("level_assist", enabled)
 	_sync_level_assist_toggle()
 
 
@@ -926,11 +959,14 @@ func _on_unlimited_bucket_toggled(enabled: bool) -> void:
 				if reason == "bucket_mass_exceeds_requested_capacity"
 				else "Unlimited bucket test mode is unavailable: %s" % reason
 			)
+	else:
+		_save_menu_preference("unlimited_bucket", enabled)
 
 
 func _on_cutting_diagnostics_toggled(enabled: bool) -> void:
 	if _excavation_world != null:
 		_excavation_world.set_voxel_diagnostics_enabled(enabled)
+		_save_menu_preference("cutting_diagnostics", enabled)
 	_sync_cutting_diagnostics_toggle()
 
 
@@ -1210,6 +1246,7 @@ func _on_reset_view_pressed() -> void:
 
 
 func _on_camera_mode_changed(_mode: String, _display_name: String) -> void:
+	_save_menu_preference("camera_mode", _mode)
 	_refresh_camera_selector()
 
 
@@ -1438,7 +1475,7 @@ func _configure_map_selector() -> void:
 	var catalog := get_node_or_null("/root/MapCatalog")
 	selector.add_item("地图：训练场")
 	selector.set_item_metadata(0, "training")
-	var labels := {"construction": "施工大地图", "urban": "城市场景"}
+	var labels := {"construction": "土方工地", "urban": "市政施工"}
 	var index := 1
 	for map_id in ["construction", "urban"]:
 		var available: bool = catalog != null and catalog.map_available(map_id)
@@ -1447,7 +1484,7 @@ func _configure_map_selector() -> void:
 		selector.set_item_metadata(index, map_id)
 		selector.set_item_disabled(index, not available or not _is_local_authority())
 		index += 1
-	selector.tooltip_text = "切换地图将重新开始作业。施工大地图的警戒线内为挖掘土区。"
+	selector.tooltip_text = "切换地图将重新开始作业。土方工地的警戒线内为挖掘土区。"
 	selector.item_selected.connect(_on_map_selected)
 	_refresh_map_selector()
 
@@ -1811,6 +1848,42 @@ func is_panel_collapsed_for_test() -> bool:
 func _on_audio_muted(pressed: bool) -> void:
 	if _feedback != null:
 		_feedback.set_muted(pressed)
+		_save_menu_preference("audio_muted", pressed)
+
+
+func _save_menu_preference(key: String, value: Variant) -> void:
+	var config := ConfigFile.new()
+	config.load(CONFIG_PATH)
+	config.set_value(CONFIG_SECTION_UI, key, value)
+	config.save(CONFIG_PATH)
+
+
+func _load_menu_preferences() -> void:
+	var config := ConfigFile.new()
+	config.load(CONFIG_PATH)
+	if _feedback != null:
+		_feedback.set_muted(bool(config.get_value(CONFIG_SECTION_UI, "audio_muted", true)))
+		_mute_audio_button.set_pressed_no_signal(_feedback.is_muted())
+	if _camera != null:
+		_camera.set_mode(String(config.get_value(CONFIG_SECTION_UI, "camera_mode", _camera.get_mode())))
+	if _visual_quality != null:
+		_quality_before_test = String(config.get_value(CONFIG_SECTION_UI, "quality_before_test", "balanced"))
+		var quality := String(config.get_value(CONFIG_SECTION_UI, "quality_profile", _visual_quality.profile))
+		if VisualQualityController.PROFILES.has(quality):
+			_visual_quality.apply_profile(quality)
+		_apply_saved_video_settings()
+		_sync_test_graphics_toggle()
+	if _excavation_world != null:
+		# These flags are also consumed when deferred soil initialization builds
+		# the authority, so map startup does not require it to exist already.
+		_excavation_world.voxel_unlimited_bucket_for_testing = bool(config.get_value(CONFIG_SECTION_UI, "unlimited_bucket", false))
+		if _excavation_world.can_set_voxel_unlimited_bucket_for_testing():
+			_excavation_world.set_voxel_unlimited_bucket_for_testing(_excavation_world.voxel_unlimited_bucket_for_testing)
+		_excavation_world.set_voxel_diagnostics_enabled(bool(config.get_value(CONFIG_SECTION_UI, "cutting_diagnostics", false)))
+	if _product_session != null:
+		_saved_level_assist = bool(config.get_value(CONFIG_SECTION_UI, "level_assist", false))
+		_product_session.request_level_assist(_saved_level_assist)
+	_menu_preferences_loaded = true
 
 
 func show_control_guide() -> void:
@@ -1854,6 +1927,11 @@ func _on_command_acknowledged(_ack: Dictionary) -> void:
 
 
 func _on_product_status_changed(_status: Dictionary) -> void:
+	# The keyboard/gamepad assist picker can change this without a menu click.
+	var level := bool(_status.get("level_assist_enabled", false))
+	if _menu_preferences_loaded and level != _saved_level_assist:
+		_saved_level_assist = level
+		_save_menu_preference("level_assist", level)
 	_refresh()
 
 

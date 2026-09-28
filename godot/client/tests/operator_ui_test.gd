@@ -13,6 +13,10 @@ func _run() -> void:
 	var ui := scene.get_node("OperatorUI") as MotionOperatorUI
 	var session := scene.get_node("ProductSession") as ProductSession
 	var camera := scene.get_node("Camera3D") as CameraRig
+	check(ui._mute_audio_button.button_pressed == ui._feedback.is_muted(), "mute checkbox disagrees with audio state")
+	ui._mute_audio_button.button_pressed = false
+	check(not ui._feedback.is_muted(), "unchecking mute did not restore audio")
+	ui._mute_audio_button.button_pressed = true
 	check(session.lifecycle == "running", "product did not auto-start")
 	check(ui.is_panel_collapsed_for_test() and not paused, "menu blocks initial drive")
 	check(not ui._guide_panel.visible, "onboarding blocks initial drive")

@@ -11,6 +11,8 @@ func _run() -> void:
 	var feedback := MachineFeedback.new()
 	root.add_child(feedback)
 	await process_frame
+	if not feedback.is_muted():
+		_fail("new feedback must default to muted")
 	var session := {"generation": 1, "lifecycle": "running", "focused": true}
 	var soil := {
 		"interaction_batch_key": "1:10:cut",

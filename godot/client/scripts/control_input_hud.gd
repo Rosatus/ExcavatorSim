@@ -2,6 +2,8 @@ class_name ControlInputHUD
 extends PanelContainer
 
 const GameSkin := preload("res://scripts/game_ui_theme.gd")
+const OrientationHUD := preload("res://scripts/slew_orientation_hud.gd")
+var orientation_hud: Control
 const GROUP_ACTIONS := [
 	["operator_swing_left", "operator_swing_right", "operator_arm_extend", "operator_arm_retract"],
 	["operator_bucket_curl", "operator_bucket_dump", "operator_boom_lower", "operator_boom_raise"],
@@ -93,6 +95,10 @@ func set_theme_variant(variant: String) -> void:
 func _apply_variant_styles() -> void:
 	theme = GameSkin.create(_theme_variant)
 	var accent := GameSkin.accent_for(_theme_variant)
+	if orientation_hud != null:
+		orientation_hud.theme = theme
+		orientation_hud.accent = accent
+		orientation_hud.queue_redraw()
 	if GameSkin.is_console_variant(_theme_variant):
 		var panel := GameSkin.box(Color(0.068, 0.088, 0.104, 0.88), 10, 16)
 		panel.border_color = Color(0.64, 0.70, 0.72, 0.22)
@@ -204,6 +210,16 @@ func _refresh_tile(action: String) -> void:
 		)
 
 func _ready() -> void:
+	# A Node2D carrier avoids PanelContainer sizing this transparent companion
+	# as another panel child, while preserving inherited visibility and theme.
+	var carrier := Node2D.new()
+	carrier.name = "OrientationAnchor"
+	add_child(carrier)
+	orientation_hud = OrientationHUD.new()
+	orientation_hud.name = "SlewOrientationHUD"
+	carrier.add_child(orientation_hud)
+	resized.connect(_layout_orientation)
+	_layout_orientation()
 	_apply_variant_styles()
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 8)
@@ -249,6 +265,9 @@ func _ready() -> void:
 	set_prompt_mode(_prompt_mode)
 	_sync_variant_chrome()
 	_ignore_mouse(self)
+
+func _layout_orientation() -> void:
+	orientation_hud.position = Vector2(-orientation_hud.size.x - 20, size.y - orientation_hud.size.y)
 
 
 ## Keyboard layout: the classic cross of keycap tiles, letters plus a small
@@ -650,6 +669,9 @@ class _Brackets:
 
 func set_wheeled_mode(value: bool) -> void:
 	_wheeled = value
+	if orientation_hud != null and orientation_hud.wheeled != value:
+		orientation_hud.wheeled = value
+		orientation_hud.queue_redraw()
 	var copy: Dictionary = TRACK_CAPTIONS
 	if value:
 		copy = WHEEL_CAPTIONS_KB if _prompt_mode == "keyboard" else WHEEL_CAPTIONS_PAD

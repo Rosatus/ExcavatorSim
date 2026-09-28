@@ -6,6 +6,12 @@ func _ready() -> void:
 
 func _apply_map_bucket_default() -> void:
 	var catalog := get_node("/root/MapCatalog")
+	var config := ConfigFile.new()
+	config.load(MotionOperatorUI.CONFIG_PATH)
+	var mode := String(config.get_value(MotionOperatorUI.CONFIG_SECTION_UI, "bucket_ground_mode", ""))
+	if BucketGroundInteractionMode.is_valid(mode):
+		$ProductSession.request_bucket_ground_mode(mode)
+		return
 	# Apply the resolved map's default through the normal fixed-tick transition.
 	$ProductSession.request_bucket_ground_mode(
 		BucketGroundInteractionMode.PASSTHROUGH
