@@ -36,6 +36,17 @@ func _run() -> void:
 		prepared.erase(key)
 	_expect(not reference.is_empty() and prepared == reference, "sliced publication preserves full SDF digest, mass, revision, queue and proposal identity", failures)
 	_expect(budgeted.slices > 1, "representative cut spans multiple budgeted frames", failures)
+	var gb12_zone := WorkZone.new()
+	root.add_child(gb12_zone)
+	_expect(await _wait_initial_ready(gb12_zone), "GB12 preparation zone ready", failures)
+	var gb12_authority := BudgetAuthority.new()
+	gb12_authority.cut_preparation_budget_usec = 250
+	gb12_authority.drain_in_step = true
+	_check_gb12_native_cut(gb12_zone, failures, gb12_authority)
+	_expect(gb12_authority.slices > 1, "GB12 native cut uses sliced preparation on another host", failures)
+	gb12_authority.clear()
+	gb12_zone.queue_free()
+	await process_frame
 	_check_bounded_queue(failures)
 	await _check_lifecycle(failures)
 	await _check_recorded_equivalence(failures)

@@ -13,6 +13,7 @@ var bucket_capacity_mass_q := 0
 var bucket_mass_q := 0
 var terrain_mass_delta_q := 0
 var discarded_cut_mass_q := 0
+var exported_dump_mass_q := 0
 var conservation_error_q := 0
 var _cells: Dictionary = {}
 var _approximate_cut_coverage: Dictionary = {}
@@ -39,6 +40,7 @@ func configure(contract: Dictionary, target_generation: int, capacity_override_m
 	bucket_mass_q = 0
 	terrain_mass_delta_q = 0
 	discarded_cut_mass_q = 0
+	exported_dump_mass_q = 0
 	conservation_error_q = 0
 	_cells.clear()
 	_approximate_cut_coverage.clear()
@@ -274,7 +276,16 @@ func _cut_capture_valid(staged: Dictionary) -> bool:
 
 
 func _mass_balance_q() -> int:
-	return terrain_mass_delta_q + bucket_mass_q + discarded_cut_mass_q
+	return terrain_mass_delta_q + bucket_mass_q + discarded_cut_mass_q + exported_dump_mass_q
+
+
+func export_bucket_mass(mass_q: int) -> bool:
+	if generation < 0 or mass_q <= 0 or mass_q > bucket_mass_q or _mass_balance_q() != 0:
+		return false
+	bucket_mass_q -= mass_q
+	exported_dump_mass_q += mass_q
+	conservation_error_q = _mass_balance_q()
+	return conservation_error_q == 0
 
 
 func stage_deposit(cell_changes: Array[Dictionary], requested_mass_q: int) -> Dictionary:
@@ -406,6 +417,8 @@ func get_status_snapshot(cell_grid: Array = [1, 1, 1], center_of_mass_local: Vec
 		"cell_grid": cell_grid.duplicate(),
 		"terrain_mass_delta_q": terrain_mass_delta_q,
 		"discarded_cut_mass_q": discarded_cut_mass_q,
+		"exported_dump_mass_q": exported_dump_mass_q,
+		"exported_dump_volume_m3": volume_for_mass_q(exported_dump_mass_q),
 		"discarded_cut_volume_m3": volume_for_mass_q(discarded_cut_mass_q),
 		"conservation_error_q": conservation_error_q,
 		"conservation_error_kg": float(conservation_error_q) / float(MASS_Q_PER_KG),

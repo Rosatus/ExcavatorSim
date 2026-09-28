@@ -342,6 +342,14 @@ func submit_pose(pose_snapshot: Dictionary, identity: Dictionary, delta_s: float
 		_cancel_uncommitted_dumps("dump_gate_closed_before_commit")
 	var proposal_started_usec := _diagnostic_clock_usec()
 	var dump_result := _build_dump_proposal(pose_snapshot, identity, delta_s)
+	if bool(dump_result.get("export", false)):
+		_cancel_uncommitted_dumps("release_outside_receiver")
+		var amount := int(dump_result["mass_q"])
+		if not material_field.export_bucket_mass(amount):
+			return _reject_submission("material_commit_invariant")
+		_release_published_since_step = true
+		_engaged = false
+		return {"accepted": true, "operation": "dump", "reason": "dump_exported", "exported_mass_q": amount}
 	if bool(dump_result.get("attempted", false)):
 		var dump_candidate := dump_result.get("proposal") as VoxelSoilOperationProposal
 		_record_proposal_telemetry(
@@ -521,7 +529,7 @@ func _advance_preparing_cut_impl(deadline_usec: int) -> VoxelCutTransaction:
 	var started := _diagnostic_clock_usec()
 	if proposal.generation != generation or proposal.model_id != model_id or proposal.tool_hash != tool_hash:
 		return _reject_transaction(_new_cut_transaction(proposal), "stale_or_wrong_tool", started)
-	if (model_id != "sy135" and model_id != "sy135neo") or proposal.native_paths.size() > MAX_NATIVE_PATHS:
+	if not cutter.uses_native_paths() or proposal.native_paths.size() > MAX_NATIVE_PATHS:
 		return _reject_transaction(_new_cut_transaction(proposal), "native_path_work_budget", started)
 	# Other operation types remain ordered behind this job. A defensive revision
 	# guard also prevents a direct/test mutation from publishing an old snapshot.
@@ -550,10 +558,11 @@ func _advance_preparing_cut_impl(deadline_usec: int) -> VoxelCutTransaction:
 		if _cut_preparation.coordinates.is_empty():
 			return _reject_transaction(_new_cut_transaction(proposal), "no_sdf_change", started)
 		# Include the native cone rasterizer's one-voxel margin, plus rounding.
-		# Do not clip to the accounting window: native brushes also edit its halo.
-		var area := cutter._native_path_bounds(_cut_preparation.paths).grow(2.0)
-		var buffer_origin := Vector3i(area.position.floor())
-		var buffer_size := Vector3i(area.end.ceil()) - buffer_origin
+		# Keep the native halo inside semantic terrain ownership.
+		var area := cutter._native_path_bounds(_cut_preparation.paths).grow(2.0).intersection(layout.voxel_bounds(_work_zone.voxel_scale_m))
+		var buffer_window := _integer_window_without_halo(area)
+		var buffer_origin := buffer_window["origin"] as Vector3i
+		var buffer_size := buffer_window["size"] as Vector3i
 		if buffer_size.x * buffer_size.y * buffer_size.z > MAX_STAGED_SAMPLES:
 			return _reject_transaction(_new_cut_transaction(proposal), "staged_window_budget", started)
 		if not _tool.is_area_editable(AABB(Vector3(buffer_origin), Vector3(buffer_size))):
@@ -583,9 +592,10 @@ func _advance_threaded_cut(proposal: VoxelCutProposal, started: int) -> VoxelCut
 	var size := window["size"] as Vector3i
 	if size.x <= 0 or size.y <= 0 or size.z <= 0 or not _tool.is_area_editable(AABB(Vector3(origin), Vector3(size))):
 		return _reject_transaction(_new_cut_transaction(proposal), "voxel_area_not_editable", started)
-	var area := cutter._native_path_bounds(_cut_preparation.paths).grow(2.0)
-	var buffer_origin := Vector3i(area.position.floor())
-	var buffer_size := Vector3i(area.end.ceil()) - buffer_origin
+	var area := cutter._native_path_bounds(_cut_preparation.paths).grow(2.0).intersection(layout.voxel_bounds(_work_zone.voxel_scale_m))
+	var buffer_window := _integer_window_without_halo(area)
+	var buffer_origin := buffer_window["origin"] as Vector3i
+	var buffer_size := buffer_window["size"] as Vector3i
 	if buffer_size.x * buffer_size.y * buffer_size.z > MAX_STAGED_SAMPLES:
 		return _reject_transaction(_new_cut_transaction(proposal), "staged_window_budget", started)
 	if not _tool.is_area_editable(AABB(Vector3(buffer_origin), Vector3(buffer_size))):
@@ -727,7 +737,7 @@ func get_status_snapshot(refresh_diagnostics: bool = false) -> Dictionary:
 		"native_overburden_path_total": _native_overburden_path_total,
 		"native_deposit_committed": _native_deposit_committed_count,
 		"readiness_coalesced": _readiness_coalesced_count,
-		"cut_accounting_mode": "sparse_coverage_approximate" if model_id == "sy135" or model_id == "sy135neo" else "exact_sdf_volume",
+		"cut_accounting_mode": "sparse_coverage_approximate" if cutter.uses_native_paths() else "exact_sdf_volume",
 		"deposit_accounting_mode": "native_sparse_deposit_approximate",
 		"engaged": _engaged,
 		"last_error": last_error,
@@ -1291,7 +1301,7 @@ func _commit_native_proposal(
 	started_usec: int,
 	prepared: VoxelCutPreparation = null
 ) -> VoxelCutTransaction:
-	if (proposal.model_id != "sy135" and proposal.model_id != "sy135neo") or proposal.native_paths.size() > MAX_NATIVE_PATHS:
+	if not cutter.uses_native_paths() or proposal.native_paths.size() > MAX_NATIVE_PATHS:
 		return _reject_transaction(transaction, "native_path_work_budget", started_usec)
 	var window := _integer_window_without_halo(proposal.area_voxels)
 	var origin := window.get("origin", Vector3i.ZERO) as Vector3i
@@ -1358,11 +1368,28 @@ func _commit_native_proposal(
 	phase_started = _diagnostic_clock_usec()
 	if prepared != null:
 		_tool.paste(prepared.buffer_origin, prepared.buffer, SDF_CHANNEL_MASK)
-	else:
+	elif layout.voxel_bounds(_work_zone.voxel_scale_m).encloses(cutter._native_path_bounds(edit_paths).grow(2.0)):
 		for path in edit_paths:
-			var points := path.get("points_voxels", PackedVector3Array()) as PackedVector3Array
-			var radii := path.get("radii_voxels", PackedFloat32Array()) as PackedFloat32Array
-			_tool.do_path(points, radii)
+			_tool.do_path(path["points_voxels"], path["radii_voxels"])
+	else:
+		# Clip native rasterization too, not just its mass-accounting window.
+		# A private buffer makes crossing the finite terrain edge an ordinary cut.
+		var area := cutter._native_path_bounds(edit_paths).grow(2.0).intersection(layout.voxel_bounds(_work_zone.voxel_scale_m))
+		var clipped_window := _integer_window_without_halo(area)
+		var clipped_origin := clipped_window["origin"] as Vector3i
+		var clipped_size := clipped_window["size"] as Vector3i
+		if clipped_size.x * clipped_size.y * clipped_size.z > MAX_STAGED_SAMPLES or not _tool.is_area_editable(AABB(Vector3(clipped_origin), Vector3(clipped_size))):
+			return _reject_transaction(transaction, "voxel_area_not_editable", started_usec)
+		var snapshot := VoxelBuffer.new()
+		snapshot.set_channel_depth(VoxelBuffer.CHANNEL_SDF, VoxelBuffer.DEPTH_16_BIT)
+		snapshot.create(clipped_size.x, clipped_size.y, clipped_size.z)
+		_tool.copy(clipped_origin, snapshot, SDF_CHANNEL_MASK, false)
+		var job := CutPreparation.new()
+		job.paths = edit_paths
+		job.begin_edit(snapshot, clipped_origin, _tool.get_sdf_scale(), _tool.get_sdf_strength())
+		while not job.edit_done:
+			job.advance_edit(Time.get_ticks_usec() + 1000000)
+		_tool.paste(clipped_origin, snapshot, SDF_CHANNEL_MASK)
 	transaction.native_geometry_only = geometry_only
 	transaction.native_edit_usec = _diagnostic_clock_usec() - phase_started
 	phase_started = _diagnostic_clock_usec()
@@ -1450,7 +1477,9 @@ func _update_dump_gate_diagnostics(pose_snapshot: Dictionary, delta_s: float) ->
 		var editable := layout.editable_world_bounds(_work_zone.voxel_scale_m)
 		# Air above the bounded voxel volume is a valid release source. Querying
 		# unloaded/out-of-volume SDF there can return zero and falsely close it.
-		if outlet_world.y < editable.position.y:
+		if not layout.owns_world_xz(Vector2(outlet_world.x, outlet_world.z)):
+			pass # There is no voxel soil outside the finite volume to bury the lip.
+		elif outlet_world.y < editable.position.y:
 			_dump_gate_raw_active = false
 		elif outlet_world.y < editable.end.y:
 			var outlet := layout.world_to_voxel(outlet_world, _work_zone.voxel_scale_m)
@@ -1475,7 +1504,7 @@ func _minimum_dump_mass_q() -> int:
 
 
 func _build_dump_proposal(pose_snapshot: Dictionary, identity: Dictionary, delta_s: float) -> Dictionary:
-	if material_field.bucket_mass_q < _minimum_dump_mass_q() or not bool(pose_snapshot.get("valid", false)):
+	if material_field.bucket_mass_q <= 0 or not bool(pose_snapshot.get("valid", false)):
 		return {"attempted": false}
 	var contract := pose_snapshot.get("contract", {}) as Dictionary
 	var opening_normal := Release.opening_normal(pose_snapshot)
@@ -1491,12 +1520,18 @@ func _build_dump_proposal(pose_snapshot: Dictionary, identity: Dictionary, delta
 	var release_world := opening.origin
 	var release_direction := (opening_normal * 0.65 + Vector3.DOWN * 0.85).normalized()
 	var editable := layout.editable_world_bounds(_work_zone.voxel_scale_m)
+	var contract_capacity := float(contract.get("heaped_capacity_m3", 0.0))
+	var exposure := clampf((opening_down_dot - dump_threshold) / maxf(0.01, 1.0 - dump_threshold), 0.0, 1.0)
+	var release_volume := contract_capacity * lerpf(0.35, 1.4, exposure) * clampf(delta_s, 0.0, 0.1)
+	var requested_mass_q := mini(material_field.bucket_mass_q, material_field.mass_q_for_volume(release_volume))
 	# The receiving terrain must be inside the work zone; the bucket may be
 	# higher than its upper Y bound. This used to strand soil until boom-lowering.
 	if release_world.x < editable.position.x or release_world.x >= editable.end.x \
 			or release_world.z < editable.position.z or release_world.z >= editable.end.z \
 			or release_world.y < editable.position.y:
-		return {"attempted": true, "accepted": false, "reason": "dump_out_of_zone", "release_world": release_world}
+		return {"export": requested_mass_q > 0, "mass_q": requested_mass_q, "attempted": false}
+	if material_field.bucket_mass_q < _minimum_dump_mass_q():
+		return {"attempted": false}
 	var support_started_usec := _diagnostic_clock_usec()
 	var support := _find_sdf_support_world(release_world)
 	var support_query_usec := _diagnostic_clock_usec() - support_started_usec
@@ -1505,10 +1540,6 @@ func _build_dump_proposal(pose_snapshot: Dictionary, identity: Dictionary, delta
 	var support_world := support.get("position", Vector3.ZERO) as Vector3
 	if not layout.is_world_position_editable(support_world, _work_zone.voxel_scale_m):
 		return {"attempted": true, "accepted": false, "reason": "dump_out_of_zone", "release_world": release_world}
-	var contract_capacity := float(contract.get("heaped_capacity_m3", 0.0))
-	var exposure := clampf((opening_down_dot - dump_threshold) / maxf(0.01, 1.0 - dump_threshold), 0.0, 1.0)
-	var release_volume := contract_capacity * lerpf(0.35, 1.4, exposure) * clampf(delta_s, 0.0, 0.1)
-	var requested_mass_q := mini(material_field.bucket_mass_q, material_field.mass_q_for_volume(release_volume))
 	if requested_mass_q <= 0:
 		return {"attempted": true, "accepted": false, "reason": "dump_sub_quantum", "release_world": release_world}
 	var shape_data := _deposit_shape_for_mass(requested_mass_q, support_world)
@@ -2496,10 +2527,10 @@ func _apply_support_cleanup(edit_area: AABB) -> Dictionary:
 	var started := _diagnostic_clock_usec()
 	var result := {"deleted_samples": 0, "columns": 0, "area": AABB(), "usec": 0}
 	var bounds := layout.voxel_bounds(_work_zone.voxel_scale_m)
-	var min_x := maxi(floori(edit_area.position.x) - 1, floori(bounds.position.x))
-	var max_x := mini(ceili(edit_area.end.x) + 1, ceili(bounds.end.x) - 1)
-	var min_z := maxi(floori(edit_area.position.z) - 1, floori(bounds.position.z))
-	var max_z := mini(ceili(edit_area.end.z) + 1, ceili(bounds.end.z) - 1)
+	var min_x := maxi(floori(edit_area.position.x) - 1, ceili(bounds.position.x))
+	var max_x := mini(ceili(edit_area.end.x) + 1, floori(bounds.end.x) - 1)
+	var min_z := maxi(floori(edit_area.position.z) - 1, ceili(bounds.position.z))
+	var max_z := mini(ceili(edit_area.end.z) + 1, floori(bounds.end.z) - 1)
 	var column_count := (max_x - min_x + 1) * (max_z - min_z + 1)
 	if column_count > MAX_SUPPORT_CLEANUP_COLUMNS:
 		# Clamp the scan rectangle around the edit center; columns outside the
@@ -2507,10 +2538,10 @@ func _apply_support_cleanup(edit_area: AABB) -> Dictionary:
 		var center_x := roundi(edit_area.get_center().x)
 		var center_z := roundi(edit_area.get_center().z)
 		var half := int((sqrt(float(MAX_SUPPORT_CLEANUP_COLUMNS)) - 1.0) * 0.5)
-		min_x = center_x - half
-		max_x = center_x + half
-		min_z = center_z - half
-		max_z = center_z + half
+		min_x = maxi(min_x, center_x - half)
+		max_x = mini(max_x, center_x + half)
+		min_z = maxi(min_z, center_z - half)
+		max_z = mini(max_z, center_z + half)
 	# The lowest buffered row is the support reference under the edit; the
 	# scan never writes it, only reads its solidity.
 	var floor_y := maxi(floori(edit_area.position.y) - 2, floori(bounds.position.y))

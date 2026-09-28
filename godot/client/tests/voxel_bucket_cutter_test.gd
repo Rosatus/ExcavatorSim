@@ -12,6 +12,7 @@ func _run() -> void:
 	var failures: Array[String] = []
 	for model_id in ["sy205", "sy135"]:
 		_check_model(String(model_id), failures)
+	_check_tilt_bucket(failures)
 	_check_sy135_deep_insertion(failures)
 	_check_sy135_lift_exit(failures)
 	_check_occupancy_volume(failures)
@@ -283,13 +284,16 @@ func _check_negative_cases(failures: Array[String]) -> void:
 		{"name": "above_ground", "previous": Transform3D(Basis.IDENTITY, base.origin + Vector3.UP * 3.0), "current": Transform3D(Basis.IDENTITY, base.origin + Vector3(0.0, 2.95, 0.05))},
 		{"name": "separating", "previous": base, "current": Transform3D(Basis.IDENTITY, base.origin + Vector3(0.0, 0.08, 0.02))},
 		{"name": "teleported", "previous": base, "current": Transform3D(Basis.IDENTITY, base.origin + Vector3(3.0, -0.1, 0.0))},
-		{"name": "protected_boundary", "previous": Transform3D(Basis.IDENTITY, Vector3(15.6, origin_y, 20.0)), "current": Transform3D(Basis.IDENTITY, Vector3(15.55, origin_y - 0.08, 20.1))},
+		{"name": "crossing_boundary", "previous": Transform3D(Basis.IDENTITY, Vector3(15.6, origin_y, 20.0)), "current": Transform3D(Basis.IDENTITY, Vector3(15.55, origin_y - 0.08, 20.1))},
 	]
 	for case_value in cases:
 		var case := case_value as Dictionary
 		var pose := _pose(contract, case["previous"] as Transform3D, case["current"] as Transform3D, String(case["name"]))
 		var result := cutter.build_proposal(pose, 1, 1, 1, "epoch", false, _flat_sdf)
-		_expect(not bool(result.get("accepted", false)), "%s is rejected" % case["name"], failures)
+		if case["name"] == "crossing_boundary":
+			_expect(bool(result.get("accepted", false)), "crossing boundary still cuts owned soil", failures)
+		else:
+			_expect(not bool(result.get("accepted", false)), "%s is rejected" % case["name"], failures)
 
 
 func _check_sy135_unengaged_negative_cases(failures: Array[String]) -> void:
@@ -442,3 +446,42 @@ func _contract(model_id: String) -> Dictionary:
 func _expect(condition: bool, message: String, failures: Array[String]) -> void:
 	if not condition:
 		failures.append("voxel bucket cutter: %s" % message)
+
+
+func _check_tilt_bucket(failures: Array[String]) -> void:
+	var contract: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://resources/attachments/gb12_s50_soil_contract.json"))
+	for host in ["sy135", "sy80u"]:
+		contract.model_id = host
+		var cutter := Cutter.new()
+		_expect(cutter.configure(contract, 0.125), "GB12 configures on " + host, failures)
+		for tilt in [-0.78, 0.0, 0.78]:
+			var basis := Basis(Vector3.UP, 1.2) * Basis(Vector3.BACK, tilt)
+			var previous := Transform3D(basis, Vector3(0, -0.5, 24))
+			var current := Transform3D(Basis(Vector3.UP, 0.01) * basis, previous.origin + Vector3.DOWN * 0.03)
+			var pose := _pose(contract, previous, current, "tilt-regression")
+			# Isolated narrow ridges between the old three teeth taps, then at
+			# the side blade while the teeth are in air. Both must initiate cuts.
+			for region_id in ["teeth_main_edge", "left_side_cutter", "right_side_cutter"]:
+				var region := _region(pose, region_id)
+				var points := region.current_points as Array
+				var ridge := (points[0] as Vector3).lerp(points[-1], 0.25)
+				var result := cutter.build_proposal(pose, 1, 1, 1, "epoch", false,
+					func(point: Vector3) -> Dictionary:
+						return {"valid": true, "sdf": -0.1 if point.distance_to(ridge) < 0.07 else 2.0, "gradient_world": Vector3.UP})
+				_expect(bool(result.accepted), "%s tilted GB12 detects %s ridge" % [host, region_id], failures)
+				if bool(result.accepted):
+					_expect(not result.proposal.native_paths.is_empty(), "GB12 occupancy follows tool on " + host, failures)
+			var floor := _region(pose, "floor_wear_plate")
+			var paths := cutter._box_surface_paths(floor, Cutter.OCCUPANCY_WIDTH_FRACTIONS, [0.0], "bucket_floor", Cutter.NATIVE_SURFACE_RADIUS_VOXELS)
+			var half := cutter._box_half_dimensions(floor)
+			for ix in 31:
+				var local := Vector3(lerpf(-half.x, half.x, float(ix) / 30), 0, 0)
+				var point: Vector3 = cutter.layout.world_to_voxel(floor.current_transform * local, 0.125)
+				var covered := false
+				for path in paths:
+					for j in range(path.points_voxels.size() - 1):
+						covered = covered or _distance_to_segment(point, path.points_voxels[j], path.points_voxels[j + 1]) <= path.radii_voxels[j]
+				_expect(covered, "tilted GB12 floor has no transverse gaps", failures)
+			var air := cutter.build_proposal(pose, 1, 2, 2, "epoch", false,
+				func(_point: Vector3) -> Dictionary: return {"valid": true, "sdf": 2.0, "gradient_world": Vector3.UP})
+			_expect(not air.accepted, "GB12 rejects air", failures)

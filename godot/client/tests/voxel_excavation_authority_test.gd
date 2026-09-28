@@ -32,6 +32,7 @@ func _run() -> void:
 		_check_per_model_dump_gate(zone, failures)
 		await _check_commit_contract(zone, failures)
 		_check_sy135_deep_native_cut(zone, failures)
+		_check_gb12_native_cut(zone, failures)
 		_check_sy135_unengaged_native_rejections(zone, failures)
 	zone.queue_free()
 	await process_frame
@@ -328,12 +329,16 @@ func _check_commit_contract(zone: VoxelWorkZone, failures: Array[String]) -> voi
 		Authority.DUMP_GATE_CONFIRMATION_S * 0.5,
 	)
 	_expect(
-		not bool(outside_submit.get("accepted", false)) and String(outside_submit.get("reason", "")) == "dump_out_of_zone",
-		"out-of-zone dump rejects before queueing (result=%s)" % JSON.stringify(outside_submit),
+		bool(outside_submit.get("accepted", false)) and String(outside_submit.get("reason", "")) == "dump_exported",
+		"out-of-zone dump exports without queueing (result=%s)" % JSON.stringify(outside_submit),
 		failures,
 	)
-	_expect(int(authority.get_payload_snapshot().get("bucket_mass_q", -1)) == before_outside_mass and authority.data_revision == before_outside_revision, "out-of-zone dump changes neither inventory nor SDF revision", failures)
-	_expect(not String(authority.get_status_snapshot().get("rejected_dump_event_id", "")).is_empty(), "out-of-zone dump publishes deduplicated feedback identity", failures)
+	_expect(int(authority.get_payload_snapshot().get("bucket_mass_q", -1)) < before_outside_mass and authority.data_revision == before_outside_revision, "out-of-zone dump debits inventory without SDF edits", failures)
+	_expect(authority.material_field.exported_dump_mass_q == before_outside_mass - authority.material_field.bucket_mass_q, "exported mass sink balances bucket debit", failures)
+	var after_export := authority.material_field.bucket_mass_q
+	var duplicate_export := authority.submit_pose(_dump_pose(contract, Vector3(30, 1.5, 24), "duplicate-export"), _identity(generation, 20, 12), 0.1)
+	_expect(not duplicate_export.accepted and authority.material_field.bucket_mass_q == after_export, "stale outside dump cannot debit twice", failures)
+
 	var terrain_mass_before_idle := authority.material_field.total_stable_mass_q()
 	var stable_before_settle := _stable_mass_snapshot(authority.material_field)
 	var settle_before := int((authority.get_status_snapshot().get("operation_counts", {}) as Dictionary).get("settle", 0))
@@ -793,3 +798,24 @@ func _native_role_centerlines_are_air(
 func _expect(condition: bool, message: String, failures: Array[String]) -> void:
 	if not condition:
 		failures.append("voxel authority: %s" % message)
+
+
+func _check_gb12_native_cut(zone: VoxelWorkZone, failures: Array[String], authority: VoxelExcavationAuthority = null) -> void:
+	var contract: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://resources/attachments/gb12_s50_soil_contract.json"))
+	# A different host must use the same tool geometry and native commit path.
+	contract.model_id = "sy80u"
+	if authority == null:
+		authority = Authority.new()
+	authority.set_diagnostics_enabled(true)
+	_expect(authority.configure(zone, contract, zone.readiness.generation, 1000.0), "GB12 native authority configures", failures)
+	var basis := Basis(Vector3.UP, 1.2) * Basis(Vector3.BACK, 0.7)
+	var previous := Transform3D(basis, Vector3(-6, -0.7, 32))
+	var current := Transform3D(Basis(Vector3.UP, 0.02) * basis, previous.origin + Vector3(0.02, -0.05, 0.02))
+	var pose := _pose_from_transforms(contract, previous, current, "gb12-native")
+	var submitted := authority.submit_pose(pose, _identity(authority.generation, 95, 95))
+	_expect(bool(submitted.accepted), "GB12 tilted stroke accepted", failures)
+	var result := authority.flush_for_test()
+	_expect(bool(result.get("changed", false)), "GB12 tilted native cut commits", failures)
+	var transaction: Dictionary = result.get("transaction", {})
+	_expect(int(transaction.get("native_path_count", 0)) > 0, "GB12 uses native occupancy on other host", failures)
+	_expect(int(authority.get_payload_snapshot().get("bucket_mass_q", 0)) > 0 and authority.material_field.conservation_error_q == 0, "GB12 captures soil with balanced ledger", failures)

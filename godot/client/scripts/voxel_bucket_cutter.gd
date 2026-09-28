@@ -59,6 +59,35 @@ func configure(contract: Dictionary, scale_m: float, zone_layout = null) -> bool
 	return true
 
 
+func uses_native_paths() -> bool:
+	# Tool geometry is independent of the excavator carrying the tiltrotator.
+	return model_id == "sy135" or model_id == "sy135neo" or _is_tilt_bucket()
+
+
+func _is_tilt_bucket() -> bool:
+	return String(_contract.get("fill_profile_id", "")) == "gb12_s50"
+
+
+func _admission_points(tool_snapshot: Dictionary, previous: bool) -> Array[Vector3]:
+	var result: Array[Vector3] = []
+	var key := "previous_points" if previous else "current_points"
+	for region_id in CUT_REGION_IDS:
+		var region := _find_region(tool_snapshot, region_id)
+		var points := _typed_points(region.get(key, []))
+		if points.size() < 2:
+			continue
+		# Match both frames' sample count to the rigid edge's longer extent.
+		var old := _typed_points(region.get("previous_points", []))
+		var now := _typed_points(region.get("current_points", []))
+		if old.size() != now.size():
+			continue
+		var length_m := maxf(old[0].distance_to(old[-1]), now[0].distance_to(now[-1]))
+		var steps := maxi(1, ceili(length_m / voxel_scale_m))
+		for index in range(steps + 1):
+			result.append(points[0].lerp(points[-1], float(index) / steps))
+	return result
+
+
 func build_proposal(
 	pose_snapshot: Dictionary,
 	generation: int,
@@ -98,6 +127,9 @@ func build_proposal(
 		return rejected
 	var previous_points := _typed_points(edge.get("previous_points", []))
 	var current_points := _typed_points(edge.get("current_points", []))
+	if _is_tilt_bucket():
+		previous_points = _admission_points(tool_snapshot, true)
+		current_points = _admission_points(tool_snapshot, false)
 	if previous_points.size() != current_points.size() or current_points.is_empty():
 		rejected["reason"] = "cutting_edge_points_invalid"
 		return rejected
@@ -108,7 +140,7 @@ func build_proposal(
 	# needed to decide the engaged-episode continuation or the cut admission
 	# gates below. Stationary non-engaged frames reject without sampling.
 	var need_samples := maximum_motion >= MIN_MOTION_M \
-		or (was_engaged and (model_id == "sy135" or model_id == "sy135neo"))
+		or (was_engaged and uses_native_paths())
 	var minimum_sdf := INF
 	var maximum_into := -INF
 	var valid_samples := 0
@@ -133,7 +165,7 @@ func build_proposal(
 		rejected["reason"] = "stationary"
 		# A committed brush clears its own contact probes. Keep the established
 		# episode through a pause in that cavity, without submitting an air cut.
-		rejected["engaged"] = was_engaged and (model_id == "sy135" or model_id == "sy135neo") \
+		rejected["engaged"] = was_engaged and uses_native_paths() \
 			and valid_samples == current_points.size() and _within_lift_exit_envelope(tool_snapshot)
 		return rejected
 	if maximum_motion > MAX_TELEPORT_M:
@@ -148,13 +180,13 @@ func build_proposal(
 	# teeth lift out. Teeth-only entry tests cannot decide that the whole bucket
 	# has left the soil. Never use this continuation to start an unengaged cut.
 	var finishing_lift := false
-	if was_engaged and (model_id == "sy135" or model_id == "sy135neo"):
+	if was_engaged and uses_native_paths():
 		# Exit contact needs occupancy only; the leading edge still needs normals.
 		finishing_lift = _has_lift_exit_contact(tool_snapshot,
 			contact_sampler if contact_sampler.is_valid() else sdf_sampler, true, batch_contact_sampler)
 	# Contact decides whether this frame cuts; the geometric exit decides
 	# when the episode ends. Clearing one frame must not disable later contact.
-	var retain_lift := was_engaged and (model_id == "sy135" or model_id == "sy135neo") \
+	var retain_lift := was_engaged and uses_native_paths() \
 		and _has_upward_motion(tool_snapshot) and _within_lift_exit_envelope(tool_snapshot)
 	phase_started = _probe_phase("cutter_contact_usec", phase_started)
 	if minimum_sdf > air_limit and not finishing_lift:
@@ -183,7 +215,7 @@ func build_proposal(
 			clearance.append_array(_clearance_capsules(region, leading_center, leading_normal))
 	var native_paths: Array[Dictionary] = []
 	phase_started = _probe_phase("cutter_capsules_usec", phase_started)
-	if model_id == "sy135" or model_id == "sy135neo":
+	if uses_native_paths():
 		native_paths = _build_sy135_native_paths(tool_snapshot, finishing_lift)
 		if native_paths.is_empty():
 			rejected["reason"] = "empty_native_sweep"
@@ -194,8 +226,9 @@ func build_proposal(
 	var native_area := _native_path_bounds(native_paths)
 	if native_area.size != Vector3.ZERO:
 		area = native_area if area.size == Vector3.ZERO else area.merge(native_area)
-	if not _area_is_editable(area):
-		rejected["reason"] = "protected_or_out_of_zone"
+	area = area.intersection(layout.voxel_bounds(voxel_scale_m))
+	if area.size.x <= 0.0 or area.size.y <= 0.0 or area.size.z <= 0.0:
+		rejected["reason"] = "out_of_zone"
 		return rejected
 	var proposal := CutProposal.create({
 		"generation": generation,
@@ -508,9 +541,10 @@ func _box_surface_paths(
 		return result
 	# Round lanes must cover the diagonal between neighbours, not merely
 	# overlap along each axis. Reserve radius for temporal subdivision too.
-	if role == "bucket_occupancy":
+	if role == "bucket_occupancy" or role == "bucket_floor":
 		width_fractions = _coverage_fractions(dimensions.x, radius_voxels)
-		height_fractions = _coverage_fractions(dimensions.y, radius_voxels)
+		if role == "bucket_occupancy":
+			height_fractions = _coverage_fractions(dimensions.y, radius_voxels)
 	for width_value in width_fractions:
 		var width_fraction := float(width_value)
 		for height_value in height_fractions:
@@ -707,13 +741,6 @@ func _capsule_bounds(capsules: Array[Dictionary]) -> AABB:
 		bounds = bounds.expand((capsule["b_voxels"] as Vector3) - Vector3.ONE * radius)
 		bounds = bounds.expand((capsule["b_voxels"] as Vector3) + Vector3.ONE * radius)
 	return bounds
-
-
-func _area_is_editable(area_voxels: AABB) -> bool:
-	var minimum_world := layout.voxel_to_world(area_voxels.position, voxel_scale_m)
-	var maximum_world := layout.voxel_to_world(area_voxels.end, voxel_scale_m)
-	var editable := layout.editable_world_bounds(voxel_scale_m)
-	return editable.has_point(minimum_world) and editable.has_point(maximum_world - Vector3.ONE * 0.0001)
 
 
 func _find_region(tool_snapshot: Dictionary, region_id: String) -> Dictionary:

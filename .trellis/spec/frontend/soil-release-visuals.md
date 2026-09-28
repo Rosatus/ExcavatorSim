@@ -5,7 +5,7 @@
 The product is voxel-only. Cut → bucket ledger → stable repose-angle deposit → re-cut.
 This replaces the earlier airborne/mobile/compaction/settle lifecycle.
 
-`terrain_mass_delta_q + bucket_mass_q + discarded_cut_mass_q == 0`.
+`terrain_mass_delta_q + bucket_mass_q + discarded_cut_mass_q + exported_dump_mass_q == 0`.
 `VoxelSoilMaterialField` stores one `stable_mass_q` per touched cell. Native and
 redeposited soil use the same fixed material density and cutting path. There is
 no mobile material, compaction density, flight escrow or periodic settlement.
@@ -18,6 +18,25 @@ debit stock; clipped deposits retain their remainder. Soil proposals accept only
 `deposit`; the product queue is bounded FIFO. Cutting retains its scheduler priority.
 Ledger mass is exact; voxel surface column geometry remains approximate.
 Collision acknowledgement may lag the visible SDF by the engine rebuild interval.
+
+GB12 cutting (2026-09-28): the attachment's `fill_profile_id=gb12_s50`, not
+its host model ID, enables native swept occupancy and lift-exit cleanup.
+Cutter and both synchronous/prepared authority gates share `uses_native_paths`.
+Admission probes the full tooth and both side segments at voxel spacing; floor
+lanes use radius-based spacing across the whole width, including when tilted.
+Focused regressions cover isolated tooth/side remnants, tilted floor coverage,
+and native transactions/preparation with GB12 on SY80U as well as SY135.
+
+Boundary policy (2026-09-28): cut admission requires overlap with the finite
+voxel volume, not containment of the full bucket sweep in inset editable bounds.
+Cut windows and native raster buffers are clipped to semantic voxel ownership;
+the hidden support apron and neighboring mesh geometry remain unchanged.
+Outside the editable receiving region, normal confirmed open-mouth unloading
+debits the bucket at the usual release rate into `exported_dump_mass_q` without
+a terrain edit or stable-deposit visual event. Pending deposits are cancelled
+before this debit. The export sink also accepts the final sub-voxel remainder;
+stale identity and simple-digging gates still apply. In-zone deposit admission,
+repose geometry, and rejected-deposit retention remain unchanged.
 
 Simple digging (advanced settings opt-in, `ExcavationWorld.set_simple_digging_enabled`
 -> `VoxelExcavationAuthority.set_dump_gate_enabled`) holds the dump gate closed:
