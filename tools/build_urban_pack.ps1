@@ -6,7 +6,7 @@ if (-not $GodotExe) {
     $chain = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'godot_voxel_toolchain.json') -Raw | ConvertFrom-Json
     $GodotExe = Join-Path $chain.default_root $chain.assets.windows_editor.filename
 }
-if (-not $Output) { $Output = Join-Path $repo 'godot/dist/maps/urban.pck' }
+if (-not $Output) { $Output = Join-Path $repo 'godot/dist/windows/maps/urban.pck' }
 $Output = [IO.Path]::GetFullPath($Output)
 New-Item -ItemType Directory -Path (Split-Path $Output) -Force | Out-Null
 $logRoot = Join-Path $repo 'artifacts/urban-map'
@@ -30,6 +30,11 @@ if (-not $SkipImport) {
 $tempPack = "$Output.pending"
 Run-Godot @('--headless', '--path', "`"$project`"", '--script', 'res://tools/build_pack.gd', '--', "`"$tempPack`"") 'map-pack'
 Move-Item -LiteralPath $tempPack -Destination $Output -Force
+# The editor and release staging resolve packs from godot/dist/maps; mirror the
+# exe-adjacent copy there so both lookup roots stay valid.
+$editorMirror = Join-Path $repo 'godot/dist/maps'
+New-Item -ItemType Directory -Path $editorMirror -Force | Out-Null
+Copy-Item -LiteralPath $Output -Destination (Join-Path $editorMirror 'urban.pck') -Force
 Get-Item -LiteralPath $Output | Select-Object FullName, Length
 $sha = [System.Security.Cryptography.SHA256]::Create()
 $stream = [IO.File]::OpenRead($Output)
