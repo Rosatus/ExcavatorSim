@@ -59,11 +59,11 @@ def recv_exact(client: socket.socket, size: int) -> bytes:
     return result
 
 
-def make_telemetry_packet(tick_ms: int) -> bytes:
+def make_telemetry_packet(tick_ms: int, swing_rad: float = 0.0) -> bytes:
     raw = struct.pack("<IBBHQ", PACKET_MAGIC, 1, 0, 0, tick_ms)
     for index in range(5):
         raw += struct.pack("<4f3f", 0.0, 0.0, 0.0, 1.0, float(index), 0.0, 0.0)
-    return raw + struct.pack("<5f", 0.0, 0.0, 0.0, 0.0, 0.0)
+    return raw + struct.pack("<5f", swing_rad, 0.0, 0.0, 0.0, 0.0)
 
 
 async def mutate_and_wait_event(
@@ -311,6 +311,37 @@ class GatewayGodotActivityProcessTest(unittest.TestCase):
                             self.fail("managed Gateway Web API did not become ready")
                         time.sleep(0.05)
                 self.assertFalse(status["godot_connected"])
+
+                with socket.create_connection(("127.0.0.1", tcp_port), timeout=3.0) as client:
+                    self.assertEqual(recv_exact(client, 3), b"who")
+                    client.sendall(b"PC001")
+                    deadline = time.time() + 3.0
+                    while time.time() < deadline:
+                        if request_json(f"{base}/api/v1/status")["status"]["pc001_handshake"]:
+                            break
+                        time.sleep(0.02)
+                    # Real handshaken owner process must survive crossing zero.
+                    for tick, swing in enumerate((0.0, -0.000017453293, 0.1), start=1):
+                        # Invalid sample is rejected atomically; the next good
+                        # sample still reaches the same handshaken connection.
+                        sender.sendto(
+                            make_telemetry_packet(tick * 100 - 1, float("nan")),
+                            ("127.0.0.1", udp_port),
+                        )
+                        sender.sendto(
+                            make_telemetry_packet(tick * 100, swing), ("127.0.0.1", udp_port)
+                        )
+                        (count,) = BATCH_PREFIX_STRUCT.unpack(
+                            recv_exact(client, BATCH_PREFIX_STRUCT.size)
+                        )
+                        self.assertGreater(count, 0)
+                        recv_exact(client, count * SINGLE_FRAME_SIZE)
+                    self.assertIsNone(process.poll())
+                    self.assertTrue(
+                        request_json(f"{base}/api/v1/status")["status"]["pc001_handshake"]
+                    )
+                # Let activity expire before the existing invalid-packet assertions.
+                time.sleep(2.7)
 
                 sender.sendto(build_control(CMD_RECORD_STOP), ("127.0.0.1", udp_port))
                 sender.sendto(b"not-telemetry", ("127.0.0.1", udp_port))

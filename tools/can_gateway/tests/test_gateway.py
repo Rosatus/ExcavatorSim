@@ -390,6 +390,19 @@ class _CaptureSink:
 
 
 class SimulationIdentityTest(unittest.TestCase):
+    def test_slew_wrap_matches_circular_sensor_encoding(self) -> None:
+        for degrees in (0.0, -0.001, -0.004, -0.01, 359.999, 360.0, 720.001):
+            with self.subTest(degrees=degrees):
+                sink = _CaptureSink()
+                sample = parse_packet(make_packet(100, swing_rad=math.radians(degrees)))
+                gateway.emit_frames(
+                    [sink],
+                    gateway.FrameScheduler({"imu": 100, "slew": 100, "rtk": 100, "travel": 100}),
+                    sample,
+                )
+                payload = next(data for can_id, data, _ in sink.frames if can_id == 0x18FFF000)
+                self.assertEqual(payload, encode_slew_frame(MachineState(sample).slew_degrees()))
+
     def test_authority_gate_receives_explicit_eff_identity(self) -> None:
         sink = _CaptureSink()
         observed: list[tuple[int, bool]] = []

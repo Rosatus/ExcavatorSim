@@ -1130,6 +1130,9 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                 except QmlMappingError as exc:
                     print(f"QML mapping rejected telemetry sample: {exc}", file=sys.stderr)
                     continue
+                except GatewayRuntimeError as exc:
+                    print(f"CAN encoding rejected telemetry sample: {exc}", file=sys.stderr)
+                    continue
                 csv_rows = writer.row_count if writer is not None else 0
                 if args.max_rows and csv_rows >= args.max_rows:
                     break
@@ -1227,6 +1230,12 @@ def emit_frames(
 
     if scheduler.due("slew", tick):
         definition = codec.unique_message_by_frame(0x18FFF000, is_extended=True)
+        # Round on the circular sensor lattice before strict physical-range
+        # validation: tiny negative angles can round through 65536 back to zero.
+        slew_degrees = state.slew_degrees()
+        if not math.isfinite(slew_degrees):
+            raise GatewayRuntimeError("slew_angle_invalid", "slew angle must be finite")
+        slew_counts = round(slew_degrees / 360.0 * 65536) % 65536
         pending.append(
             (
                 "slew",
@@ -1235,7 +1244,7 @@ def emit_frames(
                 definition.channel,
                 codec.encode_frame(
                     0x18FFF000,
-                    {"ROTATE": state.slew_degrees()},
+                    {"ROTATE": slew_counts * (360.0 / 65536)},
                     is_extended=True,
                 ),
             )
