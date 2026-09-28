@@ -7,7 +7,8 @@ func _ready() -> void:
 func _apply_map_bucket_default() -> void:
 	var catalog := get_node("/root/MapCatalog")
 	var config := ConfigFile.new()
-	config.load(MotionOperatorUI.CONFIG_PATH)
+	var operator_ui := get_node("OperatorUI") as MotionOperatorUI
+	config.load(operator_ui.preferences_path)
 	var mode := String(config.get_value(MotionOperatorUI.CONFIG_SECTION_UI, "bucket_ground_mode", ""))
 	if BucketGroundInteractionMode.is_valid(mode):
 		$ProductSession.request_bucket_ground_mode(mode)

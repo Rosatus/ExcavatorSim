@@ -53,6 +53,15 @@ func _run() -> void:
 	client.desired_model_id = _model_id
 	chassis.set_test_input_focus_bypass_for_test(true)
 	quality.profile = _quality_profile
+	# Use a fresh per-run preference file: saved assist/diagnostic/video options
+	# must neither alter the recording nor be overwritten by benchmark changes.
+	var ui := scene.get_node("OperatorUI") as MotionOperatorUI
+	ui.preferences_path = _report_path.get_base_dir().path_join("operator-ui-%d.cfg" % Time.get_ticks_usec())
+	var preferences := ConfigFile.new()
+	preferences.set_value(MotionOperatorUI.CONFIG_SECTION_UI, "bucket_ground_mode", _bucket_ground_mode)
+	if preferences.save(ui.preferences_path) != OK:
+		_finish({}, "cannot isolate operator preferences")
+		return
 	root.add_child(scene)
 	# MotionClient applies product ProjectSettings in _ready(), so the benchmark's
 	# isolated endpoint and explicit opt-in connection must be applied afterward.

@@ -30,6 +30,7 @@ var _vertices := PackedVector3Array()
 var _normals := PackedVector3Array()
 var _colors := PackedColorArray()
 var _indices := PackedInt32Array()
+var _appearance: Dictionary = {}
 
 
 func configure_contract(contract: Dictionary, cavity_size: Vector3) -> bool:
@@ -118,6 +119,9 @@ func _configure_profile(profile: Dictionary) -> bool:
 
 
 func build_arrays(fill_ratio: float) -> Array:
+	# Shared vertices occur in adjacent triangles and both skins. Cache only
+	# within this build: clipped x/z positions can change with the fill level.
+	_appearance.clear()
 	_vertices.clear()
 	_normals.clear()
 	_colors.clear()
@@ -139,12 +143,17 @@ func build_arrays(fill_ratio: float) -> Array:
 		else:
 			high = middle
 	var level := (low + high) * 0.5
+	var samples: Array[Vector4] = []
+	for row in _rows:
+		for column in _columns:
+			samples.append(_sample(column, row, level))
 	for row in _rows - 1:
 		for column in _columns - 1:
-			var a := _sample(column, row, level)
-			var b := _sample(column + 1, row, level)
-			var c := _sample(column, row + 1, level)
-			var d := _sample(column + 1, row + 1, level)
+			var index := row * _columns + column
+			var a := samples[index]
+			var b := samples[index + 1]
+			var c := samples[index + _columns]
+			var d := samples[index + _columns + 1]
 			_append_clipped([a, c, b])
 			_append_clipped([b, c, d])
 	if _vertices.is_empty():
@@ -247,12 +256,17 @@ func _append_face(a: Vector4, b: Vector4, c: Vector4, top: bool) -> void:
 	if normal.y * outward_y < 0.0:
 		points.reverse()
 		normal = -normal
+	var face_normal := normal.normalized()
 	for point in points:
+		var key := Vector2(point.x, point.z)
+		if not _appearance.has(key):
+			var shade := 0.94 + 0.055 * sin(point.x * 23.0 + point.z * 17.0) * sin(point.z * 29.0 - point.x * 11.0)
+			_appearance[key] = [_surface_normal(point.x, point.z), Color(shade, shade, shade, 1.0)]
+		var appearance: Array = _appearance[key]
 		_indices.append(_vertices.size())
 		_vertices.append(point)
-		_normals.append(_surface_normal(point.x, point.z) if top else normal.normalized())
-		var shade := 0.94 + 0.055 * sin(point.x * 23.0 + point.z * 17.0) * sin(point.z * 29.0 - point.x * 11.0)
-		_colors.append(Color(shade, shade, shade, 1.0))
+		_normals.append(appearance[0] if top else face_normal)
+		_colors.append(appearance[1])
 
 
 func _position(sample: Vector4, top: bool) -> Vector3:

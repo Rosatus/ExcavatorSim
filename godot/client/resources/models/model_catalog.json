@@ -120,7 +120,7 @@
       "parity_fixture_path": "res://tests/fixtures/sy80u_frame_parity_cases.json",
       "parity_fixture_sha256": "22e57e4a88096cabd6ee2fc9fec21e93d0003c5c18fd0e68d27c17f6fd2d0efa",
       "soil_contract_path": "res://resources/models/sy80u_soil_contract.json",
-      "soil_contract_sha256": "712e22efd4bc1b94dd39432ca3c7f7275491d961e9f51f92bb63ba5ce83e5454",
+      "soil_contract_sha256": "56fd6d004f9966807ad45a44c77195c82a0343039627c6aa9e073975895098c3",
       "physics_rig_path": "res://resources/physics/sy80u_physics_rig.json",
       "physics_rig_sha256": "eb0dc71632a11a60a94a35479c09c00432b51524a7921ed038fd19d9f8fcd60c",
       "tracked_locomotion": {

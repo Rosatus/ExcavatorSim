@@ -17,7 +17,7 @@
     "deposit_radius_m": 0.62,
     "spill_opening_down_dot": -0.45,
     "dump_opening_down_dot": 0.15,
-    "release_opening_down_dot": 0.5
+    "release_opening_down_dot": 0.15
   },
   "proxies": {
     "cutting_edge": {

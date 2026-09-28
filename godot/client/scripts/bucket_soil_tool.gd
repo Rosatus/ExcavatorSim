@@ -15,6 +15,9 @@ var _tool: Dictionary = {}
 var _regions: Array[Dictionary] = []
 var _mouth_geometry: Dictionary = {}
 var _cavity_transform := Transform3D.IDENTITY
+var _region_points: Array = []
+var _region_transforms: Array[Transform3D] = []
+var _semantic_radius_m := 0.0
 
 
 func configure(contract: Dictionary) -> bool:
@@ -32,6 +35,14 @@ func configure(contract: Dictionary) -> bool:
 		_cavity_transform = geometry_script.cavity(contract.soil_geometry)
 	for value in _tool.get("regions", []):
 		_regions.append((value as Dictionary).duplicate(true))
+	# Local geometry depends only on the configured tool, never on the pose or
+	# terrain. Keep it private; composed snapshots still own detached containers.
+	for region in _regions:
+		var points := _local_sample_points(region)
+		_region_points.append(points)
+		_region_transforms.append(region_local_transform(region))
+		for point in points:
+			_semantic_radius_m = maxf(_semantic_radius_m, point.length())
 	configured = true
 	return true
 
@@ -44,6 +55,9 @@ func reset() -> void:
 	_regions.clear()
 	_mouth_geometry.clear()
 	_cavity_transform = Transform3D.IDENTITY
+	_region_points.clear()
+	_region_transforms.clear()
+	_semantic_radius_m = 0.0
 
 
 func compose_snapshot(
@@ -71,19 +85,21 @@ func compose_snapshot(
 		return base
 	var sweep_sampling := _sweep_sampling(previous_bucket_frame, current_bucket_frame)
 	var sample_count := int(sweep_sampling["sample_count"])
+	var sweep_frames: Array[Transform3D] = []
+	for sample_index in sample_count:
+		var alpha := float(sample_index) / float(maxi(1, sample_count - 1))
+		sweep_frames.append(previous_bucket_frame.interpolate_with(current_bucket_frame, alpha))
 	var composed: Array[Dictionary] = []
 	for order in _regions.size():
 		var region := _regions[order]
-		var local_points := _local_sample_points(region)
+		var local_points: Array[Vector3] = _region_points[order]
 		var previous_points: Array[Vector3] = []
 		var current_points: Array[Vector3] = []
 		for point in local_points:
 			previous_points.append(previous_bucket_frame * point)
 			current_points.append(current_bucket_frame * point)
 		var swept_points: Array[Vector3] = []
-		for sample_index in sample_count:
-			var alpha := float(sample_index) / float(maxi(1, sample_count - 1))
-			var bucket_frame := previous_bucket_frame.interpolate_with(current_bucket_frame, alpha)
+		for bucket_frame in sweep_frames:
 			for point in local_points:
 				swept_points.append(bucket_frame * point)
 		var motion := Vector3.ZERO
@@ -92,8 +108,8 @@ func compose_snapshot(
 			if candidate_motion.length_squared() > motion.length_squared():
 				motion = candidate_motion
 		var center := _vector3(region["center_godot"])
-		var previous_transform := previous_bucket_frame * region_local_transform(region)
-		var current_transform := current_bucket_frame * region_local_transform(region)
+		var previous_transform := previous_bucket_frame * _region_transforms[order]
+		var current_transform := current_bucket_frame * _region_transforms[order]
 		composed.append({
 			"order": order,
 			"region_id": String(region["region_id"]),
@@ -307,9 +323,10 @@ func _sweep_sampling(previous: Transform3D, current: Transform3D) -> Dictionary:
 ## Solid exterior only: cavity and opening describe empty space, not contact.
 func exterior_contact_points() -> Array[Vector3]:
 	var points: Array[Vector3] = []
-	for region in _regions:
+	for index in _regions.size():
+		var region := _regions[index]
 		if String(region.get("kind", "")) in ["teeth", "side_cutter", "floor", "outer_shell"]:
-			points.append_array(_local_sample_points(region))
+			points.append_array(_region_points[index])
 	return points
 
 
@@ -384,11 +401,7 @@ func region_local_transform(region: Dictionary) -> Transform3D:
 
 
 func _maximum_semantic_radius_m() -> float:
-	var maximum_radius := 0.0
-	for region in _regions:
-		for point in _local_sample_points(region):
-			maximum_radius = maxf(maximum_radius, point.length())
-	return maximum_radius
+	return _semantic_radius_m
 
 
 func _bounds_for_points(points: Array[Vector3]) -> AABB:

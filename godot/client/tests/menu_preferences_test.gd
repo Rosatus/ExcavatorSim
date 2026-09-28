@@ -12,16 +12,18 @@ func check(ok: bool, label: String) -> void:
 		failures.append(label)
 
 func run() -> void:
-	var path := MotionOperatorUI.CONFIG_PATH
-	had_config = FileAccess.file_exists(path)
+	var product_path := MotionOperatorUI.CONFIG_PATH
+	had_config = FileAccess.file_exists(product_path)
 	if had_config:
-		saved_bytes = FileAccess.get_file_as_bytes(path)
+		saved_bytes = FileAccess.get_file_as_bytes(product_path)
+	var path := "user://menu-preferences-test-%d.cfg" % OS.get_process_id()
 	var config := ConfigFile.new()
 	config.save(path)
 	var catalog := root.get_node("MapCatalog")
 	catalog.active_map_id = "training"
 	catalog.retained_model_id = "sy135"
 	var scene := load("res://scenes/main.tscn").instantiate() as Node3D
+	scene.get_node("OperatorUI").preferences_path = path
 	root.add_child(scene)
 	current_scene = scene
 	for i in 10:
@@ -50,6 +52,7 @@ func run() -> void:
 	catalog.active_map_id = "construction"
 	catalog.retained_model_id = "sy155w"
 	scene = load("res://scenes/main.tscn").instantiate() as Node3D
+	scene.get_node("OperatorUI").preferences_path = path
 	root.add_child(scene)
 	current_scene = scene
 	for i in 10:
@@ -63,18 +66,17 @@ func run() -> void:
 	await process_frame
 	# Explicit passthrough must override construction's normal default too.
 	scene = load("res://scenes/main.tscn").instantiate() as Node3D
+	scene.get_node("OperatorUI").preferences_path = path
 	root.add_child(scene)
 	for i in 5:
 		await physics_frame
 	check(scene.get_node("ProductSession").bucket_ground_mode == BucketGroundInteractionMode.PASSTHROUGH, "explicit bucket policy wins over map default")
 	scene.queue_free()
 	await process_frame
+	check(FileAccess.file_exists(product_path) == had_config, "isolated preferences preserve product file existence")
 	if had_config:
-		var file := FileAccess.open(path, FileAccess.WRITE)
-		file.store_buffer(saved_bytes)
-		file.close()
-	else:
-		DirAccess.remove_absolute(path)
+		check(FileAccess.get_file_as_bytes(product_path) == saved_bytes, "isolated preferences preserve product bytes")
+	DirAccess.remove_absolute(path)
 	for failure in failures:
 		push_error(failure)
 	print("menu_preferences_test: ", "PASS" if failures.is_empty() else "FAIL")

@@ -48,7 +48,7 @@
   ],
   "anchor_tolerance_m": 0.002,
   "cavity_depth_m": 0.46,
-  "release_opening_down_dot": 0.5,
+  "release_opening_down_dot": 0.15,
   "columns": 33,
   "rows": 41,
   "x_bounds": [
@@ -56,5 +56,5 @@
     0.425
   ],
   "z_padding_m": 0.04,
-  "evidence": "Imported bucket inner lip (+/- .3935, .12338, -.81801) and inner rear rim (+/- .3935, .26352, .16583). The outer cheek is +/- .4435 and tooth tips lie at Z -.972: neither defines the contained mouth. Whole bucket lining footprint includes pins and cheeks as obstructions. Nominal capacity and default 0.5 release gate unchanged."
+  "evidence": "Imported bucket inner lip (+/- .3935, .12338, -.81801) and inner rear rim (+/- .3935, .26352, .16583). The outer cheek is +/- .4435 and tooth tips lie at Z -.972: neither defines the contained mouth. Whole bucket lining footprint includes pins and cheeks as obstructions. Nominal capacity unchanged. Release gate tuned to 0.15 (8.63 degrees below horizontal) after operator feedback that the former 0.5 gate required excessive inversion."
 }

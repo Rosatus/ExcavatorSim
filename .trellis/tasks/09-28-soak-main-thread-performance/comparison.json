@@ -1,0 +1,1481 @@
+{
+  "calibrated-baseline": {
+    "capture": "output\\soak-main-0928\\calibrated-baseline\\performance-captures\\capture-2026-09-28T23-23-55-8326616.json",
+    "stats": {
+      "frame_interval_ms": {
+        "count": 10510,
+        "mean": 3.9963767840152253,
+        "p50": 1.833,
+        "p95": 11.635,
+        "p99": 18.732,
+        "max": 35.726,
+        "total": 42001.9199999999
+      },
+      "soil_automatic_ms": {
+        "count": 10510,
+        "mean": 0.35799010466222697,
+        "p50": 0.0,
+        "p95": 2.485,
+        "p99": 3.711,
+        "max": 7.591,
+        "total": 3762.476000000001
+      },
+      "soil_step_ms": {
+        "count": 10510,
+        "mean": 0.048726831588962925,
+        "p50": 0.0,
+        "p95": 0.081,
+        "p99": 1.444,
+        "max": 8.293,
+        "total": 512.1189999999996
+      },
+      "soil_publish_ms": {
+        "count": 10510,
+        "mean": 0.03476812559467173,
+        "p50": 0.0,
+        "p95": 0.002,
+        "p99": 1.021,
+        "max": 13.149,
+        "total": 365.4129999999987
+      },
+      "soil_total_ms": {
+        "count": 10510,
+        "mean": 0.4414850618458615,
+        "p50": 0.0,
+        "p95": 2.784,
+        "p99": 5.959,
+        "max": 17.778,
+        "total": 4640.007999999988
+      },
+      "render_gpu_ms": {
+        "count": 10510,
+        "mean": 1.2910066603876997,
+        "p50": 1.2960000038147,
+        "p95": 1.53100001811981,
+        "p99": 1.69099998474121,
+        "max": 3.31100010871887,
+        "total": 13568.480000674725
+      },
+      "recorder_ms": {
+        "count": 10510,
+        "mean": 0.024820076117982672,
+        "p50": 0.005,
+        "p95": 0.023,
+        "p99": 1.083,
+        "max": 1.475,
+        "total": 260.85899999998594
+      },
+      "chassis_ms": {
+        "count": 10510,
+        "mean": 0.27787792578496723,
+        "p50": 0.0,
+        "p95": 1.262,
+        "p99": 1.748,
+        "max": 2.982,
+        "total": 2920.497000000007
+      }
+    },
+    "slow_frames": {
+      "16.7": 165,
+      "33.3": 3,
+      "50": 0
+    },
+    "gates": {
+      "godot_report_schema": true,
+      "godot_model_identity": true,
+      "quality_profile_expected": true,
+      "quality_profile_requested": true,
+      "quality_profile_observed": true,
+      "quality_profile_known": true,
+      "quality_profile_applied": true,
+      "bucket_ground_mode_expected": true,
+      "bucket_ground_mode_requested": true,
+      "bucket_ground_mode_observed": true,
+      "godot_contract_clean": true,
+      "single_authoritative_runtime": true,
+      "fixed_step_p95": true,
+      "fixed_step_peak": true,
+      "render_frame_p95": true,
+      "render_frame_p99": true,
+      "scenario_track_motion": true,
+      "scenario_articulation": true,
+      "scenario_cut": true,
+      "scenario_loaded": true,
+      "scenario_dump": true,
+      "replay_complete": true,
+      "gateway_health_observed": true,
+      "gateway_model_identity": true,
+      "telemetry_observed": true,
+      "telemetry_zero_drops": true,
+      "telemetry_history_bounded": true,
+      "memory_baseline_observed": true,
+      "memory_growth_ratio": true,
+      "memory_growth_absolute": true,
+      "godot_process_exit": true,
+      "rendered_product_path": true
+    },
+    "memory": {
+      "baseline_bytes": 677167104,
+      "peak_bytes": 733335552,
+      "growth_bytes": 56168448,
+      "growth_ratio": 0.08294621470566887,
+      "sample_count": 84,
+      "measurement_started_seconds": 9.2029999999977
+    },
+    "queue_max_sampled": 2,
+    "queue_age_max_ticks_sampled": 4,
+    "conservation_error_max": 0,
+    "final_context": {
+      "automatic_soil_enabled": true,
+      "available": true,
+      "bucket_ground_bypassed": false,
+      "bucket_mass_q": 0,
+      "collision_revision": 204,
+      "committed": 204,
+      "conservation_error_q": 0,
+      "cut_preparation": {
+        "age_usec": 0,
+        "budget_usec": 3000,
+        "completed": 214,
+        "latency_max_usec": 46120,
+        "oldest_age_ticks": 0,
+        "pending": false,
+        "restarts": 0,
+        "slice_max_usec": 2974,
+        "threaded": true,
+        "worker_coverage_usec": 2397750,
+        "worker_edit_usec": 1402172
+      },
+      "data_revision": 204,
+      "diagnostics_enabled": false,
+      "engaged": false,
+      "fill_ratio": 0.0,
+      "generation": 1,
+      "mesh_revision": 204,
+      "model_id": "sy135",
+      "pending_readiness_count": 4,
+      "phase_timings_usec": {},
+      "process_frame": 12870,
+      "queue_depth": 0,
+      "readiness": {
+        "canonical_block_count": 1620,
+        "collision_latency_usec": {},
+        "diagnostics_enabled": false,
+        "end_to_end_latency_usec": {},
+        "fallback_ready_block_count": 31,
+        "generation": 1,
+        "last_acknowledged_revision": 205,
+        "last_acknowledged_usec": 48561708,
+        "mesh_latency_usec": {},
+        "meshed_block_count": 31,
+        "pending_block_count": 0,
+        "ready_block_count": 1589,
+        "revision": 205,
+        "ticket_receipt_count": 205,
+        "visual_collision_pending_block_count": 31
+      },
+      "readiness_timed_out": 1,
+      "rejected": 2111,
+      "rejection_reasons": {
+        "above_ground": 1606,
+        "no_sdf_change": 33,
+        "separating": 37,
+        "stationary": 435
+      },
+      "t_ms": 41821.355,
+      "unlimited_bucket_for_testing": false,
+      "viewport_size": [
+        1920.0,
+        1080.0
+      ],
+      "visual_quality": {
+        "applied": true,
+        "audio_loops": 3,
+        "audio_voices": 4,
+        "camera_far": 140.0,
+        "last_error": "",
+        "particles": 1800,
+        "profile": "balanced",
+        "shadows": true,
+        "site_cues": 28,
+        "site_shadows": true,
+        "target_fps": 60,
+        "test_ground": false
+      },
+      "voxel_scale_m": 0.125,
+      "voxel_statistics": {
+        "dropped_block_loads": 0,
+        "dropped_block_meshs": 0,
+        "time_detect_required_blocks": 2,
+        "time_process_load_responses": 0,
+        "time_request_blocks_to_load": 0,
+        "time_request_blocks_to_update": 0,
+        "updated_blocks": 0
+      }
+    },
+    "scenario": {
+      "cut_frames": 142,
+      "dump_frames": 28,
+      "maximum_payload_mass_kg": 1056.0,
+      "replay": {
+        "applied_ticks": 2521,
+        "locomotion_calibration": {
+          "chassis_dynamics": {
+            "angular_damp": 1.9,
+            "attitude_damping_nm_s_per_rad": 180000.0,
+            "attitude_stiffness_nm_per_rad": 350000.0,
+            "can_sleep": false,
+            "center_of_mass_m": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "compound_shapes": [
+              {
+                "center_m": [
+                  0.0,
+                  0.45,
+                  0.0
+                ],
+                "kind": "box",
+                "size_m": [
+                  2.7,
+                  0.9,
+                  3.7
+                ]
+              },
+              {
+                "center_m": [
+                  0.0,
+                  1.48,
+                  -0.55
+                ],
+                "kind": "box",
+                "size_m": [
+                  2.8,
+                  1.85,
+                  3.25
+                ]
+              }
+            ],
+            "continuous_collision_detection": true,
+            "ground_clearance_m": 0.06,
+            "inertia_diagonal_kg_m2": [
+              30000.0,
+              28000.0,
+              16000.0
+            ],
+            "linear_damp": 0.14,
+            "mass_kg": 14470.0,
+            "max_angular_speed_rad_s": 1.3,
+            "max_attitude_torque_nm": 220000.0,
+            "max_linear_speed_m_s": 2.4
+          },
+          "source_path": "godot/client/resources/physics/sy135_physics_rig.json",
+          "source_revision": "88c7184",
+          "tracks": {
+            "acceleration_window_s": 2.6,
+            "brake_effort_slew_n_per_tick": 11000.0,
+            "brake_force_n": 165000.0,
+            "brake_stop_window_s": 2.2,
+            "contact_length_m": 2.9,
+            "contact_width_m": 2.5,
+            "drive_effort_slew_n_per_tick": 9000.0,
+            "friction": 1.1,
+            "gauge_m": 1.96,
+            "lateral_resistance_n_per_m_s": 115000.0,
+            "max_belt_speed_m_s": 1.55,
+            "max_drive_force_n": 135000.0,
+            "max_support_force_n": 30000.0,
+            "minimum_traction_ratio": 0.2,
+            "pivot_lateral_resistance_scale": 0.24,
+            "probe_depth_m": 0.75,
+            "probe_height_m": 0.42,
+            "recovery_speed_m_s": 0.22,
+            "support_damping_n_s_per_m": 50000.0,
+            "support_rest_length_m": 0.55,
+            "support_stiffness_n_per_m": 280000.0,
+            "traction_points_per_side": 4.0,
+            "traction_response_n_per_m_s": 155000.0,
+            "yaw_assist_scale": 0.12
+          }
+        },
+        "loops": 0,
+        "model_mismatch": false,
+        "path": "C:\\code\\ExcavatorSim\\backend\\fixtures\\soak\\sy135-deep-cut-42s.json",
+        "physics_ticks_per_second": 60,
+        "tick_count": 2521,
+        "yaw_divergence_final_deg": 0.0076587376335624,
+        "yaw_divergence_max_deg": 0.0339167723603282
+      }
+    },
+    "metadata": {
+      "authority_profile": "jolt_authoritative",
+      "cpu": "AMD Ryzen 5 9500F 6-Core Processor",
+      "cpu_threads": 12,
+      "display_server": "Windows",
+      "duration_limit_s": 180.0,
+      "engine": {
+        "build": "custom_build",
+        "hash": "ed1daf0bf001b61586d9930840f2f1394092c079",
+        "hex": 263938,
+        "major": 4,
+        "minor": 7,
+        "patch": 2,
+        "status": "stable",
+        "string": "4.7.2-stable (custom_build)",
+        "timestamp": 1786929518
+      },
+      "frame_limit": 60000,
+      "gpu": "AMD Radeon RX 9070 XT",
+      "max_fps": 0,
+      "measurement_notes": [
+        "tracks_ms is nested inside chassis_ms; both accumulate callbacks across physics steps, excluding engine physics solver time.",
+        "All time columns use milliseconds. -1 means unavailable, not zero cost.",
+        "Frame interval is monotonic wall time between late process callbacks; includes pacing/waits, not GPU presentation latency.",
+        "Engine/render timings are latest engine reports and may lag the row. Physics time is one reported tick, not all ticks in the interval.",
+        "Render CPU/GPU cover the main viewport only. CPU/GPU overlap; do not sum them into frame time.",
+        "Soil stage columns accumulate steps since the preceding row. Commit phases are nested inside soil_step, not additive to it.",
+        "Capture enables lightweight stage clocks only, not full soil diagnostics or additional SDF digest sampling.",
+        "Recorder cost includes sampling/context/callback work, excludes engine instrumentation. Pre-existing full diagnostics add digest work inside soil/commit times.",
+        "Pause/focus transitions exclude the adjacent interval from active-play summary. Low-rate context is sampled at four Hz.",
+        "The first partial interval is excluded from summary. Unframed tail stages at stop are saved separately.",
+        "JSON serialization/file saving occurs after capture stops. Abrupt termination loses buffered samples."
+      ],
+      "os": "Windows",
+      "physics_ticks_per_second": 60,
+      "render_timing_available": true,
+      "renderer": "forward_plus",
+      "soil_diagnostics_enabled": false,
+      "soil_timing_enabled": true,
+      "source_sha256": {
+        "res://scripts/excavation_world.gd": "e21b492562807c903f3ff916c3dd169b4cb565c3329a4b259543b8aab2d05a34",
+        "res://scripts/jolt_chassis_track_runtime.gd": "a2b5f8b76c5bad0e1a7aeef6a7edb2d8b360d6c0e08af99d19bcbfc58664eb3e",
+        "res://scripts/performance_capture.gd": "55f5ee1e40dc3b56fd5de67d01d62b8f443e23f31793ddc171e33ad19af5de4a",
+        "res://scripts/track_contact_solver.gd": "cd70fc8dd17b287f1cf80c3e2ea5fcf4b949f4d682f578832f3e99f24fea5951",
+        "res://scripts/voxel_bucket_cutter.gd": "335dad9bbbe18233f6dd80b1c10e52cb2dfcf7f21a726614b3567acb9df8680e",
+        "res://scripts/voxel_cut_preparation.gd": "4dfd96a1fa7b0f4bc1c3aa25e0a6870322c8ccc494c2d83ef7072ceda224a073",
+        "res://scripts/voxel_cut_proposal.gd": "5f6e60895d5e1d14d5364bfc487abe08a84ef8d49a95191ef088f0e37886ee79",
+        "res://scripts/voxel_cut_worker.gd": "2e82baa696d3ba5b4fdddf852bd299ddb43e0041355c62713cb823ce2d87f6ba",
+        "res://scripts/voxel_excavation_authority.gd": "428eea4a4bffee0be5523dfcfb794db9085914f110bee0774f78034b063d7816"
+      },
+      "started_local": "2026-09-28T23:23:55",
+      "viewport_size": [
+        1920.0,
+        1080.0
+      ],
+      "vsync_mode": 0
+    }
+  },
+  "cache-final": {
+    "capture": "output\\soak-main-0928\\cache-final\\performance-captures\\capture-2026-09-28T23-28-02-8285281.json",
+    "stats": {
+      "frame_interval_ms": {
+        "count": 10420,
+        "mean": 4.03106833013435,
+        "p50": 1.862,
+        "p95": 11.745,
+        "p99": 18.674,
+        "max": 36.94,
+        "total": 42003.73199999992
+      },
+      "soil_automatic_ms": {
+        "count": 10420,
+        "mean": 0.3307527831094049,
+        "p50": 0.0,
+        "p95": 2.335,
+        "p99": 3.585,
+        "max": 8.953,
+        "total": 3446.4439999999972
+      },
+      "soil_step_ms": {
+        "count": 10420,
+        "mean": 0.047613147792706347,
+        "p50": 0.0,
+        "p95": 0.07,
+        "p99": 1.443,
+        "max": 8.306,
+        "total": 496.129
+      },
+      "soil_publish_ms": {
+        "count": 10420,
+        "mean": 0.03278905950095968,
+        "p50": 0.0,
+        "p95": 0.002,
+        "p99": 0.998,
+        "max": 13.735,
+        "total": 341.6619999999977
+      },
+      "soil_total_ms": {
+        "count": 10420,
+        "mean": 0.4111549904030709,
+        "p50": 0.0,
+        "p95": 2.637,
+        "p99": 5.644,
+        "max": 17.75,
+        "total": 4284.234999999995
+      },
+      "render_gpu_ms": {
+        "count": 10420,
+        "mean": 1.280742034584913,
+        "p50": 1.27799999713898,
+        "p95": 1.53600001335144,
+        "p99": 1.64499998092651,
+        "max": 3.28399991989136,
+        "total": 13345.332000374794
+      },
+      "recorder_ms": {
+        "count": 10420,
+        "mean": 0.025269673704414464,
+        "p50": 0.005,
+        "p95": 0.023,
+        "p99": 1.081,
+        "max": 1.505,
+        "total": 263.3099999999884
+      },
+      "chassis_ms": {
+        "count": 10420,
+        "mean": 0.2826788867562379,
+        "p50": 0.0,
+        "p95": 1.285,
+        "p99": 1.677,
+        "max": 3.023,
+        "total": 2945.5140000000047
+      }
+    },
+    "slow_frames": {
+      "16.7": 164,
+      "33.3": 2,
+      "50": 0
+    },
+    "gates": {
+      "godot_report_schema": true,
+      "godot_model_identity": true,
+      "quality_profile_expected": true,
+      "quality_profile_requested": true,
+      "quality_profile_observed": true,
+      "quality_profile_known": true,
+      "quality_profile_applied": true,
+      "bucket_ground_mode_expected": true,
+      "bucket_ground_mode_requested": true,
+      "bucket_ground_mode_observed": true,
+      "godot_contract_clean": true,
+      "single_authoritative_runtime": true,
+      "fixed_step_p95": true,
+      "fixed_step_peak": true,
+      "render_frame_p95": true,
+      "render_frame_p99": true,
+      "scenario_track_motion": true,
+      "scenario_articulation": true,
+      "scenario_cut": true,
+      "scenario_loaded": true,
+      "scenario_dump": true,
+      "replay_complete": true,
+      "gateway_health_observed": true,
+      "gateway_model_identity": true,
+      "telemetry_observed": true,
+      "telemetry_zero_drops": true,
+      "telemetry_history_bounded": true,
+      "memory_baseline_observed": true,
+      "memory_growth_ratio": true,
+      "memory_growth_absolute": true,
+      "godot_process_exit": true,
+      "rendered_product_path": true
+    },
+    "memory": {
+      "baseline_bytes": 682430464,
+      "peak_bytes": 733085696,
+      "growth_bytes": 50655232,
+      "growth_ratio": 0.07422768277824127,
+      "sample_count": 84,
+      "measurement_started_seconds": 9.234000000000378
+    },
+    "queue_max_sampled": 2,
+    "queue_age_max_ticks_sampled": 3,
+    "conservation_error_max": 0,
+    "final_context": {
+      "automatic_soil_enabled": true,
+      "available": true,
+      "bucket_ground_bypassed": false,
+      "bucket_mass_q": 0,
+      "collision_revision": 205,
+      "committed": 205,
+      "conservation_error_q": 0,
+      "cut_preparation": {
+        "age_usec": 0,
+        "budget_usec": 3000,
+        "completed": 212,
+        "latency_max_usec": 36692,
+        "oldest_age_ticks": 0,
+        "pending": false,
+        "restarts": 0,
+        "slice_max_usec": 2584,
+        "threaded": true,
+        "worker_coverage_usec": 2387272,
+        "worker_edit_usec": 1380191
+      },
+      "data_revision": 205,
+      "diagnostics_enabled": false,
+      "engaged": false,
+      "fill_ratio": 0.0,
+      "generation": 1,
+      "mesh_revision": 205,
+      "model_id": "sy135",
+      "pending_readiness_count": 3,
+      "phase_timings_usec": {},
+      "process_frame": 12817,
+      "queue_depth": 0,
+      "readiness": {
+        "canonical_block_count": 1620,
+        "collision_latency_usec": {},
+        "diagnostics_enabled": false,
+        "end_to_end_latency_usec": {},
+        "fallback_ready_block_count": 27,
+        "generation": 1,
+        "last_acknowledged_revision": 206,
+        "last_acknowledged_usec": 48522537,
+        "mesh_latency_usec": {},
+        "meshed_block_count": 27,
+        "pending_block_count": 0,
+        "ready_block_count": 1593,
+        "revision": 206,
+        "ticket_receipt_count": 206,
+        "visual_collision_pending_block_count": 27
+      },
+      "readiness_timed_out": 1,
+      "rejected": 2102,
+      "rejection_reasons": {
+        "above_ground": 1602,
+        "no_sdf_change": 30,
+        "separating": 39,
+        "stationary": 431
+      },
+      "t_ms": 41766.294,
+      "unlimited_bucket_for_testing": false,
+      "viewport_size": [
+        1920.0,
+        1080.0
+      ],
+      "visual_quality": {
+        "applied": true,
+        "audio_loops": 3,
+        "audio_voices": 4,
+        "camera_far": 140.0,
+        "last_error": "",
+        "particles": 1800,
+        "profile": "balanced",
+        "shadows": true,
+        "site_cues": 28,
+        "site_shadows": true,
+        "target_fps": 60,
+        "test_ground": false
+      },
+      "voxel_scale_m": 0.125,
+      "voxel_statistics": {
+        "dropped_block_loads": 0,
+        "dropped_block_meshs": 0,
+        "time_detect_required_blocks": 2,
+        "time_process_load_responses": 0,
+        "time_request_blocks_to_load": 0,
+        "time_request_blocks_to_update": 0,
+        "updated_blocks": 0
+      }
+    },
+    "scenario": {
+      "cut_frames": 157,
+      "dump_frames": 31,
+      "maximum_payload_mass_kg": 1056.0,
+      "replay": {
+        "applied_ticks": 2521,
+        "locomotion_calibration": {
+          "chassis_dynamics": {
+            "angular_damp": 1.9,
+            "attitude_damping_nm_s_per_rad": 180000.0,
+            "attitude_stiffness_nm_per_rad": 350000.0,
+            "can_sleep": false,
+            "center_of_mass_m": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "compound_shapes": [
+              {
+                "center_m": [
+                  0.0,
+                  0.45,
+                  0.0
+                ],
+                "kind": "box",
+                "size_m": [
+                  2.7,
+                  0.9,
+                  3.7
+                ]
+              },
+              {
+                "center_m": [
+                  0.0,
+                  1.48,
+                  -0.55
+                ],
+                "kind": "box",
+                "size_m": [
+                  2.8,
+                  1.85,
+                  3.25
+                ]
+              }
+            ],
+            "continuous_collision_detection": true,
+            "ground_clearance_m": 0.06,
+            "inertia_diagonal_kg_m2": [
+              30000.0,
+              28000.0,
+              16000.0
+            ],
+            "linear_damp": 0.14,
+            "mass_kg": 14470.0,
+            "max_angular_speed_rad_s": 1.3,
+            "max_attitude_torque_nm": 220000.0,
+            "max_linear_speed_m_s": 2.4
+          },
+          "source_path": "godot/client/resources/physics/sy135_physics_rig.json",
+          "source_revision": "88c7184",
+          "tracks": {
+            "acceleration_window_s": 2.6,
+            "brake_effort_slew_n_per_tick": 11000.0,
+            "brake_force_n": 165000.0,
+            "brake_stop_window_s": 2.2,
+            "contact_length_m": 2.9,
+            "contact_width_m": 2.5,
+            "drive_effort_slew_n_per_tick": 9000.0,
+            "friction": 1.1,
+            "gauge_m": 1.96,
+            "lateral_resistance_n_per_m_s": 115000.0,
+            "max_belt_speed_m_s": 1.55,
+            "max_drive_force_n": 135000.0,
+            "max_support_force_n": 30000.0,
+            "minimum_traction_ratio": 0.2,
+            "pivot_lateral_resistance_scale": 0.24,
+            "probe_depth_m": 0.75,
+            "probe_height_m": 0.42,
+            "recovery_speed_m_s": 0.22,
+            "support_damping_n_s_per_m": 50000.0,
+            "support_rest_length_m": 0.55,
+            "support_stiffness_n_per_m": 280000.0,
+            "traction_points_per_side": 4.0,
+            "traction_response_n_per_m_s": 155000.0,
+            "yaw_assist_scale": 0.12
+          }
+        },
+        "loops": 0,
+        "model_mismatch": false,
+        "path": "C:\\code\\ExcavatorSim\\backend\\fixtures\\soak\\sy135-deep-cut-42s.json",
+        "physics_ticks_per_second": 60,
+        "tick_count": 2521,
+        "yaw_divergence_final_deg": -0.00386678082256253,
+        "yaw_divergence_max_deg": 0.0406878363915837
+      }
+    },
+    "metadata": {
+      "authority_profile": "jolt_authoritative",
+      "cpu": "AMD Ryzen 5 9500F 6-Core Processor",
+      "cpu_threads": 12,
+      "display_server": "Windows",
+      "duration_limit_s": 180.0,
+      "engine": {
+        "build": "custom_build",
+        "hash": "ed1daf0bf001b61586d9930840f2f1394092c079",
+        "hex": 263938,
+        "major": 4,
+        "minor": 7,
+        "patch": 2,
+        "status": "stable",
+        "string": "4.7.2-stable (custom_build)",
+        "timestamp": 1786929518
+      },
+      "frame_limit": 60000,
+      "gpu": "AMD Radeon RX 9070 XT",
+      "max_fps": 0,
+      "measurement_notes": [
+        "tracks_ms is nested inside chassis_ms; both accumulate callbacks across physics steps, excluding engine physics solver time.",
+        "All time columns use milliseconds. -1 means unavailable, not zero cost.",
+        "Frame interval is monotonic wall time between late process callbacks; includes pacing/waits, not GPU presentation latency.",
+        "Engine/render timings are latest engine reports and may lag the row. Physics time is one reported tick, not all ticks in the interval.",
+        "Render CPU/GPU cover the main viewport only. CPU/GPU overlap; do not sum them into frame time.",
+        "Soil stage columns accumulate steps since the preceding row. Commit phases are nested inside soil_step, not additive to it.",
+        "Capture enables lightweight stage clocks only, not full soil diagnostics or additional SDF digest sampling.",
+        "Recorder cost includes sampling/context/callback work, excludes engine instrumentation. Pre-existing full diagnostics add digest work inside soil/commit times.",
+        "Pause/focus transitions exclude the adjacent interval from active-play summary. Low-rate context is sampled at four Hz.",
+        "The first partial interval is excluded from summary. Unframed tail stages at stop are saved separately.",
+        "JSON serialization/file saving occurs after capture stops. Abrupt termination loses buffered samples."
+      ],
+      "os": "Windows",
+      "physics_ticks_per_second": 60,
+      "render_timing_available": true,
+      "renderer": "forward_plus",
+      "soil_diagnostics_enabled": false,
+      "soil_timing_enabled": true,
+      "source_sha256": {
+        "res://scripts/excavation_world.gd": "e21b492562807c903f3ff916c3dd169b4cb565c3329a4b259543b8aab2d05a34",
+        "res://scripts/jolt_chassis_track_runtime.gd": "a2b5f8b76c5bad0e1a7aeef6a7edb2d8b360d6c0e08af99d19bcbfc58664eb3e",
+        "res://scripts/performance_capture.gd": "55f5ee1e40dc3b56fd5de67d01d62b8f443e23f31793ddc171e33ad19af5de4a",
+        "res://scripts/track_contact_solver.gd": "cd70fc8dd17b287f1cf80c3e2ea5fcf4b949f4d682f578832f3e99f24fea5951",
+        "res://scripts/voxel_bucket_cutter.gd": "335dad9bbbe18233f6dd80b1c10e52cb2dfcf7f21a726614b3567acb9df8680e",
+        "res://scripts/voxel_cut_preparation.gd": "4dfd96a1fa7b0f4bc1c3aa25e0a6870322c8ccc494c2d83ef7072ceda224a073",
+        "res://scripts/voxel_cut_proposal.gd": "5f6e60895d5e1d14d5364bfc487abe08a84ef8d49a95191ef088f0e37886ee79",
+        "res://scripts/voxel_cut_worker.gd": "2e82baa696d3ba5b4fdddf852bd299ddb43e0041355c62713cb823ce2d87f6ba",
+        "res://scripts/voxel_excavation_authority.gd": "428eea4a4bffee0be5523dfcfb794db9085914f110bee0774f78034b063d7816"
+      },
+      "started_local": "2026-09-28T23:28:02",
+      "viewport_size": [
+        1920.0,
+        1080.0
+      ],
+      "vsync_mode": 0
+    }
+  },
+  "probed": {
+    "capture": "output\\soak-main-0928\\probed\\performance-captures\\capture-2026-09-28T23-31-52-8405248.json",
+    "stats": {
+      "frame_interval_ms": {
+        "count": 10461,
+        "mean": 4.015288213363922,
+        "p50": 1.879,
+        "p95": 11.359,
+        "p99": 20.329,
+        "max": 39.976,
+        "total": 42003.92999999995
+      },
+      "soil_automatic_ms": {
+        "count": 10461,
+        "mean": 0.3298373004492883,
+        "p50": 0.0,
+        "p95": 2.313,
+        "p99": 3.62,
+        "max": 8.914,
+        "total": 3450.4280000000085
+      },
+      "soil_step_ms": {
+        "count": 10461,
+        "mean": 0.04919223783577095,
+        "p50": 0.0,
+        "p95": 0.082,
+        "p99": 1.491,
+        "max": 8.398,
+        "total": 514.599999999999
+      },
+      "soil_publish_ms": {
+        "count": 10461,
+        "mean": 0.04052117388394988,
+        "p50": 0.0,
+        "p95": 0.002,
+        "p99": 1.012,
+        "max": 10.299,
+        "total": 423.8919999999988
+      },
+      "soil_total_ms": {
+        "count": 10461,
+        "mean": 0.4195507121690087,
+        "p50": 0.0,
+        "p95": 2.677,
+        "p99": 6.075,
+        "max": 17.751,
+        "total": 4388.919999999986
+      },
+      "render_gpu_ms": {
+        "count": 10461,
+        "mean": 1.2878805088069285,
+        "p50": 1.28999996185303,
+        "p95": 1.52799999713898,
+        "p99": 1.69500005245209,
+        "max": 3.43400001525879,
+        "total": 13472.51800262928
+      },
+      "recorder_ms": {
+        "count": 10461,
+        "mean": 0.02471914730905253,
+        "p50": 0.005,
+        "p95": 0.021,
+        "p99": 1.075,
+        "max": 1.573,
+        "total": 258.5869999999842
+      },
+      "chassis_ms": {
+        "count": 10461,
+        "mean": 0.27662594398241075,
+        "p50": 0.0,
+        "p95": 1.24,
+        "p99": 1.734,
+        "max": 4.063,
+        "total": 2893.7840000000037
+      }
+    },
+    "slow_frames": {
+      "16.7": 181,
+      "33.3": 4,
+      "50": 0
+    },
+    "gates": {
+      "godot_report_schema": true,
+      "godot_model_identity": true,
+      "quality_profile_expected": true,
+      "quality_profile_requested": true,
+      "quality_profile_observed": true,
+      "quality_profile_known": true,
+      "quality_profile_applied": true,
+      "bucket_ground_mode_expected": true,
+      "bucket_ground_mode_requested": true,
+      "bucket_ground_mode_observed": true,
+      "godot_contract_clean": true,
+      "single_authoritative_runtime": true,
+      "fixed_step_p95": true,
+      "fixed_step_peak": true,
+      "render_frame_p95": true,
+      "render_frame_p99": true,
+      "scenario_track_motion": true,
+      "scenario_articulation": true,
+      "scenario_cut": true,
+      "scenario_loaded": true,
+      "scenario_dump": true,
+      "replay_complete": true,
+      "gateway_health_observed": true,
+      "gateway_model_identity": true,
+      "telemetry_observed": true,
+      "telemetry_zero_drops": true,
+      "telemetry_history_bounded": true,
+      "memory_baseline_observed": true,
+      "memory_growth_ratio": false,
+      "memory_growth_absolute": true,
+      "godot_process_exit": true,
+      "rendered_product_path": true
+    },
+    "memory": {
+      "baseline_bytes": 684707840,
+      "peak_bytes": 753815552,
+      "growth_bytes": 69107712,
+      "growth_ratio": 0.10093021864624772,
+      "sample_count": 84,
+      "measurement_started_seconds": 9.203000000001339
+    },
+    "queue_max_sampled": 2,
+    "queue_age_max_ticks_sampled": 5,
+    "conservation_error_max": 0,
+    "final_context": {
+      "automatic_soil_enabled": true,
+      "available": true,
+      "bucket_ground_bypassed": false,
+      "bucket_mass_q": 0,
+      "collision_revision": 204,
+      "committed": 204,
+      "conservation_error_q": 0,
+      "cut_preparation": {
+        "age_usec": 0,
+        "budget_usec": 3000,
+        "completed": 214,
+        "latency_max_usec": 44520,
+        "oldest_age_ticks": 0,
+        "pending": false,
+        "restarts": 0,
+        "slice_max_usec": 3249,
+        "threaded": true,
+        "worker_coverage_usec": 2427254,
+        "worker_edit_usec": 1396950
+      },
+      "data_revision": 204,
+      "diagnostics_enabled": false,
+      "engaged": false,
+      "fill_ratio": 0.0,
+      "generation": 1,
+      "mesh_revision": 204,
+      "model_id": "sy135",
+      "pending_readiness_count": 4,
+      "phase_timings_usec": {},
+      "process_frame": 12790,
+      "queue_depth": 0,
+      "readiness": {
+        "canonical_block_count": 1620,
+        "collision_latency_usec": {},
+        "diagnostics_enabled": false,
+        "end_to_end_latency_usec": {},
+        "fallback_ready_block_count": 27,
+        "generation": 1,
+        "last_acknowledged_revision": 205,
+        "last_acknowledged_usec": 48641442,
+        "mesh_latency_usec": {},
+        "meshed_block_count": 27,
+        "pending_block_count": 0,
+        "ready_block_count": 1593,
+        "revision": 205,
+        "ticket_receipt_count": 205,
+        "visual_collision_pending_block_count": 27
+      },
+      "readiness_timed_out": 1,
+      "rejected": 2093,
+      "rejection_reasons": {
+        "above_ground": 1591,
+        "no_sdf_change": 34,
+        "separating": 37,
+        "stationary": 431
+      },
+      "t_ms": 41782.771,
+      "unlimited_bucket_for_testing": false,
+      "viewport_size": [
+        1920.0,
+        1080.0
+      ],
+      "visual_quality": {
+        "applied": true,
+        "audio_loops": 3,
+        "audio_voices": 4,
+        "camera_far": 140.0,
+        "last_error": "",
+        "particles": 1800,
+        "profile": "balanced",
+        "shadows": true,
+        "site_cues": 28,
+        "site_shadows": true,
+        "target_fps": 60,
+        "test_ground": false
+      },
+      "voxel_scale_m": 0.125,
+      "voxel_statistics": {
+        "dropped_block_loads": 0,
+        "dropped_block_meshs": 0,
+        "time_detect_required_blocks": 2,
+        "time_process_load_responses": 0,
+        "time_request_blocks_to_load": 0,
+        "time_request_blocks_to_update": 0,
+        "updated_blocks": 0
+      }
+    },
+    "scenario": {
+      "cut_frames": 143,
+      "dump_frames": 27,
+      "maximum_payload_mass_kg": 1056.0,
+      "replay": {
+        "applied_ticks": 2521,
+        "locomotion_calibration": {
+          "chassis_dynamics": {
+            "angular_damp": 1.9,
+            "attitude_damping_nm_s_per_rad": 180000.0,
+            "attitude_stiffness_nm_per_rad": 350000.0,
+            "can_sleep": false,
+            "center_of_mass_m": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "compound_shapes": [
+              {
+                "center_m": [
+                  0.0,
+                  0.45,
+                  0.0
+                ],
+                "kind": "box",
+                "size_m": [
+                  2.7,
+                  0.9,
+                  3.7
+                ]
+              },
+              {
+                "center_m": [
+                  0.0,
+                  1.48,
+                  -0.55
+                ],
+                "kind": "box",
+                "size_m": [
+                  2.8,
+                  1.85,
+                  3.25
+                ]
+              }
+            ],
+            "continuous_collision_detection": true,
+            "ground_clearance_m": 0.06,
+            "inertia_diagonal_kg_m2": [
+              30000.0,
+              28000.0,
+              16000.0
+            ],
+            "linear_damp": 0.14,
+            "mass_kg": 14470.0,
+            "max_angular_speed_rad_s": 1.3,
+            "max_attitude_torque_nm": 220000.0,
+            "max_linear_speed_m_s": 2.4
+          },
+          "source_path": "godot/client/resources/physics/sy135_physics_rig.json",
+          "source_revision": "88c7184",
+          "tracks": {
+            "acceleration_window_s": 2.6,
+            "brake_effort_slew_n_per_tick": 11000.0,
+            "brake_force_n": 165000.0,
+            "brake_stop_window_s": 2.2,
+            "contact_length_m": 2.9,
+            "contact_width_m": 2.5,
+            "drive_effort_slew_n_per_tick": 9000.0,
+            "friction": 1.1,
+            "gauge_m": 1.96,
+            "lateral_resistance_n_per_m_s": 115000.0,
+            "max_belt_speed_m_s": 1.55,
+            "max_drive_force_n": 135000.0,
+            "max_support_force_n": 30000.0,
+            "minimum_traction_ratio": 0.2,
+            "pivot_lateral_resistance_scale": 0.24,
+            "probe_depth_m": 0.75,
+            "probe_height_m": 0.42,
+            "recovery_speed_m_s": 0.22,
+            "support_damping_n_s_per_m": 50000.0,
+            "support_rest_length_m": 0.55,
+            "support_stiffness_n_per_m": 280000.0,
+            "traction_points_per_side": 4.0,
+            "traction_response_n_per_m_s": 155000.0,
+            "yaw_assist_scale": 0.12
+          }
+        },
+        "loops": 0,
+        "model_mismatch": false,
+        "path": "C:\\code\\ExcavatorSim\\backend\\fixtures\\soak\\sy135-deep-cut-42s.json",
+        "physics_ticks_per_second": 60,
+        "tick_count": 2521,
+        "yaw_divergence_final_deg": -0.132012766382388,
+        "yaw_divergence_max_deg": 0.203445856569516
+      }
+    },
+    "metadata": {
+      "authority_profile": "jolt_authoritative",
+      "cpu": "AMD Ryzen 5 9500F 6-Core Processor",
+      "cpu_threads": 12,
+      "display_server": "Windows",
+      "duration_limit_s": 180.0,
+      "engine": {
+        "build": "custom_build",
+        "hash": "ed1daf0bf001b61586d9930840f2f1394092c079",
+        "hex": 263938,
+        "major": 4,
+        "minor": 7,
+        "patch": 2,
+        "status": "stable",
+        "string": "4.7.2-stable (custom_build)",
+        "timestamp": 1786929518
+      },
+      "frame_limit": 60000,
+      "gpu": "AMD Radeon RX 9070 XT",
+      "max_fps": 0,
+      "measurement_notes": [
+        "tracks_ms is nested inside chassis_ms; both accumulate callbacks across physics steps, excluding engine physics solver time.",
+        "All time columns use milliseconds. -1 means unavailable, not zero cost.",
+        "Frame interval is monotonic wall time between late process callbacks; includes pacing/waits, not GPU presentation latency.",
+        "Engine/render timings are latest engine reports and may lag the row. Physics time is one reported tick, not all ticks in the interval.",
+        "Render CPU/GPU cover the main viewport only. CPU/GPU overlap; do not sum them into frame time.",
+        "Soil stage columns accumulate steps since the preceding row. Commit phases are nested inside soil_step, not additive to it.",
+        "Capture enables lightweight stage clocks only, not full soil diagnostics or additional SDF digest sampling.",
+        "Recorder cost includes sampling/context/callback work, excludes engine instrumentation. Pre-existing full diagnostics add digest work inside soil/commit times.",
+        "Pause/focus transitions exclude the adjacent interval from active-play summary. Low-rate context is sampled at four Hz.",
+        "The first partial interval is excluded from summary. Unframed tail stages at stop are saved separately.",
+        "JSON serialization/file saving occurs after capture stops. Abrupt termination loses buffered samples."
+      ],
+      "os": "Windows",
+      "physics_ticks_per_second": 60,
+      "render_timing_available": true,
+      "renderer": "forward_plus",
+      "soil_diagnostics_enabled": false,
+      "soil_timing_enabled": true,
+      "source_sha256": {
+        "res://scripts/excavation_world.gd": "e21b492562807c903f3ff916c3dd169b4cb565c3329a4b259543b8aab2d05a34",
+        "res://scripts/jolt_chassis_track_runtime.gd": "a2b5f8b76c5bad0e1a7aeef6a7edb2d8b360d6c0e08af99d19bcbfc58664eb3e",
+        "res://scripts/performance_capture.gd": "55f5ee1e40dc3b56fd5de67d01d62b8f443e23f31793ddc171e33ad19af5de4a",
+        "res://scripts/track_contact_solver.gd": "cd70fc8dd17b287f1cf80c3e2ea5fcf4b949f4d682f578832f3e99f24fea5951",
+        "res://scripts/voxel_bucket_cutter.gd": "335dad9bbbe18233f6dd80b1c10e52cb2dfcf7f21a726614b3567acb9df8680e",
+        "res://scripts/voxel_cut_preparation.gd": "4dfd96a1fa7b0f4bc1c3aa25e0a6870322c8ccc494c2d83ef7072ceda224a073",
+        "res://scripts/voxel_cut_proposal.gd": "5f6e60895d5e1d14d5364bfc487abe08a84ef8d49a95191ef088f0e37886ee79",
+        "res://scripts/voxel_cut_worker.gd": "2e82baa696d3ba5b4fdddf852bd299ddb43e0041355c62713cb823ce2d87f6ba",
+        "res://scripts/voxel_excavation_authority.gd": "428eea4a4bffee0be5523dfcfb794db9085914f110bee0774f78034b063d7816"
+      },
+      "started_local": "2026-09-28T23:31:52",
+      "viewport_size": [
+        1920.0,
+        1080.0
+      ],
+      "vsync_mode": 0
+    }
+  },
+  "final": {
+    "capture": "output\\soak-main-0928\\final\\performance-captures\\capture-2026-09-28T23-34-49-8280588.json",
+    "stats": {
+      "frame_interval_ms": {
+        "count": 10336,
+        "mean": 4.063899090557282,
+        "p50": 1.865,
+        "p95": 11.989,
+        "p99": 19.459,
+        "max": 38.292,
+        "total": 42004.46100000028
+      },
+      "soil_automatic_ms": {
+        "count": 10336,
+        "mean": 0.3393369775541793,
+        "p50": 0.0,
+        "p95": 2.406,
+        "p99": 3.664,
+        "max": 9.267,
+        "total": 3507.3869999999984
+      },
+      "soil_step_ms": {
+        "count": 10336,
+        "mean": 0.05199787151702784,
+        "p50": 0.0,
+        "p95": 0.095,
+        "p99": 1.456,
+        "max": 8.697,
+        "total": 537.45
+      },
+      "soil_publish_ms": {
+        "count": 10336,
+        "mean": 0.038654024767801824,
+        "p50": 0.0,
+        "p95": 0.002,
+        "p99": 1.005,
+        "max": 12.881,
+        "total": 399.52799999999894
+      },
+      "soil_total_ms": {
+        "count": 10336,
+        "mean": 0.4299888738390097,
+        "p50": 0.0,
+        "p95": 2.931,
+        "p99": 5.897,
+        "max": 18.301,
+        "total": 4444.365000000001
+      },
+      "render_gpu_ms": {
+        "count": 10336,
+        "mean": 1.2835188659409713,
+        "p50": 1.28799998760223,
+        "p95": 1.54999995231628,
+        "p99": 1.69700002670288,
+        "max": 3.31900000572205,
+        "total": 13266.450998365879
+      },
+      "recorder_ms": {
+        "count": 10336,
+        "mean": 0.02594301470588226,
+        "p50": 0.005,
+        "p95": 0.024,
+        "p99": 1.088,
+        "max": 1.767,
+        "total": 268.1469999999878
+      },
+      "chassis_ms": {
+        "count": 10336,
+        "mean": 0.28783746130030946,
+        "p50": 0.0,
+        "p95": 1.322,
+        "p99": 1.729,
+        "max": 3.741,
+        "total": 2975.0879999999993
+      }
+    },
+    "slow_frames": {
+      "16.7": 183,
+      "33.3": 4,
+      "50": 0
+    },
+    "gates": {
+      "godot_report_schema": true,
+      "godot_model_identity": true,
+      "quality_profile_expected": true,
+      "quality_profile_requested": true,
+      "quality_profile_observed": true,
+      "quality_profile_known": true,
+      "quality_profile_applied": true,
+      "bucket_ground_mode_expected": true,
+      "bucket_ground_mode_requested": true,
+      "bucket_ground_mode_observed": true,
+      "godot_contract_clean": true,
+      "single_authoritative_runtime": true,
+      "fixed_step_p95": true,
+      "fixed_step_peak": true,
+      "render_frame_p95": true,
+      "render_frame_p99": true,
+      "scenario_track_motion": true,
+      "scenario_articulation": true,
+      "scenario_cut": true,
+      "scenario_loaded": true,
+      "scenario_dump": true,
+      "replay_complete": true,
+      "gateway_health_observed": true,
+      "gateway_model_identity": true,
+      "telemetry_observed": true,
+      "telemetry_zero_drops": true,
+      "telemetry_history_bounded": true,
+      "memory_baseline_observed": true,
+      "memory_growth_ratio": true,
+      "memory_growth_absolute": true,
+      "godot_process_exit": true,
+      "rendered_product_path": true
+    },
+    "memory": {
+      "baseline_bytes": 682610688,
+      "peak_bytes": 739483648,
+      "growth_bytes": 56872960,
+      "growth_ratio": 0.08331683198022238,
+      "sample_count": 83,
+      "measurement_started_seconds": 9.217999999997119
+    },
+    "queue_max_sampled": 2,
+    "queue_age_max_ticks_sampled": 4,
+    "conservation_error_max": 0,
+    "final_context": {
+      "automatic_soil_enabled": true,
+      "available": true,
+      "bucket_ground_bypassed": false,
+      "bucket_mass_q": 0,
+      "collision_revision": 205,
+      "committed": 205,
+      "conservation_error_q": 0,
+      "cut_preparation": {
+        "age_usec": 0,
+        "budget_usec": 3000,
+        "completed": 219,
+        "latency_max_usec": 41118,
+        "oldest_age_ticks": 0,
+        "pending": false,
+        "restarts": 0,
+        "slice_max_usec": 3285,
+        "threaded": true,
+        "worker_coverage_usec": 2445785,
+        "worker_edit_usec": 1391437
+      },
+      "data_revision": 205,
+      "diagnostics_enabled": false,
+      "engaged": false,
+      "fill_ratio": 0.0,
+      "generation": 1,
+      "mesh_revision": 205,
+      "model_id": "sy135",
+      "pending_readiness_count": 4,
+      "phase_timings_usec": {},
+      "process_frame": 12799,
+      "queue_depth": 0,
+      "readiness": {
+        "canonical_block_count": 1620,
+        "collision_latency_usec": {},
+        "diagnostics_enabled": false,
+        "end_to_end_latency_usec": {},
+        "fallback_ready_block_count": 29,
+        "generation": 1,
+        "last_acknowledged_revision": 206,
+        "last_acknowledged_usec": 48520301,
+        "mesh_latency_usec": {},
+        "meshed_block_count": 29,
+        "pending_block_count": 0,
+        "ready_block_count": 1591,
+        "revision": 206,
+        "ticket_receipt_count": 206,
+        "visual_collision_pending_block_count": 29
+      },
+      "readiness_timed_out": 2,
+      "rejected": 2097,
+      "rejection_reasons": {
+        "above_ground": 1600,
+        "no_sdf_change": 37,
+        "separating": 24,
+        "stationary": 436
+      },
+      "t_ms": 41851.099,
+      "unlimited_bucket_for_testing": false,
+      "viewport_size": [
+        1920.0,
+        1080.0
+      ],
+      "visual_quality": {
+        "applied": true,
+        "audio_loops": 3,
+        "audio_voices": 4,
+        "camera_far": 140.0,
+        "last_error": "",
+        "particles": 1800,
+        "profile": "balanced",
+        "shadows": true,
+        "site_cues": 28,
+        "site_shadows": true,
+        "target_fps": 60,
+        "test_ground": false
+      },
+      "voxel_scale_m": 0.125,
+      "voxel_statistics": {
+        "dropped_block_loads": 0,
+        "dropped_block_meshs": 0,
+        "time_detect_required_blocks": 2,
+        "time_process_load_responses": 0,
+        "time_request_blocks_to_load": 2,
+        "time_request_blocks_to_update": 0,
+        "updated_blocks": 0
+      }
+    },
+    "scenario": {
+      "cut_frames": 163,
+      "dump_frames": 30,
+      "maximum_payload_mass_kg": 1056.0,
+      "replay": {
+        "applied_ticks": 2521,
+        "locomotion_calibration": {
+          "chassis_dynamics": {
+            "angular_damp": 1.9,
+            "attitude_damping_nm_s_per_rad": 180000.0,
+            "attitude_stiffness_nm_per_rad": 350000.0,
+            "can_sleep": false,
+            "center_of_mass_m": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "compound_shapes": [
+              {
+                "center_m": [
+                  0.0,
+                  0.45,
+                  0.0
+                ],
+                "kind": "box",
+                "size_m": [
+                  2.7,
+                  0.9,
+                  3.7
+                ]
+              },
+              {
+                "center_m": [
+                  0.0,
+                  1.48,
+                  -0.55
+                ],
+                "kind": "box",
+                "size_m": [
+                  2.8,
+                  1.85,
+                  3.25
+                ]
+              }
+            ],
+            "continuous_collision_detection": true,
+            "ground_clearance_m": 0.06,
+            "inertia_diagonal_kg_m2": [
+              30000.0,
+              28000.0,
+              16000.0
+            ],
+            "linear_damp": 0.14,
+            "mass_kg": 14470.0,
+            "max_angular_speed_rad_s": 1.3,
+            "max_attitude_torque_nm": 220000.0,
+            "max_linear_speed_m_s": 2.4
+          },
+          "source_path": "godot/client/resources/physics/sy135_physics_rig.json",
+          "source_revision": "88c7184",
+          "tracks": {
+            "acceleration_window_s": 2.6,
+            "brake_effort_slew_n_per_tick": 11000.0,
+            "brake_force_n": 165000.0,
+            "brake_stop_window_s": 2.2,
+            "contact_length_m": 2.9,
+            "contact_width_m": 2.5,
+            "drive_effort_slew_n_per_tick": 9000.0,
+            "friction": 1.1,
+            "gauge_m": 1.96,
+            "lateral_resistance_n_per_m_s": 115000.0,
+            "max_belt_speed_m_s": 1.55,
+            "max_drive_force_n": 135000.0,
+            "max_support_force_n": 30000.0,
+            "minimum_traction_ratio": 0.2,
+            "pivot_lateral_resistance_scale": 0.24,
+            "probe_depth_m": 0.75,
+            "probe_height_m": 0.42,
+            "recovery_speed_m_s": 0.22,
+            "support_damping_n_s_per_m": 50000.0,
+            "support_rest_length_m": 0.55,
+            "support_stiffness_n_per_m": 280000.0,
+            "traction_points_per_side": 4.0,
+            "traction_response_n_per_m_s": 155000.0,
+            "yaw_assist_scale": 0.12
+          }
+        },
+        "loops": 0,
+        "model_mismatch": false,
+        "path": "C:\\code\\ExcavatorSim\\backend\\fixtures\\soak\\sy135-deep-cut-42s.json",
+        "physics_ticks_per_second": 60,
+        "tick_count": 2521,
+        "yaw_divergence_final_deg": 0.000786369080827853,
+        "yaw_divergence_max_deg": 0.0285582008127676
+      }
+    },
+    "metadata": {
+      "authority_profile": "jolt_authoritative",
+      "cpu": "AMD Ryzen 5 9500F 6-Core Processor",
+      "cpu_threads": 12,
+      "display_server": "Windows",
+      "duration_limit_s": 180.0,
+      "engine": {
+        "build": "custom_build",
+        "hash": "ed1daf0bf001b61586d9930840f2f1394092c079",
+        "hex": 263938,
+        "major": 4,
+        "minor": 7,
+        "patch": 2,
+        "status": "stable",
+        "string": "4.7.2-stable (custom_build)",
+        "timestamp": 1786929518
+      },
+      "frame_limit": 60000,
+      "gpu": "AMD Radeon RX 9070 XT",
+      "max_fps": 0,
+      "measurement_notes": [
+        "tracks_ms is nested inside chassis_ms; both accumulate callbacks across physics steps, excluding engine physics solver time.",
+        "All time columns use milliseconds. -1 means unavailable, not zero cost.",
+        "Frame interval is monotonic wall time between late process callbacks; includes pacing/waits, not GPU presentation latency.",
+        "Engine/render timings are latest engine reports and may lag the row. Physics time is one reported tick, not all ticks in the interval.",
+        "Render CPU/GPU cover the main viewport only. CPU/GPU overlap; do not sum them into frame time.",
+        "Soil stage columns accumulate steps since the preceding row. Commit phases are nested inside soil_step, not additive to it.",
+        "Capture enables lightweight stage clocks only, not full soil diagnostics or additional SDF digest sampling.",
+        "Recorder cost includes sampling/context/callback work, excludes engine instrumentation. Pre-existing full diagnostics add digest work inside soil/commit times.",
+        "Pause/focus transitions exclude the adjacent interval from active-play summary. Low-rate context is sampled at four Hz.",
+        "The first partial interval is excluded from summary. Unframed tail stages at stop are saved separately.",
+        "JSON serialization/file saving occurs after capture stops. Abrupt termination loses buffered samples."
+      ],
+      "os": "Windows",
+      "physics_ticks_per_second": 60,
+      "render_timing_available": true,
+      "renderer": "forward_plus",
+      "soil_diagnostics_enabled": false,
+      "soil_timing_enabled": true,
+      "source_sha256": {
+        "res://scripts/excavation_world.gd": "e21b492562807c903f3ff916c3dd169b4cb565c3329a4b259543b8aab2d05a34",
+        "res://scripts/jolt_chassis_track_runtime.gd": "a2b5f8b76c5bad0e1a7aeef6a7edb2d8b360d6c0e08af99d19bcbfc58664eb3e",
+        "res://scripts/performance_capture.gd": "55f5ee1e40dc3b56fd5de67d01d62b8f443e23f31793ddc171e33ad19af5de4a",
+        "res://scripts/track_contact_solver.gd": "cd70fc8dd17b287f1cf80c3e2ea5fcf4b949f4d682f578832f3e99f24fea5951",
+        "res://scripts/voxel_bucket_cutter.gd": "335dad9bbbe18233f6dd80b1c10e52cb2dfcf7f21a726614b3567acb9df8680e",
+        "res://scripts/voxel_cut_preparation.gd": "4dfd96a1fa7b0f4bc1c3aa25e0a6870322c8ccc494c2d83ef7072ceda224a073",
+        "res://scripts/voxel_cut_proposal.gd": "5f6e60895d5e1d14d5364bfc487abe08a84ef8d49a95191ef088f0e37886ee79",
+        "res://scripts/voxel_cut_worker.gd": "2e82baa696d3ba5b4fdddf852bd299ddb43e0041355c62713cb823ce2d87f6ba",
+        "res://scripts/voxel_excavation_authority.gd": "428eea4a4bffee0be5523dfcfb794db9085914f110bee0774f78034b063d7816"
+      },
+      "started_local": "2026-09-28T23:34:49",
+      "viewport_size": [
+        1920.0,
+        1080.0
+      ],
+      "vsync_mode": 0
+    }
+  },
+  "source_sha256": {
+    "godot/client/scripts/bucket_soil_tool.gd": "2e7f714fbf792e3152d0ed321f72e96aa88a7e90f920131ed8bc40bbde57ab86",
+    "godot/client/scripts/bucket_fill_surface.gd": "2bb66c0d2e97f6d94712e30942c90533cccec4be34f7ddb433f21dec9fbef851",
+    "godot/client/scripts/operator_ui.gd": "4d4e3205342132df254d4c5c58beb8fe57e453c14c5a2e99d62a99e7990893b7",
+    "godot/client/scripts/main_map.gd": "9cb9e01348abc688882e4d3110f485b486f1277f32170fb3d120b8637e535cab",
+    "backend/scripts/godot/jolt_product_soak.gd": "eda2ccfbbc3a0a4f828e7752e04e626585d15052d3af242c2a021c52dd2bf649"
+  }
+}

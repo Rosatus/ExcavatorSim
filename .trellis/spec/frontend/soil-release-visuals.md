@@ -291,7 +291,10 @@ mouth normal, approximately (0,-0.990012,0.140985). The former legacy profile
 contained stale rim coordinates in an unrelated cavity basis and extrapolated
 a metre-scale sloping soil slab. Regenerate through the recipe; do not copy
 another profile's cavity-local rim or hand-edit generated projections.
-Nominal capacity remains 0.24 m3 and the ordinary release down-dot gate 0.5.
+Nominal capacity remains 0.24 m3. The release down-dot gate is 0.15 (mouth
+normal 8.63 degrees below horizontal), tuned after operator feedback that
+the former 0.5 gate required excessive inversion. The transaction regression
+checks retention at 0.1 and committed release at 0.2 with mass conservation.
 
 SY80U native cutting uses the shared native swept occupancy, lip/floor and
 lift-exit cleanup path. Contact side segments follow the measured body mouth;

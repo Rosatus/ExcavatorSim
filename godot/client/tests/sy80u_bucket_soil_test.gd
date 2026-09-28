@@ -41,7 +41,7 @@ func _run() -> void:
 		_check(distance < 0.002, "mouth anchor detached from source")
 		_check(absf(anchor.x) < 0.394, "mouth uses inner edge, not outside cheeks")
 		_check(anchor.z > -0.82, "tooth tips cannot define contained mouth")
-	_check(Release.threshold(contract.interaction) == 0.5, "native release threshold changed")
+	_check(is_equal_approx(Release.threshold(contract.interaction), 0.15), "native shallow release threshold")
 	for angles in [Vector3.ZERO, Vector3(0.9, -0.3, 0.4), Vector3(-1.7, 0.8, -0.6)]:
 		var pose := Transform3D(Basis.from_euler(angles), Vector3(4, 2, -3))
 		var mouth: Transform3D = Geometry.mouth(geometry.mouth_polygon_godot).transform

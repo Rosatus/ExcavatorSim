@@ -9,6 +9,8 @@ const MenuControls := preload("res://scenes/operator_menu_controls.tscn")
 const UIStrings := preload("res://scripts/operator_ui_strings.gd")
 const SlopeSideView := preload("res://scripts/slope_side_view.gd")
 const CONFIG_PATH := "user://operator_ui.cfg"
+# Standalone test runners can isolate preferences before this node enters the tree.
+var preferences_path := CONFIG_PATH
 const CONFIG_SECTION := "onboarding"
 const CONFIG_GUIDE_DISMISSED := "guide_dismissed"
 const CONFIG_SECTION_UI := "ui"
@@ -430,7 +432,7 @@ func _wire_built_menu() -> void:
 
 func _load_ui_theme() -> String:
 	var config := ConfigFile.new()
-	if config.load(CONFIG_PATH) != OK:
+	if config.load(preferences_path) != OK:
 		return GameSkin.VARIANT_DEBUG
 	var variant := String(config.get_value(CONFIG_SECTION_UI, CONFIG_UI_THEME, GameSkin.VARIANT_DEBUG))
 	return variant if variant in GameSkin.VARIANTS else GameSkin.VARIANT_DEBUG
@@ -470,9 +472,9 @@ func _apply_ui_theme(variant: String) -> void:
 		return
 	_ui_theme = variant
 	var config := ConfigFile.new()
-	config.load(CONFIG_PATH)
+	config.load(preferences_path)
 	config.set_value(CONFIG_SECTION_UI, CONFIG_UI_THEME, variant)
-	config.save(CONFIG_PATH)
+	config.save(preferences_path)
 	_rebuild_menu_theme()
 
 
@@ -482,7 +484,7 @@ func _apply_ui_theme(variant: String) -> void:
 ## / windowed; fps limit writes Engine.max_fps (0 = uncapped).
 func _apply_saved_video_settings() -> void:
 	var config := ConfigFile.new()
-	config.load(CONFIG_PATH)
+	config.load(preferences_path)
 	_apply_window_mode(String(config.get_value(CONFIG_SECTION_VIDEO, CONFIG_VIDEO_WINDOW_MODE, WINDOW_MODE_WINDOWED)))
 	_apply_fps_limit(int(config.get_value(CONFIG_SECTION_VIDEO, CONFIG_VIDEO_FPS_LIMIT, 60)))
 
@@ -575,10 +577,10 @@ func _apply_fps_limit(limit: int) -> void:
 ## refuse or defer a mode change, but the user's choice is what reloads.
 func _save_video_config(window_mode_id: String, fps_limit: int) -> void:
 	var config := ConfigFile.new()
-	config.load(CONFIG_PATH)
+	config.load(preferences_path)
 	config.set_value(CONFIG_SECTION_VIDEO, CONFIG_VIDEO_WINDOW_MODE, window_mode_id)
 	config.set_value(CONFIG_SECTION_VIDEO, CONFIG_VIDEO_FPS_LIMIT, fps_limit)
-	config.save(CONFIG_PATH)
+	config.save(preferences_path)
 
 
 ## Runtime theme switch: the two variants compose different menu structures
@@ -972,9 +974,9 @@ func _on_cutting_diagnostics_toggled(enabled: bool) -> void:
 
 func _on_race_mode_toggled(enabled: bool) -> void:
 	var config := ConfigFile.new()
-	config.load(CONFIG_PATH)
+	config.load(preferences_path)
 	config.set_value(CONFIG_SECTION_UI, "race_mode", enabled)
-	config.save(CONFIG_PATH)
+	config.save(preferences_path)
 	if _product_session != null:
 		_product_session.request_race_mode(enabled)
 	_sync_race_mode_toggle()
@@ -990,9 +992,9 @@ func _sync_race_mode_toggle() -> void:
 
 func _on_relaxed_assist_toggled(enabled: bool) -> void:
 	var config := ConfigFile.new()
-	config.load(CONFIG_PATH)
+	config.load(preferences_path)
 	config.set_value(CONFIG_SECTION_UI, "relaxed_assist", enabled)
-	config.save(CONFIG_PATH)
+	config.save(preferences_path)
 	if _product_session != null:
 		_product_session.request_relaxed_assist(enabled)
 	_sync_relaxed_assist_toggle()
@@ -1023,9 +1025,9 @@ func _configure_simple_digging_selector() -> void:
 func _on_simple_digging_selected(index: int) -> void:
 	var mode := int(_simple_digging_selector.get_item_metadata(index))
 	var config := ConfigFile.new()
-	config.load(CONFIG_PATH)
+	config.load(preferences_path)
 	config.set_value(CONFIG_SECTION_UI, "simple_digging", mode)
-	config.save(CONFIG_PATH)
+	config.save(preferences_path)
 	if _product_session != null:
 		_product_session.request_simple_digging_mode(mode)
 	_sync_simple_digging_selector()
@@ -1049,7 +1051,7 @@ func _sync_simple_digging_selector() -> void:
 ## chassis re-applies it to each freshly configured Jolt runtime.
 func _load_race_mode() -> void:
 	var config := ConfigFile.new()
-	if config.load(CONFIG_PATH) != OK:
+	if config.load(preferences_path) != OK:
 		return
 	if _product_session != null and bool(config.get_value(CONFIG_SECTION_UI, "race_mode", false)):
 		_product_session.request_race_mode(true)
@@ -1060,7 +1062,7 @@ func _load_race_mode() -> void:
 ## runtime and the excavation world, both of which re-apply across rebuilds.
 func _load_assist_options() -> void:
 	var config := ConfigFile.new()
-	if config.load(CONFIG_PATH) != OK:
+	if config.load(preferences_path) != OK:
 		return
 	if _product_session != null:
 		if bool(config.get_value(CONFIG_SECTION_UI, "relaxed_assist", false)):
@@ -1099,16 +1101,16 @@ func _build_capture_controls() -> void:
 	display_toggle.tooltip_text = "右上角显示 FPS、帧时间与 CPU / GPU 耗时。关闭后停止采样；不影响性能录制。"
 	group.add_child(display_toggle)
 	var config := ConfigFile.new()
-	config.load(CONFIG_PATH)
+	config.load(preferences_path)
 	var enabled := bool(config.get_value(CONFIG_SECTION_UI, "performance_overlay", false))
 	display_toggle.set_pressed_no_signal(enabled)
 	_performance_overlay.set_enabled(enabled)
 	display_toggle.toggled.connect(func(value: bool):
 		_performance_overlay.set_enabled(value)
 		var saved := ConfigFile.new()
-		saved.load(CONFIG_PATH)
+		saved.load(preferences_path)
 		saved.set_value(CONFIG_SECTION_UI, "performance_overlay", value)
-		saved.save(CONFIG_PATH)
+		saved.save(preferences_path)
 	)
 	_capture_button = Button.new()
 	_capture_button.text = "开始性能录制 · F12"
@@ -1853,14 +1855,14 @@ func _on_audio_muted(pressed: bool) -> void:
 
 func _save_menu_preference(key: String, value: Variant) -> void:
 	var config := ConfigFile.new()
-	config.load(CONFIG_PATH)
+	config.load(preferences_path)
 	config.set_value(CONFIG_SECTION_UI, key, value)
-	config.save(CONFIG_PATH)
+	config.save(preferences_path)
 
 
 func _load_menu_preferences() -> void:
 	var config := ConfigFile.new()
-	config.load(CONFIG_PATH)
+	config.load(preferences_path)
 	if _feedback != null:
 		_feedback.set_muted(bool(config.get_value(CONFIG_SECTION_UI, "audio_muted", true)))
 		_mute_audio_button.set_pressed_no_signal(_feedback.is_muted())
@@ -1894,14 +1896,14 @@ func show_control_guide() -> void:
 func _on_guide_closed() -> void:
 	(_menu["tabs"] as TabContainer).current_tab = 0
 	var config := ConfigFile.new()
-	config.load(CONFIG_PATH)
+	config.load(preferences_path)
 	config.set_value(CONFIG_SECTION, CONFIG_GUIDE_DISMISSED, true)
-	config.save(CONFIG_PATH)
+	config.save(preferences_path)
 
 
 func _guide_was_dismissed() -> bool:
 	var config := ConfigFile.new()
-	if config.load(CONFIG_PATH) != OK:
+	if config.load(preferences_path) != OK:
 		return false
 	return bool(config.get_value(CONFIG_SECTION, CONFIG_GUIDE_DISMISSED, false))
 

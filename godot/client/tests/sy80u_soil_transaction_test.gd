@@ -23,15 +23,15 @@ func _run() -> void:
 	_expect(int(cut.get("transaction", {}).get("native_path_count", 0)) > 0, "native swept volume used", failures)
 	_expect(authority.material_field.bucket_mass_q > 0, "cut captures stock", failures)
 	_expect(authority.material_field.conservation_error_q == 0, "cut conserves mass", failures)
-	# The rebuilt +Y mouth frame must preserve the ordinary bucket's .5 gate.
+	# Retain below the tuned mouth gate; release without full inversion.
 	var stock := authority.material_field.bucket_mass_q
 	var source := Vector3(0, 3, 24)
-	pose = _dump_pose_with_normal(contract, source, Vector3(sqrt(0.84), -0.4, 0), "sy80u-carry")
+	pose = _dump_pose_with_normal(contract, source, Vector3(sqrt(0.99), -0.1, 0), "sy80u-carry")
 	for tick in range(2, 10):
 		authority.submit_pose(pose, _identity(generation, tick, tick), 0.02)
 		authority.step_fixed(0.02)
 	_expect(authority.material_field.bucket_mass_q == stock, "shallow ordinary mouth retains soil", failures)
-	pose = _dump_pose_with_normal(contract, source, Vector3.DOWN, "sy80u-dump")
+	pose = _dump_pose_with_normal(contract, source, Vector3(sqrt(0.96), -0.2, 0), "sy80u-dump")
 	for tick in range(10, 18):
 		authority.submit_pose(pose, _identity(generation, tick, tick), 0.02)
 	_expect(authority.material_field.bucket_mass_q == stock, "pending dump retains stock", failures)
