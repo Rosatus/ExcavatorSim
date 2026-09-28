@@ -154,15 +154,16 @@ def main():
     descendants(by_name["BUCKET_ROOT"])
     # The small-arm four-bar is deleted along with the whole bucket cylinder
     # assembly that used to drive it (barrel/rod subtrees), the welded base
-    # ears/pin that held the barrel, and the stick's distal pin hardware at
-    # the bucket joint.
+    # ears/pin that held the barrel, the stick's distal pin hardware at
+    # the bucket joint, and the leftover four-bar mounting bosses welded
+    # on the stick.
     descendants(by_name["BUCKET_ROCKER"])
     descendants(by_name["BUCKET_COUPLER"])
     descendants(by_name["BUCKET_CYLINDER_BARREL"])
     descendants(by_name["BUCKET_CYLINDER_ROD"])
     for index, n in enumerate(nodes):
         name = str(n.get("name", ""))
-        if name.startswith("Bucket cylinder base") or name.startswith("Dipper stick_distal_pin"):
+        if name.startswith(("Bucket cylinder base", "Dipper stick_distal_pin", "Fourbar", "Rocker fixed mount")):
             descendants(index)
     for n in nodes:
         if "children" in n:

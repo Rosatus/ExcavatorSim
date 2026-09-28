@@ -30,7 +30,7 @@
   ],
   "source_is_unmodified": true,
   "default_attachment": "xtr13+gb12",
-  "removed_bucket_linkage_cylinder_nodes": 80,
+  "removed_bucket_linkage_cylinder_nodes": 85,
   "cylinders": [
     [
       "BOOM_LIFT_L",

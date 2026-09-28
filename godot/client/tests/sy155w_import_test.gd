@@ -33,6 +33,8 @@ func _run() -> void:
 	_check(asset.find_children("BUCKET_CYLINDER*", "", true, false).is_empty(), "four-bar bucket cylinder is absent")
 	_check(asset.find_children("Bucket cylinder base*", "", true, false).is_empty(), "bucket cylinder mounts are absent")
 	_check(asset.find_children("Dipper stick_distal_pin*", "", true, false).is_empty(), "stick distal pin is absent")
+	_check(asset.find_children("Fourbar*", "", true, false).is_empty(), "four-bar bosses are absent")
+	_check(asset.find_children("Rocker fixed mount*", "", true, false).is_empty(), "rocker mounts are absent")
 	_check(asset.find_children("*", "AnimationPlayer", true, false).is_empty(), "no animation authority remains")
 	_check(hydraulics.snapshot().cylinder_count == 5 and hydraulics.snapshot().hose_count == 12, "all cylinders and hoses resolve")
 	# Independently authored source samples, converted Blender -> glTF -> -Z forward.

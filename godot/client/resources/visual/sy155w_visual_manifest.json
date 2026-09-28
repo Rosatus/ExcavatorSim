@@ -5,19 +5,19 @@
   "source": {
     "path": "C:\\code\\blender\\Excavator\\SY155W\\SANY_SY155W_Animated.glb",
     "sha256": "c7eea3e28a976765502ee0b886af41ff4df8280c1f7f6c5fb40b099a0bc0f3a4",
-    "runtime_sha256": "8ea4c3f542bf8d47dabe4be6cbb5af01e2e7cd27de10251c8c2f6cbabeabc2e6",
+    "runtime_sha256": "bee4936dbea50b28d8c8334abe3ced56f8e35e1c0301014c45e7978e8d26bc0f",
     "byte_size": 25250448,
     "adaptation": "repaired source blend; sample frame 91; rigid pivot coordinate changes; omit bucket subtree, arm four-bar linkage and animation players",
     "semantic_zero_provenance": "Independent build_sy155w.py params(Work_Cycle, .25): [58,-47,-99,97] degrees; own two-piece-boom authority neutral"
   },
   "inspection": {
     "scene_count": 1,
-    "gltf_node_count": 1279,
-    "mesh_count": 754,
+    "gltf_node_count": 1274,
+    "mesh_count": 749,
     "material_count": 16,
     "embedded_image_count": 6,
     "animation_count": 0,
-    "removed_bucket_and_linkage_nodes": 80
+    "removed_bucket_and_linkage_nodes": 85
   },
   "coordinate_system": {
     "source_authoring": "right_handed_blender_z_up",
@@ -655,9 +655,6 @@
         "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_side reinforcement_001",
         "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_weld",
         "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_weld_001",
-        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Fourbar fixed spacer",
-        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Fourbar fixed spacer_001",
-        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Fourbar saddle pad",
         "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Line clamp block_006",
         "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Line clamp block_007",
         "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Line clamp block_008",
@@ -676,8 +673,6 @@
         "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Rigid hydraulic line_009",
         "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Rigid hydraulic line_010",
         "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Rigid hydraulic line_011",
-        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Rocker fixed mount",
-        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Rocker fixed mount_001",
         "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Service fastener_008",
         "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Service fastener_009",
         "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Service fastener_010",
@@ -848,7 +843,7 @@
       ]
     },
     "authority_fixture": "godot/client/tests/fixtures/sy155w_frame_parity_cases.json",
-    "authority_fixture_sha256": "96caa3e99cd0f4fd1b8ebc9bfd2941e9ae08958c3207c9969d92ef99fbe097ee"
+    "authority_fixture_sha256": "9e259844c31adf69ea19fae81f56c7c866eafbb4ed287fc922616e36ba0ef570"
   },
   "runtime_policy": {
     "motion_authority": "selected_runtime_profile",
