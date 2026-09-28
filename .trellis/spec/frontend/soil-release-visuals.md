@@ -277,6 +277,33 @@ failure without writes for stale sources, missing meshes, moved/crossed anchors
 and output/input aliases. Adaptation procedure lives in the attachment skill's
 `references/contained-soil-adaptation.md`; do not duplicate tool-specific bake code.
 
+## SY80U native bucket geometry (2026-09-28)
+
+The native bucket uses `resources/models/sy80u_soil_bake.json` and the same
+geometry-backed mouth/cavity pipeline as attachments. The recipe's
+`catalog_kind: model` selects the model catalog's `models`/`glb_*` fields;
+omitting it retains the attachment `tools`/`tool_glb_*` contract. The shared
+baker updates the selected catalog's soil-contract pin last.
+
+Measure the inner lip and rolled-bowl rear rim at X +/-0.3935, not the outer
+cheeks (+/-0.4435) or tooth tips (Z -0.972). Cavity +Y is the measured outward
+mouth normal, approximately (0,-0.990012,0.140985). The former legacy profile
+contained stale rim coordinates in an unrelated cavity basis and extrapolated
+a metre-scale sloping soil slab. Regenerate through the recipe; do not copy
+another profile's cavity-local rim or hand-edit generated projections.
+Nominal capacity remains 0.24 m3 and the ordinary release down-dot gate 0.5.
+
+SY80U native cutting uses the shared native swept occupancy, lip/floor and
+lift-exit cleanup path. Contact side segments follow the measured body mouth;
+the front wear plate follows the actual sloped lining and the rear blocker
+sits on the rolled back. These soil-contract semantic regions drive production
+bucket obstacle contacts; the physics-rig bucket box does not build that collider.
+
+`sy80u_bucket_soil_test.gd` independently checks imported-mesh containment,
+mouth clearance, closed fill, contact alignment and release axes. Shared fill
+follow/cutter tests include SY80U, and `sy80u_soil_transaction_test.gd` checks
+native terrain cutting and mouth-based dumping with exact ledger conservation.
+
 ## Mode retirement
 
 Only `voxel` / `voxel_bucket_v1` are selectable. Old serialized requests normalize
