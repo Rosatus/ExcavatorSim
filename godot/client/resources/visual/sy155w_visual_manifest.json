@@ -5,19 +5,19 @@
   "source": {
     "path": "C:\\code\\blender\\Excavator\\SY155W\\SANY_SY155W_Animated.glb",
     "sha256": "c7eea3e28a976765502ee0b886af41ff4df8280c1f7f6c5fb40b099a0bc0f3a4",
-    "runtime_sha256": "009f17f797460d100cf8ebae8cb460a5c2cdabd4ab04001e102622f0a5318d49",
+    "runtime_sha256": "8ea4c3f542bf8d47dabe4be6cbb5af01e2e7cd27de10251c8c2f6cbabeabc2e6",
     "byte_size": 25250448,
     "adaptation": "repaired source blend; sample frame 91; rigid pivot coordinate changes; omit bucket subtree, arm four-bar linkage and animation players",
     "semantic_zero_provenance": "Independent build_sy155w.py params(Work_Cycle, .25): [58,-47,-99,97] degrees; own two-piece-boom authority neutral"
   },
   "inspection": {
     "scene_count": 1,
-    "gltf_node_count": 1284,
-    "mesh_count": 759,
+    "gltf_node_count": 1279,
+    "mesh_count": 754,
     "material_count": 16,
     "embedded_image_count": 6,
     "animation_count": 0,
-    "removed_bucket_and_linkage_nodes": 75
+    "removed_bucket_and_linkage_nodes": 80
   },
   "coordinate_system": {
     "source_authoring": "right_handed_blender_z_up",
@@ -646,11 +646,6 @@
       "pivot_axis": "X",
       "visual_nodes": [
         "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick",
-        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_distal_pin",
-        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_distal_pin_collar",
-        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_distal_pin_collar_001",
-        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_distal_pin_retainer",
-        "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_distal_pin_retainer_001",
         "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_proximal_pin",
         "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_proximal_pin_collar",
         "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/Dipper stick_proximal_pin_collar_001",
@@ -853,7 +848,7 @@
       ]
     },
     "authority_fixture": "godot/client/tests/fixtures/sy155w_frame_parity_cases.json",
-    "authority_fixture_sha256": "9318a257c627c03d3f88fd9124a497feac79cfd1892e49f2df495e7e7a7369e3"
+    "authority_fixture_sha256": "96caa3e99cd0f4fd1b8ebc9bfd2941e9ae08958c3207c9969d92ef99fbe097ee"
   },
   "runtime_policy": {
     "motion_authority": "selected_runtime_profile",

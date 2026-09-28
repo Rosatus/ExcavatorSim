@@ -222,7 +222,8 @@ are provisional, not manufacturer hard stops. `PassiveHydraulics` updates five
 cylinder pairs and twelve multi-target hoses after driven poses; it never accepts
 operator commands or writes authority frames. The source small-arm four-bar
 (BUCKET_ROCKER/BUCKET_COUPLER) and the whole bucket-cylinder assembly that drove
-it are removed at import, including the welded base ears/pin on the stick;
+it are removed at import, including the welded base ears/pin on the stick and
+the stick's distal pin hardware at the bucket joint;
 non-planar cylinder pins are still rejected atomically. The arm authority joint extends +30 deg beyond
 the demonstrated source range (rig `arm_joint` limit [-9,+39] deg; positive joint =
 arm_extend per the shared sign profile), `bucket_joint` was widened to
