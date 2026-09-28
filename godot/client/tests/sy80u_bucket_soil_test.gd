@@ -99,7 +99,7 @@ func _run() -> void:
 			for point in [center - delta, center + delta]:
 				_check(_surface_distance(point, bucket_faces) < 0.035, "side blade endpoint detached")
 		elif region.region_id in ["floor_wear_plate", "outer_back"]:
-			var frame := tool._region_transform(region)
+			var frame := tool.region_local_transform(region)
 			var half := Geometry.vector(region.shape.size_m) * 0.5
 			for x in [-1, 0, 1]:
 				for z in [-1, 0, 1]:

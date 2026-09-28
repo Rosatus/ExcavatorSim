@@ -299,8 +299,8 @@ func _check_negative_cases(failures: Array[String]) -> void:
 			_expect(not bool(result.get("accepted", false)), "%s is rejected" % case["name"], failures)
 
 
-func _check_sy135_unengaged_negative_cases(failures: Array[String]) -> void:
-	var contract := _contract("sy135")
+func _check_sy135_unengaged_negative_cases(failures: Array[String], model_id: String = "sy135") -> void:
+	var contract := _contract(model_id)
 	var cutter := Cutter.new()
 	_expect(cutter.configure(contract, WorkZoneConfig.DEFAULT_VOXEL_SCALE_M), "sy135 negative cases configure", failures)
 	if not cutter.configured:

@@ -3,7 +3,14 @@ extends "../bake_bucket_soil.gd"
 
 
 func _run() -> void:
-	var recipe: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://resources/attachments/gb12_s50_soil_bake.json"))
+	for path in ["res://resources/attachments/gb12_s50_soil_bake.json", "res://resources/models/sy80u_soil_bake.json"]:
+		_check_recipe(path)
+	print("bucket_soil_bake_test: PASS")
+	quit(0)
+
+
+func _check_recipe(recipe_path: String) -> void:
+	var recipe: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(recipe_path))
 	var before := {}
 	for path in [recipe.profile_path, recipe.contract_path, recipe.catalog_path]:
 		before[path] = FileAccess.get_sha256(path)
@@ -11,6 +18,8 @@ func _run() -> void:
 	assert(not first.has("error"), str(first.get("error")))
 	var second := bake(recipe)
 	assert(first.outputs == second.outputs, "bake must be deterministic")
+	for path in first.outputs:
+		assert(FileAccess.get_file_as_string(path) == first.outputs[path], "generated resource drift: " + path)
 	for kind in ["source_hash", "missing_mesh", "moved_anchor", "crossed_mouth", "overwritten_input"]:
 		var bad := recipe.duplicate(true)
 		match kind:
@@ -26,5 +35,3 @@ func _run() -> void:
 		assert(result.has("error") and not result.has("outputs"), kind + " must fail before writes")
 	for path in before:
 		assert(FileAccess.get_sha256(path) == before[path], "bake validation must not mutate resources")
-	print("bucket_soil_bake_test: PASS")
-	quit(0)
