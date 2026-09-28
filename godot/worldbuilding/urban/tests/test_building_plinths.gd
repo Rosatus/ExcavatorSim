@@ -7,8 +7,10 @@ extends McpTestSuite
 ## ~3-30cm above the drivable surface (GroundPlane top y=1.08, sidewalk
 ## slabs ~1.297). The BuildingPlinths MultiMesh drops a concrete skirt
 ## under every ground-floor module: footprint + 5cm margin, top embedded
-## 2.5cm into the module, bottom 80cm below the module origin. Visual
-## only -- the node must carry no colliders.
+## 2.5cm into the module, bottom 80cm below the module origin. A sibling
+## StaticBody3D "BuildingPlinthsCollision" mirrors every plinth instance
+## with a matching box collider so tracked machines cannot clip through
+## building foundations.
 
 const GROUND_FLOOR_MAX_Y := 2.0
 const TOP_EMBED := 0.025
@@ -83,20 +85,13 @@ func test_every_ground_floor_module_has_plinth() -> void:
 	assert_true(mm.instance_count == modules.size(), "plinth count must match ground-floor module count")
 
 	# verify each module's expected plinth transform exists in the array
-	var ta := mm.transform_array
+	var buf := mm.buffer
 	var missing := 0
 	for n in modules:
 		var want := _expected_plinth_transform(n, FOOTPRINT[n.scene_file_path.get_file().get_basename()])
 		var found := false
 		for i in mm.instance_count:
-			var b := i * 4
-			# transform_array vec3s are matrix ROWS (row0, row1, row2, origin)
-			var r0: Vector3 = ta[b]; var r1: Vector3 = ta[b + 1]; var r2: Vector3 = ta[b + 2]
-			var got := Transform3D(
-				Basis(Vector3(r0.x, r1.x, r2.x),
-					Vector3(r0.y, r1.y, r2.y),
-					Vector3(r0.z, r1.z, r2.z)),
-				ta[b + 3])
+			var got := _read_instance(buf, i)
 			if got.origin.distance_to(want.origin) < 0.01 \
 					and abs(got.basis.x.length() - want.basis.x.length()) < 0.01:
 				found = true
@@ -108,11 +103,47 @@ func test_every_ground_floor_module_has_plinth() -> void:
 	assert_true(missing == 0, "%d modules without matching plinth" % missing)
 
 
-func test_plinths_have_no_colliders() -> void:
+## MultiMesh.buffer stores 12 floats per instance:
+## (basis row0, origin.x), (basis row1, origin.y), (basis row2, origin.z).
+func _read_instance(buf: PackedFloat32Array, i: int) -> Transform3D:
+	var b := i * 12
+	return Transform3D(Basis(
+		Vector3(buf[b], buf[b + 4], buf[b + 8]),
+		Vector3(buf[b + 1], buf[b + 5], buf[b + 9]),
+		Vector3(buf[b + 2], buf[b + 6], buf[b + 10])),
+		Vector3(buf[b + 3], buf[b + 7], buf[b + 11]))
+
+
+func test_plinth_colliders_match_multimesh() -> void:
 	var root := EditorInterface.get_edited_scene_root()
 	var pl := root.get_node_or_null("BuildingPlinths") as MultiMeshInstance3D
 	assert_true(pl != null, "BuildingPlinths node missing")
-	if pl == null:
+	var body := root.get_node_or_null("BuildingPlinthsCollision") as StaticBody3D
+	assert_true(body != null, "BuildingPlinthsCollision body missing")
+	if pl == null or body == null:
 		return
-	var bodies := pl.find_children("*", "CollisionObject3D", true, false)
-	assert_true(bodies.size() == 0, "plinths are visual-only; no colliders allowed")
+	var shapes := body.find_children("*", "CollisionShape3D", true, false)
+	assert_true(shapes.size() == pl.multimesh.instance_count,
+		"collider count %d must match plinth count %d" % [shapes.size(), pl.multimesh.instance_count])
+	var buf := pl.multimesh.buffer
+	var unmatched := 0
+	for i in pl.multimesh.instance_count:
+		var inst := _read_instance(buf, i)
+		# the plinth covers a unit box under its basis; compare world AABBs so
+		# yaw-rotated instances (axes permuted in the shared BoxShape) still match
+		var want_aabb := inst * AABB(-Vector3.ONE * 0.5, Vector3.ONE)
+		var found := false
+		for s in shapes:
+			var cs := s as CollisionShape3D
+			var box := cs.shape as BoxShape3D
+			if box == null:
+				continue
+			var got_aabb := cs.global_transform * AABB(-box.size * 0.5, box.size)
+			if got_aabb.position.distance_to(want_aabb.position) < 0.01 \
+					and got_aabb.size.distance_to(want_aabb.size) < 0.01:
+				found = true
+				break
+		if not found:
+			unmatched += 1
+			push_warning("plinth %d has no matching collider aabb=%s" % [i, want_aabb])
+	assert_true(unmatched == 0, "%d plinths without matching collider" % unmatched)

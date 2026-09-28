@@ -15,7 +15,7 @@ func _run() -> void:
 		return
 	_expect(await _wait_initial_ready(zone), "urban voxel collision is ready", failures)
 	var center: Vector3 = zone.layout.ORIGIN_WORLD
-	_expect(center.is_equal_approx(Vector3(31.7, 1.3, 30.225)), "voxel zone sits on the cleared sidewalk strip", failures)
+	_expect(center.is_equal_approx(Vector3(31.7, 1.1, 30.225)), "voxel zone sits on the cleared sidewalk strip", failures)
 	_expect(zone.layout.SIZE_WORLD_M.is_equal_approx(Vector3(15.8, 10.0, 5.55)), "voxel volume spans curb to under the foundations", failures)
 	var space = scene.get_world_3d().direct_space_state
 	var map_rid: RID = scene.get_node("StaticMap/Ground").collision.get_rid()
@@ -24,6 +24,7 @@ func _run() -> void:
 	var editable: AABB = zone.layout.editable_world_bounds(zone.voxel_scale_m)
 	var hard_remnants := 0
 	var off_profile_samples := 0
+	var terrain_hits := 0
 	for z in range(ceili(editable.position.z), floori(editable.end.z)):
 		for x in range(ceili(editable.position.x), floori(editable.end.x)):
 			var interior_ray := PhysicsRayQueryParameters3D.create(Vector3(x, 4, z), Vector3(x, -5, z), 1)
@@ -31,9 +32,18 @@ func _run() -> void:
 			if interior_hit.is_empty() or interior_hit.get("rid", RID()) == map_rid:
 				hard_remnants += 1
 			else:
+				# Authored props (cones, fences, plinths) may stand inside the
+				# strip; only voxel-terrain hits prove the soil profile.
+				var hit_body := instance_from_id(interior_hit.get("collider_id", 0)) as Node
+				var hit_is_terrain: bool = hit_body == zone.terrain \
+					or (hit_body != null and zone.terrain.is_ancestor_of(hit_body))
+				if not hit_is_terrain:
+					continue
+				terrain_hits += 1
 				var expected_y: float = center.y + generator.surface_height_m(x - center.x, z - center.z)
 				if absf(interior_hit.position.y - expected_y) > 0.35:
 					off_profile_samples += 1
+	_expect(terrain_hits > 0, "editable interior probes reach voxel soil", failures)
 	_expect(hard_remnants == 0, "editable interior has no missing soil or retained slab collision", failures)
 	_expect(off_profile_samples == 0, "initial soil matches the municipal trench profile", failures)
 	# The pipe-trench half dug along -X; the +X half waits at grade.
@@ -77,6 +87,16 @@ func _run() -> void:
 	var support: Dictionary = chassis._jolt_runtime.get_post_step_snapshot()
 	_expect(int(support.get("track_support_source_counts", {}).get("voxel_terrain", 0)) > 0, "tracks accept voxel soil inside the strip", failures)
 	_expect(chassis.global_position.y > center.y - 2.0, "chassis does not fall through the strip", failures)
+	# The live automatic path: real chassis pose sampling must reach the voxel
+	# authority, so digging can never silently stall on no_pose/identity gates.
+	var live_status: Dictionary = excavation.get_status_snapshot()
+	var live_pose := live_status.get("bucket_pose", {}) as Dictionary
+	_expect(bool(live_pose.get("valid", false)), "live bucket pose samples for automatic digging", failures)
+	var live_state := String(live_status.get("interaction_state", ""))
+	print("URBAN_LIVE pose_valid=%s state=%s" % [live_pose.get("valid", false), live_state])
+	_expect(live_state != "no_pose" and live_state != "voxel_identity_rejected"
+		and live_state != "voxel_authority_unavailable",
+		"automatic interaction reaches the authority, got %s" % live_state, failures)
 	# Product reset restores the designed half-dug surface.
 	var generation: int = zone.readiness.generation
 	_expect(scene.get_node("ProductSession").request_reset(), "product reset accepts voxel map", failures)

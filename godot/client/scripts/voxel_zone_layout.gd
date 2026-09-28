@@ -117,8 +117,8 @@ func _validated_scale(scale_m: float) -> float:
 	return scale_m
 
 
-func configure_area(center: Vector3, size_xz: Vector2) -> void:
-	perimeter_inset_m = 1.5
+func configure_area(center: Vector3, size_xz: Vector2, inset_m: float = 1.5) -> void:
+	perimeter_inset_m = inset_m
 	ORIGIN_WORLD = center
 	SIZE_WORLD_M = Vector3(size_xz.x, 10.0, size_xz.y)
 	MIN_WORLD = center - Vector3(size_xz.x / 2.0, 6.0, size_xz.y / 2.0)

@@ -24,3 +24,17 @@ Track support accepts the immutable 1 m apron outside the semantic soil rectangl
 only when the hit point's own canonical collision block is ready. Initial surface
 readiness registers the apron blocks as well as the interior. This does not
 expand `owns_world_xz`, editable soil bounds or excavation authorization.
+
+`WorkArea/ExcavationArea` meta `editable_inset_m` overrides the default 1.5 m
+protected perimeter per map; the urban strip sets 0.3 m so the whole bucket
+sweep fits inside its 5.55 m width. The urban strip grade is the sidewalk slab
+top (~1.10 m): `ExcavationArea.position.y = 1.1`, with the 2.5 m trench bottom
+near -1.4 m. Building plinth visuals (`BuildingPlinths` MultiMesh, 378 ground-
+floor skirt instances) are mirrored by a generated `BuildingPlinthsCollision`
+StaticBody3D with one `CollisionShape3D` per instance sharing 38 BoxShapes;
+the collider's transform carries the plinth rotation and the box carries the
+basis-column extents, so regenerating must decode `MultiMesh.buffer` rows as
+(row0|ox, row1|oy, row2|oz) and compare world AABBs. Plinths legitimately
+overlap the strip's north edge (digging stops at foundations); keep them out
+of the trench's dug half. Voxel-profile probes must ignore hits that are not
+`zone.terrain` — authored props (pylons, plinths) occlude rays inside the strip.

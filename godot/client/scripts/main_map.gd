@@ -52,7 +52,8 @@ func _enter_tree() -> void:
 	var area := map.get_node_or_null("WorkArea/ExcavationArea") as Node3D
 	if area != null and area.get_meta("status", "") == "voxel":
 		var zone := $TerrainRoot/VoxelWorkZone
-		zone.layout.configure_area(area.global_position, area.get_meta("size_m"))
+		zone.layout.configure_area(area.global_position, area.get_meta("size_m"),
+			float(area.get_meta("editable_inset_m", 1.5)))
 		# Start as a half-excavated foundation pit: the approach half is already
 		# dug with a machinery ramp, the far half remains at grade for digging.
 		# Depth travels with the map so other voxel maps stay undisturbed.
