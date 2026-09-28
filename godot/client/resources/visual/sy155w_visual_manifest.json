@@ -860,7 +860,7 @@
       ]
     },
     "authority_fixture": "godot/client/tests/fixtures/sy155w_frame_parity_cases.json",
-    "authority_fixture_sha256": "7846444ee1109be7a38727ff2bf5040731ed0e5a43d9f5ccd99107ec9bf92016"
+    "authority_fixture_sha256": "bde0a6c6a138ea48ae4ad819a9280f52ee3ee6a37f59e165185301a075675e84"
   },
   "runtime_policy": {
     "motion_authority": "selected_runtime_profile",
@@ -887,7 +887,7 @@
           1,
           1
         ],
-        "min_degrees": -10.0,
+        "min_degrees": -30.0,
         "max_degrees": 10.0,
         "max_rate_degrees_per_second": 12.0,
         "positive_semantic": "unfold",
@@ -896,7 +896,7 @@
           "positive_action": "operator_boom_swing_right",
           "negative_action": "operator_boom_swing_left"
         },
-        "evidence": "Source Work_Cycle -57..-37 deg; conservative demonstrated range, not factory limits"
+        "evidence": "Source Work_Cycle -57..-37 deg; fold side extended past the demonstrated range at user request, not a factory limit"
       }
     ]
   },

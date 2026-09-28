@@ -299,7 +299,7 @@ def main():
                 "runtime_axis": "X",
                 "local_position": [0, 0, -1.93],
                 "scale": [1, 1, 1],
-                "min_degrees": -10.0,
+                "min_degrees": -30.0,
                 "max_degrees": 10.0,
                 "max_rate_degrees_per_second": 12.0,
                 "positive_semantic": "unfold",
@@ -309,8 +309,8 @@ def main():
                     "negative_action": "operator_boom_swing_left",
                 },
                 "evidence": (
-                    "Source Work_Cycle -57..-37 deg; "
-                    "conservative demonstrated range, not factory limits"
+                    "Source Work_Cycle -57..-37 deg; fold side extended past the "
+                    "demonstrated range at user request, not a factory limit"
                 ),
             }
         ],

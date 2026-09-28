@@ -59,7 +59,7 @@ func _run() -> void:
 	_expect(mask == Vector4(0.5, -0.5, 0.25, 0.0),
 			"boom_swing layer did not mask the bucket axis: %s" % mask)
 	pad_held["pad_layer_dpad_up"] = true
-	axis_values["operator_boom_raise|operator_boom_lower"] = 0.6
+	axis_values["operator_boom_lower|operator_boom_raise"] = 0.6
 	_expect(is_equal_approx(mapper.read_local_axis("boom_fold", base_pair[0], base_pair[1]), 0.6),
 			"D-pad-up layer did not drive boom_fold from right-stick Y")
 	mask = mapper.mask_operator_axes(Vector4(0.5, -0.5, 0.25, -0.25))

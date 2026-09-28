@@ -48,8 +48,8 @@ const LOCAL_PAD_LAYERS := {
 	},
 	"boom_fold": {
 		"pad_modifier_action": "pad_layer_dpad_up",
-		"pad_negative_action": "operator_boom_raise",
-		"pad_positive_action": "operator_boom_lower",
+		"pad_negative_action": "operator_boom_lower",
+		"pad_positive_action": "operator_boom_raise",
 	},
 }
 

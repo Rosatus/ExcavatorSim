@@ -54,7 +54,7 @@ func _run() -> void:
 	Input.action_release("pad_layer_dpad_down")
 	Input.action_press("pad_layer_dpad_up")
 	hud.refresh_input_state_for_test()
-	check(hud._captions["operator_boom_lower"].text == "展开", "D-pad-up layer did not relabel boom axis")
+	check(hud._captions["operator_boom_lower"].text == "折叠", "D-pad-up layer did not relabel boom axis")
 	check(hud._captions["operator_bucket_curl"].text == "斗收", "D-pad-up layer touched an unborrowed axis")
 	Input.action_release("pad_layer_dpad_up")
 	hud.refresh_input_state_for_test()

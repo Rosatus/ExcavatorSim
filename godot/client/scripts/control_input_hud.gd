@@ -33,7 +33,7 @@ const DPAD_CAPTIONS := ["双截", "偏摆", "倾旋", "—"]
 ## indices 4..7 = up/left/down/right) relabel to the layer function. Applied
 ## in listing order so the tiltrotator layer wins its shared bucket pair.
 const PAD_LAYER_OVERRIDES := {
-	"pad_layer_dpad_up": {4: "展开", 6: "折叠"},
+	"pad_layer_dpad_up": {4: "折叠", 6: "展开"},
 	"pad_layer_dpad_left": {5: "偏摆左", 7: "偏摆右"},
 	"pad_layer_dpad_down": {4: "后倾", 5: "左旋", 6: "前倾", 7: "右旋"},
 }

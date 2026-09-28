@@ -214,7 +214,10 @@ SY155W is a wheeled two-piece boom, with a source-specific authority neutral
 single-boom SY135 zero convention to its hydraulic geometry. `tools/import_sy155w.py`
 cross-checks independent source equations, then builds its own rig/URDF/fixture.
 The outer-boom fold sits between boom and arm as a local +X axis (`boom_fold`):
-E folds, U unfolds, relative limits [-10,+10] degrees. Source demonstration ranges
+E folds, U unfolds, relative limits [-30,+10] degrees — the fold side was widened
+past the demonstrated source range at user request. On pad, D-pad Up borrows
+right-stick Y with up=fold/down=unfold (the pair was flipped from the original
+layout per operator preference). Source demonstration ranges
 are provisional, not manufacturer hard stops. `PassiveHydraulics` updates six
 cylinder pairs and twelve multi-target hoses after driven poses; it never accepts
 operator commands or writes authority frames. The source small-arm four-bar
