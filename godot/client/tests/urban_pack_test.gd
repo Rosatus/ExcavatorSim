@@ -17,6 +17,13 @@ func run() -> void:
 		return
 	catalog.active_map_id = "urban"
 	catalog.retained_model_id = "sy135"
+	for shader_name in ["Flag_Inst", "Foliage_01_Inst", "prp_tarp_mat"]:
+		var wind := load("res://maps/urban/Shaders/%s.tres" % shader_name) as VisualShader
+		check(wind != null, "Urban pack lost wind shader: " + shader_name)
+		if wind != null:
+			var code := wind.get_code()
+			check(not code.contains("INV_VIEW_MATRIX * vec4( VERTEX") and code.contains("MODEL_MATRIX * vec4( VERTEX"),
+				"Packed wind phase depends on camera: " + shader_name)
 	var start_usec := Time.get_ticks_usec()
 	var scene := load("res://scenes/main.tscn").instantiate() as Node3D
 	root.add_child(scene)

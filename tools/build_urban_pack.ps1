@@ -28,6 +28,7 @@ if (-not $SkipImport) {
     Run-Godot @('--headless', '--path', "`"$project`"", '--editor', '--import') 'map-import'
 }
 $tempPack = "$Output.pending"
+Run-Godot @('--headless', '--path', "`"$project`"", '--script', 'res://tests/_check_wind_shader.gd') 'wind-shader-check'
 Run-Godot @('--headless', '--path', "`"$project`"", '--script', 'res://tools/build_pack.gd', '--', "`"$tempPack`"") 'map-pack'
 Move-Item -LiteralPath $tempPack -Destination $Output -Force
 # The editor and release staging resolve packs from godot/dist/maps; mirror the
