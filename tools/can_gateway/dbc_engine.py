@@ -29,6 +29,10 @@ PROTOCOL_DBC_HASHES = {
     "can3.sy135c.dbc": "dc48542fda0ad369a3a30d0d13e74df1cdcc4c9bab71f01e9be3e56df99e7b58",
     "can4.sy135c.dbc": "fe7dd152c256b8c3d1999792fad66e8872d08d1053c56c51a2272f2978a5e3c1",
 }
+SY80U_DBC_HASHES = {
+    "can3.sy80c6y5lu.dbc": "b8fe11cf672dc020acecde957df4a286630aafcedf332cbd8fbab90b137ee6f5",
+    "can4.sy80c6y5lu.dbc": "ccaa2675a953db326e4d7158843daf477e2891f5cd9f7b3b26f87c1500f93a5d",
+}
 RTK_FRAME_IDS = tuple(0x0CFDA000 + offset * 0x100 for offset in range(10))
 IMU_ANGLE_FRAME_IDS = (0x18FF3A00, 0x18FF3B00, 0x18FF3C00, 0x18FF3D00)
 GPS_EPOCH_UNIX_S = 315_964_800.0
@@ -164,9 +168,7 @@ def _signal_definition(signal: Any) -> DbcSignalDefinition:
     )
 
 
-def _message_definition(
-    message: Any, content_hash: str, source_name: str
-) -> DbcMessageDefinition:
+def _message_definition(message: Any, content_hash: str, source_name: str) -> DbcMessageDefinition:
     signals = tuple(_signal_definition(signal) for signal in message.signals)
     layout = json.dumps(
         {
@@ -324,6 +326,18 @@ class DbcCodec:
         for signal in native.signals:
             if signal.is_multiplexer:
                 default_value = self._default_value(signal)
+                branch_ids = sorted(
+                    {
+                        branch
+                        for child in native.signals
+                        if child.multiplexer_signal == signal.name
+                        for branch in (child.multiplexer_ids or [])
+                    }
+                )
+                if branch_ids and self._multiplexer_raw(signal, default_value) not in branch_ids:
+                    default_value = float(
+                        signal.conversion.raw_to_scaled(branch_ids[0], decode_choices=False)
+                    )
                 values[signal.name] = default_value
                 multiplexers[signal.name] = self._multiplexer_raw(signal, default_value)
         for signal in native.signals:
@@ -972,9 +986,12 @@ class OperatorDbcRuntime:
         self.scheduler.replace(entries)
 
 
-def load_protocol_codec(bundled_root: Path) -> DbcCodec:
+def load_protocol_codec(bundled_root: Path, model: str = "sy135") -> DbcCodec:
     """Load only the approved bundled files and reject any protocol drift."""
-    for name, expected_hash in PROTOCOL_DBC_HASHES.items():
+    hashes = SY80U_DBC_HASHES if model == "sy80u" else PROTOCOL_DBC_HASHES
+    if model == "sy80u":
+        bundled_root = bundled_root / "sy80u"
+    for name, expected_hash in hashes.items():
         path = bundled_root / name
         try:
             actual_hash = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -1012,6 +1029,27 @@ def encode_godot_imu(codec: DbcCodec, frame_id: int, slot_counts: Iterable[int])
         "temp": 0.0,
         "reversed_56": 0.0,
     }
+    return codec.encode_frame(frame_id, values)
+
+
+def encode_sy80u_imu(
+    codec: DbcCodec,
+    frame_id: int,
+    reported_rpy: tuple[float, float, float],
+) -> bytes:
+    """Invert SY80's parser R/P remap; its signed IMU has no 180-degree bias."""
+    roll, pitch, yaw = reported_rpy
+    values = {
+        "Pitch_Angle": -pitch,
+        "Roll_Angle": roll,
+        "Yaw_Angle": (yaw + 180.0) % 360.0 - 180.0,
+        "temp": 0.0,
+        "reversed_56": 0.0,
+    }
+    # Only the all-zero quantized triple is an invalid sensor marker. Yaw is
+    # unused by GuideSystem's joint/body kinematics (heading comes from RTK).
+    if all(round(values[name] * 100) == 0 for name in ("Pitch_Angle", "Roll_Angle", "Yaw_Angle")):
+        values["Yaw_Angle"] = 0.01
     return codec.encode_frame(frame_id, values)
 
 

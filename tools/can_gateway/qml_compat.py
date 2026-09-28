@@ -65,6 +65,7 @@ class QmlPoseProjection:
     velocity_enu_mps: tuple[float, float, float, float]
     wire_heading_deg: float
     satellite_status: int
+    boom_swing_deg: float = 0.0  # Godot local +Y == QML local +Z == DBC SWING
 
     def main_geodetic(self) -> tuple[float, float, float]:
         return enu_to_geodetic(self.main_antenna_enu_m)
@@ -135,6 +136,10 @@ class QmlCanMapper:
         imu_rpy: dict[str, tuple[float, float, float]] = {
             "body": (wire_body_roll, wire_body_pitch, body_heading),
         }
+        if self.profile.model_id == "sy80u":
+            # SY80 VAL swaps parser axes once more before the common service:
+            # kin pitch = DBC roll + eR; kin roll = DBC pitch - eP.
+            imu_rpy["body"] = (wire_body_pitch, -wire_body_roll, body_heading)
         for link, reported_pitch in zip(
             ("boom", "arm", "bucket"),
             (boom_pitch, arm_pitch, bucket_pitch),
@@ -165,6 +170,7 @@ class QmlCanMapper:
             velocity_enu_mps=velocity,
             wire_heading_deg=wire_heading,
             satellite_status=self.profile.satellite_status,
+            boom_swing_deg=self._boom_swing(sample),
         )
         self._previous_tick_ms = sample.tick_ms
         self._previous_main_enu_m = main_enu
@@ -198,6 +204,9 @@ class QmlCanMapper:
                 quat_inverse(sample.bodies[parent].quat_xyzw),
                 sample.bodies[child].quat_xyzw,
             )
+            if self.profile.model_id == "sy80u" and child == "boom":
+                half = math.radians(self._boom_swing(sample)) * 0.5
+                relation = quat_multiply((0.0, -math.sin(half), 0.0, math.cos(half)), relation)
             neutral_quat = quat_x_degrees(neutral_deg)
             delta = quat_normalize(quat_multiply(quat_inverse(neutral_quat), relation))
             if delta[3] < 0.0:
@@ -210,6 +219,17 @@ class QmlCanMapper:
                 )
             values.append(math.degrees(2.0 * math.atan2(delta[0], delta[3])))
         return values[0], values[1], values[2]
+
+    def _boom_swing(self, sample: TelemetrySample) -> float:
+        if self.profile.model_id != "sy80u":
+            return 0.0
+        relation = quat_multiply(
+            quat_inverse(sample.bodies["upper"].quat_xyzw),
+            sample.bodies["boom"].quat_xyzw,
+        )
+        matrix = quat_to_matrix(relation)
+        # R = Ry(side swing) Rx(boom). The first column is independent of boom.
+        return math.degrees(math.atan2(-matrix[2][0], matrix[0][0]))
 
 
 def qml_exca_from_godot_quaternion(quaternion: Quaternion) -> Matrix3:

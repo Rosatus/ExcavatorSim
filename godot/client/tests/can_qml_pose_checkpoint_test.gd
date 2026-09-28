@@ -11,6 +11,8 @@ const TRANSFORM_EPSILON := 2.0e-4
 const QML_PROFILE_NEUTRAL_RELATION_DEG := [35.0, -90.0, -50.0]
 
 var failures: Array[String] = []
+var model_id := "sy135"
+var packets: Array[Dictionary] = []
 
 
 func _init() -> void:
@@ -18,13 +20,22 @@ func _init() -> void:
 
 
 func _run() -> void:
+	if OS.get_environment("CAN_POSE_MODEL") == "sy80u":
+		model_id = "sy80u"
 	await _capture_case("neutral", -1)
 	for joint_index in JOINT_NAMES.size():
 		await _capture_case("%s_positive" % JOINT_NAMES[joint_index], joint_index)
+	if model_id == "sy80u":
+		await _capture_case("swing_left", -1, 65.0)
+		await _capture_case("swing_right", -1, -51.0)
+	var output := OS.get_environment("CAN_POSE_OUTPUT")
+	if not output.is_empty():
+		var file := FileAccess.open(output, FileAccess.WRITE)
+		file.store_string(JSON.stringify(packets))
 	_finish()
 
 
-func _capture_case(label: String, joint_index: int) -> void:
+func _capture_case(label: String, joint_index: int, side_deg: float = 0.0) -> void:
 	var scene := load(MAIN_SCENE).instantiate() as Node3D
 	if scene == null:
 		_fail("%s: main scene did not instantiate" % label)
@@ -34,7 +45,7 @@ func _capture_case(label: String, joint_index: int) -> void:
 	await process_frame
 	await physics_frame
 	var helper = CAPTURE_HELPER.new()
-	var configured: Dictionary = await helper.configure_product_for_capture(scene, "sy135", "low")
+	var configured: Dictionary = await helper.configure_product_for_capture(scene, model_id, "low")
 	if not bool(configured.get("ok", false)):
 		_fail("%s: product configuration failed: %s" % [label, configured])
 		await _free_scene(scene)
@@ -56,6 +67,10 @@ func _capture_case(label: String, joint_index: int) -> void:
 		return
 	if joint_index >= 0:
 		await _drive_joint(chassis, runtime, joint_index)
+	if side_deg != 0.0:
+		var presentation := scene.get_node("MotionPresentation") as MotionPresentation
+		if not presentation.set_local_axis_angle_for_test("boom_swing", side_deg):
+			_fail("side swing could not be configured")
 	var snapshot := runtime.get_post_step_snapshot()
 	var bridge := root.get_node_or_null("CanTelemetryBridge")
 	if bridge == null:
@@ -69,7 +84,11 @@ func _capture_case(label: String, joint_index: int) -> void:
 	bridge.set("_chassis", null)
 	bridge.call("_resolve_once")
 	var packet: PackedByteArray = bridge.call("_build_packet", Time.get_ticks_msec())
-	_assert_checkpoint(label, scene, snapshot, packet)
+	if packet.size() > 8:
+		if packet[4] != 2 or packet.decode_u16(6) != (2 if model_id == "sy80u" else 1):
+			_fail("telemetry model/version does not match active presentation")
+	packets.append({"label": label, "model": model_id, "packet_hex": packet.hex_encode(), "side_deg": side_deg})
+	_assert_checkpoint(label, scene, snapshot, packet, side_deg == 0.0)
 	helper.release_product_after_capture(scene)
 	await _free_scene(scene)
 
@@ -110,6 +129,7 @@ func _assert_checkpoint(
 	scene: Node3D,
 	snapshot: Dictionary,
 	packet: PackedByteArray,
+	compare_authority: bool = true,
 ) -> void:
 	if packet.size() != 176:
 		_fail("%s: packet size %d != 176" % [label, packet.size()])
@@ -136,7 +156,9 @@ func _assert_checkpoint(
 			continue
 		var visual_transform := node.global_transform
 		var truth_transform := authoritative[frame_name] as Transform3D
-		_assert_transform_close(label, frame_name, visual_transform, truth_transform)
+		# Side swing is an existing presentation-local articulation layer.
+		if compare_authority:
+			_assert_transform_close(label, frame_name, visual_transform, truth_transform)
 		if packet_origin.distance_to(visual_transform.origin) > TRANSFORM_EPSILON:
 			_fail("%s: %s packet origin differs from presentation" % [label, frame_name])
 		var visual_quat := visual_transform.basis.orthonormalized().get_rotation_quaternion().normalized()

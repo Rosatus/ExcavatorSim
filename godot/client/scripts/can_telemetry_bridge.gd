@@ -17,6 +17,10 @@ const HEARTBEAT_MAGIC := 0x43544E4B  # "CTNK"
 const SESSION_DONE_MAGIC := 0x43544E44  # "CTND"
 const ICT_RESULT_MAGIC := 0x43544E52  # "CTNR"
 const PROTOCOL_VERSION := 1
+const TELEMETRY_VERSION := 2
+# SY135 NEO is a visual variant of SY135. Keep its wire identity identical so
+# skin switches preserve the gateway profile, PC001 socket and handshake.
+const TELEMETRY_MODELS := {"sy135": 1, "sy135neo": 1, "sy80u": 2}
 const CMD_RECORD_START := 1
 const CMD_RECORD_STOP := 2
 const CMD_SHUTDOWN := 3
@@ -46,7 +50,7 @@ enum GatewayLifecycle { IDLE, STARTING, STOPPING, FAILED }
 @export var web_port := DEFAULT_WEB_PORT
 @export var auto_spawn := true
 @export var python_command := "python"
-## Machine model selecting the gateway IMU mount-compensation table.
+## Startup/legacy model. Each telemetry v2 packet selects the active rig.
 @export var model_id := "sy135"
 ## QML is the CAN semantic authority; the gateway fails closed if this strict
 ## profile or its SHA-bound calibration cannot be loaded.
@@ -800,12 +804,16 @@ func _resolve_once() -> void:
 
 func _build_packet(tick_ms: int) -> PackedByteArray:
 	_send_buffer.clear()
+	var active_model: String = _presentation.get_active_model_id()
+	# Unsupported rigs must never be transmitted with another machine's layout.
+	if not TELEMETRY_MODELS.has(active_model):
+		return PackedByteArray()
 	var header := StreamPeerBuffer.new()
 	header.big_endian = false
 	header.put_32(TELEMETRY_MAGIC)
-	header.put_8(PROTOCOL_VERSION)
+	header.put_8(TELEMETRY_VERSION)
 	header.put_8(0)
-	header.put_16(0)
+	header.put_16(TELEMETRY_MODELS[active_model])
 	header.put_64(tick_ms)
 	_send_buffer.append_array(header.data_array)
 

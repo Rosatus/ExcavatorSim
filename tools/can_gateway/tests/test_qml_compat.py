@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 TOOLS_DIR = Path(__file__).resolve().parents[1]
 if str(TOOLS_DIR) not in sys.path:
@@ -301,6 +302,41 @@ class QmlGatewayIntegrationTest(unittest.TestCase):
         with self.assertRaises(QmlMappingError):
             emit_frames([sink], scheduler, invalid, qml_mapper=QmlCanMapper(self.profile))
         self.assertEqual(sink.frames, [])
+
+    def test_encoding_rejection_does_not_advance_projection_history(self) -> None:
+        mapper = QmlCanMapper(self.profile)
+        scheduler = FrameScheduler({"imu": 100, "slew": 100, "rtk": 100, "travel": 100})
+        sink = _CollectingSink()
+        emit_frames([sink], scheduler, make_sample(tick_ms=1000), qml_mapper=mapper)
+        baseline = mapper._previous_main_enu_m
+        sink.frames.clear()
+        with (
+            patch("gateway.encode_godot_rtk", side_effect=OverflowError("invalid RTK")),
+            self.assertRaises(QmlMappingError),
+        ):
+            emit_frames([sink], scheduler, make_sample(tick_ms=1100), qml_mapper=mapper)
+        self.assertEqual(sink.frames, [])
+        self.assertEqual(mapper._previous_tick_ms, 1000)
+        self.assertEqual(mapper._previous_main_enu_m, baseline)
+        emit_frames([sink], scheduler, make_sample(tick_ms=1100), qml_mapper=mapper)
+        self.assertEqual(len(sink.frames), 16)
+
+    def test_scaled_quaternions_keep_existing_normalization_behavior(self) -> None:
+        from conventions import PACKET_STRUCT, parse_packet
+
+        sample = make_sample()
+        values = []
+        for pose in sample.bodies.values():
+            values.extend(value * 1.01 for value in pose.quat_xyzw)
+            values.extend(pose.origin_m)
+        packet = PACKET_STRUCT.pack(0x314E5443, 1, 0, 0, sample.tick_ms,
+                                    *values, 0.0, 0.0, 0.0, 0.0, 0.0)
+        parsed = parse_packet(packet)
+        self.assertIsNotNone(parsed)
+        sink = _CollectingSink()
+        emit_frames([sink], FrameScheduler({"imu": 100, "slew": 100, "rtk": 100, "travel": 100}),
+                    parsed, qml_mapper=QmlCanMapper(self.profile))
+        self.assertEqual(len(sink.frames), 16)
 
     def test_non_finite_origin_is_rejected_before_any_frame_is_sent(self) -> None:
         sample = make_sample()

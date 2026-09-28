@@ -1,4 +1,4 @@
-"""CAN telemetry gateway: sim UDP packets -> SY135C CAN frames -> CSV / SocketCAN.
+"""CAN telemetry gateway: model-tagged UDP poses -> SY135/SY80U CAN -> frame sinks.
 
 Reverse of GuideSystem/services/can ProtocolParser decode logic.
 See .trellis/tasks/08-25-can-telemetry-gateway/design.md for the byte layouts.
@@ -15,6 +15,7 @@ import socket
 import struct
 import sys
 import time
+import traceback
 import webbrowser
 from collections.abc import Callable
 from pathlib import Path
@@ -61,9 +62,11 @@ from conventions import (
 from csv_writer import CanapeCsvWriter
 from dbc_engine import (
     DbcCodec,
+    DbcConfigStore,
     OperatorDbcRuntime,
     encode_godot_imu,
     encode_godot_rtk,
+    encode_sy80u_imu,
     load_protocol_codec,
 )
 from encoders.ruifen_imu import RUFINEN_IDS
@@ -99,14 +102,18 @@ def godot_connection_state(
     """Project recent valid Godot telemetry without coupling it to any sink."""
     if mode != "godot-managed":
         return None
-    return (
-        last_telemetry_s is not None
-        and now_s - last_telemetry_s <= GODOT_ACTIVITY_TIMEOUT_S
-    )
+    return last_telemetry_s is not None and now_s - last_telemetry_s <= GODOT_ACTIVITY_TIMEOUT_S
+
+
 _PROTOCOL_CODEC: DbcCodec | None = None
+_MODEL_CODECS: dict[str, DbcCodec] = {}
 
 
-def protocol_codec() -> DbcCodec:
+def protocol_codec(model: str = DEFAULT_MODEL) -> DbcCodec:
+    if model == "sy80u":
+        if model not in _MODEL_CODECS:
+            _MODEL_CODECS[model] = load_protocol_codec(resource_root() / "dbc", model)
+        return _MODEL_CODECS[model]
     global _PROTOCOL_CODEC
     if _PROTOCOL_CODEC is None:
         _PROTOCOL_CODEC = load_protocol_codec(resource_root() / "dbc")
@@ -275,6 +282,45 @@ def _retire_failed_socketcan_sink(
     return True
 
 
+def simulation_rates(args: argparse.Namespace, model: str) -> dict[int, float]:
+    rates = {
+        **{can_id: float(args.imu_hz) for can_id in RUFINEN_IDS.values()},
+        **{can_id: float(args.rtk_hz) for can_id in range(0x0CFDA000, 0x0CFDAA00, 0x100)},
+        0x18FFF000: float(args.slew_hz),
+        0x256: float(args.travel_hz),
+        TIMED_CAN_ID: float(TIMED_CAN_FREQUENCY_HZ),
+    }
+    if model == "sy80u":
+        rates[0x18FF3E00] = float(args.imu_hz)
+    return rates
+
+
+def model_console(
+    args: argparse.Namespace, model: str
+) -> tuple[OperatorDbcRuntime, CanConsoleRuntime]:
+    adjacent_root = (
+        Path(sys.executable).resolve().parent / "dbc"
+        if getattr(sys, "frozen", False)
+        else Path(__file__).resolve().parent / "dbc"
+    )
+    model_subdir = "sy80u" if model == "sy80u" else ""
+    operator_roots = [resource_root() / "dbc" / model_subdir]
+    adjacent_root = adjacent_root / model_subdir
+    if getattr(sys, "frozen", False) or adjacent_root.is_dir():
+        operator_roots.append(adjacent_root)
+    operator_roots.extend(Path(path) for path in getattr(args, "dbc_dir", []))
+    store = DbcConfigStore()
+    if model == "sy80u":
+        store = DbcConfigStore(store.path.parent / "sy80u" / store.path.name)
+    operator_dbc = OperatorDbcRuntime(operator_roots, store=store)
+    can_console = CanConsoleRuntime(
+        operator_dbc,
+        mode=args.mode,
+        simulation_rates=simulation_rates(args, model),
+    )
+    return operator_dbc, can_console
+
+
 def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int:
     rates = {
         "imu": args.imu_hz,
@@ -287,30 +333,11 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
     out_path = Path(args.out)
     out_path.mkdir(parents=True, exist_ok=True)
 
+    current_model = args.model
+    initial_mapper = qml_mapper
     try:
-        protocol = protocol_codec()
-        adjacent_root = (
-            Path(sys.executable).resolve().parent / "dbc"
-            if getattr(sys, "frozen", False)
-            else Path(__file__).resolve().parent / "dbc"
-        )
-        operator_roots = [resource_root() / "dbc"]
-        if getattr(sys, "frozen", False) or adjacent_root.is_dir():
-            operator_roots.append(adjacent_root)
-        operator_roots.extend(Path(path) for path in getattr(args, "dbc_dir", []))
-        operator_dbc = OperatorDbcRuntime(operator_roots)
-        simulation_rates = {
-            **{can_id: float(args.imu_hz) for can_id in RUFINEN_IDS.values()},
-            **{can_id: float(args.rtk_hz) for can_id in range(0x0CFDA000, 0x0CFDAA00, 0x100)},
-            0x18FFF000: float(args.slew_hz),
-            0x256: float(args.travel_hz),
-            TIMED_CAN_ID: float(TIMED_CAN_FREQUENCY_HZ),
-        }
-        can_console = CanConsoleRuntime(
-            operator_dbc,
-            mode=args.mode,
-            simulation_rates=simulation_rates,
-        )
+        protocol = protocol_codec(current_model)
+        operator_dbc, can_console = model_console(args, current_model)
     except GatewayRuntimeError as exc:
         print(f"Gateway DBC startup failed ({exc.code}): {exc}", file=sys.stderr)
         return 1
@@ -551,9 +578,7 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
             else operator_dbc.codec.messages[_key].channel,
             source="web",
             family=(
-                "dbc"
-                if console_entry is None or console_entry.dbc_key is not None
-                else "native"
+                "dbc" if console_entry is None or console_entry.dbc_key is not None else "native"
             ),
             is_extended=is_extended,
         )
@@ -922,7 +947,7 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                 can_console = CanConsoleRuntime(
                     operator_dbc,
                     mode=args.mode,
-                    simulation_rates=simulation_rates,
+                    simulation_rates=simulation_rates(args, current_model),
                 )
                 publish_operator_dbc(mutate_revision=True)
                 publish_can_console()
@@ -1109,8 +1134,50 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
 
             sample = parse_packet(data)
             if sample is None:
-                print("bad packet (magic/version/size), dropped", file=sys.stderr)
+                print("bad packet (header/size/physical values), dropped", file=sys.stderr)
                 continue
+            requested_model = sample.model_id or args.model
+            if requested_model != current_model:
+                try:
+                    next_protocol = protocol_codec(requested_model)
+                    if requested_model == args.model:
+                        next_mapper = (
+                            QmlCanMapper(initial_mapper.profile) if initial_mapper else None
+                        )
+                    else:
+                        next_mapper = QmlCanMapper(
+                            load_qml_profile(f"builtin:qml-{requested_model}-ground-truth")
+                        )
+                    next_operator, next_console = model_console(args, requested_model)
+                except (QmlProfileError, GatewayRuntimeError) as exc:
+                    print(f"CAN model switch rejected: {exc}", file=sys.stderr)
+                    continue
+                stop_timed("model_switch")
+                operator_dbc.stop()
+                can_console.stop()
+                if isinstance(ict_sink, SocketCanSink):
+                    ict_sink.purge(reason="model_switch")
+                if isinstance(ict_sink, TcpPc001Sink):
+                    # Retire the complete old session, including queued/in-flight
+                    # frames. The next peer must complete a fresh PC001 handshake.
+                    ict_sink.close()
+                    ict_sink = None
+                    core.publish(pc001_handshake=False)
+                    try:
+                        ict_sink = TcpPc001Sink(args.tcp_host, args.tcp_port)
+                        attach_tcp_observer(ict_sink)
+                    except RuntimeError as exc:
+                        core.publish(transport_state="error", transport_detail=str(exc))
+                        core.emit_event("transport_error", "model_switch", detail=str(exc))
+                        print(f"PC001 listener restart failed: {exc}", file=sys.stderr)
+                current_model = requested_model
+                protocol, qml_mapper = next_protocol, next_mapper
+                operator_dbc, can_console = next_operator, next_console
+                scheduler = FrameScheduler(rates)
+                publish_operator_dbc()
+                publish_can_console()
+                core.emit_event("model_changed", "godot", model=current_model)
+                print(f"CAN model selected: {current_model}")
             last_godot_telemetry_s = time.monotonic()
             sinks = active_sinks()
             if sinks:
@@ -1120,13 +1187,16 @@ def run(args: argparse.Namespace, qml_mapper: QmlCanMapper | None = None) -> int
                         scheduler,
                         sample,
                         args.rtk_byteorder,
-                        args.model,
+                        current_model,
                         qml_mapper,
                         observe_godot,
                         protocol,
                         can_console.allows,
                     )
                     retire_failed_socketcan()
+                except TelemetryPreparationError:
+                    traceback.print_exc()
+                    continue
                 except QmlMappingError as exc:
                     print(f"QML mapping rejected telemetry sample: {exc}", file=sys.stderr)
                     continue
@@ -1198,6 +1268,10 @@ def _open_can0(interface: str) -> tuple[SocketCanSink | None, int, str]:
         return None, result_code, detail
 
 
+class TelemetryPreparationError(RuntimeError):
+    """Unexpected preparation bug; drop the sample but keep the owner alive."""
+
+
 def emit_frames(
     sinks: list[FrameSink],
     scheduler: FrameScheduler,
@@ -1209,7 +1283,67 @@ def emit_frames(
     dbc_codec: DbcCodec | None = None,
     authority_allows: Callable[[str, int, bool], bool] | None = None,
 ) -> None:
-    codec = dbc_codec or protocol_codec()
+    # Only the velocity baseline changes during projection. Restore these two
+    # fields if a later encoder rejects the sample.
+    previous_tick = qml_mapper._previous_tick_ms if qml_mapper is not None else None
+    previous_position = qml_mapper._previous_main_enu_m if qml_mapper is not None else None
+    try:
+        pending = _prepare_frames(scheduler, sample, model, qml_mapper, dbc_codec)
+    except Exception as exc:
+        if qml_mapper is not None:
+            qml_mapper._previous_tick_ms = previous_tick
+            qml_mapper._previous_main_enu_m = previous_position
+        if isinstance(exc, (QmlMappingError, GatewayRuntimeError)):
+            raise
+        if isinstance(exc, (ValueError, ArithmeticError, struct.error)):
+            raise QmlMappingError(f"telemetry numeric encoding failed: {exc}") from exc
+        # Unexpected bugs are diagnosed separately from ordinary bad data.
+        # Transport and observer failures remain outside this boundary.
+        raise TelemetryPreparationError("unexpected telemetry preparation failure") from exc
+    tick = float(sample.tick_ms)
+
+    # Finish all profile math and encoding before exposing any frame. A bad
+    # telemetry sample must never produce a partial CAN family.
+    for family, can_id, is_extended, channel, payload in pending:
+        if authority_allows is not None and not authority_allows("godot", can_id, is_extended):
+            continue
+        for sink in sinks:
+            append_frame(
+                sink,
+                can_id,
+                payload,
+                channel=channel,
+                source="godot",
+                family=family,
+                is_extended=is_extended,
+            )
+        if observer is not None:
+            observer(can_id, payload)
+
+    if scheduler.due("imu", tick):
+        scheduler.advance("imu", tick)
+    if scheduler.due("slew", tick):
+        scheduler.advance("slew", tick)
+    if scheduler.due("travel", tick):
+        scheduler.advance("travel", tick)
+    if scheduler.due("rtk", tick):
+        scheduler.advance("rtk", tick)
+
+
+def _prepare_frames(
+    scheduler: FrameScheduler,
+    sample: TelemetrySample,
+    model: str,
+    qml_mapper: QmlCanMapper | None,
+    dbc_codec: DbcCodec | None,
+) -> list[tuple[str, int, bool, CanChannel, bytes]]:
+    codec = dbc_codec or protocol_codec(model)
+    if sample.model_id is not None and sample.model_id != model:
+        raise QmlMappingError("telemetry model does not match the selected CAN model")
+    if qml_mapper is not None and qml_mapper.profile.model_id != model:
+        raise QmlMappingError("projection profile does not match the selected CAN model")
+    if model == "sy80u" and qml_mapper is None:
+        raise QmlMappingError("SY80U requires its calibrated pose profile")
     state = MachineState(sample, model=model)
     projection = qml_mapper.project(sample) if qml_mapper is not None else None
     tick = float(sample.tick_ms)
@@ -1221,11 +1355,25 @@ def emit_frames(
                 roll, pitch, yaw = state.link_rpy(link)
             else:
                 roll, pitch, yaw = projection.imu_rpy_deg[link]
-            slots = state.sensor_slots(roll, pitch, yaw)
             can_id = RUFINEN_IDS[link]
             definition = codec.unique_message_by_frame(can_id, is_extended=True)
+            payload = (
+                encode_sy80u_imu(codec, can_id, (roll, pitch, yaw))
+                if model == "sy80u"
+                else encode_godot_imu(codec, can_id, state.sensor_slots(roll, pitch, yaw))
+            )
+            pending.append(("imu", can_id, True, definition.channel, payload))
+        if model == "sy80u":
+            assert projection is not None
+            definition = codec.unique_message_by_frame(0x18FF3E00, is_extended=True)
             pending.append(
-                ("imu", can_id, True, definition.channel, encode_godot_imu(codec, can_id, slots))
+                (
+                    "imu",
+                    0x18FF3E00,
+                    True,
+                    definition.channel,
+                    codec.encode_frame(0x18FF3E00, {"SWING": projection.boom_swing_deg}),
+                )
             )
 
     if scheduler.due("slew", tick):
@@ -1267,32 +1415,7 @@ def emit_frames(
             definition = codec.unique_message_by_frame(can_id, is_extended=True)
             pending.append(("rtk", can_id, True, definition.channel, payload))
 
-    # Finish all profile math and encoding before exposing any frame. A bad
-    # telemetry sample must never produce a partial CAN family.
-    for family, can_id, is_extended, channel, payload in pending:
-        if authority_allows is not None and not authority_allows("godot", can_id, is_extended):
-            continue
-        for sink in sinks:
-            append_frame(
-                sink,
-                can_id,
-                payload,
-                channel=channel,
-                source="godot",
-                family=family,
-                is_extended=is_extended,
-            )
-        if observer is not None:
-            observer(can_id, payload)
-
-    if scheduler.due("imu", tick):
-        scheduler.advance("imu", tick)
-    if scheduler.due("slew", tick):
-        scheduler.advance("slew", tick)
-    if scheduler.due("travel", tick):
-        scheduler.advance("travel", tick)
-    if scheduler.due("rtk", tick):
-        scheduler.advance("rtk", tick)
+    return pending
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1326,7 +1449,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--model",
-        choices=tuple(IMU_MOUNT_COMPENSATION_DEG),
+        choices=(*IMU_MOUNT_COMPENSATION_DEG, "sy80u"),
         default=DEFAULT_MODEL,
         help="machine model selecting the IMU zero-mount compensation table",
     )
@@ -1390,6 +1513,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"SocketCAN interface ready: {args.interface}")
         return 0
 
+    if args.model == "sy80u" and not args.compat_profile:
+        args.compat_profile = "builtin:qml-sy80u-ground-truth"
     if args.qml_calibration and not args.compat_profile:
         print("--qml-calibration requires --compat-profile", file=sys.stderr)
         return 1

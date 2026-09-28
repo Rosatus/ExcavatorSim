@@ -1,0 +1,246 @@
+VERSION ""
+
+
+NS_ :
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	CAT_DEF_
+	CAT_
+	FILTER
+	BA_DEF_DEF_
+	EV_DATA_
+	ENVVAR_DATA_
+	SGTYPE_
+	SGTYPE_VAL_
+	BA_DEF_SGTYPE_
+	BA_SGTYPE_
+	SIG_TYPE_REF_
+	VAL_TABLE_
+	SIG_GROUP_
+	SIG_VALTYPE_
+	SIGTYPE_VALTYPE_
+	BO_TX_BU_
+	BA_DEF_REL_
+	BA_REL_
+	BA_DEF_DEF_REL_
+	BU_SG_REL_
+	BU_EV_REL_
+	BU_BO_REL_
+	SG_MUL_VAL_
+
+BS_:
+
+BU_: IMU_BODY Controller IMU_BOOM IMU_ARM IMU_BUCKET P_Box IMU_ROTATE IMU_SWING IMU_BOOM2
+
+
+BO_ 2566863360 MSG_18FF3A00: 8 IMU_BODY
+ SG_ Pitch_Angle : 0|16@1- (0.01,0) [-327.68|327.67] "°/度"  Controller
+ SG_ Roll_Angle : 16|16@1- (0.01,0) [-327.68|327.67] "°/度"  Controller
+ SG_ Yaw_Angle : 32|16@1- (0.01,0) [-327.68|327.67] "°/度"  Controller
+ SG_ temp : 48|8@1+ (1,-75) [-75|180] "℃/摄氏度"  Controller
+ SG_ reversed_56 : 56|8@1+ (1,0) [0|255] ""  Controller
+
+BO_ 2566859264 MSG_18FF2A00: 8 IMU_BODY
+ SG_ Acc_X : 0|16@1+ (0.001,-32) [-32|33.535] "g/重力加速度"  Controller
+ SG_ Acc_Y : 16|16@1+ (0.001,-32) [-32|33.535] "g/重力加速度"  Controller
+ SG_ Acc_Z : 32|16@1+ (0.001,-32) [-32|33.535] "g/重力加速度"  Controller
+ SG_ temp : 48|8@1+ (1,0) [0|255] "℃/摄氏度"  Controller
+ SG_ reversed : 56|8@1+ (1,0) [0|255] ""  Controller
+
+BO_ 2566855168 MSG_18FF1A00: 8 IMU_BODY
+ SG_ Gyro_X : 0|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S"  Controller
+ SG_ Gyro_Y : 16|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S"  Controller
+ SG_ Gyro_Z : 32|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S"  Controller
+ SG_ temp : 48|8@1+ (1,0) [0|255] "℃/摄氏度"  Controller
+ SG_ reversed : 56|8@1+ (1,0) [0|255] ""  Controller
+
+BO_ 2566863616 MSG_18FF3B00: 8 IMU_BOOM
+ SG_ Pitch_Angle : 0|16@1- (0.01,0) [-327.68|327.67] "°/度"  Controller
+ SG_ Roll_Angle : 16|16@1- (0.01,0) [-327.68|327.67] "°/度"  Controller
+ SG_ Yaw_Angle : 32|16@1- (0.01,0) [-327.68|327.67] "°/度"  Controller
+ SG_ temp : 48|8@1+ (1,-75) [-75|180] "℃/摄氏度"  Controller
+ SG_ reversed_56 : 56|8@1+ (1,0) [0|255] ""  Controller
+
+BO_ 2566859520 MSG_18FF2B00: 8 IMU_BOOM
+ SG_ Acc_X : 0|16@1+ (0.001,-32) [-32|33.535] "g/重力加速度"  Controller
+ SG_ Acc_Y : 16|16@1+ (0.001,-32) [-32|33.535] "g/重力加速度"  Controller
+ SG_ Acc_Z : 32|16@1+ (0.001,-32) [-32|33.535] "g/重力加速度"  Controller
+ SG_ temp : 48|8@1+ (1,0) [0|255] "℃/摄氏度"  Controller
+ SG_ reversed : 56|8@1+ (1,0) [0|255] ""  Controller
+
+BO_ 2566855424 MSG_18FF1B00: 8 IMU_BOOM
+ SG_ Gyro_X : 0|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S"  Controller
+ SG_ Gyro_Y : 16|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S"  Controller
+ SG_ Gyro_Z : 32|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S"  Controller
+ SG_ temp : 48|8@1+ (1,0) [0|255] "℃/摄氏度"  Controller
+ SG_ reversed : 56|8@1+ (1,0) [0|255] ""  Controller
+
+BO_ 2566863872 MSG_18FF3C00: 8 IMU_ARM
+ SG_ Pitch_Angle : 0|16@1- (0.01,0) [-327.68|327.67] "°/度"  Controller
+ SG_ Roll_Angle : 16|16@1- (0.01,0) [-327.68|327.67] "°/度"  Controller
+ SG_ Yaw_Angle : 32|16@1- (0.01,0) [-327.68|327.67] "°/度"  Controller
+ SG_ temp : 48|8@1+ (1,-75) [-75|180] "℃/摄氏度"  Controller
+ SG_ reversed_56 : 56|8@1+ (1,0) [0|255] ""  Controller
+
+BO_ 2566859776 MSG_18FF2C00: 8 IMU_ARM
+ SG_ Acc_X : 0|16@1+ (0.001,-32) [-32|33.535] "g/重力加速度"  Controller
+ SG_ Acc_Y : 16|16@1+ (0.001,-32) [-32|33.535] "g/重力加速度"  Controller
+ SG_ Acc_Z : 32|16@1+ (0.001,-32) [-32|33.535] "g/重力加速度"  Controller
+ SG_ temp : 48|8@1+ (1,0) [0|255] "℃/摄氏度"  Controller
+ SG_ reversed : 56|8@1+ (1,0) [0|255] ""  Controller
+
+BO_ 2566855680 MSG_18FF1C00: 8 IMU_ARM
+ SG_ Gyro_X : 0|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S"  Controller
+ SG_ Gyro_Y : 16|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S"  Controller
+ SG_ Gyro_Z : 32|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S"  Controller
+ SG_ temp : 48|8@1+ (1,0) [0|255] "℃/摄氏度"  Controller
+ SG_ reversed : 56|8@1+ (1,0) [0|255] ""  Controller
+
+BO_ 2566864128 MSG_18FF3D00: 8 IMU_BUCKET
+ SG_ Pitch_Angle : 0|16@1- (0.01,0) [-327.68|327.67] "°/度"  Controller
+ SG_ Roll_Angle : 16|16@1- (0.01,0) [-327.68|327.67] "°/度"  Controller
+ SG_ Yaw_Angle : 32|16@1- (0.01,0) [-327.68|327.67] "°/度"  Controller
+ SG_ temp : 48|8@1+ (1,-75) [-75|180] "℃/摄氏度"  Controller
+ SG_ reversed_56 : 56|8@1+ (1,0) [0|255] ""  Controller
+
+BO_ 2566860032 MSG_18FF2D00: 8 IMU_BUCKET
+ SG_ Acc_X : 0|16@1+ (0.001,-32) [-32|33.535] "g/重力加速度"  Controller
+ SG_ Acc_Y : 16|16@1+ (0.001,-32) [-32|33.535] "g/重力加速度"  Controller
+ SG_ Acc_Z : 32|16@1+ (0.001,-32) [-32|33.535] "g/重力加速度"  Controller
+ SG_ temp : 48|8@1+ (1,0) [0|255] "℃/摄氏度"  Controller
+ SG_ reversed : 56|8@1+ (1,0) [0|255] ""  Controller
+
+BO_ 2566855936 MSG_18FF1D00: 8 IMU_BUCKET
+ SG_ Gyro_X : 0|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S"  Controller
+ SG_ Gyro_Y : 16|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S"  Controller
+ SG_ Gyro_Z : 32|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S"  Controller
+ SG_ temp : 48|8@1+ (1,0) [0|255] "℃/摄氏度"  Controller
+ SG_ reversed : 56|8@1+ (1,0) [0|255] ""  P_Box
+
+BO_ 2566909952 MSG_18FFF000: 2 IMU_ROTATE
+ SG_ ROTATE : 0|16@1+ (0.0054931640625,0) [0|359.9945068359375] "°/度"  Controller
+
+BO_ 2566864384 MSG_18FF3E00: 8 IMU_SWING
+ SG_ SWING : 0|16@1- (0.01,-180) [-507.68|147.67] "°/度"  Controller
+
+BO_ 2566864640 MSG_18FF3F00: 8 IMU_BOOM2
+ SG_ Gyro_X : 0|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S"  Controller
+ SG_ Gyro_Y : 16|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S"  Controller
+ SG_ Gyro_Z : 32|16@1+ (0.01,-320) [-320|335.35] "度/秒 °/S"  Controller
+ SG_ Reserved_Temperature : 48|8@1+ (1,0) [0|255] "raw"  Controller
+
+BO_ 2566910208 MSG_18FFF100: 8 Controller
+ SG_ CMD M : 0|8@1+ (1,0) [0|255] ""  IMU_ROTATE
+ SG_ ZeroPosition m1 : 8|16@1+ (0.0054931640625,0) [0|359.9945068359375] "°/度"  IMU_ROTATE
+ SG_ Direction m2 : 8|8@1+ (1,0) [0|1] ""  IMU_ROTATE
+ SG_ PdoPeriod m3 : 8|16@1+ (1,0) [4|65535] "ms"  IMU_ROTATE
+ SG_ FilterCoeff m4 : 8|16@1+ (1,0) [10|1000] ""  IMU_ROTATE
+
+BO_ 1598 MSG_0000063E: 8 Controller
+ SG_ Cmd : 0|8@1+ (1,0) [0|255] ""  IMU_SWING
+ SG_ Index M : 8|16@1+ (1,0) [0|65535] ""  IMU_SWING
+ SG_ SubIndex : 24|8@1+ (1,0) [0|255] ""  IMU_SWING
+ SG_ ConfigData m4112 : 32|32@1+ (1,0) [0|4294967295] ""  IMU_SWING
+
+BO_ 1470 MSG_000005BE: 8 IMU_SWING
+ SG_ Cmd : 0|8@1+ (1,0) [0|255] ""  Controller
+ SG_ Index M : 8|16@1+ (1,0) [0|65535] ""  Controller
+ SG_ SubIndex : 24|8@1+ (1,0) [0|255] ""  Controller
+ SG_ ConfigData m4112 : 32|32@1+ (1,0) [0|4294967295] ""  Controller
+
+
+
+
+CM_ BO_ 2566863360 "channel=can3";
+CM_ SG_ 2566863360 reversed_56 "状态标志位（Flag）预留 b1b0=00：角度帧；b3b2=00：自检成功 / 双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
+CM_ SG_ 2566863360 temp "温度值预留";
+CM_ SG_ 2566863360 Yaw_Angle "Z 轴（YAW 方位角）；小端有符号 int16，raw×0.01°。";
+CM_ SG_ 2566863360 Roll_Angle "X 轴（ROLL 横滚角）；小端有符号 int16，raw×0.01°。";
+CM_ SG_ 2566863360 Pitch_Angle "Y 轴（PITCH 俯仰角）；小端有符号 int16，raw×0.01°。";
+CM_ BO_ 2566859264 "channel=can3";
+CM_ SG_ 2566859264 reversed "b1b0=00：加速度帧；b3b2=00：自检成功 /，双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
+CM_ SG_ 2566859264 Acc_Z "Z轴加速度大小";
+CM_ SG_ 2566859264 Acc_Y "Y轴加速度大小";
+CM_ SG_ 2566859264 Acc_X "X 轴加速度大小";
+CM_ BO_ 2566855168 "channel=can3";
+CM_ SG_ 2566855168 reversed "b1b0=00：陀螺帧；b3b2=00：自检成功 /，双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
+CM_ SG_ 2566855168 Gyro_Z "Z轴陀螺大小";
+CM_ SG_ 2566855168 Gyro_Y "Y轴陀螺大小";
+CM_ SG_ 2566855168 Gyro_X "X 轴陀螺大小";
+CM_ BO_ 2566863616 "channel=can3";
+CM_ SG_ 2566863616 reversed_56 "状态标志位（Flag）预留 b1b0=00：角度帧；b3b2=00：自检成功 / 双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
+CM_ SG_ 2566863616 Yaw_Angle "Z 轴（YAW 方位角）；小端有符号 int16，raw×0.01°。";
+CM_ SG_ 2566863616 Roll_Angle "X 轴（ROLL 横滚角）；小端有符号 int16，raw×0.01°。";
+CM_ SG_ 2566863616 Pitch_Angle "Y 轴（PITCH 俯仰角）；小端有符号 int16，raw×0.01°。";
+CM_ BO_ 2566859520 "channel=can3";
+CM_ SG_ 2566859520 reversed "b1b0=00：加速度帧；b3b2=00：自检成功 /，双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
+CM_ SG_ 2566859520 Acc_Z "Z轴加速度大小";
+CM_ SG_ 2566859520 Acc_Y "Y轴加速度大小";
+CM_ SG_ 2566859520 Acc_X "X 轴加速度大小";
+CM_ BO_ 2566855424 "channel=can3";
+CM_ SG_ 2566855424 reversed "b1b0=00：陀螺帧；b3b2=00：自检成功 /，双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
+CM_ SG_ 2566855424 Gyro_Z "Z轴陀螺大小";
+CM_ SG_ 2566855424 Gyro_Y "Y轴陀螺大小";
+CM_ SG_ 2566855424 Gyro_X "X 轴陀螺大小";
+CM_ BO_ 2566863872 "channel=can3";
+CM_ SG_ 2566863872 reversed_56 "状态标志位（Flag）预留 b1b0=00：角度帧；b3b2=00：自检成功 / 双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
+CM_ SG_ 2566863872 Yaw_Angle "Z 轴（YAW 方位角）；小端有符号 int16，raw×0.01°。";
+CM_ SG_ 2566863872 Roll_Angle "X 轴（ROLL 横滚角）；小端有符号 int16，raw×0.01°。";
+CM_ SG_ 2566863872 Pitch_Angle "Y 轴（PITCH 俯仰角）；小端有符号 int16，raw×0.01°。";
+CM_ BO_ 2566859776 "channel=can3";
+CM_ SG_ 2566859776 reversed "b1b0=00：加速度帧；b3b2=00：自检成功 /，双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
+CM_ SG_ 2566859776 Acc_Z "Z轴加速度大小";
+CM_ SG_ 2566859776 Acc_Y "Y轴加速度大小";
+CM_ SG_ 2566859776 Acc_X "X 轴加速度大小";
+CM_ BO_ 2566855680 "channel=can3";
+CM_ SG_ 2566855680 reversed "b1b0=00：陀螺帧；b3b2=00：自检成功 /，双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
+CM_ SG_ 2566855680 Gyro_Z "Z轴陀螺大小";
+CM_ SG_ 2566855680 Gyro_Y "Y轴陀螺大小";
+CM_ SG_ 2566855680 Gyro_X "X 轴陀螺大小";
+CM_ BO_ 2566864128 "channel=can3";
+CM_ SG_ 2566864128 reversed_56 "状态标志位（Flag）预留 b1b0=00：角度帧；b3b2=00：自检成功 / 双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
+CM_ SG_ 2566864128 Yaw_Angle "Z 轴（YAW 方位角）；小端有符号 int16，raw×0.01°。";
+CM_ SG_ 2566864128 Roll_Angle "X 轴（ROLL 横滚角）；小端有符号 int16，raw×0.01°。";
+CM_ SG_ 2566864128 Pitch_Angle "Y 轴（PITCH 俯仰角）；小端有符号 int16，raw×0.01°。";
+CM_ BO_ 2566860032 "channel=can3";
+CM_ SG_ 2566860032 reversed "b1b0=00：加速度帧；b3b2=00：自检成功 /，双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
+CM_ SG_ 2566860032 Acc_Z "Z轴加速度大小";
+CM_ SG_ 2566860032 Acc_Y "Y轴加速度大小";
+CM_ SG_ 2566860032 Acc_X "X 轴加速度大小";
+CM_ BO_ 2566855936 "channel=can3";
+CM_ SG_ 2566855936 reversed "b1b0=00：陀螺帧；b3b2=00：自检成功 /，双陀螺模式；b7b6b5b4=0000：水平安装测量方式";
+CM_ SG_ 2566855936 Gyro_Z "Z轴陀螺大小";
+CM_ SG_ 2566855936 Gyro_Y "Y轴陀螺大小";
+CM_ SG_ 2566855936 Gyro_X "X 轴陀螺大小";
+CM_ BO_ 2566909952 "回转传感器；CAN ID=0x18FFF000；按旧协议 DLC=2；顺时针方向角度增大。";
+CM_ SG_ 2566909952 ROTATE "回转角；物理值=raw×360/65536。";
+CM_ BO_ 2566864384 "偏摆传感器；CAN ID=0x18FF3E00；按旧协议 DLC=8 顺时针角度减小";
+CM_ SG_ 2566864384 SWING "有符号偏摆角；物理值=(int16(raw)-18000)×0.01。";
+CM_ BO_ 2566864640 "双节臂 IMU；CAN ID=0x18FF3F00，当前业务不解析。";
+CM_ SG_ 2566864640 Reserved_Temperature "温度换算关系未定义，仅保留原始字节。";
+CM_ BO_ 2566910208 "channel=can3；回转传感器配置指令/应答；CAN ID=0x18FFF100；主机发指令，传感器≤50ms 回显应答；错误应答为固定帧 CMD=0xFF（不定义 mux 组）；发送方按主机请求建模，应答内容与请求相同";
+CM_ SG_ 2566910208 FilterCoeff "滤波系数设置（CMD=0x04）";
+CM_ SG_ 2566910208 PdoPeriod "PDO 周期设置（CMD=0x03）；协议文档写 DATA[1] 但范围 4~65535，按 uint16 小端处理";
+CM_ SG_ 2566910208 Direction "方向设置（CMD=0x02）";
+CM_ SG_ 2566910208 ZeroPosition "零点校准（CMD=0x01）；零点位置 uint16，物理值=raw×360/65536，单圈";
+CM_ SG_ 2566910208 CMD "指令代码 0x01~0x04；应答 0xFF=错误（数据超范围或指令格式错误）";
+CM_ BO_ 1598 "偏摆传感器SDO请求；CAN ID=0x63E（0x600+NODE_ID=0x3E）；扩展帧29位；主机配置偏摆传感器参数。";
+CM_ SG_ 1598 ConfigData "Index=0x1010时：32位配置数据（角度清零=0x10101010/软件复位=0x88888888）。";
+CM_ SG_ 1598 SubIndex "8位子索引，固定位0x00。";
+CM_ SG_ 1598 Index "16位主索引，低字节在前（Byte1=Index_L, Byte2=Index_H）；用作多路复用器。";
+CM_ SG_ 1598 Cmd "固定位0x40；SDO传输命令。";
+CM_ BO_ 1470 "偏摆传感器SDO应答；CAN ID=0x5BE（0x580+NODE_ID=0x3E）；扩展帧29位；传感器应答主机配置。";
+CM_ SG_ 1470 ConfigData "Index=0x1010时：32位配置数据（角度清零=0x10101010/软件复位=0x88888888）。";
+CM_ SG_ 1470 SubIndex "8位子索引，固定位0x00。";
+CM_ SG_ 1470 Index "16位主索引，低字节在前（Byte1=Index_L, Byte2=Index_H）；用作多路复用器。";
+CM_ SG_ 1470 Cmd "固定位0x40；SDO传输命令。";
+
+
+
+VAL_ 2566910208 Direction 1 "CCW 逆时针增大" 0 "CW 顺时针增大" ;
+VAL_ 2566910208 CMD 255 "错误应答" 4 "滤波系数设置" 3 "PDO周期设置" 2 "方向设置" 1 "零点校准" ;
+VAL_ 1598 Cmd 64 "SDO传输" ;
+VAL_ 1470 Cmd 64 "SDO传输" ;

@@ -114,8 +114,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return result.returncode
     adjacent_dbc = dist / "dbc"
     adjacent_dbc.mkdir(parents=True, exist_ok=True)
-    for source in sorted((GW_DIR / "resources" / "dbc").glob("*.dbc")):
-        destination = adjacent_dbc / source.name
+    for source in sorted((GW_DIR / "resources" / "dbc").rglob("*.dbc")):
+        destination = adjacent_dbc / source.relative_to(GW_DIR / "resources" / "dbc")
+        destination.parent.mkdir(parents=True, exist_ok=True)
         # A running packaged gateway or scanner may hold an adjacent DBC open
         # on Windows. An already byte-identical file needs no replacement.
         if destination.is_file() and _sha256(source) == _sha256(destination):

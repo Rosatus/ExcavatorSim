@@ -1,0 +1,47 @@
+# Reference: GuideSystem SY80U selected with the existing x86-linux-debug/database/calibration.toml.
+# Persisted calibration overrides machine defaults; do not substitute uncalibrated factory values.
+[profile]
+version = 1
+target = "qml-guidance-3d"
+model_id = "sy80u"
+calibration_file = "qml_sy80u_calibration.toml"
+calibration_sha256 = "8d51ad18169367023884500e6ed8141335afecb60869e6c2fd45bedf763c2749"
+
+[frames]
+body_imu = "upper"
+rtk_attitude = "upper"
+slew_center = "upper"
+
+[alignment]
+# WorkingModel3DView applies boomPhi directly and adds 180 degrees to armPhi
+# and bktPhi before rotating the three local-X pivots. These targets therefore
+# render the same neutral local relations as Godot: +35 / -90 / -50 degrees.
+boom_phi_neutral_deg = 35.0
+arm_phi_neutral_deg = 90.0
+bucket_phi_neutral_deg = 130.0
+boom_sign = 1.0
+arm_sign = 1.0
+bucket_sign = 1.0
+
+[neutral_relation]
+swing_deg = 0.0
+boom_deg = 35.0
+arm_deg = -90.0
+bucket_deg = -50.0
+
+[bucket_inverse]
+min_mnq_deg = 0.0
+max_mnq_deg = 180.0
+tolerance_deg = 0.000001
+
+[gnss]
+# Vehicle frame is X right, Y forward, Z up. The reference UI identifies the
+# primary antenna as right and secondary as left. This synthetic one-metre
+# baseline is explicit/profile-bound until field mount geometry is supplied.
+vice_offset_vehicle_m = [-1.0, 0.0, 0.0]
+satellite_status = 4
+
+[tolerance]
+off_axis_quaternion = 0.0001
+gimbal_cosine = 0.000001
+joint_forward_error_deg = 0.00001

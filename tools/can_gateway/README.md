@@ -1,7 +1,41 @@
 # CAN Telemetry Gateway
 
-把 ExcavatorSim 的机器物理量编码为 SY135C CAN 帧 CSV，供 dev_arch2.0_36b5586c
-引导系统经 `tools/can_replay` 回放消费。
+把 ExcavatorSim 的机器姿态编码为 SY135 / SY80U CAN 帧，通过 PC001 TCP、
+SocketCAN 或 CSV 输出。
+
+## Model-aware telemetry
+
+The product sends CTN1 telemetry version 2 (unchanged 176-byte size): the
+header's former reserved uint16 identifies SY135=1 or SY80U=2. Control and
+heartbeat packets remain version 1. Legacy telemetry v1 uses `--model`.
+Unsupported product models do not publish mislabeled CAN telemetry.
+
+Switching between SY135 and SY80U replaces the projection, DBC catalog,
+console definitions and frame scheduler. The old PC001 session is closed and
+its queued frames discarded; the listener reopens on the same port and requires
+a fresh client handshake. Pending SocketCAN frames and custom schedules are retired. Standalone console storage is isolated per model.
+Both updated client source and gateway are required for automatic switching.
+
+SY80U uses signed IMU axes with 0.01-degree scale and no 180-degree offset,
+two-byte slew frames, and the additional `0x18FF3E00` boom-side-swing frame.
+The approved DBCs live in `resources/dbc/sy80u`; never merge them into the
+SY135 directory because identical frame IDs have different layouts.
+
+`--model sy80u` defaults to `builtin:qml-sy80u-ground-truth`. Its hash-bound
+calibration is a snapshot of `C:/code/x86-linux-debug/database/calibration.toml`
+on 2026-09-28. GuideSystem with `ICT_MACHINE_MODEL=SY80U` loads that existing
+file over its factory defaults. The mapper reverses the SY80 parser's signed
+angles, the extra body-axis remap, common calibrated linkage and QML rotations.
+The parser's all-zero IMU sentinel is avoided with a 0.01-degree yaw value only
+when all three quantized axes are zero; displayed heading comes from RTK.
+
+Parity covers body and joint orientations and movement directions under that
+calibration. The existing runtime calibration still specifies CF/FQ/QV lengths
+4.6543/2.5294/1.1927 m, whereas the simulator SY80U uses 3.52/2.05/0.972 m;
+CAN angles cannot change the receiver's configured lengths or mesh geometry.
+If the receiver calibration changes, supply a matching profile and calibration
+hash. Uncalibrated factory SY80 linkage parameters cannot represent the
+simulator's neutral bucket angle; the gateway never silently substitutes them.
 
 ```
 ExcavatorSim (CanTelemetryBridge autoload)          Python gateway（独立进程）

@@ -60,10 +60,12 @@ function Assert-WebBundle {
 
 function Build-WebBundle {
     $bootstrap = Join-Path $env:USERPROFILE ".codex\scripts\Initialize-NodeCli.ps1"
-    if (-not (Test-Path -LiteralPath $bootstrap -PathType Leaf)) {
-        throw "Node CLI bootstrap is missing: $bootstrap"
+    if (Test-Path -LiteralPath $bootstrap -PathType Leaf) {
+        & $bootstrap -Require node
     }
-    & $bootstrap -Require node
+    elseif (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+        throw "Node.js is unavailable; install Node.js or provide $bootstrap"
+    }
     $npmCommand = (Get-Command npm.cmd, npm -ErrorAction SilentlyContinue | Select-Object -First 1).Source
     if ([string]::IsNullOrWhiteSpace($npmCommand)) {
         throw "npm is unavailable after Node CLI initialization"

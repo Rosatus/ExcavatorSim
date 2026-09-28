@@ -180,6 +180,10 @@ class TcpPc001Sink:
             self._server.close()
         for sock in (client, candidate):
             if sock is not None:
+                # Wake the service thread even when it is waiting for a
+                # handshake or blocked in send; model changes reuse this port.
+                with suppress(OSError):
+                    sock.shutdown(socket.SHUT_RDWR)
                 with suppress(OSError):
                     sock.close()
         self._thread.join(timeout=2.0)

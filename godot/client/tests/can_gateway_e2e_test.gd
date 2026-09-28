@@ -207,6 +207,28 @@ func _run() -> void:
 		if ict_client != null:
 			_check(await _wait_ict_handshake(bridge, true),
 				"accepted PC001 socket reaches the Godot heartbeat state")
+			var skin_switch_pid := int(bridge.get_gateway_pid_for_test())
+			for skin in ["sy135neo", "sy135"]:
+				_check(session.request_model_switch(skin), "switch skin to %s" % skin)
+				await physics_frame
+				bridge.call("_resolve_once")
+				var skin_packet: PackedByteArray = bridge.call("_build_packet", Time.get_ticks_msec())
+				_check(skin_packet.size() == 176 and skin_packet.decode_u16(6) == 1,
+					"%s retains SY135 telemetry identity" % skin)
+				# Drain pre-switch frames, then prove new data arrives on the same
+				# handshaken connection after the gateway consumed the new skin.
+				await create_timer(1.0).timeout
+				ict_client.poll()
+				if ict_client.get_available_bytes() > 0:
+					ict_client.get_data(ict_client.get_available_bytes())
+				await create_timer(0.3).timeout
+				ict_client.poll()
+				_check(ict_client.get_status() == StreamPeerTCP.STATUS_CONNECTED
+					and ict_client.get_available_bytes() > 0,
+					"%s continues CAN output on the original PC001 socket" % skin)
+				_check(bridge.is_ict_handshake_connected() and bridge.is_ict_active()
+					and int(bridge.get_gateway_pid_for_test()) == skin_switch_pid,
+					"%s preserves PC001 handshake and gateway process" % skin)
 			await process_frame
 			var ict_status_label := (scene.get_node("OperatorUI") as MotionOperatorUI).get_control_for_test("ict_label") as Label
 			var ict_status_lamp := (scene.get_node("OperatorUI") as MotionOperatorUI).get_control_for_test("ict_lamp") as Panel

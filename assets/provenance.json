@@ -80,6 +80,33 @@
       "hash_mode": "raw",
       "relationship": "user-supplied-articulated-visual-model",
       "imported_at": "2026-09-17"
+    },
+    {
+      "source_path": "C:/code/GuideSystem/services/can/models/SY80C6Y5LU/dbc/can3.sy80c6y5lu.dbc",
+      "destination_path": "tools/can_gateway/resources/dbc/sy80u/can3.sy80c6y5lu.dbc",
+      "byte_size": 13908,
+      "sha256": "b8fe11cf672dc020acecde957df4a286630aafcedf332cbd8fbab90b137ee6f5",
+      "hash_mode": "raw",
+      "relationship": "sy80u-reference-protocol-and-runtime-calibration",
+      "imported_at": "2026-09-28"
+    },
+    {
+      "source_path": "C:/code/GuideSystem/services/can/models/SY80C6Y5LU/dbc/can4.sy80c6y5lu.dbc",
+      "destination_path": "tools/can_gateway/resources/dbc/sy80u/can4.sy80c6y5lu.dbc",
+      "byte_size": 5992,
+      "sha256": "ccaa2675a953db326e4d7158843daf477e2891f5cd9f7b3b26f87c1500f93a5d",
+      "hash_mode": "raw",
+      "relationship": "sy80u-reference-protocol-and-runtime-calibration",
+      "imported_at": "2026-09-28"
+    },
+    {
+      "source_path": "C:/code/x86-linux-debug/database/calibration.toml",
+      "destination_path": "tools/can_gateway/resources/qml_sy80u_calibration.toml",
+      "byte_size": 1676,
+      "sha256": "8d51ad18169367023884500e6ed8141335afecb60869e6c2fd45bedf763c2749",
+      "hash_mode": "raw",
+      "relationship": "sy80u-reference-protocol-and-runtime-calibration",
+      "imported_at": "2026-09-28"
     }
   ],
   "generated_assets": [

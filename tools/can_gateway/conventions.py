@@ -16,6 +16,8 @@ from dataclasses import dataclass, field
 
 PACKET_MAGIC = 0x314E5443  # "CTN1"
 PACKET_VERSION = 1
+MODEL_PACKET_VERSION = 2
+PACKET_MODELS = {1: "sy135", 2: "sy80u"}
 BODY_COUNT = 5
 BODY_ORDER = ("chassis", "upper", "boom", "arm", "bucket")
 LINK_BY_BODY = {"chassis": "body", "upper": "body", "boom": "boom", "arm": "arm", "bucket": "bucket"}
@@ -71,6 +73,7 @@ class TelemetrySample:
     swing_rad: float
     track_left_mps: float
     track_right_mps: float
+    model_id: str | None = None
 
 
 def parse_packet(data: bytes) -> TelemetrySample | None:
@@ -78,7 +81,10 @@ def parse_packet(data: bytes) -> TelemetrySample | None:
         return None
     values = PACKET_STRUCT.unpack(data)
     magic, version, _flags = values[0], values[1], values[2]
-    if magic != PACKET_MAGIC or version != PACKET_VERSION:
+    if magic != PACKET_MAGIC or version not in (PACKET_VERSION, MODEL_PACKET_VERSION):
+        return None
+    model_id = PACKET_MODELS.get(values[3]) if version == MODEL_PACKET_VERSION else None
+    if version == MODEL_PACKET_VERSION and model_id is None:
         return None
     tick_ms = values[4]
     bodies: dict[str, BodyPose] = {}
@@ -89,13 +95,19 @@ def parse_packet(data: bytes) -> TelemetrySample | None:
         bodies[name] = BodyPose(quat_xyzw=quat, origin_m=origin)
         offset += 7
     tail = values[offset:offset + 5]
-    return TelemetrySample(
+    sample = TelemetrySample(
         tick_ms=tick_ms,
         bodies=bodies,
         swing_rad=tail[0],
         track_left_mps=tail[1],
         track_right_mps=tail[2],
+        model_id=model_id,
     )
+    # Shape and tick type are guaranteed by PACKET_STRUCT. Only consumed
+    # physical values need an ingress check; reserved floats are ignored.
+    if not all(math.isfinite(value) for value in values[5:-2]):
+        return None
+    return sample
 
 
 @dataclass

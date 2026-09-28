@@ -22,8 +22,22 @@ must remain byte-compatible.
   tick.
 - `emit_frames(...)` pre-encodes the complete due frame family before appending
   any frame to the sink.
-- The Godot CTN1 telemetry packet schema and version are unchanged. The profile
-  consumes the existing `upper`, boom, arm and bucket transforms.
+- Both legacy and calibrated telemetry reject non-finite physical values at
+  ingress; packet shape/tick types come from the binary layout. Preserve the
+  calibrated mapper's existing quaternion normalization without a unit-norm
+  admission threshold. Sample preparation has an exception boundary
+  before any sink writes: failures discard the whole due family and preserve
+  projection history and scheduler state. A following valid sample can resume on
+  the same PC001 connection. Rollback preserves only the two velocity-history
+  fields. Unexpected preparation bugs retain a traceback distinct from ordinary
+  data rejection. Transport errors remain separate from bad samples.
+- Godot CTN1 telemetry v2 retains the 176-byte layout and assigns the reserved
+  header uint16 to model identity (1=SY135, 2=SY80U). CTNC/CTNK remain v1.
+  Gateway accepts legacy CTN1 v1 using its CLI model; v2 selects a matching
+  codec/profile per sample. Unknown model IDs are rejected.
+- SY135 NEO is a visual variant: Godot publishes it as wire model 1 (SY135),
+  using the existing SY135 profile and DBC. SY135/NEO switches must preserve
+  the gateway model, PC001 socket and completed handshake.
 
 ## 3. Semantic Contracts
 
@@ -35,6 +49,17 @@ must remain byte-compatible.
 - Main antenna position obeys `GNSSA = O - Exca * GO`. Velocity is the finite
   difference of successive GNSSA positions. The vice antenna uses the explicit
   profile mount offset; it is never inferred silently.
+- SY80U uses its own hash-bound DBC directory and persisted reference calibration.
+  Its IMU is signed int16 with zero offset; the extra VAL body-axis swap is
+  reversed separately. Extract upper-to-boom as Ry(side) Rx(boom), remove side
+  before local-X validation, and emit side as DBC SWING (parser and QML each
+  negate it). Slew DLC is 2. Model transitions reset projection history and
+  schedulers, rebuild the console, retire old SocketCAN frames/custom schedules,
+  and close/reopen PC001 transport on the same port with a fresh handshake.
+  Old TCP queues are discarded. Per-model operator persistence is isolated.
+- SY80 calibration binds orientation parity to the actual persisted receiver
+  values, not uncalibrated factory defaults. Do not claim model dimensions or
+  tooth positions agree when receiver lengths differ from the simulator rig.
 - Boom, arm and bucket inputs come from adjacent-link local-X twist relative to
   the profile neutral alignment. Off-axis residuals, gimbal singularities and
   unreachable four-bar branches are rejected.

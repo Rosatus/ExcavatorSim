@@ -56,6 +56,8 @@ def resource_root() -> Path:
 
 
 def resolve_profile_path(value: str | Path) -> Path:
+    if str(value) == "builtin:qml-sy80u-ground-truth":
+        return resource_root() / "qml_sy80u_ground_truth.toml"
     if str(value) == BUILTIN_PROFILE:
         return resource_root() / BUILTIN_PROFILE_FILE
     return Path(value).expanduser().resolve()
@@ -75,7 +77,7 @@ def load_qml_profile(
         raise QmlProfileError(f"unsupported profile version {version}")
     if target != "qml-guidance-3d":
         raise QmlProfileError(f"unsupported profile target {target!r}")
-    if model_id != "sy135":
+    if model_id not in ("sy135", "sy80u"):
         raise QmlProfileError(f"unsupported QML model {model_id!r}")
 
     expected_hash = _string(identity, "calibration_sha256").lower()

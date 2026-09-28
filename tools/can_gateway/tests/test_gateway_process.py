@@ -167,19 +167,6 @@ class GatewayStandaloneDbcProcessTest(unittest.TestCase):
                     if item["message"]["frame_id"] == 0x0CFDA800
                 )
                 key = urllib.parse.quote(message["key"], safe="")
-                preview = request_json(
-                    f"{base}/api/v1/can-console/messages/{key}/preview",
-                    "POST",
-                    {
-                        "payload_hex": "7B 00 C7 FF 00 00 87 00",
-                    },
-                )["result"]["preview"]
-                self.assertEqual(preview["payload_hex"], "7B 00 C7 FF 00 00 87 00")
-                self.assertAlmostEqual(preview["values"]["VelE"], 1.23)
-                self.assertEqual(
-                    request_json(f"{base}/api/v1/status")["status"]["revision"],
-                    status["revision"],
-                )
                 authority = asyncio.run(
                     mutate_and_wait_event(
                         base,
@@ -196,6 +183,19 @@ class GatewayStandaloneDbcProcessTest(unittest.TestCase):
                     )
                 )
                 revision = authority["result"]["status"]["revision"]
+                preview = request_json(
+                    f"{base}/api/v1/can-console/messages/{key}/preview",
+                    "POST",
+                    {
+                        "payload_hex": "7B 00 C7 FF 00 00 87 00",
+                    },
+                )["result"]["preview"]
+                self.assertEqual(preview["payload_hex"], "7B 00 C7 FF 00 00 87 00")
+                self.assertAlmostEqual(preview["values"]["VelE"], 1.23)
+                self.assertEqual(
+                    request_json(f"{base}/api/v1/status")["status"]["revision"],
+                    revision,
+                )
                 updated = request_json(
                     f"{base}/api/v1/can-console/messages/{key}",
                     "PUT",
@@ -272,8 +272,9 @@ class GatewayGodotActivityProcessTest(unittest.TestCase):
             environment["XDG_STATE_HOME"] = str(Path(tmp, "state"))
             process = subprocess.Popen(
                 [
-                    sys.executable,
-                    str(TOOLS_DIR / "gateway.py"),
+                    *([os.environ["CAN_GATEWAY_TEST_EXE"]]
+                      if "CAN_GATEWAY_TEST_EXE" in os.environ
+                      else [sys.executable, str(TOOLS_DIR / "gateway.py")]),
                     "--mode",
                     "godot-managed",
                     "--sink",
@@ -321,6 +322,17 @@ class GatewayGodotActivityProcessTest(unittest.TestCase):
                             break
                         time.sleep(0.02)
                     # Real handshaken owner process must survive crossing zero.
+                    # Malformed poses/scalars and finite RTK overflow must not
+                    # terminate the owner or emit any part of the bad sample.
+                    for offset, value in ((16, float("nan")), (44, float("inf")),
+                                          (36, 1e30), (160, float("nan"))):
+                        packet = bytearray(make_telemetry_packet(50))
+                        struct.pack_into("<f", packet, offset, value)
+                        sender.sendto(packet, ("127.0.0.1", udp_port))
+                    client.settimeout(0.3)
+                    with self.assertRaises(socket.timeout):
+                        client.recv(1)
+                    client.settimeout(3.0)
                     for tick, swing in enumerate((0.0, -0.000017453293, 0.1), start=1):
                         # Invalid sample is rejected atomically; the next good
                         # sample still reaches the same handshaken connection.

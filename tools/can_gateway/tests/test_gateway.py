@@ -390,6 +390,34 @@ class _CaptureSink:
 
 
 class SimulationIdentityTest(unittest.TestCase):
+    def test_corrupt_numeric_packet_fields_are_rejected(self) -> None:
+        for offset in range(16, 168, 4):
+            for value in (math.nan, math.inf, -math.inf):
+                with self.subTest(offset=offset, value=value):
+                    packet = bytearray(make_packet(100))
+                    struct.pack_into("<f", packet, offset, value)
+                    self.assertIsNone(parse_packet(packet))
+    def test_preparation_exceptions_drop_whole_sample_and_recover(self) -> None:
+        for failure in (ValueError, OverflowError, ZeroDivisionError, KeyError, RuntimeError):
+            with self.subTest(failure=failure):
+                sink = _CaptureSink()
+                scheduler = gateway.FrameScheduler(
+                    {"imu": 100, "slew": 100, "rtk": 100, "travel": 100}
+                )
+                sample = parse_packet(make_packet(100))
+                # Fail late, after the IMU/slew/travel frames have been prepared.
+                with (
+                    patch.object(gateway, "encode_godot_rtk", side_effect=failure("bad input")),
+                    self.assertRaises(
+                        gateway.TelemetryPreparationError
+                        if failure in (KeyError, RuntimeError) else gateway.QmlMappingError
+                    ),
+                ):
+                    gateway.emit_frames([sink], scheduler, sample)
+                self.assertEqual(sink.frames, [])
+                gateway.emit_frames([sink], scheduler, sample)
+                self.assertEqual(len(sink.frames), 16)
+
     def test_slew_wrap_matches_circular_sensor_encoding(self) -> None:
         for degrees in (0.0, -0.001, -0.004, -0.01, 359.999, 360.0, 720.001):
             with self.subTest(degrees=degrees):
