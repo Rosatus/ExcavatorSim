@@ -28,7 +28,7 @@ func _run() -> void:
 	host.add_child(effects)
 	await process_frame
 	var mesh_id := effects._fill_array_mesh.get_instance_id()
-	for model in ["sy135", "sy205", "sy135"]:
+	for model in ["sy135", "sy205", "sy80u", "sy135"]:
 		if not presentation.activate_model_for_test(model):
 			return _finish(host, "model activation failed")
 		await process_frame # Let the old imported model actually be freed.

@@ -10,8 +10,11 @@ func _init() -> void:
 
 func _run() -> void:
 	var failures: Array[String] = []
-	for model_id in ["sy205", "sy135"]:
+	for model_id in ["sy205", "sy135", "sy80u"]:
 		_check_model(String(model_id), failures)
+	_check_sy135_deep_insertion(failures, "sy80u")
+	_check_sy135_lift_exit(failures, "sy80u")
+	_check_sy135_unengaged_negative_cases(failures, "sy80u")
 	_check_tilt_bucket(failures)
 	_check_sy135_deep_insertion(failures)
 	_check_sy135_lift_exit(failures)
@@ -57,14 +60,14 @@ func _check_model(model_id: String, failures: Array[String]) -> void:
 		_expect(_sources_are_canonical(proposal.capsules), "%s %s canonical region order" % [model_id, stroke["name"]], failures)
 		_expect(_edge_sweep_is_covered(pose, proposal.capsules), "%s %s connected half-voxel coverage" % [model_id, stroke["name"]], failures)
 		_expect(not proposal.clearance_capsules.is_empty(), "%s %s constrained clearance exists" % [model_id, stroke["name"]], failures)
-		if model_id == "sy135":
+		if cutter.uses_native_paths():
 			_expect(not proposal.native_paths.is_empty(), "%s %s native paths exist" % [model_id, stroke["name"]], failures)
 			_expect(_has_role(proposal.native_paths, "bucket_occupancy"), "%s %s inner occupancy participates" % [model_id, stroke["name"]], failures)
 			_expect(_has_role(proposal.native_paths, "bucket_floor"), "%s %s floor participates" % [model_id, stroke["name"]], failures)
 
 
-func _check_sy135_deep_insertion(failures: Array[String]) -> void:
-	var contract := _contract("sy135")
+func _check_sy135_deep_insertion(failures: Array[String], model_id: String = "sy135") -> void:
+	var contract := _contract(model_id)
 	var cutter := Cutter.new()
 	_expect(cutter.configure(contract, WorkZoneConfig.DEFAULT_VOXEL_SCALE_M), "sy135 deep configures", failures)
 	var start := Vector3(0.0, _bucket_origin_y(contract, -1.1), 24.0)
@@ -86,8 +89,8 @@ func _has_role(paths: Array[Dictionary], role: String) -> bool:
 	return false
 
 
-func _check_sy135_lift_exit(failures: Array[String]) -> void:
-	var contract := _contract("sy135")
+func _check_sy135_lift_exit(failures: Array[String], model_id: String = "sy135") -> void:
+	var contract := _contract(model_id)
 	var cutter := Cutter.new()
 	cutter.configure(contract, WorkZoneConfig.DEFAULT_VOXEL_SCALE_M)
 	var start := Vector3(0.0, _bucket_origin_y(contract, -0.45), 24.0)
