@@ -332,6 +332,7 @@ size = Vector3(638.8, 0.1, 5.55)
 size = Vector3(545.4, 0.1, 5.55)
 
 [node name="Root" type="Node3D" unique_id=753633726]
+metadata/sun_time_hours = 12.0
 
 [node name="WorldSettings1" type="Node3D" parent="." unique_id=227244436]
 

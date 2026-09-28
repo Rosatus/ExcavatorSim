@@ -2187,7 +2187,11 @@ VisualQualityController.apply_profile(profile_name: String) -> bool
 - `VisualEnvironment` is the only production profile/configuration owner.
   Sky3D uses `TimeOfDay.CelestialMode.SIMPLE` at 10:30 with UTC +7, longitude
   108 degrees and latitude 16 degrees. The resulting SkyDome polar angle is
-  19.5 degrees, or about 70.5 degrees solar elevation. Editor/game time,
+  19.5 degrees, or about 70.5 degrees solar elevation. A static map may pin a
+  different fixed hour through its root `sun_time_hours` meta (urban sets
+  12.0 for a near-zenith noon sun; `sun_altitude` is the polar angle, so noon
+  reads *below* 19.5 degrees); `VisualEnvironment.daytime_hours`/`set_daytime_hours`
+  applies it before and across profile re-applies. Editor/game time,
   system sync, moon/deep-space calculations, and cloud wind remain disabled.
 - Sky3D's `SunLight` is the only active daytime directional light. The root
   `KeyLight` path remains as a disabled compatibility seam and may not cast a
@@ -2215,7 +2219,7 @@ VisualQualityController.apply_profile(profile_name: String) -> bool
 | Sky3D/environment unavailable | Return `false`; report profile failure |
 | Low profile | Disable clouds, Sky3D fog, and sun shadows |
 | Balanced/high profile | Enable bounded clouds/fog without time progression |
-| Runtime starts | One visible sun, 10:30 SIMPLE daytime, legacy key light inactive |
+| Runtime starts | One visible sun, 10:30 SIMPLE daytime (or the map-pinned `sun_time_hours`), legacy key light inactive |
 
 #### 5. Good / Base / Bad Cases
 

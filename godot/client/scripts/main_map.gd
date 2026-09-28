@@ -30,6 +30,9 @@ func _enter_tree() -> void:
 	var preview_sky := map.get_node_or_null("WorldEnvironment")
 	if preview_sky != null:
 		preview_sky.free()
+	# A map may pin the fixed product sun time on its root (e.g. sun_time_hours 12.0).
+	$VisualEnvironment.set_daytime_hours(float(map.get_meta(
+		"sun_time_hours", VisualEnvironment.FIXED_DAYTIME_HOURS)))
 	# Map-baked directional lights would double the client Sky3D sun.
 	for light in map.find_children("*", "DirectionalLight3D"):
 		light.visible = false

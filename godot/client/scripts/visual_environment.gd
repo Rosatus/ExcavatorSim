@@ -47,10 +47,20 @@ const SKY_PROFILES := {
 @export var profile := "balanced"
 
 var environment_ready := false
+# Maps may pin their own fixed sun time; otherwise the default workday hour stands.
+var daytime_hours := FIXED_DAYTIME_HOURS
 
 
 func _ready() -> void:
 	apply_profile(profile)
+
+
+func set_daytime_hours(hours: float) -> void:
+	daytime_hours = clampf(hours, 0.0, 23.9998)
+	var world := get_node_or_null(world_environment_path) as Sky3D
+	if world != null:
+		world.current_time = daytime_hours
+		world.pause()
 
 
 func apply_profile(profile_name: String) -> bool:
@@ -152,5 +162,5 @@ func _configure_fixed_daytime(world: Sky3D) -> void:
 		world.tod.utc = FIXED_UTC_OFFSET_HOURS
 		world.tod.compute_moon_coords = false
 		world.tod.compute_deep_space_coords = false
-	world.current_time = FIXED_DAYTIME_HOURS
+	world.current_time = daytime_hours
 	world.pause()

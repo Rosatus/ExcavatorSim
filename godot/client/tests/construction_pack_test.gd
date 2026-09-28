@@ -50,6 +50,8 @@ func run() -> void:
 	check(ground.material.world_background == Terrain3DMaterial.NONE, "Unexpected infinite background terrain")
 	check(map.get_node_or_null("WorldEnvironment") == null, "Map duplicates product environment")
 	check(scene.get_node("WorldEnvironment") is Sky3D, "Product Sky3D unavailable")
+	var sky := scene.get_node("WorldEnvironment") as Sky3D
+	check(is_equal_approx(sky.current_time, VisualEnvironment.FIXED_DAYTIME_HOURS), "Map without a sun-time pin lost the default workday hour")
 	var bodies := map.find_children("*", "StaticBody3D", true, false).size()
 	var world := map.get_world_3d()
 	var area_shape := BoxShape3D.new()

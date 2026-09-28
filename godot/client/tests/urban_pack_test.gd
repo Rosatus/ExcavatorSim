@@ -31,6 +31,9 @@ func run() -> void:
 	check(map.get_node_or_null("WorkArea/ExcavationArea") != null, "Urban map lost its voxel work-zone marker")
 	check(map.get_node_or_null("WorldEnvironment") == null, "Urban map duplicates product environment")
 	check(scene.get_node("WorldEnvironment") is Sky3D, "Product Sky3D unavailable")
+	var sky := scene.get_node("WorldEnvironment") as Sky3D
+	check(is_equal_approx(sky.current_time, 12.0), "Urban map did not pin the noon sun")
+	check(sky.sky != null and sky.sky.sun_altitude < deg_to_rad(19.5), "Urban noon sun stayed at or below the 10:30 height (polar %.1f deg)" % rad_to_deg(sky.sky.sun_altitude if sky.sky != null else -1.0))
 	for light in map.find_children("*", "DirectionalLight3D"):
 		check(not light.visible, "Urban map directional light stayed enabled")
 	check(not scene.get_node("TerrainRoot/TerrainCollider").enabled, "Training collider leaked into urban map")
