@@ -38,9 +38,11 @@ def sha(p):
 
 
 def dump(p, value):
+    # Byte-level LF output: catalog/registry sha pins must match the bytes a
+    # checkout produces, and Windows text mode would write CRLF instead.
     p = Path(p)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    p.write_bytes((json.dumps(value, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
 
 
 def read(p):
@@ -495,7 +497,7 @@ def main():
         ]
     xml.append("</robot>")
     urdf_path = REPO / "assets/model/library/sy155w_reference.urdf"
-    urdf_path.write_text("\n".join(xml) + "\n", encoding="utf-8")
+    urdf_path.write_bytes(("\n".join(xml) + "\n").encode("utf-8"))
     fixture = {
         "model_id": ID,
         "model_version": VERSION,
