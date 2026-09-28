@@ -25,6 +25,7 @@ var _replay_loops := 0
 var _replay_model_mismatch := false
 var _replay_yaw_divergence_max_deg := 0.0
 var _replay_yaw_divergence_final_deg := 0.0
+var _replay_calibration: Dictionary = {}
 var _failures: Array[String] = []
 
 
@@ -102,6 +103,16 @@ func _run() -> void:
 	if not _replay_path.is_empty() and not _load_replay():
 		_finish({}, "replay recording failed to load: %s" % _replay_path)
 		return
+	if not _replay_calibration.is_empty():
+		# Diagnostic recordings may pin the locomotion tuning under which their
+		# inputs were recorded. Never change product resources or saved settings.
+		var runtime = chassis._jolt_runtime
+		runtime._tracks_base = (_replay_calibration["tracks"] as Dictionary).duplicate(true)
+		runtime._dynamics_base = (_replay_calibration["chassis_dynamics"] as Dictionary).duplicate(true)
+		runtime._apply_locomotion_mode()
+		Engine.max_fps = int(_replay_calibration.get("render_fps_limit", 0))
+		if bool(_replay_calibration.get("skip_solid_queries", false)):
+			runtime._solid_contacts.parts.clear()
 	if not _replay_path.is_empty() and _replay_settle_seconds > 0.0:
 		var settle_ticks := int(_replay_settle_seconds * Engine.physics_ticks_per_second)
 		var settle_start := Engine.get_physics_frames()
@@ -483,6 +494,8 @@ func _run() -> void:
 				"model_mismatch": _replay_model_mismatch,
 				"yaw_divergence_max_deg": _replay_yaw_divergence_max_deg,
 				"yaw_divergence_final_deg": _replay_yaw_divergence_final_deg,
+				"physics_ticks_per_second": Engine.physics_ticks_per_second,
+				"locomotion_calibration": _replay_calibration,
 			},
 		},
 	}
@@ -578,6 +591,13 @@ func _load_replay() -> bool:
 	var recording := parsed as Dictionary
 	if String(recording.get("schema", "")) != "excavator-sim-input-recording-v1":
 		return false
+	if int(recording.get("physics_ticks_per_second", 0)) != Engine.physics_ticks_per_second:
+		push_error("Replay physics frequency differs from the recording")
+		return false
+	_replay_calibration = recording.get("locomotion_calibration", {}) as Dictionary
+	if not _replay_calibration.is_empty():
+		if not _replay_calibration.get("tracks") is Dictionary or not _replay_calibration.get("chassis_dynamics") is Dictionary:
+			return false
 	_replay_tracks = recording.get("tracks", []) as Array
 	_replay_equipment = recording.get("equipment", []) as Array
 	if _replay_tracks.size() != _replay_equipment.size() or _replay_equipment.is_empty():
