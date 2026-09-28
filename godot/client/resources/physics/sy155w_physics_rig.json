@@ -368,7 +368,8 @@
         "max_acceleration_rad_s2": 0.9,
         "max_jerk_rad_s3": 3.6,
         "damping": 60000.0
-      }
+      },
+      "initial_rad": 0.0
     },
     {
       "name": "boom_joint",
@@ -446,7 +447,8 @@
         "max_acceleration_rad_s2": 0.65,
         "max_jerk_rad_s3": 2.6,
         "damping": 65000.0
-      }
+      },
+      "initial_rad": 0.10471975511965978
     },
     {
       "name": "arm_joint",
@@ -524,7 +526,8 @@
         "max_acceleration_rad_s2": 0.8,
         "max_jerk_rad_s3": 3.2,
         "damping": 50000.0
-      }
+      },
+      "initial_rad": -0.10471975511965978
     },
     {
       "name": "bucket_joint",
@@ -602,7 +605,8 @@
         "max_acceleration_rad_s2": 1.0,
         "max_jerk_rad_s3": 4.0,
         "damping": 35000.0
-      }
+      },
+      "initial_rad": -0.17453292519943295
     }
   ],
   "chassis_dynamics": {

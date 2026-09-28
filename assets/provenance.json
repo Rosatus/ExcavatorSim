@@ -219,7 +219,7 @@
       "raw_sha256": "2f6ee1a18b0a10a4e7c42f532bdb7697b689ee195e102ec7d7f8dbd60974535c",
       "generator": {
         "path": "tools/import_sy155w.py",
-        "sha256": "3d9c75a660313b55bbe2ec988aba3a60b6238a39c6c07730712c014b978cb129"
+        "sha256": "7fdca8894646adac4df020e617ffcf9dd6fd2d376ee9a5b06f6ed2f384a4e76b"
       },
       "inputs": [
         {
@@ -278,11 +278,11 @@
     },
     {
       "destination_path": "godot/client/resources/visual/sy155w_visual_manifest.json",
-      "destination_sha256": "c57b0a907ce25dd667411f40bba319496a9984c731a643779b0edd0ef9897e96",
-      "raw_sha256": "c57b0a907ce25dd667411f40bba319496a9984c731a643779b0edd0ef9897e96",
+      "destination_sha256": "d9f232f279939041f97a5a757799e45fe52f5508466d82011f3965b953462457",
+      "raw_sha256": "d9f232f279939041f97a5a757799e45fe52f5508466d82011f3965b953462457",
       "generator": {
         "path": "tools/import_sy155w.py",
-        "sha256": "3d9c75a660313b55bbe2ec988aba3a60b6238a39c6c07730712c014b978cb129"
+        "sha256": "7fdca8894646adac4df020e617ffcf9dd6fd2d376ee9a5b06f6ed2f384a4e76b"
       },
       "inputs": [
         {
@@ -341,11 +341,11 @@
     },
     {
       "destination_path": "godot/client/resources/physics/sy155w_physics_rig.json",
-      "destination_sha256": "1f105a4e28673c03786cb6f0f3faf25c3f3b67f19a151029d39a35e7dd143d0a",
-      "raw_sha256": "1f105a4e28673c03786cb6f0f3faf25c3f3b67f19a151029d39a35e7dd143d0a",
+      "destination_sha256": "1b7625892ffb2c53d93bfb0a2077091e6c80ea93503554bc7fb3df9c427ac1ea",
+      "raw_sha256": "1b7625892ffb2c53d93bfb0a2077091e6c80ea93503554bc7fb3df9c427ac1ea",
       "generator": {
         "path": "tools/import_sy155w.py",
-        "sha256": "3d9c75a660313b55bbe2ec988aba3a60b6238a39c6c07730712c014b978cb129"
+        "sha256": "7fdca8894646adac4df020e617ffcf9dd6fd2d376ee9a5b06f6ed2f384a4e76b"
       },
       "inputs": [
         {
@@ -408,7 +408,7 @@
       "raw_sha256": "aa6976a4a79fd48c170463fe2945036dcb4897bd617acca4d4ee6edc98b0fa8d",
       "generator": {
         "path": "tools/import_sy155w.py",
-        "sha256": "3d9c75a660313b55bbe2ec988aba3a60b6238a39c6c07730712c014b978cb129"
+        "sha256": "7fdca8894646adac4df020e617ffcf9dd6fd2d376ee9a5b06f6ed2f384a4e76b"
       },
       "inputs": [
         {
@@ -471,7 +471,7 @@
       "raw_sha256": "3051f7c08206ba78a3bd1985a41dc9823ceba14a5363d800bc98f4018841f4ed",
       "generator": {
         "path": "tools/import_sy155w.py",
-        "sha256": "3d9c75a660313b55bbe2ec988aba3a60b6238a39c6c07730712c014b978cb129"
+        "sha256": "7fdca8894646adac4df020e617ffcf9dd6fd2d376ee9a5b06f6ed2f384a4e76b"
       },
       "inputs": [
         {
@@ -530,11 +530,11 @@
     },
     {
       "destination_path": "godot/client/tests/fixtures/sy155w_frame_parity_cases.json",
-      "destination_sha256": "bde0a6c6a138ea48ae4ad819a9280f52ee3ee6a37f59e165185301a075675e84",
-      "raw_sha256": "bde0a6c6a138ea48ae4ad819a9280f52ee3ee6a37f59e165185301a075675e84",
+      "destination_sha256": "1d5e03f99cec698d2bb0f285ff0eb83ffc4f0ce5c8be65b744a231f46de4e3bb",
+      "raw_sha256": "1d5e03f99cec698d2bb0f285ff0eb83ffc4f0ce5c8be65b744a231f46de4e3bb",
       "generator": {
         "path": "tools/import_sy155w.py",
-        "sha256": "3d9c75a660313b55bbe2ec988aba3a60b6238a39c6c07730712c014b978cb129"
+        "sha256": "7fdca8894646adac4df020e617ffcf9dd6fd2d376ee9a5b06f6ed2f384a4e76b"
       },
       "inputs": [
         {
@@ -597,7 +597,7 @@
       "raw_sha256": "5637419579c694ba7f91e713deac90896827b0807d987d6884f5ec746094550e",
       "generator": {
         "path": "tools/import_sy155w.py",
-        "sha256": "3d9c75a660313b55bbe2ec988aba3a60b6238a39c6c07730712c014b978cb129"
+        "sha256": "7fdca8894646adac4df020e617ffcf9dd6fd2d376ee9a5b06f6ed2f384a4e76b"
       },
       "inputs": [
         {

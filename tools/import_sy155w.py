@@ -411,11 +411,16 @@ def main():
     # Arm extension gains +30 deg: without the four-bar chain the stick can
     # travel further out. Limits stay asymmetric about the neutral.
     limits = [[-180, 180], [-7, 7], [-9, 39], [-15, 15]]
+    # Carry-pose seed: at the source neutral the GB12 cutting edge sits
+    # level with the chassis origin (on the ground). Lift each joint inside
+    # its limits so the bucket starts clear of the terrain.
+    initial_deg = [0.0, 6.0, -6.0, -10.0]
     for idx, joint in enumerate(rig["joints"]):
         parent, child = FRAMES[idx : idx + 2]
         joint["parent_anchor_godot"] = rows(np.linalg.inv(source_fw[parent]) @ source_fw[child])
         joint["child_anchor_godot"] = rows(IDENTITY)
         joint["limit_rad"] = [math.radians(v) for v in limits[idx]]
+        joint["initial_rad"] = math.radians(initial_deg[idx])
     rig["chassis_dynamics"]["mass_kg"] = 15000.0
     rig["chassis_dynamics"]["compound_shapes"] = [
         {"kind": "box", "center_m": [0, 0.535, 0], "size_m": [2.55, 1.03, 3.55]},

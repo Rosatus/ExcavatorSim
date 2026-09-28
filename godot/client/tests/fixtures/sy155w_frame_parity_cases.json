@@ -848,7 +848,7 @@
       }
     }
   },
-  "generator_sha256": "ec0c6f7f103362946cd67e5396887e697141cd1cac2dd49875714408d3b83db0",
+  "generator_sha256": "0e27bd2d19be40cfbee3e422a0bd9b815e6414345e282e20086883fb0facf0c1",
   "source_pixi_lock_sha256": "d4c4083ca6143dcd9acd40666bca117ed0790e8a8685ec2be0c7ebb32e6a7775",
   "pinocchio_version": "4.1.0",
   "model_implementation": "backend/src/babylon_sim/model.py",

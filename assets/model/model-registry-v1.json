@@ -125,10 +125,10 @@
       "godot_glb_sha256": "2f6ee1a18b0a10a4e7c42f532bdb7697b689ee195e102ec7d7f8dbd60974535c",
       "visual_manifest_path": "godot/client/resources/visual/sy155w_visual_manifest.json",
       "visual_manifest_resource": "res://resources/visual/sy155w_visual_manifest.json",
-      "visual_manifest_sha256": "c57b0a907ce25dd667411f40bba319496a9984c731a643779b0edd0ef9897e96",
+      "visual_manifest_sha256": "d9f232f279939041f97a5a757799e45fe52f5508466d82011f3965b953462457",
       "parity_fixture_path": "godot/client/tests/fixtures/sy155w_frame_parity_cases.json",
       "parity_fixture_resource": "res://tests/fixtures/sy155w_frame_parity_cases.json",
-      "parity_fixture_sha256": "bde0a6c6a138ea48ae4ad819a9280f52ee3ee6a37f59e165185301a075675e84",
+      "parity_fixture_sha256": "1d5e03f99cec698d2bb0f285ff0eb83ffc4f0ce5c8be65b744a231f46de4e3bb",
       "passive_linkage_mode": "none",
       "excavation_contact": {
         "mode": "node",

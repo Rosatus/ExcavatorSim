@@ -225,7 +225,13 @@ operator commands or writes authority frames. The source small-arm four-bar
 `BUCKET_JOINT` directly; reachability no longer applies, but non-planar cylinder
 pins are still rejected atomically. The arm authority joint extends +30 deg beyond
 the demonstrated source range (rig `arm_joint` limit [-9,+39] deg; positive joint =
-arm_extend per the shared sign profile). After regenerating the GLB, delete stale
+arm_extend per the shared sign profile). At the authority neutral the GB12 cutting
+edge sits level with the chassis origin, so SY155W seeds a carry pose instead:
+each joint may declare `initial_rad` (optional, must lie inside `limit_rad`),
+and `KinematicArticulationState` seeds positions/targets from it at configure and
+reset_motion. SY155W uses boom +6 / arm -6 / bucket -10 deg (tooth ~0.47 m above
+the chassis datum). Other models' neutrals already lift the tooth 0.7-3.6 m, so
+they keep zero seeds. After regenerating the GLB, delete stale
 `.godot/imported/SY155W_excavator_godot.glb-*.scn` cache or run `--import` once —
 headless runs serve the cached scene and resurrect removed nodes.
 

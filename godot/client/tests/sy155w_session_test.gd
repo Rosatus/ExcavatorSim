@@ -28,6 +28,18 @@ func _run() -> void:
 	_check(presentation.get_contract_error().is_empty(), "presentation: " + presentation.get_contract_error())
 	_check(bool(chassis.get_status_snapshot().get("configured", false)), "chassis configured")
 	_check(chassis.get_status_snapshot().get("locomotion_mode") == "wheeled", "main scene selects wheeled locomotion")
+	# Carry-pose seed: sy155w joints start lifted inside their limits so the
+	# GB12 cutting edge clears the ground at spawn (zero pose put it level
+	# with the chassis origin).
+	var joint_positions := {}
+	for state in chassis._jolt_runtime._articulation.joint_states():
+		joint_positions[state.name] = rad_to_deg(float(state.position_rad))
+	_check(is_equal_approx(float(joint_positions.get("boom_joint", 999.0)), 6.0), "spawn carry boom: %s" % joint_positions)
+	_check(is_equal_approx(float(joint_positions.get("arm_joint", 999.0)), -6.0), "spawn carry arm: %s" % joint_positions)
+	_check(is_equal_approx(float(joint_positions.get("bucket_joint", 999.0)), -10.0), "spawn carry bucket: %s" % joint_positions)
+	var frames := chassis._jolt_runtime._articulation.accepted_frames()
+	var tooth_world := (frames.bucket_link as Transform3D) * Vector3(0.0, -1.276, 0.668)
+	_check(tooth_world.y - float(frames.base_link.origin.y) > 0.3, "GB12 tooth clears ground at spawn: %s" % tooth_world.y)
 	chassis.set_wheeled_commands_for_test(0, 0, 0)
 	for tick in 120:
 		await physics_frame

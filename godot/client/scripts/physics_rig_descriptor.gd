@@ -16,6 +16,7 @@ const JOINT_FIELDS := [
 	"child_anchor_godot", "axis", "axis_frame", "limit_rad", "collide_connected",
 	"actuator",
 ]
+const OPTIONAL_JOINT_FIELDS := ["initial_rad"]
 const ACTUATOR_FIELDS := [
 	"mode", "max_torque_nm", "max_velocity_rad_s", "max_acceleration_rad_s2",
 	"max_jerk_rad_s3", "damping",
@@ -237,7 +238,7 @@ func _validate_joints(value: Variant) -> bool:
 			return _reject("joints[%d]" % index, "must be an object")
 		var joint := value[index] as Dictionary
 		var path := "joints[%d]" % index
-		if not _exact_fields(joint, JOINT_FIELDS, path):
+		if not _fields_with_optional(joint, JOINT_FIELDS, OPTIONAL_JOINT_FIELDS, path):
 			return false
 		var name := String(joint.get("name", ""))
 		if not JOINT_NAMES.has(name) or found.has(name):
@@ -269,6 +270,12 @@ func _validate_joints(value: Variant) -> bool:
 			return _reject("%s.limit_rad" % path, "must be finite and strictly increasing")
 		if float(limits[0]) > 0.0 or float(limits[1]) < 0.0:
 			return _reject("%s.limit_rad" % path, "must contain the descriptor rest pose")
+		if joint.has("initial_rad") and (
+			not _finite_number(joint.get("initial_rad"))
+			or float(joint["initial_rad"]) < float(limits[0])
+			or float(joint["initial_rad"]) > float(limits[1])
+		):
+			return _reject("%s.initial_rad" % path, "must be finite and within limit_rad")
 		if not _validate_actuator(joint.get("actuator"), "%s.actuator" % path):
 			return false
 		found.append(name)

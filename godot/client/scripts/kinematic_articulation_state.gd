@@ -44,10 +44,11 @@ func configure(descriptor: Dictionary, chassis_transform: Transform3D) -> bool:
 		reset()
 		return false
 	for joint_name in JOINT_NAMES:
-		_positions[joint_name] = 0.0
+		var initial := float((_joint_descriptors[joint_name] as Dictionary).get("initial_rad", 0.0))
+		_positions[joint_name] = initial
 		_velocities[joint_name] = 0.0
 		_accelerations[joint_name] = 0.0
-		_targets[joint_name] = 0.0
+		_targets[joint_name] = initial
 	_accepted_frames = _compute_frames(chassis_transform, _positions)
 	configured = _accepted_frames.size() == BODY_NAMES.size()
 	return configured
@@ -79,10 +80,11 @@ func reset_motion(chassis_transform: Transform3D) -> void:
 	command_identity = -1
 	cut_engagement = 0.0
 	for joint_name in JOINT_NAMES:
-		_positions[joint_name] = 0.0
+		var initial := float((_joint_descriptors.get(joint_name, {}) as Dictionary).get("initial_rad", 0.0))
+		_positions[joint_name] = initial
 		_velocities[joint_name] = 0.0
 		_accelerations[joint_name] = 0.0
-		_targets[joint_name] = 0.0
+		_targets[joint_name] = initial
 	_accepted_frames = _compute_frames(chassis_transform, _positions)
 
 
