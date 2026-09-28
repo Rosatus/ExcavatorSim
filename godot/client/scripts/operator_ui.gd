@@ -2231,10 +2231,10 @@ func _refresh_prompt_copy() -> void:
 	if wheeled:
 		if _prompt_mode == "keyboard":
 			_control_hint.text = keyboard_hint.replace("R/F、Y/H  履带", "G 前 · V 左 · B 后 · N 右 · 空格刹车")
-			_guide_controls_label.text = UIStrings.GUIDE_KEYBOARD.replace("R / F   左履带前进 / 后退     Y / H   右履带前进 / 后退", "G   前进     V   左转     B   后退     N   右转     空格   刹车\n松开行驶键自动驻车；转向需要车辆移动。")
+			_guide_controls_label.text = UIStrings.GUIDE_KEYBOARD.replace("R / F   左履带前进 / 后退     Y / H   右履带前进 / 后退", "G   前进     V   左转     B   后退     N   右转     空格 / Shift   刹车\n松开行驶键自动驻车；转向需要车辆移动。")
 		else:
 			_control_hint.text = gamepad_hint.replace("扳机与肩键  履带", "RT 前进 · LT 后退 · LB/RB 转向")
-			_guide_controls_label.text = UIStrings.GUIDE_GAMEPAD.replace("LT / LB   左履带前进 / 后退\nRT / RB   右履带前进 / 后退", "RT   前进     LT   后退\nLB / RB   左转 / 右转\n松开行驶输入自动驻车。")
+			_guide_controls_label.text = UIStrings.GUIDE_GAMEPAD.replace("LT / LB   左履带前进 / 后退\nRT / RB   右履带前进 / 后退", "RT   前进     LT   后退\nLB / RB   左转 / 右转     A   刹车\n松开行驶输入自动驻车。")
 
 
 func set_prompt_mode_for_test(value: String) -> void:

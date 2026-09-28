@@ -218,12 +218,12 @@ E folds, U unfolds, relative limits [-30,+10] degrees — the fold side was wide
 past the demonstrated source range at user request. On pad, D-pad Up borrows
 right-stick Y with up=fold/down=unfold (the pair was flipped from the original
 layout per operator preference). Source demonstration ranges
-are provisional, not manufacturer hard stops. `PassiveHydraulics` updates six
+are provisional, not manufacturer hard stops. `PassiveHydraulics` updates five
 cylinder pairs and twelve multi-target hoses after driven poses; it never accepts
 operator commands or writes authority frames. The source small-arm four-bar
-(BUCKET_ROCKER/BUCKET_COUPLER) is removed at import and the bucket cylinder drives
-`BUCKET_JOINT` directly; reachability no longer applies, but non-planar cylinder
-pins are still rejected atomically. The arm authority joint extends +30 deg beyond
+(BUCKET_ROCKER/BUCKET_COUPLER) and the whole bucket-cylinder assembly that drove
+it are removed at import (the stick keeps only its welded base ears);
+non-planar cylinder pins are still rejected atomically. The arm authority joint extends +30 deg beyond
 the demonstrated source range (rig `arm_joint` limit [-9,+39] deg; positive joint =
 arm_extend per the shared sign profile). At the authority neutral the GB12 cutting
 edge sits level with the chassis origin, so SY155W seeds a carry pose instead:

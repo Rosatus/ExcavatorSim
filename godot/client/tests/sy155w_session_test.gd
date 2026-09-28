@@ -116,7 +116,7 @@ func _run() -> void:
 	await process_frame
 	await physics_frame
 	_check(attachments.active_attachment_id() == "xtr13+gb12", "default attachment on second activation")
-	_check(presentation.get_hydraulics_snapshot_for_test().cylinder_count == 6, "hydraulics on second activation")
+	_check(presentation.get_hydraulics_snapshot_for_test().cylinder_count == 5, "hydraulics on second activation")
 	if failures.is_empty():
 		print("SY155W session test passed: switch, default attachments, folding inputs/limits/reset, return to SY135.")
 	else:

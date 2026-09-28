@@ -3,11 +3,11 @@
 Run with repository Python: tools/import_sy155w.py --source <SY155W directory>.
 Mesh/accessor bytes and materials are preserved. Animated transforms are sampled,
 semantic pivot bases are changed by rigid coordinate changes, and the bucket tree
-is removed along with the small-arm four-bar linkage: the bucket cylinder drives
-BUCKET_JOINT directly. The four authority joints have a source-specific neutral;
-their fifth folding joint stays local, as in SY80U. Limits are demonstrated
-animation ranges, plus an extra +30 deg of arm extension the mechanism supports
-once the linkage is gone.
+is removed along with the small-arm four-bar linkage and its bucket cylinder
+assembly (the stick keeps only its welded base ears). The four authority joints
+have a source-specific neutral; their fifth folding joint stays local, as in
+SY80U. Limits are demonstrated animation ranges, plus an extra +30 deg of arm
+extension the mechanism supports once the linkage is gone.
 """
 
 import argparse
@@ -152,10 +152,13 @@ def main():
             descendants(child)
 
     descendants(by_name["BUCKET_ROOT"])
-    # The small-arm four-bar is deleted: the bucket cylinder drives the bucket
-    # pin directly, so the rocker/coupler links are dropped with the bucket tree.
+    # The small-arm four-bar is deleted along with the whole bucket cylinder
+    # assembly that used to drive it (barrel/rod subtrees); the welded base
+    # ears on the stick stay.
     descendants(by_name["BUCKET_ROCKER"])
     descendants(by_name["BUCKET_COUPLER"])
+    descendants(by_name["BUCKET_CYLINDER_BARREL"])
+    descendants(by_name["BUCKET_CYLINDER_ROD"])
     for n in nodes:
         if "children" in n:
             n["children"] = [i for i in n["children"] if i not in remove]
@@ -322,9 +325,6 @@ def main():
         ("BOOM_LIFT_R", "SLEW", (1.02, -0.55, 0.30), "BOOM_BASE", (1.4, -0.32, -0.17)),
         ("BOOM_ARTICULATION", "BOOM_BASE", (0.50, 0, -0.36), "BOOM_OUTER", (0.78, 0, -0.43)),
         ("STICK_CYLINDER", "BOOM_OUTER", (0.59, 0, 0.54), "STICK", (-0.60, 0, 0.18)),
-        # Direct pin drive: the rod end lands on the bucket horn pin that used
-        # to be fed through the deleted rocker/coupler chain.
-        ("BUCKET_CYLINDER", "STICK", (0.26, 0, 0.40), "BUCKET_JOINT", (0.22, 0, 0.26)),
         ("BLADE_CYLINDER", "CHASSIS", (-1.80, 0, 0.86), "BLADE_PIVOT", (-0.4235, 0, -0.02)),
     ]
     for name, a, pa, b, pb in cylinder_defs:
@@ -624,14 +624,12 @@ def main():
                     -108 + 18 * phase,
                     112 - 30 * phase,
                 ],
-                # The direct-drive bucket cylinder has no source oracle: the
-                # source aimed its rod at the deleted rocker, not the horn pin.
                 "nodes": {
                     k: v
                     for k, v in sample["nodes"].items()
                     if any(
                         k == n + s
-                        for n, *_ in (d for d in cylinder_defs if d[0] != "BUCKET_CYLINDER")
+                        for n, *_ in cylinder_defs
                         for s in ["_BARREL", "_ROD"]
                     )
                 },
@@ -662,7 +660,7 @@ def main():
             "joint_degrees": [58, -47, -99, 97],
             "source_is_unmodified": True,
             "default_attachment": "xtr13+gb12",
-            "removed_bucket_and_linkage_nodes": len(remove),
+            "removed_bucket_linkage_cylinder_nodes": len(remove),
             "cylinders": cylinder_defs,
             "default_tool_transform_in_bucket_link": rows(socket_transform),
         },
@@ -717,7 +715,8 @@ def main():
     dump(provenance_path, provenance)
     print(
         f"Generated SY155W: {len(nodes)} nodes, {len(doc['meshes'])} meshes; "
-        f"removed {len(remove)} bucket nodes; 6 passive cylinders, 12 hoses."
+        f"removed {len(remove)} bucket/cylinder nodes; "
+        f"{len(cylinders)} passive cylinders, {len(hoses)} hoses."
     )
 
 

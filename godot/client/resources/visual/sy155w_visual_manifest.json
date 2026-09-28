@@ -5,19 +5,19 @@
   "source": {
     "path": "C:\\code\\blender\\Excavator\\SY155W\\SANY_SY155W_Animated.glb",
     "sha256": "c7eea3e28a976765502ee0b886af41ff4df8280c1f7f6c5fb40b099a0bc0f3a4",
-    "runtime_sha256": "2f6ee1a18b0a10a4e7c42f532bdb7697b689ee195e102ec7d7f8dbd60974535c",
+    "runtime_sha256": "f3b00a1c59d60284a1f1888e0ea68cc3cfd3b55691bff275649fc432533b035b",
     "byte_size": 25250448,
     "adaptation": "repaired source blend; sample frame 91; rigid pivot coordinate changes; omit bucket subtree, arm four-bar linkage and animation players",
     "semantic_zero_provenance": "Independent build_sy155w.py params(Work_Cycle, .25): [58,-47,-99,97] degrees; own two-piece-boom authority neutral"
   },
   "inspection": {
     "scene_count": 1,
-    "gltf_node_count": 1305,
-    "mesh_count": 778,
+    "gltf_node_count": 1291,
+    "mesh_count": 766,
     "material_count": 16,
     "embedded_image_count": 6,
     "animation_count": 0,
-    "removed_bucket_and_linkage_nodes": 54
+    "removed_bucket_and_linkage_nodes": 68
   },
   "coordinate_system": {
     "source_authoring": "right_handed_blender_z_up",
@@ -860,7 +860,7 @@
       ]
     },
     "authority_fixture": "godot/client/tests/fixtures/sy155w_frame_parity_cases.json",
-    "authority_fixture_sha256": "1d5e03f99cec698d2bb0f285ff0eb83ffc4f0ce5c8be65b744a231f46de4e3bb"
+    "authority_fixture_sha256": "7b676fdfe776c67a2694c38bd7205ba959635b1326cb6553f7360cd3a7f269cb"
   },
   "runtime_policy": {
     "motion_authority": "selected_runtime_profile",
@@ -968,23 +968,6 @@
           0.0,
           0.18,
           0.6
-        ]
-      },
-      {
-        "id": "BUCKET_CYLINDER",
-        "barrel": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BUCKET_CYLINDER_BARREL",
-        "rod": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BUCKET_CYLINDER_ROD",
-        "a_node": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK",
-        "a_point": [
-          0.0,
-          0.4,
-          -0.26
-        ],
-        "b_node": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/BUCKET_JOINT",
-        "b_point": [
-          0.0,
-          0.26,
-          -0.22
         ]
       },
       {

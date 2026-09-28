@@ -38,16 +38,27 @@ const PAD_LAYER_OVERRIDES := {
 	"pad_layer_dpad_down": {4: "后倾", 5: "左旋", 6: "前倾", 7: "右旋"},
 }
 var _prompt_mode := "keyboard"
-const WHEEL_ACTIONS := {
+## Keyboard wheel tiles keep the semantic grid: drive on the left column,
+## steering on the right.
+const WHEEL_ACTIONS_KB := {
 	"track_left_forward": "wheel_forward", "track_left_reverse": "wheel_reverse",
 	"track_right_forward": "wheel_right", "track_right_reverse": "wheel_left",
+}
+## The pad layout matches the tracked arrangement — triggers across the top
+## row, bumpers below — so the shared tiles show LT/LB/RT/RB and captions and
+## highlights follow the drawn button, not the track semantics.
+const WHEEL_ACTIONS_PAD := {
+	"track_left_forward": "wheel_reverse", "track_left_reverse": "wheel_left",
+	"track_right_forward": "wheel_forward", "track_right_reverse": "wheel_right",
 }
 const TRAVEL_ACTIONS := [
 	"track_left_forward", "track_left_reverse",
 	"track_right_forward", "track_right_reverse",
 ]
-const WHEEL_CAPTIONS := {"track_left_forward": "前进", "track_left_reverse": "后退",
+const WHEEL_CAPTIONS_KB := {"track_left_forward": "前进", "track_left_reverse": "后退",
 	"track_right_forward": "右转", "track_right_reverse": "左转"}
+const WHEEL_CAPTIONS_PAD := {"track_left_forward": "后退", "track_left_reverse": "左转",
+	"track_right_forward": "前进", "track_right_reverse": "右转"}
 const TRACK_CAPTIONS := {"track_left_forward": "左前进", "track_left_reverse": "左后退",
 	"track_right_forward": "右前进", "track_right_reverse": "右后退"}
 var _wheeled := false
@@ -385,25 +396,32 @@ func set_prompt_mode(mode: String) -> void:
 	if _keys.is_empty():
 		return
 	# Travel keycaps are shared; their glyph labels follow the active mode.
-	# Slots are [left fwd, left rev, right fwd, right rev]; pads read
-	# LT/LB/RT/RB tracked or RT drive / LT reverse / RB/LB steer wheeled.
+	# Slots are [left fwd, left rev, right fwd, right rev]; pads always read
+	# LT/LB/RT/RB so wheeled keeps the tracked trigger-over-bumper layout.
 	var travel: Array = (["R", "F", "Y", "H"] if mode == "keyboard" else ["LT", "LB", "RT", "RB"])
-	if _wheeled:
-		travel = ["G", "B", "N", "V"] if mode == "keyboard" else ["RT", "LT", "RB", "LB"]
+	if _wheeled and mode == "keyboard":
+		travel = ["G", "B", "N", "V"]
 	for index in 4:
 		(_keys[TRAVEL_ACTIONS[index]] as Label).text = travel[index]
+	if _wheeled:
+		var wheel_captions: Dictionary = WHEEL_CAPTIONS_KB if mode == "keyboard" else WHEEL_CAPTIONS_PAD
+		for action in TRAVEL_ACTIONS:
+			var wheel_caption := _captions.get(action) as Label
+			if wheel_caption != null:
+				wheel_caption.text = wheel_captions[action]
 	_footer.text = "1–5 切换视角 · C 复位" if mode == "keyboard" else "View 循环视角 · R3 复位 · Y 辅助 · 按住十字键+右摇杆 属具层"
 	if _wheeled and mode == "keyboard":
-		_footer.text += " · 空格刹车 · Shift 漂移"
+		_footer.text += " · 空格刹车 · Shift 刹车"
 	elif _wheeled:
-		_footer.text += " · A 漂移"
+		_footer.text += " · A 刹车"
 
 func _process(_delta: float) -> void:
 	refresh_input_state_for_test()
 
 func refresh_input_state_for_test() -> void:
+	var wheel_actions: Dictionary = WHEEL_ACTIONS_PAD if _prompt_mode == "gamepad" else WHEEL_ACTIONS_KB
 	for action in _tiles:
-		var input_action: String = WHEEL_ACTIONS.get(action, action) if _wheeled else action
+		var input_action: String = wheel_actions.get(action, action) if _wheeled else action
 		var active := InputMap.has_action(input_action) and Input.is_action_pressed(input_action)
 		var tile := _tiles[action] as Control
 		if bool(tile.get_meta("active", not active)) != active:
@@ -632,7 +650,9 @@ class _Brackets:
 
 func set_wheeled_mode(value: bool) -> void:
 	_wheeled = value
-	var copy: Dictionary = WHEEL_CAPTIONS if value else TRACK_CAPTIONS
+	var copy: Dictionary = TRACK_CAPTIONS
+	if value:
+		copy = WHEEL_CAPTIONS_KB if _prompt_mode == "keyboard" else WHEEL_CAPTIONS_PAD
 	for action in TRAVEL_ACTIONS:
 		var label := _captions.get(action) as Label
 		if label != null:

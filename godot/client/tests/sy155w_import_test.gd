@@ -30,8 +30,9 @@ func _run() -> void:
 	_check(asset.find_children("BUCKET_ROOT", "", true, false).is_empty(), "source bucket is absent")
 	_check(asset.find_children("BUCKET_ROCKER", "", true, false).is_empty(), "four-bar rocker is absent")
 	_check(asset.find_children("BUCKET_COUPLER", "", true, false).is_empty(), "four-bar coupler is absent")
+	_check(asset.find_children("BUCKET_CYLINDER*", "", true, false).is_empty(), "four-bar bucket cylinder is absent")
 	_check(asset.find_children("*", "AnimationPlayer", true, false).is_empty(), "no animation authority remains")
-	_check(hydraulics.snapshot().cylinder_count == 6 and hydraulics.snapshot().hose_count == 12, "all cylinders and hoses resolve")
+	_check(hydraulics.snapshot().cylinder_count == 5 and hydraulics.snapshot().hose_count == 12, "all cylinders and hoses resolve")
 	# Independently authored source samples, converted Blender -> glTF -> -Z forward.
 	var conversion := Basis(Vector3(0, 0, -1), Vector3(-1, 0, 0), Vector3(0, 1, 0))
 	var gltf := Basis(Vector3.RIGHT, Vector3.FORWARD, Vector3.UP)
@@ -75,11 +76,11 @@ func _run() -> void:
 	# Invalid geometry cannot partially write any passive cylinder.
 	var barrel := asset.find_children("BOOM_LIFT_L_BARREL", "Node3D", true, false)[0] as Node3D
 	var before := barrel.transform
-	var bucket_before: Transform3D = nodes.bucket_link.transform
-	nodes.bucket_link.position += Vector3(20, 0, 0)
+	var arm_before: Transform3D = nodes.arm_link.transform
+	nodes.arm_link.position += Vector3(20, 0, 0)
 	_check(not hydraulics.update(), "non-planar cylinder pins rejected")
 	_check(barrel.transform.is_equal_approx(before), "unreachable retention is atomic")
-	nodes.bucket_link.transform = bucket_before
+	nodes.arm_link.transform = arm_before
 	for frame in nodes:
 		nodes[frame].transform = rest[frame]
 	fold.transform = fold_rest
@@ -88,7 +89,7 @@ func _run() -> void:
 	_assert_pins(hydraulics)
 	asset.free()
 	if failures.is_empty():
-		print("SY155W import test passed: source oracle, 81 independent poses, six cylinders, twelve hoses, invalid-geometry retention.")
+		print("SY155W import test passed: source oracle, 81 independent poses, five cylinders, twelve hoses, invalid-geometry retention.")
 	else:
 		for failure in failures:
 			push_error(failure)

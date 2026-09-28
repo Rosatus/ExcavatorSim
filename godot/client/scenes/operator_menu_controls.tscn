@@ -274,8 +274,8 @@ text = "切削性能诊断"
 
 [node name="RaceMode" type="CheckButton" parent="StatusPanel/Margin/VBox/AdvancedPanel"]
 layout_mode = 2
-text = "竞速模式（高速行驶）"
-tooltip_text = "大幅提高履带/轮式行驶速度并提供赛车化操控辅助，仅用于驾驶娱乐；精细作业前请关闭"
+text = "高速模式"
+tooltip_text = "大幅提高履带/轮式行驶速度并提供高速操控辅助；精细作业前请关闭"
 
 [node name="RelaxedAssist" type="CheckButton" parent="StatusPanel/Margin/VBox/AdvancedPanel"]
 layout_mode = 2
