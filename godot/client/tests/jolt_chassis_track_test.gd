@@ -185,8 +185,10 @@ func _test_model(model_id: String) -> void:
 		failures.append("%s moved before neutral track re-arm" % model_id)
 	var start := runtime.get_body_global_transform()
 	# Reset/model activation requires one explicit neutral track sample before motion.
+	# Half-throttle commands keep the fixture inside its calibrated speed
+	# envelope: full throttle now commands the doubled belt speed.
 	runtime.set_commands(0.0, 0.0)
-	runtime.set_commands(1.0, 1.0)
+	runtime.set_commands(0.5, 0.5)
 	var drive_heave_sq_sum := 0.0
 	var drive_tilt_sq_sum := 0.0
 	var drive_min_y := INF
@@ -307,12 +309,12 @@ func _test_model(model_id: String) -> void:
 		failures.append("%s hard braking had sustained/repeating pitch response: rms=%.4f reversals=%d" % [model_id, brake_pitch_rms, brake_pitch_sign_reversals])
 	# Reverse must first brake the existing forward motion through a bounded zero crossing.
 	runtime.set_commands(0.0, 0.0)
-	runtime.set_commands(1.0, 1.0)
+	runtime.set_commands(0.5, 0.5)
 	for _frame in 60:
 		await physics_frame
 	var previous_reverse_speed := float(runtime.get_status_snapshot().get("forward_speed_m_s", 0.0))
 	var reverse_crossed_zero := false
-	runtime.set_commands(-1.0, -1.0)
+	runtime.set_commands(-0.5, -0.5)
 	for _frame in 120:
 		await physics_frame
 		var reverse_speed := float(runtime.get_status_snapshot().get("forward_speed_m_s", 0.0))
@@ -331,7 +333,7 @@ func _test_model(model_id: String) -> void:
 		await physics_frame
 	var pivot_start := runtime.get_body_global_transform()
 	runtime.set_commands(0.0, 0.0)
-	runtime.set_commands(-1.0, 1.0)
+	runtime.set_commands(-0.5, 0.5)
 	for _frame in DRIVE_FRAMES:
 		await physics_frame
 	var pivot_end := runtime.get_body_global_transform()

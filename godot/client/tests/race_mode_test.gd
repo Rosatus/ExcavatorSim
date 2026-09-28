@@ -108,6 +108,7 @@ func _test_tracked_race() -> void:
 		host.queue_free()
 		return
 	var normal_belt := float(runtime._tracks["max_belt_speed_m_s"])
+	var normal_clamp := float(runtime._dynamics["max_linear_speed_m_s"])
 	runtime.set_commands(0, 0)
 	await ticks(150)
 	# Normal drive saturates near the work-machine belt speed.
@@ -116,7 +117,7 @@ func _test_tracked_race() -> void:
 	for i in 400:
 		await physics_frame
 		normal_top = maxf(normal_top, float(runtime.get_status_snapshot()["forward_speed_m_s"]))
-	check(normal_top > 0.5 and normal_top < 2.4, "normal tracked drive stays near belt speed (%f)" % normal_top)
+	check(normal_top > 0.5 and normal_top < 4.8, "normal tracked drive stays near belt speed (%f)" % normal_top)
 	# Race on: solver swap raises both belt speed and the body velocity clamp.
 	runtime.set_race_mode(true)
 	runtime.set_commands(0, 0)
@@ -170,7 +171,7 @@ func _test_tracked_race() -> void:
 	runtime.set_race_mode(false)
 	check(not runtime.get_status_snapshot()["race_mode"], "snapshot clears race mode")
 	check(is_equal_approx(float(runtime._tracks["max_belt_speed_m_s"]), normal_belt), "normal belt speed restored")
-	check(float(runtime._dynamics["max_linear_speed_m_s"]) < 3.0, "normal body clamp restored")
+	check(is_equal_approx(float(runtime._dynamics["max_linear_speed_m_s"]), normal_clamp), "normal body clamp restored")
 	runtime.set_commands(0, 0)
 	await ticks(2)
 	runtime.set_commands(1, 1)
@@ -178,7 +179,7 @@ func _test_tracked_race() -> void:
 	for i in 400:
 		await physics_frame
 		restored_top = maxf(restored_top, float(runtime.get_status_snapshot()["forward_speed_m_s"]))
-	check(restored_top < 2.4, "normal mode top speed restored (%f)" % restored_top)
+	check(restored_top < 4.8, "normal mode top speed restored (%f)" % restored_top)
 	host.queue_free()
 
 

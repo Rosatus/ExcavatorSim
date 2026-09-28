@@ -67,7 +67,9 @@ func _scenario(scenario: String) -> void:
 	for i in 150:
 		await physics_frame
 	var start := runtime.get_body_global_transform()
-	runtime.set_commands(1,-1 if scenario == "pivot" else 1)
+	# Half throttle reproduces the former working-speed envelope; full
+	# throttle now commands the doubled belt speed (out of scenario scope).
+	runtime.set_commands(0.5,-0.5 if scenario == "pivot" else 0.5)
 	var max_vy := 0.0
 	var max_tilt := 0.0
 	var min_y := INF
