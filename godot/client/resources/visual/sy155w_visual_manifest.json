@@ -5,19 +5,19 @@
   "source": {
     "path": "C:\\code\\blender\\Excavator\\SY155W\\SANY_SY155W_Animated.glb",
     "sha256": "c7eea3e28a976765502ee0b886af41ff4df8280c1f7f6c5fb40b099a0bc0f3a4",
-    "runtime_sha256": "de2d015f0d63cbfa9dd453cc30f7b57806f44a033ff1d9ea099198ef77fc4344",
+    "runtime_sha256": "2f6ee1a18b0a10a4e7c42f532bdb7697b689ee195e102ec7d7f8dbd60974535c",
     "byte_size": 25250448,
-    "adaptation": "repaired source blend; sample frame 91; rigid pivot coordinate changes; omit bucket subtree and animation players",
+    "adaptation": "repaired source blend; sample frame 91; rigid pivot coordinate changes; omit bucket subtree, arm four-bar linkage and animation players",
     "semantic_zero_provenance": "Independent build_sy155w.py params(Work_Cycle, .25): [58,-47,-99,97] degrees; own two-piece-boom authority neutral"
   },
   "inspection": {
     "scene_count": 1,
-    "gltf_node_count": 1324,
-    "mesh_count": 795,
+    "gltf_node_count": 1305,
+    "mesh_count": 778,
     "material_count": 16,
     "embedded_image_count": 6,
     "animation_count": 0,
-    "removed_bucket_nodes": 35
+    "removed_bucket_and_linkage_nodes": 54
   },
   "coordinate_system": {
     "source_authoring": "right_handed_blender_z_up",
@@ -860,7 +860,7 @@
       ]
     },
     "authority_fixture": "godot/client/tests/fixtures/sy155w_frame_parity_cases.json",
-    "authority_fixture_sha256": "d953cfcd0cb56e01573751b105a3e884b49d5af499fccae1a1c6f0670d21e5eb"
+    "authority_fixture_sha256": "c6089656251bdc494a3b47a09d2314b25e26d4cbd664a9e9efb2c9b69226b098"
   },
   "runtime_policy": {
     "motion_authority": "selected_runtime_profile",
@@ -980,11 +980,11 @@
           0.4,
           -0.26
         ],
-        "b_node": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/BUCKET_ROCKER",
+        "b_node": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/BUCKET_JOINT",
         "b_point": [
-          0.32,
           0.0,
-          0.0
+          0.26,
+          -0.22
         ]
       },
       {
@@ -1103,24 +1103,6 @@
         "target_count": 41
       }
     ],
-    "four_bar": {
-      "arm": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK",
-      "bucket": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/BUCKET_JOINT",
-      "rocker": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/BUCKET_ROCKER",
-      "coupler": "SY155W_Runtime/SY155W_ROOT/CHASSIS/SLEW/BOOM_BASE/BOOM_OUTER/STICK/BUCKET_COUPLER",
-      "bucket_pin": [
-        0.0,
-        0.26,
-        -0.22
-      ],
-      "rocker_tip": [
-        0.32,
-        0,
-        0
-      ],
-      "rocker_length_m": 0.32,
-      "coupler_length_m": 0.48
-    },
     "policy": "visual only; solve after active pivots; atomic retain on invalid or unreachable pins"
   }
 }

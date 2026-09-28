@@ -215,16 +215,16 @@
     },
     {
       "destination_path": "godot/client/assets/visual/SY155W_excavator_godot.glb",
-      "destination_sha256": "28fcd72bfb608ee91b13ffd040677342eadba86051ab98fad37a3d4da9058c79",
-      "raw_sha256": "de2d015f0d63cbfa9dd453cc30f7b57806f44a033ff1d9ea099198ef77fc4344",
+      "destination_sha256": "12d00a710853498d88e765fd21a0b01e1e68478c3d530266acc2ce96be8bc475",
+      "raw_sha256": "2f6ee1a18b0a10a4e7c42f532bdb7697b689ee195e102ec7d7f8dbd60974535c",
       "generator": {
         "path": "tools/import_sy155w.py",
-        "sha256": "1e2ee3f7e951d2b6ab7a89f88a637347c214937c7baea731a6dde9300751ecd1"
+        "sha256": "469d7e5d08aa4a8646db3384e229259c2267dbb4b38f2b3575312f3d2d14cdfd"
       },
       "inputs": [
         {
           "path": "assets/model/sy155w_source_evidence.json",
-          "sha256": "e80d1ba559b874c9d31fdbca149b306af821d4901ccf281584424e39ea8c724c"
+          "sha256": "8e3c2b2fd267491d8458c90f1d2266d1dcc076c2e0dbc94fba5e81d3eaa27d29"
         },
         {
           "path": "godot/client/resources/visual/sy135_visual_manifest.json",
@@ -232,7 +232,7 @@
         },
         {
           "path": "godot/client/resources/physics/sy135_physics_rig.json",
-          "sha256": "a5d96b65f9e4c802327d1fa1506121491a3871d0f92c3e3a9afe03051aded031"
+          "sha256": "cc6d3de463db09ce4c20994ee5f72112cc569448c1b428ef1f388ed0d199f6c7"
         },
         {
           "path": "godot/client/resources/attachments/gb12_s50_soil_contract.json",
@@ -278,16 +278,16 @@
     },
     {
       "destination_path": "godot/client/resources/visual/sy155w_visual_manifest.json",
-      "destination_sha256": "51e269b0d58d9d87e0007c9e3fba16881d44d6126d25f1bcfc365a8a7946c1f9",
-      "raw_sha256": "72b32c740153f4b17bf5acd0bc08296c29202c278a3533b6b106e99e73b8d3cd",
+      "destination_sha256": "38e324a720ee9fe787edc68a6bbaa79d6ecd07592245c6b66d60480f748dfb6f",
+      "raw_sha256": "dcaca34c4fe8a781eaad088e8722c039bba73af02b77ef26683ce3e069d4aa14",
       "generator": {
         "path": "tools/import_sy155w.py",
-        "sha256": "1e2ee3f7e951d2b6ab7a89f88a637347c214937c7baea731a6dde9300751ecd1"
+        "sha256": "469d7e5d08aa4a8646db3384e229259c2267dbb4b38f2b3575312f3d2d14cdfd"
       },
       "inputs": [
         {
           "path": "assets/model/sy155w_source_evidence.json",
-          "sha256": "e80d1ba559b874c9d31fdbca149b306af821d4901ccf281584424e39ea8c724c"
+          "sha256": "8e3c2b2fd267491d8458c90f1d2266d1dcc076c2e0dbc94fba5e81d3eaa27d29"
         },
         {
           "path": "godot/client/resources/visual/sy135_visual_manifest.json",
@@ -295,7 +295,7 @@
         },
         {
           "path": "godot/client/resources/physics/sy135_physics_rig.json",
-          "sha256": "a5d96b65f9e4c802327d1fa1506121491a3871d0f92c3e3a9afe03051aded031"
+          "sha256": "cc6d3de463db09ce4c20994ee5f72112cc569448c1b428ef1f388ed0d199f6c7"
         },
         {
           "path": "godot/client/resources/attachments/gb12_s50_soil_contract.json",
@@ -341,16 +341,16 @@
     },
     {
       "destination_path": "godot/client/resources/physics/sy155w_physics_rig.json",
-      "destination_sha256": "a90cdefe9a0f01bd4890ad8ccb756fee35f3e66c347a2b4091d115b70b6d07de",
-      "raw_sha256": "0eea9d97dd8e6db7ceab3941ffbb94d613532be36d688915d2cefb4d3acb8a11",
+      "destination_sha256": "1f105a4e28673c03786cb6f0f3faf25c3f3b67f19a151029d39a35e7dd143d0a",
+      "raw_sha256": "1917a613589230f524f2324e6460b405175c902c468e7fa51f1c115fc6a23c55",
       "generator": {
         "path": "tools/import_sy155w.py",
-        "sha256": "1e2ee3f7e951d2b6ab7a89f88a637347c214937c7baea731a6dde9300751ecd1"
+        "sha256": "469d7e5d08aa4a8646db3384e229259c2267dbb4b38f2b3575312f3d2d14cdfd"
       },
       "inputs": [
         {
           "path": "assets/model/sy155w_source_evidence.json",
-          "sha256": "e80d1ba559b874c9d31fdbca149b306af821d4901ccf281584424e39ea8c724c"
+          "sha256": "8e3c2b2fd267491d8458c90f1d2266d1dcc076c2e0dbc94fba5e81d3eaa27d29"
         },
         {
           "path": "godot/client/resources/visual/sy135_visual_manifest.json",
@@ -358,7 +358,7 @@
         },
         {
           "path": "godot/client/resources/physics/sy135_physics_rig.json",
-          "sha256": "a5d96b65f9e4c802327d1fa1506121491a3871d0f92c3e3a9afe03051aded031"
+          "sha256": "cc6d3de463db09ce4c20994ee5f72112cc569448c1b428ef1f388ed0d199f6c7"
         },
         {
           "path": "godot/client/resources/attachments/gb12_s50_soil_contract.json",
@@ -408,12 +408,12 @@
       "raw_sha256": "417f8f68e49793a43310aaa851815ed8030b6cc204daa6972a09c793a6c3650e",
       "generator": {
         "path": "tools/import_sy155w.py",
-        "sha256": "1e2ee3f7e951d2b6ab7a89f88a637347c214937c7baea731a6dde9300751ecd1"
+        "sha256": "469d7e5d08aa4a8646db3384e229259c2267dbb4b38f2b3575312f3d2d14cdfd"
       },
       "inputs": [
         {
           "path": "assets/model/sy155w_source_evidence.json",
-          "sha256": "e80d1ba559b874c9d31fdbca149b306af821d4901ccf281584424e39ea8c724c"
+          "sha256": "8e3c2b2fd267491d8458c90f1d2266d1dcc076c2e0dbc94fba5e81d3eaa27d29"
         },
         {
           "path": "godot/client/resources/visual/sy135_visual_manifest.json",
@@ -421,7 +421,7 @@
         },
         {
           "path": "godot/client/resources/physics/sy135_physics_rig.json",
-          "sha256": "a5d96b65f9e4c802327d1fa1506121491a3871d0f92c3e3a9afe03051aded031"
+          "sha256": "cc6d3de463db09ce4c20994ee5f72112cc569448c1b428ef1f388ed0d199f6c7"
         },
         {
           "path": "godot/client/resources/attachments/gb12_s50_soil_contract.json",
@@ -467,16 +467,16 @@
     },
     {
       "destination_path": "assets/model/library/sy155w_reference.urdf",
-      "destination_sha256": "e36fa4e9f5e28cec1ee4bdf957c3a0e6efab491c67a327bcc4c1471cb7403feb",
-      "raw_sha256": "9fb05bd71fe7011ebe5b12b79ad36fc60820757a0bc41f0d0a0c5d4cfa77a25b",
+      "destination_sha256": "3051f7c08206ba78a3bd1985a41dc9823ceba14a5363d800bc98f4018841f4ed",
+      "raw_sha256": "8c753397a73350356bdd4607974d689c597ef148fbc511651589d67e382a6c55",
       "generator": {
         "path": "tools/import_sy155w.py",
-        "sha256": "1e2ee3f7e951d2b6ab7a89f88a637347c214937c7baea731a6dde9300751ecd1"
+        "sha256": "469d7e5d08aa4a8646db3384e229259c2267dbb4b38f2b3575312f3d2d14cdfd"
       },
       "inputs": [
         {
           "path": "assets/model/sy155w_source_evidence.json",
-          "sha256": "e80d1ba559b874c9d31fdbca149b306af821d4901ccf281584424e39ea8c724c"
+          "sha256": "8e3c2b2fd267491d8458c90f1d2266d1dcc076c2e0dbc94fba5e81d3eaa27d29"
         },
         {
           "path": "godot/client/resources/visual/sy135_visual_manifest.json",
@@ -484,7 +484,7 @@
         },
         {
           "path": "godot/client/resources/physics/sy135_physics_rig.json",
-          "sha256": "a5d96b65f9e4c802327d1fa1506121491a3871d0f92c3e3a9afe03051aded031"
+          "sha256": "cc6d3de463db09ce4c20994ee5f72112cc569448c1b428ef1f388ed0d199f6c7"
         },
         {
           "path": "godot/client/resources/attachments/gb12_s50_soil_contract.json",
@@ -530,16 +530,16 @@
     },
     {
       "destination_path": "godot/client/tests/fixtures/sy155w_frame_parity_cases.json",
-      "destination_sha256": "2b4caf6080baa5d05b8f140f73c852a1a8f395d0bd8268fa39134376dc9d83bc",
-      "raw_sha256": "d953cfcd0cb56e01573751b105a3e884b49d5af499fccae1a1c6f0670d21e5eb",
+      "destination_sha256": "7846444ee1109be7a38727ff2bf5040731ed0e5a43d9f5ccd99107ec9bf92016",
+      "raw_sha256": "c6089656251bdc494a3b47a09d2314b25e26d4cbd664a9e9efb2c9b69226b098",
       "generator": {
         "path": "tools/import_sy155w.py",
-        "sha256": "1e2ee3f7e951d2b6ab7a89f88a637347c214937c7baea731a6dde9300751ecd1"
+        "sha256": "469d7e5d08aa4a8646db3384e229259c2267dbb4b38f2b3575312f3d2d14cdfd"
       },
       "inputs": [
         {
           "path": "assets/model/sy155w_source_evidence.json",
-          "sha256": "e80d1ba559b874c9d31fdbca149b306af821d4901ccf281584424e39ea8c724c"
+          "sha256": "8e3c2b2fd267491d8458c90f1d2266d1dcc076c2e0dbc94fba5e81d3eaa27d29"
         },
         {
           "path": "godot/client/resources/visual/sy135_visual_manifest.json",
@@ -547,7 +547,7 @@
         },
         {
           "path": "godot/client/resources/physics/sy135_physics_rig.json",
-          "sha256": "a5d96b65f9e4c802327d1fa1506121491a3871d0f92c3e3a9afe03051aded031"
+          "sha256": "cc6d3de463db09ce4c20994ee5f72112cc569448c1b428ef1f388ed0d199f6c7"
         },
         {
           "path": "godot/client/resources/attachments/gb12_s50_soil_contract.json",
@@ -593,16 +593,16 @@
     },
     {
       "destination_path": "godot/client/tests/fixtures/sy155w_source_poses.json",
-      "destination_sha256": "ae70ef0cfca7e054a653a5e56905849f310b1d6f5d0beacd3f26163409409b6d",
-      "raw_sha256": "78417ace763c01fbdce0ba06f9b0bd5a24926e0829e0ab3da5c07756eda114f3",
+      "destination_sha256": "5637419579c694ba7f91e713deac90896827b0807d987d6884f5ec746094550e",
+      "raw_sha256": "2201875f92dcf89c6da6dfbf083a680dd27387437524f04b9dbd09e171c6e594",
       "generator": {
         "path": "tools/import_sy155w.py",
-        "sha256": "1e2ee3f7e951d2b6ab7a89f88a637347c214937c7baea731a6dde9300751ecd1"
+        "sha256": "469d7e5d08aa4a8646db3384e229259c2267dbb4b38f2b3575312f3d2d14cdfd"
       },
       "inputs": [
         {
           "path": "assets/model/sy155w_source_evidence.json",
-          "sha256": "e80d1ba559b874c9d31fdbca149b306af821d4901ccf281584424e39ea8c724c"
+          "sha256": "8e3c2b2fd267491d8458c90f1d2266d1dcc076c2e0dbc94fba5e81d3eaa27d29"
         },
         {
           "path": "godot/client/resources/visual/sy135_visual_manifest.json",
@@ -610,7 +610,7 @@
         },
         {
           "path": "godot/client/resources/physics/sy135_physics_rig.json",
-          "sha256": "a5d96b65f9e4c802327d1fa1506121491a3871d0f92c3e3a9afe03051aded031"
+          "sha256": "cc6d3de463db09ce4c20994ee5f72112cc569448c1b428ef1f388ed0d199f6c7"
         },
         {
           "path": "godot/client/resources/attachments/gb12_s50_soil_contract.json",

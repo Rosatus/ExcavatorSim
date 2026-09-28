@@ -28,6 +28,8 @@ func _run() -> void:
 	var fold := asset.get_node(manifest.local_articulation.axes[0].node_path) as Node3D
 	var fold_rest := fold.transform
 	_check(asset.find_children("BUCKET_ROOT", "", true, false).is_empty(), "source bucket is absent")
+	_check(asset.find_children("BUCKET_ROCKER", "", true, false).is_empty(), "four-bar rocker is absent")
+	_check(asset.find_children("BUCKET_COUPLER", "", true, false).is_empty(), "four-bar coupler is absent")
 	_check(asset.find_children("*", "AnimationPlayer", true, false).is_empty(), "no animation authority remains")
 	_check(hydraulics.snapshot().cylinder_count == 6 and hydraulics.snapshot().hose_count == 12, "all cylinders and hoses resolve")
 	# Independently authored source samples, converted Blender -> glTF -> -Z forward.
@@ -62,7 +64,7 @@ func _run() -> void:
 	# Independent joint extremes (source Work_Cycle alone couples all inputs).
 	for boom in [-7., 0., 7.]:
 		for folding in [-10., 0., 10.]:
-			for arm in [-9., 0., 9.]:
+			for arm in [-9., 0., 39.]:
 				for bucket in [-15., 0., 15.]:
 					_set_joint(nodes.boom_link, rest.boom_link, boom)
 					_set_joint(fold, fold_rest, folding)
@@ -74,8 +76,8 @@ func _run() -> void:
 	var barrel := asset.find_children("BOOM_LIFT_L_BARREL", "Node3D", true, false)[0] as Node3D
 	var before := barrel.transform
 	var bucket_before: Transform3D = nodes.bucket_link.transform
-	nodes.bucket_link.position += Vector3(0, 20, 0)
-	_check(not hydraulics.update(), "unreachable four-bar rejected")
+	nodes.bucket_link.position += Vector3(20, 0, 0)
+	_check(not hydraulics.update(), "non-planar cylinder pins rejected")
 	_check(barrel.transform.is_equal_approx(before), "unreachable retention is atomic")
 	nodes.bucket_link.transform = bucket_before
 	for frame in nodes:
@@ -86,7 +88,7 @@ func _run() -> void:
 	_assert_pins(hydraulics)
 	asset.free()
 	if failures.is_empty():
-		print("SY155W import test passed: source oracle, 81 independent poses, six cylinders, twelve hoses, unreachable retention.")
+		print("SY155W import test passed: source oracle, 81 independent poses, six cylinders, twelve hoses, invalid-geometry retention.")
 	else:
 		for failure in failures:
 			push_error(failure)

@@ -3,8 +3,11 @@
 Run with repository Python: tools/import_sy155w.py --source <SY155W directory>.
 Mesh/accessor bytes and materials are preserved. Animated transforms are sampled,
 semantic pivot bases are changed by rigid coordinate changes, and the bucket tree
-is removed. The four authority joints have a source-specific neutral; their fifth
-folding joint stays local, as in SY80U. Limits are demonstrated animation ranges.
+is removed along with the small-arm four-bar linkage: the bucket cylinder drives
+BUCKET_JOINT directly. The four authority joints have a source-specific neutral;
+their fifth folding joint stays local, as in SY80U. Limits are demonstrated
+animation ranges, plus an extra +30 deg of arm extension the mechanism supports
+once the linkage is gone.
 """
 
 import argparse
@@ -147,6 +150,10 @@ def main():
             descendants(child)
 
     descendants(by_name["BUCKET_ROOT"])
+    # The small-arm four-bar is deleted: the bucket cylinder drives the bucket
+    # pin directly, so the rocker/coupler links are dropped with the bucket tree.
+    descendants(by_name["BUCKET_ROCKER"])
+    descendants(by_name["BUCKET_COUPLER"])
     for n in nodes:
         if "children" in n:
             n["children"] = [i for i in n["children"] if i not in remove]
@@ -229,7 +236,7 @@ def main():
         "byte_size": len(raw),
         "adaptation": (
             "repaired source blend; sample frame 91; rigid pivot coordinate changes; "
-            "omit bucket subtree and animation players"
+            "omit bucket subtree, arm four-bar linkage and animation players"
         ),
         "semantic_zero_provenance": (
             "Independent build_sy155w.py params(Work_Cycle, .25): "
@@ -243,7 +250,7 @@ def main():
         "material_count": len(doc["materials"]),
         "embedded_image_count": len(doc["images"]),
         "animation_count": 0,
-        "removed_bucket_nodes": len(remove),
+        "removed_bucket_and_linkage_nodes": len(remove),
     }
     contracts, frame_map, pivots = {}, {}, {}
     for idx, (f, name) in enumerate(zip(FRAMES, NAMES, strict=True)):
@@ -313,7 +320,9 @@ def main():
         ("BOOM_LIFT_R", "SLEW", (1.02, -0.55, 0.30), "BOOM_BASE", (1.4, -0.32, -0.17)),
         ("BOOM_ARTICULATION", "BOOM_BASE", (0.50, 0, -0.36), "BOOM_OUTER", (0.78, 0, -0.43)),
         ("STICK_CYLINDER", "BOOM_OUTER", (0.59, 0, 0.54), "STICK", (-0.60, 0, 0.18)),
-        ("BUCKET_CYLINDER", "STICK", (0.26, 0, 0.40), "BUCKET_ROCKER", (0.32, 0, 0)),
+        # Direct pin drive: the rod end lands on the bucket horn pin that used
+        # to be fed through the deleted rocker/coupler chain.
+        ("BUCKET_CYLINDER", "STICK", (0.26, 0, 0.40), "BUCKET_JOINT", (0.22, 0, 0.26)),
         ("BLADE_CYLINDER", "CHASSIS", (-1.80, 0, 0.86), "BLADE_PIVOT", (-0.4235, 0, -0.02)),
     ]
     for name, a, pa, b, pb in cylinder_defs:
@@ -352,16 +361,6 @@ def main():
     mani["passive_hydraulics"] = {
         "cylinders": cylinders,
         "hoses": hoses,
-        "four_bar": {
-            "arm": path("STICK"),
-            "bucket": path("BUCKET_JOINT"),
-            "rocker": path("BUCKET_ROCKER"),
-            "coupler": path("BUCKET_COUPLER"),
-            "bucket_pin": point((0.22, 0, 0.26)),
-            "rocker_tip": [0.32, 0, 0],
-            "rocker_length_m": 0.32,
-            "coupler_length_m": 0.48,
-        },
         "policy": (
             "visual only; solve after active pivots; atomic retain on invalid or unreachable pins"
         ),
@@ -407,7 +406,9 @@ def main():
         body["rest_transform_godot"] = rows(source_fw[body["frame"]])
         body["center_of_mass_m"] = centers[idx]
         body["shape"] = {"kind": "box", "center_m": centers[idx], "size_m": sizes[idx]}
-    limits = [[-180, 180], [-7, 7], [-9, 9], [-15, 15]]
+    # Arm extension gains +30 deg: without the four-bar chain the stick can
+    # travel further out. Limits stay asymmetric about the neutral.
+    limits = [[-180, 180], [-7, 7], [-9, 39], [-15, 15]]
     for idx, joint in enumerate(rig["joints"]):
         parent, child = FRAMES[idx : idx + 2]
         joint["parent_anchor_godot"] = rows(np.linalg.inv(source_fw[parent]) @ source_fw[child])
@@ -601,7 +602,7 @@ def main():
     registry["models"] = [m for m in registry["models"] if m["model_id"] != ID] + [re]
     dump(registry_path, registry)
     # Independent source samples survive without the external source tree and are
-    # used to check cylinder transforms, four-bar and morph weights in Godot.
+    # used to check cylinder transforms and morph weights in Godot.
     samples = read(args.source / "reports/source_samples.json")["Work_Cycle"]
     oracle = []
     for index in [0, 45, 90, 135, 180, 270, 360]:
@@ -616,11 +617,16 @@ def main():
                     -108 + 18 * phase,
                     112 - 30 * phase,
                 ],
+                # The direct-drive bucket cylinder has no source oracle: the
+                # source aimed its rod at the deleted rocker, not the horn pin.
                 "nodes": {
                     k: v
                     for k, v in sample["nodes"].items()
-                    if any(k == n + s for n, *_ in cylinder_defs for s in ["_BARREL", "_ROD"])
-                    or k in ["BUCKET_ROCKER", "BUCKET_COUPLER"]
+                    if any(
+                        k == n + s
+                        for n, *_ in (d for d in cylinder_defs if d[0] != "BUCKET_CYLINDER")
+                        for s in ["_BARREL", "_ROD"]
+                    )
                 },
                 "weights": sample["weights"],
             }
@@ -649,7 +655,7 @@ def main():
             "joint_degrees": [58, -47, -99, 97],
             "source_is_unmodified": True,
             "default_attachment": "xtr13+gb12",
-            "native_bucket_removed_nodes": len(remove),
+            "removed_bucket_and_linkage_nodes": len(remove),
             "cylinders": cylinder_defs,
             "default_tool_transform_in_bucket_link": rows(socket_transform),
         },

@@ -217,12 +217,19 @@ The outer-boom fold sits between boom and arm as a local +X axis (`boom_fold`):
 E folds, U unfolds, relative limits [-10,+10] degrees. Source demonstration ranges
 are provisional, not manufacturer hard stops. `PassiveHydraulics` updates six
 cylinder pairs and twelve multi-target hoses after driven poses; it never accepts
-operator commands or writes authority frames. Its source four-bar is solved before
-cylinder endpoints, with atomic passive-pose retention on invalid/unreachable pins.
+operator commands or writes authority frames. The source small-arm four-bar
+(BUCKET_ROCKER/BUCKET_COUPLER) is removed at import and the bucket cylinder drives
+`BUCKET_JOINT` directly; reachability no longer applies, but non-planar cylinder
+pins are still rejected atomically. The arm authority joint extends +30 deg beyond
+the demonstrated source range (rig `arm_joint` limit [-9,+39] deg; positive joint =
+arm_extend per the shared sign profile). After regenerating the GLB, delete stale
+`.godot/imported/SY155W_excavator_godot.glb-*.scn` cache or run `--import` once —
+headless runs serve the cached scene and resurrect removed nodes.
 
 The model catalog may declare `default_attachment` and
 `attachment_bucket_limit_offsets_deg`. SY155W defaults to XTR13+GB12 and sets
-`xtr13: 0`, because the older +130-degree XTR13 offset makes its four-bar unreachable.
+`xtr13: 0` (the legacy +130-degree offset predates direct drive; keep the neutral
+offset so the bucket joint stays inside its authority limits).
 Other models keep that legacy offset. Do not enlarge the SY155W authority bucket
 limits to compensate for attachment orientation. Its absent native bucket is omitted
 from selection. Host physics soil proxies include the neutral XTR13 socket offset;

@@ -2,9 +2,9 @@
   "model_id": "sy155w",
   "model_version": "sy155w-source-urdf-v1",
   "source_model_path": "godot\\client\\assets\\visual\\SY155W_excavator_godot.glb",
-  "source_model_sha256": "de2d015f0d63cbfa9dd453cc30f7b57806f44a033ff1d9ea099198ef77fc4344",
+  "source_model_sha256": "2f6ee1a18b0a10a4e7c42f532bdb7697b689ee195e102ec7d7f8dbd60974535c",
   "source_urdf_path": "assets\\model\\library\\sy155w_reference.urdf",
-  "source_urdf_sha256": "9fb05bd71fe7011ebe5b12b79ad36fc60820757a0bc41f0d0a0c5d4cfa77a25b",
+  "source_urdf_sha256": "8c753397a73350356bdd4607974d689c597ef148fbc511651589d67e382a6c55",
   "generator_path": "tools/import_sy155w.py",
   "poses": {
     "zero": {
@@ -848,7 +848,7 @@
       }
     }
   },
-  "generator_sha256": "1e2ee3f7e951d2b6ab7a89f88a637347c214937c7baea731a6dde9300751ecd1",
+  "generator_sha256": "469d7e5d08aa4a8646db3384e229259c2267dbb4b38f2b3575312f3d2d14cdfd",
   "source_pixi_lock_sha256": "d4c4083ca6143dcd9acd40666bca117ed0790e8a8685ec2be0c7ebb32e6a7775",
   "pinocchio_version": "4.1.0",
   "model_implementation": "backend/src/babylon_sim/model.py",

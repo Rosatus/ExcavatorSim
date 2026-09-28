@@ -50,6 +50,33 @@ func _run() -> void:
 	_check(attachments.active_attachment_id() == "xtr13+gb12", "rejected source bucket preserves mounted default")
 	_check(presentation.get_soil_frame_node("bucket_link") == attachments.active_tool_node(), "soil follows mounted GB12")
 	_check(presentation.get_soil_contract().get("fill_profile_id", "") == "gb12_s50", "GB12 soil geometry")
+	# Gamepad attachment layer end-to-end: hold D-pad Down, right-stick Y must
+	# drive XTR13 tilt (and right-stick X rotate) through the real
+	# InputMap -> MotionClient -> ProductSession -> AttachmentRig chain while
+	# the masked boom/bucket axes stay zero. Input.action_press feeds
+	# is_action_pressed/get_axis exactly like the registered joypad bindings.
+	_check(session.request_start(), "session start for pad tilt")
+	session.set_focused(true)
+	_check(InputMap.has_action("pad_layer_dpad_down"), "pad layer action not registered")
+	Input.action_press("pad_layer_dpad_down")
+	Input.action_press("operator_boom_raise", 1.0)
+	await physics_frame
+	var attachment_axes := session.get_attachment_input_axes()
+	_check(attachment_axes.x > 0.5, "pad tilt axis not routed to XTR13: %s" % attachment_axes)
+	var base_axes := session.get_equipment_input_axes()
+	_check(absf(base_axes.y) < 0.01 and absf(base_axes.w) < 0.01, "pad tilt leaked into base axes: %s" % base_axes)
+	var tilt_before := float(attachments.joint_state_for_test().get("tilt_deg", 0.0))
+	for tick in 30:
+		await physics_frame
+	var tilt_after := float(attachments.joint_state_for_test().get("tilt_deg", 0.0))
+	_check(tilt_after > tilt_before + 1.0, "XTR13 tilt did not move under pad layer: %s -> %s" % [tilt_before, tilt_after])
+	Input.action_release("operator_boom_raise")
+	Input.action_press("operator_bucket_dump", 1.0)
+	for tick in 30:
+		await physics_frame
+	_check(absf(float(attachments.joint_state_for_test().get("rotate_deg", 0.0))) > 1.0, "XTR13 rotate did not move under pad layer")
+	Input.action_release("operator_bucket_dump")
+	Input.action_release("pad_layer_dpad_down")
 	var axis: Dictionary = presentation.get_local_axis_state_for_test().get("boom_fold", {})
 	_check(not axis.is_empty(), "fold axis registered")
 	if axis.is_empty():
