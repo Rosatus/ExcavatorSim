@@ -70,6 +70,13 @@ func _surface_target(_ctx: RefCounted) -> Dictionary:
 	return {"height": _profile.height_at(s), "grade": _profile.grade_at(s)}
 
 
+func _surface_target_at(ctx: RefCounted, point: Vector3) -> Dictionary:
+	if _profile == null:
+		return super._surface_target_at(ctx, point)
+	var s := _profile.along(point)
+	return {"height": _profile.height_at(s), "grade": _profile.grade_at(s)}
+
+
 ## The task frame is the profile plane — re-anchored above to the live
 ## upper forward, so it equals ctx.horizontal while self-consistent with
 ## the surface the Jacobian rows are built from.

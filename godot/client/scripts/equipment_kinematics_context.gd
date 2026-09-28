@@ -26,6 +26,8 @@ var joint_limits: Dictionary = {}
 var cutting_edge_available := true
 var bucket_edge_half_world := Vector3.ZERO
 var tool_point_velocity := Vector3.ZERO
+var exterior_points: Array[Vector3] = []
+var exterior_mount_velocities: Array[Vector3] = []
 var bucket_link := Transform3D.IDENTITY
 var bucket_ref_world := Vector3.ZERO
 var bucket_ref_dir_world := Vector3.FORWARD
@@ -34,7 +36,21 @@ var horizontal := Vector3.FORWARD
 var up := Vector3.UP
 
 
-## Per-joint world linear-velocity columns for a rigid point: axis x (point - pivot).
+## Lowest solid contact along a plane normal, used to latch level guidance.
+func surface_contact(normal: Vector3) -> Dictionary:
+	var point := bucket_ref_world
+	var velocity := tool_point_velocity
+	var lowest := INF
+	for index in exterior_points.size():
+		var distance := normal.dot(exterior_points[index])
+		if distance < lowest:
+			lowest = distance
+			point = exterior_points[index]
+			velocity = exterior_mount_velocities[index]
+	return {"point": point, "mount_velocity": velocity}
+
+
+## Per-joint world linear-velocity columns: axis x (point - pivot).
 func rate_columns(point: Vector3, joint_names: Array) -> Dictionary:
 	var columns := {}
 	for joint_name in joint_names:

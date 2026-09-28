@@ -19,6 +19,9 @@ const WORK_JOINTS := ["boom_joint", "arm_joint", "bucket_joint"]
 ## 0 reproduces the pure-P limit cycle observed near kinematic toggles, 1
 ## approaches critical damping. 0.5 damps the ring without slowing recovery.
 const VELOCITY_DAMPING := 0.5
+## Whole-tool support changes have a non-smooth Jacobian. Precision travel
+## leaves acceleration/jerk authority to arrest the incoming floor/back contact.
+const RELAXED_TRAVEL_SCALE := 0.3
 var horizontal_speed_m_s := 1.0
 var input_deadband := 0.05
 var height_gain_hz := 4.0
@@ -31,7 +34,7 @@ var dls_lambda := 0.08
 ## Flag namespace emitted by this stage ("level_assist", "slope_assist");
 ## concrete stages set it in configure before calling super.
 var flag_prefix := "assist"
-## Relaxed mode tracks the cutting edge from the first tick, with no pitch task.
+## Relaxed mode tracks the lowest solid exterior contact, with no pitch task.
 var relaxed_attitude := false
 
 var _attitude_ref := 0.0
@@ -101,6 +104,28 @@ func reset(_reason := "reset") -> void:
 ## grade = dh/ds along the intent axis (0 for flat reference surfaces).
 func _surface_target(_ctx: RefCounted) -> Dictionary:
 	return {"height": 0.0, "grade": 0.0}
+
+
+func _surface_target_at(ctx: RefCounted, point: Vector3) -> Dictionary:
+	var target := _surface_target(ctx)
+	return {"height": float(target.height) + float(target.grade) * (point - ctx.bucket_ref_world).dot(_intent_axis(ctx)), "grade": target.grade}
+
+
+func _exterior_contact(ctx: RefCounted) -> Dictionary:
+	var point: Vector3 = ctx.bucket_ref_world
+	var velocity: Vector3 = ctx.tool_point_velocity
+	var target := _surface_target(ctx)
+	var lowest := INF
+	for index in ctx.exterior_points.size():
+		var candidate: Vector3 = ctx.exterior_points[index]
+		var surface := _surface_target_at(ctx, candidate)
+		var gap := candidate.y - float(surface.height)
+		if gap < lowest:
+			lowest = gap
+			point = candidate
+			velocity = ctx.exterior_mount_velocities[index]
+			target = surface
+	return {"point": point, "mount_velocity": velocity, "target": target}
 
 
 ## The horizontal task axis: direction of operator intent and the second
@@ -195,7 +220,7 @@ func step(ctx: RefCounted, commands: Vector4) -> Dictionary:
 	# the feedback path a tick late.
 	var chassis: Vector3 = ctx.chassis_point_velocity(ctx.bucket_ref_world) + ctx.tool_point_velocity
 	var axis := _intent_axis(ctx)
-	var intent_speed := intent * horizontal_speed_m_s
+	var intent_speed := intent * horizontal_speed_m_s * (RELAXED_TRAVEL_SCALE if relaxed_attitude else 1.0)
 	var desired := Vector3(
 		clampf(height_gain_hz * height_error, -max_height_correction_m_s, max_height_correction_m_s)
 			+ float(target.get("grade", 0.0)) * intent_speed
@@ -225,8 +250,16 @@ func step(ctx: RefCounted, commands: Vector4) -> Dictionary:
 	if relaxed_attitude:
 		# Solve the surface-normal velocity, not an absolute vertical demand
 		# based on requested travel: actual travel may be actuator-limited.
-		var grade := float(target.get("grade", 0.0))
+		var contact := _exterior_contact(ctx)
+		var grade := float(contact.target.grade)
 		var normal: Vector3 = ctx.up - grade * axis
+		var point: Vector3 = contact.point
+		# Evaluate each exterior point on the actual profile, including a slope
+		# toe/knee. A tangent plane at the tooth is wrong across that boundary.
+		height_error = clampf(float(contact.target.height) - point.y, -max_height_error_m, max_height_error_m)
+		_last_error_m = height_error
+		columns = ctx.rate_columns(point, WORK_JOINTS)
+		chassis = ctx.chassis_point_velocity(point) + Vector3(contact.mount_velocity)
 		_edge_plane_span_m = 2.0 * absf(normal.dot(ctx.bucket_edge_half_world)) / normal.length()
 		if _edge_plane_span_m > 0.02:
 			flags.append("%s_edge_tilt" % flag_prefix)

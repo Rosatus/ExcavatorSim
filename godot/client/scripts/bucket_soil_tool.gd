@@ -304,6 +304,15 @@ func _sweep_sampling(previous: Transform3D, current: Transform3D) -> Dictionary:
 	}
 
 
+## Solid exterior only: cavity and opening describe empty space, not contact.
+func exterior_contact_points() -> Array[Vector3]:
+	var points: Array[Vector3] = []
+	for region in _regions:
+		if String(region.get("kind", "")) in ["teeth", "side_cutter", "floor", "outer_shell"]:
+			points.append_array(_local_sample_points(region))
+	return points
+
+
 func _local_sample_points(region: Dictionary) -> Array[Vector3]:
 	if not _mouth_geometry.is_empty() and region.get("region_id") == "opening":
 		var mouth_points: Array[Vector3] = [_mouth_geometry.transform.origin]

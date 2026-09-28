@@ -10,6 +10,8 @@ func _run() -> void:
 	_check_bounded_solver(failures)
 	_check_actuator_inverse(failures)
 	_check_geometry(failures)
+	_check_exterior_geometry(failures)
+	_check_profile_knee(failures)
 	_drive_transport(failures)
 	for angle in [0.0, 20.0, -20.0]:
 		for direction in [-1.0, 1.0]:
@@ -138,11 +140,15 @@ func _drive_surface(angle: float, direction: float, failures: Array[String]) -> 
 	pipeline.set_stage_enabled(name, true)
 	var start := pipeline.build_context(articulation, chassis, STAGE_DT, {}) as KCtx
 	if profile != null:
-		profile = Profile.create(start.bucket_ref_world, start.horizontal, -10.0, angle,
-			start.bucket_ref_world.y - tan(deg_to_rad(angle)) * 10.0)
+		var contact: Vector3 = start.surface_contact(Vector3.UP - tan(deg_to_rad(angle)) * start.horizontal).point
+		profile = Profile.create(contact, start.horizontal, -10.0, angle,
+			contact.y - tan(deg_to_rad(angle)) * 10.0)
 		pipeline.set_stage_params(name, {"profile": profile})
-	var initial_y := start.bucket_ref_world.y
+	var initial_y: float = start.surface_contact(Vector3.UP).point.y
 	var max_error := 0.0
+	var min_gap := INF
+	var max_gap := -INF
+	var tooth_clearance := 0.0
 	var max_step := 0.0
 	var previous_attitude := start.bucket_attitude_rad()
 	var travel := 0.0
@@ -159,9 +165,15 @@ func _drive_surface(angle: float, direction: float, failures: Array[String]) -> 
 		articulation.set_commands(commands, tick)
 		articulation.accept_step(articulation.propose_step(STAGE_DT, chassis, true), 1.0)
 		var ctx := pipeline.build_context(articulation, chassis, STAGE_DT, {}) as KCtx
-		for endpoint in [ctx.bucket_ref_world - ctx.bucket_edge_half_world, ctx.bucket_ref_world + ctx.bucket_edge_half_world]:
+		var lowest_gap := INF
+		for endpoint in ctx.exterior_points:
 			var height := initial_y if profile == null else profile.height_at(profile.along(endpoint))
-			max_error = maxf(max_error, absf(endpoint.y - height))
+			lowest_gap = minf(lowest_gap, endpoint.y - height)
+		max_error = maxf(max_error, absf(lowest_gap))
+		min_gap = minf(min_gap, lowest_gap)
+		max_gap = maxf(max_gap, lowest_gap)
+		var tooth_height := initial_y if profile == null else profile.height_at(profile.along(ctx.bucket_ref_world))
+		tooth_clearance = maxf(tooth_clearance, ctx.bucket_ref_world.y - tooth_height)
 		var along := (ctx.bucket_ref_world - start.bucket_ref_world).dot(start.horizontal) * direction
 		if tick < 600:
 			travel = maxf(travel, along)
@@ -170,8 +182,10 @@ func _drive_surface(angle: float, direction: float, failures: Array[String]) -> 
 			returned = maxf(returned, reverse_start - along)
 		max_step = maxf(max_step, absf(wrapf(ctx.bucket_attitude_rad() - previous_attitude, -PI, PI)))
 		previous_attitude = ctx.bucket_attitude_rad()
+	print("gap range %.5f .. %.5f" % [min_gap, max_gap])
 	print("surface angle=%.0f dir=%.0f travel=%.3f return=%.3f max_error=%.5f max_pitch_step=%.5f" % [angle, direction, travel, returned, max_error, max_step])
-	_expect(max_error < 0.03, "surface endpoints stay within 3cm (angle=%s dir=%s error=%s)" % [angle, direction, max_error], failures)
+	_expect(angle != 0.0 or tooth_clearance > 0.05, "body contact allows teeth to rise instead of pushing shell through surface", failures)
+	_expect(max_error < 0.015, "lowest exterior stays within 1.5cm (angle=%s dir=%s error=%s)" % [angle, direction, max_error], failures)
 	_expect(travel > 0.5 and returned > 0.25, "sustained pass and reversal progress (angle=%s dir=%s)" % [angle, direction], failures)
 	_expect(max_step < 0.04, "pitch changes continuously", failures)
 
@@ -201,6 +215,51 @@ func _drive_transport(failures: Array[String]) -> void:
 		articulation.set_commands(result.commands, tick)
 		articulation.accept_step(articulation.propose_step(STAGE_DT, chassis, true), 1.0)
 		var ctx := pipeline.build_context(articulation, chassis, STAGE_DT, {}) as KCtx
-		max_error = maxf(max_error, absf(ctx.bucket_ref_world.y - start.bucket_ref_world.y))
+		max_error = maxf(max_error, absf(float(ctx.surface_contact(Vector3.UP).point.y) - float(start.surface_contact(Vector3.UP).point.y)))
 	print("moving chassis and attachment max_error=%.5f" % max_error)
 	_expect(max_error < 0.02, "moving chassis and attachment keep the original level plane", failures)
+
+
+func _check_exterior_geometry(failures: Array[String]) -> void:
+	for path in ["res://resources/models/sy135_soil_contract.json", "res://resources/models/sy80u_soil_contract.json", "res://resources/attachments/gb12_s50_soil_contract.json"]:
+		var fixture := _standalone_fixture("sy135")
+		var pipeline := fixture.pipeline as EquipmentAssistPipeline
+		var articulation := fixture.articulation as KinematicArticulationState
+		var contract := JSON.parse_string(FileAccess.get_file_as_string(path)) as Dictionary
+		pipeline.set_tool_geometry(contract)
+		pipeline.set_stage_params("bucket_level", {"relaxed_attitude": true})
+		pipeline.set_stage_enabled("bucket_level", true)
+		var mount := Transform3D(Basis(Vector3.FORWARD, 0.3), Vector3(0.1, -0.2, 0.3))
+		pipeline.set_tool_mount(mount)
+		var ctx := pipeline.build_context(articulation, Transform3D.IDENTITY, STAGE_DT, {}) as KCtx
+		var tool := BucketSoilTool.new()
+		_expect(tool.configure(contract), "exterior tool config " + path, failures)
+		var snapshot := tool.compose_snapshot(ctx.bucket_link, ctx.bucket_link, true, "assist-test")
+		var count := 0
+		for region in snapshot.regions:
+			if region.kind not in ["teeth", "side_cutter", "floor", "outer_shell"]:
+				continue
+			for point in region.current_points:
+				var found := false
+				for candidate in ctx.exterior_points:
+					found = found or candidate.distance_to(point) < 0.00001
+				_expect(found, "assist covers mounted exterior " + region.region_id + " " + path, failures)
+				count += 1
+		_expect(count == ctx.exterior_points.size() and count > 10, "no empty cavity/opening used as solid contact", failures)
+
+
+func _check_profile_knee(failures: Array[String]) -> void:
+	var fixture := _standalone_fixture("sy135")
+	var pipeline := fixture.pipeline as EquipmentAssistPipeline
+	var ctx := pipeline.build_context(fixture.articulation, Transform3D.IDENTITY, STAGE_DT, {}) as KCtx
+	# Tooth on the descending slope while the back is still over the bench.
+	# Extrapolating the tooth tangent misses the bench contact.
+	ctx.horizontal = Vector3.RIGHT
+	ctx.bucket_ref_world = Vector3(1, -0.5, 0)
+	ctx.exterior_points = [Vector3(1, -0.5, 0), Vector3(-1, -0.1, 0)]
+	ctx.exterior_mount_velocities = [Vector3.ZERO, Vector3.ZERO]
+	var stage := pipeline.get_stage("slope_grade") as SlopeGradeAssist
+	var profile := Profile.create(Vector3.ZERO, Vector3.RIGHT, 0, -30, 0)
+	stage.apply_params({"profile": profile, "relaxed_attitude": true})
+	var contact := stage._exterior_contact(ctx)
+	_expect(contact.point == ctx.exterior_points[1] and is_zero_approx(float(contact.target.grade)), "knee checks each point against its actual bench/slope segment", failures)

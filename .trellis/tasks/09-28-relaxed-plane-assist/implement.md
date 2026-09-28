@@ -21,3 +21,34 @@ Agent automated:
 Human manual: pending user control-feel assessment. Run source SY135, enable relaxed in Advanced, use level and +/-slope passes with W/S then reverse near endpoint; confirm longer usable stroke, stable line, no pitch snap. Exported client remains previous version.
 
 Delivered source implementation and automated validation. Human control-feel review remains pending; no export/commit performed. Contact bypass has independent accepted assist-mount history so clearing solid sweep history cannot erase mount feedforward. Next: user tests source/newly exported client; investigate only concrete reported remaining symptoms.
+
+
+## Exterior contact correction — 2026-09-28
+User reported teeth-only tracking leaves the floor/back below the grading
+surface. Main agent replaced relaxed support geometry with all solid semantic
+samples (teeth/side cutters/floor/outer shell); excludes cavity/opening. Cached
+on tool change, transformed with active mount each tick. Selected support point
+owns Jacobian, chassis and mount feedforward. Flat latches lowest exterior;
+slope evaluates each point on actual profile, including bench/knee.
+
+Discriminating trajectory evidence: simply changing support at original speed
+produced 3–13.5cm transient penetration from acceleration/jerk at contact changes.
+Experimental multi-plane/smoothing solves were removed; final uses original
+bounded normal-priority solver with precision travel 30% of configured speed
+and milder joint centering (.036 vs .12). Tooltip and current joint contract
+state this tradeoff. No new QP or smoothing approximation remains.
+
+Agent automated: relaxed_surface_assist_test and assist_modes_test PASS final,
+exit 0, stderr empty. Actual SY135 loaded flat/+20/-20 strokes both directions
+900 ticks each with reversal: worst exterior penetration .00868m; continuous
+pitch; flat cases prove teeth may lift >5cm. Moving mount/chassis max .00448m.
+Geometry coverage compares mounted SY135/SY80U/GB12 exterior against soil tool
+snapshot; bench/slope knee regression included. Bound stroke remains .349m vs
+strict .0327m. Final strict bucket_level_assist_test PASS (SY135/SY205), exit 0 and empty stderr.
+Logs TEMP/<test>-exterior.out/.err. git diff --check PASS.
+
+Human manual still pending: source run relaxed level/slope with varied bucket
+curl, inspect bottom/back contact and reduced precision speed. No export,
+commit, or claimed universal zero-penetration guarantee. Uses existing semantic
+solid geometry, not a new mesh collider. Preserved two pre-existing untracked
+SY80U test UID sidecars. Next: human source control-feel/contact review; automatic validation complete.

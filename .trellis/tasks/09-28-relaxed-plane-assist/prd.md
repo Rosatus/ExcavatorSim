@@ -13,3 +13,9 @@ Progress: found starvation-gated pitch fallback, uniform scaling, absolute verti
 Implementation and Agent automated validation complete; see implement.md for metrics. Human manual control-feel review pending. Current exported executable not rebuilt.
 
 2026-09-28 repository housekeeping: user authorized grouped commits of current workspace changes. Implementation and existing validation records are retained; pending human review or unreproduced symptoms remain pending. Build outputs/caches stay under existing ignore rules.
+
+
+2026-09-28 follow-up supersedes cutting-edge-only acceptance: user observed
+floor/back below the work plane while teeth stayed on it. Relaxed guidance
+must use the solid exterior support, leaving pitch free and allowing the teeth
+to lift when another region supports the bucket. Preserve strict mode.

@@ -29,6 +29,8 @@ func _surface_target(_ctx: RefCounted) -> Dictionary:
 
 func _latch_payload(ctx: RefCounted) -> void:
 	_height_ref = ctx.bucket_ref_world.y
+	if relaxed_attitude:
+		_height_ref = (ctx.surface_contact(ctx.up).point as Vector3).y
 
 
 ## Bounded drift: the stored height follows the measured pose within the

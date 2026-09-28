@@ -245,7 +245,8 @@ static func solve_surface(normal: Vector3, tangent: Vector3, normal_speed: float
 			safe_high = minf(safe_high, brake * sqrt(maxf(limits.y - position, 0.0)))
 			safe_low = maxf(safe_low, (limits.x - position) / ctx.delta)
 			safe_high = minf(safe_high, (limits.y - position) / ctx.delta)
-			preferred[index] = 0.12 * ((limits.x + limits.y) * 0.5 - position) / maxf((limits.y - limits.x) * 0.5, 0.01)
+			# Mild centering preserves braking authority at exterior contact switches.
+			preferred[index] = 0.036 * ((limits.x + limits.y) * 0.5 - position) / maxf((limits.y - limits.x) * 0.5, 0.01)
 		# If momentum already violates the safe envelope, fastest achievable
 		# braking is the only choice. Never invent a velocity the plant cannot do.
 		low[index] = clampf(safe_low, reachable_low, reachable_high)

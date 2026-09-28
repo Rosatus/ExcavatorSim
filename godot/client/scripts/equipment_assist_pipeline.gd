@@ -26,6 +26,7 @@ var last_error := ""
 var _descriptor: Dictionary = {}
 var _soil_contract: Dictionary = {}
 var _tool_contract: Dictionary = {}
+var _exterior_local: Array[Vector3] = []
 var _tool_mount := Transform3D.IDENTITY
 var _previous_tool_mount := Transform3D.IDENTITY
 var _joint_descriptors: Dictionary = {}
@@ -41,6 +42,7 @@ func configure(descriptor: Dictionary, soil_contract: Dictionary, requested_mode
 	_descriptor = descriptor.duplicate(true)
 	_soil_contract = soil_contract.duplicate(true)
 	_tool_contract = _soil_contract
+	_cache_exterior()
 	_tool_mount = Transform3D.IDENTITY
 	_previous_tool_mount = Transform3D.IDENTITY
 	_joint_descriptors.clear()
@@ -78,9 +80,17 @@ func configure(descriptor: Dictionary, soil_contract: Dictionary, requested_mode
 ## Geometry follows the active mount, independently of the solid-contact solver.
 func set_tool_geometry(contract: Dictionary) -> void:
 	_tool_contract = contract.duplicate(true)
+	_cache_exterior()
 	_tool_mount = Transform3D.IDENTITY
 	_previous_tool_mount = Transform3D.IDENTITY
 	reset("tool_changed")
+
+
+func _cache_exterior() -> void:
+	_exterior_local.clear()
+	var tool := BucketSoilTool.new()
+	if not _tool_contract.is_empty() and tool.configure(_tool_contract):
+		_exterior_local = tool.exterior_contact_points()
 
 
 func set_tool_mount(mount: Transform3D, previous_mount: Variant = null) -> void:
@@ -237,6 +247,7 @@ func build_context(
 		if stage.enabled and stage.relaxed_attitude:
 			relaxed = true
 	if relaxed:
+		ctx.cutting_edge_available = ctx.cutting_edge_available and not _exterior_local.is_empty()
 		for region in (_tool_contract.get("bucket_tool", {}) as Dictionary).get("regions", []):
 			var shape := (region as Dictionary).get("shape", {}) as Dictionary
 			if String(region.get("kind", "")) != "teeth" or String(shape.get("kind", "")) != "segment":
@@ -247,6 +258,11 @@ func build_context(
 			break
 	ctx.bucket_edge_half_world = ctx.bucket_link.basis * half_edge
 	ctx.bucket_ref_world = ctx.bucket_link * ref_local
+	if relaxed:
+		var host := frames.get("bucket_link", Transform3D.IDENTITY) as Transform3D
+		for point in _exterior_local:
+			ctx.exterior_points.append(ctx.bucket_link * point)
+			ctx.exterior_mount_velocities.append(host.basis * ((_tool_mount * point) - (_previous_tool_mount * point)) / delta if delta > 0.0 else Vector3.ZERO)
 	if delta > 0.0:
 		var host := frames.get("bucket_link", Transform3D.IDENTITY) as Transform3D
 		ctx.tool_point_velocity = host.basis * ((_tool_mount * ref_local) - (_previous_tool_mount * ref_local)) / delta

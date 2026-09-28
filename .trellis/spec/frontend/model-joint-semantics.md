@@ -60,13 +60,18 @@ pixi run python backend/scripts/sync_sy205_joint_contract.py [--check]
   Context FK uses the current chassis transform and active tool mount/contract.
   Chassis transport converts COM velocity to origin velocity; mount-induced
   point velocity is subtracted alongside chassis transport.
-  Relaxed guidance uses the outer teeth segment sampled by BucketSoilTool
-  (region center + outward normal * radius), not its capsule center. No active
-  cutting edge produces `<prefix>_no_cutting_edge` with work channels zero.
-  Edge midpoint tracking enforces the whole line only when its direction is
-  tangent to the surface. Roll/attachment tilt beyond 2cm endpoint normal span
-  emits `<prefix>_edge_tilt` and reports `edge_plane_span_m`; the three coplanar
-  work joints cannot correct arbitrary transverse edge tilt.
+  Relaxed guidance tracks the lowest solid exterior contact (teeth, side
+  cutters, floor and outer shell), using BucketSoilTool geometry; cavity and
+  opening volumes are excluded. Level latches the lowest exterior height.
+  Each slope point is evaluated on its own profile segment, including the
+  bench/knee. The contact point owns both Jacobian and transport feedforward.
+  Pitch remains free; teeth may rise when the floor/back supports the tool.
+  Travel is 30% of the configured guide speed, with reduced joint centering,
+  reserving acceleration/jerk authority for changes of supporting surface.
+  No active cutting edge produces `<prefix>_no_cutting_edge` with work channels
+  zero. Roll/attachment tilt beyond 2cm endpoint normal span still emits
+  `<prefix>_edge_tilt`; the lowest side is protected, but the three coplanar
+  work joints cannot flatten an arbitrary transverse edge tilt.
   The chassis flag persists across runtime/model rebuilds and re-injects the
   option into both stages.
 - Strict assist tracks constraints by *integrator inversion*, not blind rate
