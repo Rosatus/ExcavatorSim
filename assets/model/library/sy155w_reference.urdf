@@ -23,7 +23,7 @@
 <joint name="bucket_joint" type="revolute">
 <parent link="arm_link"/><child link="bucket_link"/>
 <origin xyz="0.0000000000 2.5000000000 0.0000000000" rpy="1.6929693737 0.0000000000 0.0000000000"/>
-<axis xyz="1 0 0"/><limit lower="-0.2617993877991494" upper="0.2617993877991494" effort="1000000" velocity="1"/>
+<axis xyz="1 0 0"/><limit lower="-0.6981317007977318" upper="0.6981317007977318" effort="1000000" velocity="1"/>
 </joint>
 <link name="tooth_center"/>
 <joint name="tooth_center_fixed" type="fixed"><parent link="bucket_link"/>

@@ -66,7 +66,7 @@ func _run() -> void:
 	for boom in [-7., 0., 7.]:
 		for folding in [-10., 0., 10.]:
 			for arm in [-9., 0., 39.]:
-				for bucket in [-15., 0., 15.]:
+				for bucket in [-40., 0., 40.]:
 					_set_joint(nodes.boom_link, rest.boom_link, boom)
 					_set_joint(fold, fold_rest, folding)
 					_set_joint(nodes.arm_link, rest.arm_link, arm)

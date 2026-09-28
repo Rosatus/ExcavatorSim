@@ -860,7 +860,7 @@
       ]
     },
     "authority_fixture": "godot/client/tests/fixtures/sy155w_frame_parity_cases.json",
-    "authority_fixture_sha256": "7b676fdfe776c67a2694c38bd7205ba959635b1326cb6553f7360cd3a7f269cb"
+    "authority_fixture_sha256": "116f036d26545ef35cb2dba5404ed69f2d37b8a808212c9fd5449cc77a6031ba"
   },
   "runtime_policy": {
     "motion_authority": "selected_runtime_profile",

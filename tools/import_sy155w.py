@@ -409,8 +409,9 @@ def main():
         body["center_of_mass_m"] = centers[idx]
         body["shape"] = {"kind": "box", "center_m": centers[idx], "size_m": sizes[idx]}
     # Arm extension gains +30 deg: without the four-bar chain the stick can
-    # travel further out. Limits stay asymmetric about the neutral.
-    limits = [[-180, 180], [-7, 7], [-9, 39], [-15, 15]]
+    # travel further out. Limits stay asymmetric about the neutral. The
+    # bucket pair was widened +-25 deg per side at user request.
+    limits = [[-180, 180], [-7, 7], [-9, 39], [-40, 40]]
     # Carry-pose seed: at the source neutral the GB12 cutting edge sits
     # level with the chassis origin (on the ground). Lift each joint inside
     # its limits so the bucket starts clear of the terrain.
