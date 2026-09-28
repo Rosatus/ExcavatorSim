@@ -61,7 +61,7 @@ func configure(contract: Dictionary, scale_m: float, zone_layout = null) -> bool
 
 func uses_native_paths() -> bool:
 	# Tool geometry is independent of the excavator carrying the tiltrotator.
-	return model_id == "sy135" or model_id == "sy135neo" or _is_tilt_bucket()
+	return model_id in ["sy135", "sy135neo", "sy80u"] or _is_tilt_bucket()
 
 
 func _is_tilt_bucket() -> bool:

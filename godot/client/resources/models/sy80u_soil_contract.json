@@ -5,9 +5,9 @@
   "nominal_capacity_m3": 0.24,
   "heaped_capacity_m3": 0.3,
   "cell_grid": [
-    6,
-    4,
-    5
+    6.0,
+    4.0,
+    5.0
   ],
   "interaction": {
     "contact_tolerance_m": 0.1,
@@ -16,7 +16,8 @@
     "cut_radius_m": 0.42,
     "deposit_radius_m": 0.62,
     "spill_opening_down_dot": -0.45,
-    "dump_opening_down_dot": 0.15
+    "dump_opening_down_dot": 0.15,
+    "release_opening_down_dot": 0.5
   },
   "proxies": {
     "cutting_edge": {
@@ -28,8 +29,8 @@
       ],
       "direction_godot": [
         0.0,
-        -0.3,
-        -0.953939
+        -0.62532094,
+        -0.78036768
       ],
       "half_width_m": 0.4435
     },
@@ -37,78 +38,78 @@
       "frame": "bucket_link",
       "center_godot": [
         0.0,
-        0.256,
-        0.186
+        0.26352,
+        0.16583
       ],
-      "half_width_m": 0.4
+      "half_width_m": 0.3935
     },
     "opening": {
       "frame": "bucket_link",
       "center_godot": [
         0.0,
-        0.1862,
-        -0.3061
+        0.193450003862381,
+        -0.326099991798401
       ],
       "normal_godot": [
         0.0,
-        -0.9926,
-        0.1218
+        -0.990011811256409,
+        0.140984624624252
       ],
       "up_godot": [
         0.0,
-        0.1218,
-        0.9926
+        -0.990011811256409,
+        0.140984624624252
       ],
       "size_m": [
-        0.887,
-        1.0315
+        0.787000000476837,
+        0.993725419044495
       ]
     },
     "cavity": {
       "frame": "bucket_link",
       "center_godot": [
         0.0,
-        0.315,
-        -0.3
+        0.421152710914612,
+        -0.358526468276978
       ],
       "up_godot": [
         0.0,
-        0.1218,
-        0.9926
+        -0.990011811256409,
+        0.140984624624252
       ],
       "size_m": [
-        0.79,
-        0.6,
-        0.82
+        0.787000000476837,
+        0.46,
+        0.993725419044495
       ]
     },
     "shell": {
       "frame": "bucket_link",
       "center_godot": [
         0.0,
-        0.42,
-        -0.1
+        0.652,
+        -0.235
       ],
       "up_godot": [
         0.0,
-        0.1218,
-        0.9926
+        1.0,
+        0.0
       ],
       "size_m": [
-        0.89,
-        0.22,
-        0.72
+        0.887,
+        0.06,
+        0.3
       ],
-      "evidence": "tuned_from_sy80u_bucket_local_aabb_and_shell_section"
+      "evidence": "Measured central rolled back: inner Y .6383, outer Y .678; excludes open mouth."
     },
     "rear_support": {
       "frame": "bucket_link",
       "center_godot": [
         0.0,
-        0.45,
-        -0.05
+        0.646,
+        -0.235
       ],
-      "radius_m": 0.24
+      "radius_m": 0.06
     }
   },
   "bucket_tool": {
@@ -122,7 +123,7 @@
     "sweep": {
       "maximum_translation_step_m": 0.08,
       "maximum_rotation_step_degrees": 4.0,
-      "maximum_samples": 12
+      "maximum_samples": 12.0
     },
     "regions": [
       {
@@ -135,8 +136,8 @@
         ],
         "outward_normal_godot": [
           0.0,
-          -0.3,
-          -0.953939
+          -0.62532094,
+          -0.78036768
         ],
         "shape": {
           "kind": "segment",
@@ -158,8 +159,8 @@
         "kind": "side_cutter",
         "center_godot": [
           -0.42,
-          0.2,
-          -0.45
+          0.19345,
+          -0.32609
         ],
         "outward_normal_godot": [
           -1.0,
@@ -170,10 +171,10 @@
           "kind": "segment",
           "axis_godot": [
             0.0,
-            0.1218,
-            0.9926
+            0.14101843,
+            0.99000697
           ],
-          "half_length_m": 0.48,
+          "half_length_m": 0.496885,
           "radius_m": 0.035
         },
         "stable_soil_roles": [
@@ -186,8 +187,8 @@
         "kind": "side_cutter",
         "center_godot": [
           0.42,
-          0.2,
-          -0.45
+          0.19345,
+          -0.32609
         ],
         "outward_normal_godot": [
           1.0,
@@ -198,10 +199,10 @@
           "kind": "segment",
           "axis_godot": [
             0.0,
-            0.1218,
-            0.9926
+            0.14101843,
+            0.99000697
           ],
-          "half_length_m": 0.48,
+          "half_length_m": 0.496885,
           "radius_m": 0.035
         },
         "stable_soil_roles": [
@@ -214,20 +215,20 @@
         "kind": "floor",
         "center_godot": [
           0.0,
-          0.16,
-          -0.4
+          0.312115,
+          -0.662005
         ],
         "outward_normal_godot": [
           0.0,
-          -0.9926,
-          0.1218
+          0.63710833,
+          -0.77077427
         ],
         "shape": {
           "kind": "box",
           "size_m": [
-            0.79,
-            0.08,
-            0.62
+            0.787,
+            0.045,
+            0.489728
           ]
         },
         "stable_soil_roles": [
@@ -241,20 +242,20 @@
         "kind": "outer_shell",
         "center_godot": [
           0.0,
-          0.42,
-          -0.1
+          0.652,
+          -0.235
         ],
         "outward_normal_godot": [
-          -0.0,
-          -0.1218,
-          -0.9926
+          0.0,
+          1.0,
+          0.0
         ],
         "shape": {
           "kind": "box",
           "size_m": [
-            0.89,
-            0.22,
-            0.72
+            0.887,
+            0.06,
+            0.3
           ]
         },
         "stable_soil_roles": [
@@ -269,9 +270,9 @@
         "region_id": "outer_left_side",
         "kind": "outer_shell",
         "center_godot": [
-          -0.415,
-          0.28,
-          -0.32
+          -0.42,
+          0.39,
+          -0.29
         ],
         "outward_normal_godot": [
           -1.0,
@@ -281,9 +282,9 @@
         "shape": {
           "kind": "box",
           "size_m": [
-            0.06,
-            0.55,
-            0.72
+            0.05,
+            0.46,
+            0.88
           ]
         },
         "stable_soil_roles": [
@@ -297,9 +298,9 @@
         "region_id": "outer_right_side",
         "kind": "outer_shell",
         "center_godot": [
-          0.415,
-          0.28,
-          -0.32
+          0.42,
+          0.39,
+          -0.29
         ],
         "outward_normal_godot": [
           1.0,
@@ -309,9 +310,9 @@
         "shape": {
           "kind": "box",
           "size_m": [
-            0.06,
-            0.55,
-            0.72
+            0.05,
+            0.46,
+            0.88
           ]
         },
         "stable_soil_roles": [
@@ -326,20 +327,20 @@
         "kind": "inner_shell",
         "center_godot": [
           0.0,
-          0.315,
-          -0.3
+          0.421152710914612,
+          -0.358526468276978
         ],
         "outward_normal_godot": [
           0.0,
-          0.1218,
-          0.9926
+          -0.990011811256409,
+          0.140984624624252
         ],
         "shape": {
           "kind": "box",
           "size_m": [
-            0.79,
-            0.6,
-            0.82
+            0.787000000476837,
+            0.46,
+            0.993725419044495
           ]
         },
         "stable_soil_roles": [],
@@ -352,19 +353,19 @@
         "kind": "opening",
         "center_godot": [
           0.0,
-          0.1862,
-          -0.3061
+          0.193450003862381,
+          -0.326099991798401
         ],
         "outward_normal_godot": [
           0.0,
-          -0.9926,
-          0.1218
+          -0.990011811256409,
+          0.140984624624252
         ],
         "shape": {
           "kind": "plane",
           "size_m": [
-            0.887,
-            1.0315
+            0.787000000476837,
+            0.993725419044495
           ],
           "width_axis_godot": [
             1.0,
@@ -373,8 +374,8 @@
           ],
           "height_axis_godot": [
             0.0,
-            0.1218,
-            0.9926
+            -0.140984624624252,
+            -0.990011811256409
           ]
         },
         "stable_soil_roles": [],
@@ -385,5 +386,36 @@
         ]
       }
     ]
+  },
+  "fill_profile_id": "sy80u",
+  "soil_geometry": {
+    "schema_version": "bucket-soil-geometry-v1",
+    "mouth_polygon_godot": [
+      [
+        -0.393500000238419,
+        0.123399995267391,
+        -0.817999958992004
+      ],
+      [
+        0.393500000238419,
+        0.123399995267391,
+        -0.817999958992004
+      ],
+      [
+        0.393500000238419,
+        0.26350000500679,
+        0.165799990296364
+      ],
+      [
+        -0.393500000238419,
+        0.26350000500679,
+        0.165799990296364
+      ]
+    ],
+    "cavity_depth_m": 0.46,
+    "fill_profile_path": "res://resources/visual/sy80u_bucket_fill_profile.json",
+    "fill_profile_sha256": "286a5d8e028ce8387f66bd8939824b93978bb6721d02df4f2a9c7fcbeea1ead4",
+    "source_glb_path": "res://assets/visual/SY80U_excavator_godot.glb",
+    "source_glb_sha256": "a91cd60b6673eb3511296fabe582ff408c1605e4e849c5bd8325706825f22101"
   }
 }

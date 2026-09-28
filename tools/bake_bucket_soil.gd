@@ -156,10 +156,11 @@ func _measure(asset: Node3D, recipe: Dictionary) -> Dictionary:
 	var catalog_text := FileAccess.get_file_as_string(recipe.catalog_path)
 	var catalog: Dictionary = JSON.parse_string(catalog_text)
 	var matched := false
-	for tool in catalog.get("tools", []):
-		if tool.tool_id == recipe.tool_id:
-			if tool.get("soil_contract_path") != recipe.contract_path or tool.get("tool_glb_path") != recipe.asset_path \
-					or tool.get("tool_glb_sha256") != recipe.asset_sha256:
+	var native_model := String(recipe.get("catalog_kind", "tool")) == "model"
+	for tool in catalog.get("models" if native_model else "tools", []):
+		if tool.get("model_id" if native_model else "tool_id") == recipe.tool_id:
+			if tool.get("soil_contract_path") != recipe.contract_path or tool.get("glb_path" if native_model else "tool_glb_path") != recipe.asset_path \
+					or tool.get("glb_sha256" if native_model else "tool_glb_sha256") != recipe.asset_sha256:
 				return {"error": "recipe and catalog asset/contract disagree"}
 			if not tool.get("soil_contract_sha256") is String or String(tool.soil_contract_sha256).length() != 64 \
 					or catalog_text.count(String(tool.soil_contract_sha256)) != 1 or matched:
@@ -220,7 +221,10 @@ func _validate_recipe(value: Variant) -> String:
 	if not descriptor.is_valid_for(String(base.get("model_id", ""))):
 		return "base contract: " + descriptor.validation_error()
 	var catalog: Variant = JSON.parse_string(FileAccess.get_file_as_string(value.catalog_path))
-	if not catalog is Dictionary or not catalog.get("tools") is Array:
+	var catalog_kind := String(value.get("catalog_kind", "tool"))
+	if catalog_kind not in ["tool", "model"]:
+		return "catalog_kind must be tool or model"
+	if not catalog is Dictionary or not catalog.get("models" if catalog_kind == "model" else "tools") is Array:
 		return "invalid catalog"
 	return ""
 
