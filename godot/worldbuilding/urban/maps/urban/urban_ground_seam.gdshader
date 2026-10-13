@@ -5,7 +5,7 @@ render_mode cull_disabled;
 // the voxel work-zone rectangle are discarded so the finite VoxelTerrain owns
 // the strip — the same seam approach as construction's ground_voxel_seam
 // shader, shrunk down for this plain box mesh.
-uniform vec4 voxel_seam_rect = vec4(23.8, 27.45, 39.6, 33.0); // min_x, min_z, max_x, max_z
+uniform vec4 voxel_seam_rect = vec4(23.8, 27.45, 87.0, 33.0); // min_x, min_z, max_x, max_z
 
 varying vec3 world_pos;
 

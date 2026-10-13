@@ -703,6 +703,18 @@ func _empty_authoritative_status() -> Dictionary:
 
 
 func _connect_runtime() -> void:
+	# Optional maps can spawn directly on voxel soil. Do not create a dynamic
+	# chassis until its initial support exists, or it falls into the loading soil.
+	var spawn_zone := get_node_or_null("../TerrainRoot/VoxelWorkZone") as VoxelWorkZone
+	if static_map_driving and spawn_zone != null and spawn_zone.initialize_on_ready \
+			and spawn_zone.layout.owns_world_xz(Vector2(map_spawn_position.x, map_spawn_position.z)):
+		while not spawn_zone.readiness.is_ready(spawn_zone.initial_ticket):
+			if not spawn_zone.last_error.is_empty():
+				contract_error = "voxel_spawn_support_unavailable: " + spawn_zone.last_error
+				return
+			await get_tree().physics_frame
+			if not is_inside_tree() or is_queued_for_deletion():
+				return
 	_motion_client = get_node_or_null(motion_client_path) as MotionClient
 	_product_session = get_node_or_null(product_session_path) as ProductSession
 	_motion_presentation = get_node_or_null(motion_presentation_path) as MotionPresentation

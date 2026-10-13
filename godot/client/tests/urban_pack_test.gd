@@ -80,7 +80,8 @@ func run() -> void:
 	check(Vector2(before.x, before.z).distance_to(Vector2(spawn_point.global_position.x, spawn_point.global_position.z)) < 0.5, "Urban map did not use the spawn marker")
 	var snapshot := chassis._jolt_runtime.get_post_step_snapshot()
 	check(snapshot.get("grounded", false), "Urban map has no track support")
-	check(snapshot.get("track_support_source_counts", {}).get("static_map", 0) > 0, "Urban ground owner was rejected")
+	check(snapshot.get("track_support_source_counts", {}).get("voxel_terrain", 0) > 0, "Urban spawn must be supported by the filled voxel strip")
+	check((-chassis.global_basis.z).dot(Vector3.LEFT) > 0.999, "Urban spawn heading is not snapped to -X")
 	chassis.set_commands_for_test(1, 1)
 	for frame in 120:
 		await physics_frame

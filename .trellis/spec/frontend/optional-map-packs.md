@@ -6,6 +6,29 @@ Construction source assets live in the independent `godot/worldbuilding/construc
 
 A map may pin the product sun hour by setting `sun_time_hours` on its scene root node (urban sets `12.0` for noon); absent metas keep `VisualEnvironment.FIXED_DAYTIME_HOURS` (10:30). `main_map.gd` pushes it via `set_daytime_hours` before `VisualEnvironment._ready`, so the pinned hour also survives later quality-profile re-applies; the map's own `WorldEnvironment` stays preview-only and is still stripped at load.
 
+Loaded optional maps set `VisualQualityController.minimum_camera_far_m` to
+1500 m, matching the workbench preview cameras. All quality changes retain
+this floor; camera orbit zoom limits still use the original profile distances.
+Training retains its profile far planes. Construction small/mid props use
+400/600 m visibility ranges in their source prefabs and authoring tool.
+Validate packed maps and profile transitions with `map_view_distance_test.gd`.
+
+Urban's spawn is on the filled voxel strip at (37.351578, 1.1, 29.245409),
+heading 90 degrees toward world -X. Spawn markers store ground height, not
+the settled chassis origin. For static-map spawns inside a voxel zone, chassis
+runtime connection waits for the initial collision ticket before creating the
+dynamic body; otherwise the vehicle falls into soil that is still loading and
+is displaced when collision appears.
+
+Urban's strip is 63.2 by 5.55 m, centred at (55.4, 1.1, 30.225):
+X 23.8..87, Z 27.45..33. It extends 47.4 m toward the spawn's rear (+X).
+The ground shader cutout and four collision-frame shapes match these bounds.
+`trim_spline_tiles.gd` clips sidewalk surface triangles against all four
+rectangle edges, retaining the road material surface. Clearing removes whole
+hedge/planter instances (including collisions) and corresponding foliage;
+building modules and all 378 foundations remain. The existing roadwork-barrier
+row stays at Z 19.2705, with 40 added panels extending its endpoint by 47.4 m.
+
 Construction enables finite voxel excavation only when `WorkArea/ExcavationArea` opts in with status `voxel`; urban uses the same marker for its municipal-trench strip. Configure an independent `VoxelZoneLayout` before the work zone initializes; the cutter and authority consume that same layout for sampling, clipping, native edit coordinates, deposit and collision queries. Never mutate the training static defaults. Hide training meshes and remove its walls/foundation on construction. Imported ground owns collisions outside the pit; the map ground creates control-map holes only when the host explicitly sets `excavation_enabled`, so standalone workbench previews and older hosts retain solid ground. Map grounds need not be Terrain3D: urban's `Ground` is a plain `StaticBody3D` slab that disables its full-slab shape and enables four frame shapes around the hole, and it exposes a duck-typed `collision` RID accessor for the shared client code. `JoltChassisTrackRuntime` accepts readiness-gated voxel hits before checking the explicit static-map root and never falls back to the training heightfield on construction. Missing/older maps without an opted-in area remain driving-only. Static-map capacity is 32768 Jolt bodies because the source uses more than 22000.
 
 Root-scene reloads retire scene nodes while autoloads survive. CAN must rebind presentation/chassis to the current scene and must not sample detached frames. Model/reset on the driving map must not resurrect training colliders. Product Sky3D stays the single runtime environment; the pack sky is for the independent workbench.
@@ -18,7 +41,7 @@ the pack builder checks flag, foliage and tarp graphs before publishing, and
 the client pack test verifies the actual packed shader code. Rebuild both
 runtime pack copies and restart the client after wind resource changes.
 
-The optional `WorkArea/SpawnPoint` marker in the map supplies a world-space ground position and absolute chassis yaw. Main-map initialization resolves it after the map enters the tree, before the chassis initializes. Static-map spawning adds descriptor hull clearance/support sag above that ground elevation; it does not add the training rig's yaw a second time. Maps without the marker retain the origin default. Switching, resetting and changing models reuse the marker. `WorkArea/ExcavationArea` warning lines are map-optional dressing: construction keeps four non-colliding ground lines with no posts/walls; the urban strip carries none. The 18×28 m terrain has a 1.5 m protected perimeter to cover the coarse Terrain3D hole-grid seam. The starter soil profile is a `VoxelPitGenerator` surface parameterized by `WorkArea/ExcavationArea` meta `starter_pit_depth_m` (absent or 0 keeps a level surface at the area marker elevation, as on training) and `starter_pit_axis_x` (true rotates the profile so the pit occupies the local -X half instead of -Z). Construction sets 1.5 m: the approach half (local -Z, the spawn side) is a foundation pit reached by a gentle constant-grade full-width ramp; side walls and the midline dig face are cut-steep; the far half stays at grade as the remaining dig area. Urban sets 2.5 m with `axis_x`: the western strip half is already trenched and the eastern half waits at grade. Cut processing clips to the finite voxel volume; a bucket sweep crossing the strip boundary must not be rejected as a whole. Unloading outside the receiving region drains through the accounted export sink without creating a pile. Below-grade soil is tinted as subsoil relative to the original grade datum, not the generated profile. Reset regenerates the same starter profile, retires previous voxel readiness and clears soil accounting. Status reads after scene detachment return an unavailable identity transform instead of querying a retired Node3D's global transform.
+The optional `WorkArea/SpawnPoint` marker in the map supplies a world-space ground position and absolute chassis yaw. Main-map initialization resolves it after the map enters the tree, before the chassis initializes. Static-map spawning adds descriptor hull clearance/support sag above that ground elevation; it does not add the training rig's yaw a second time. Maps without the marker retain the origin default. Switching, resetting and changing models reuse the marker. `WorkArea/ExcavationArea` warning lines are map-optional dressing: construction keeps four non-colliding ground lines with no posts/walls; the urban strip carries none. The 18×28 m terrain has a 1.5 m protected perimeter to cover the coarse Terrain3D hole-grid seam. The starter soil profile is a `VoxelPitGenerator` surface parameterized by `WorkArea/ExcavationArea` meta `starter_pit_depth_m` (absent or 0 keeps a level surface at the area marker elevation, as on training) and `starter_pit_axis_x` (true rotates the profile so the pit occupies the local -X half instead of -Z). Construction sets 1.5 m: the approach half (local -Z, the spawn side) is a foundation pit reached by a gentle constant-grade full-width ramp; side walls and the midline dig face are cut-steep; the far half stays at grade as the remaining dig area. Urban sets 0 m: the entire strip starts filled to grade, including the former western trench. Cut processing clips to the finite voxel volume; a bucket sweep crossing the strip boundary must not be rejected as a whole. Unloading outside the receiving region drains through the accounted export sink without creating a pile. Below-grade soil is tinted as subsoil relative to the original grade datum, not the generated profile. Reset regenerates the same starter profile, retires previous voxel readiness and clears soil accounting. Status reads after scene detachment return an unavailable identity transform instead of querying a retired Node3D's global transform.
 
 Focused checks: `map_switch_test.gd` with `-- --without-map-packs`, followed by `construction_pack_test.gd` after building the real pack. Source dependency audit includes binary resources; text-only path replacement misses materials inside `.res` meshes. Build uses the same pinned engine/import format as the host. Human review owns visual appearance and driving feel.
 
@@ -38,8 +61,8 @@ expand `owns_world_xz`, editable soil bounds or excavation authorization.
 `WorkArea/ExcavationArea` meta `editable_inset_m` overrides the default 1.5 m
 protected perimeter per map; the urban strip sets 0.3 m so the whole bucket
 sweep fits inside its 5.55 m width. The urban strip grade is the sidewalk slab
-top (~1.10 m): `ExcavationArea.position.y = 1.1`, with the 2.5 m trench bottom
-near -1.4 m. Building plinth visuals (`BuildingPlinths` MultiMesh, 378 ground-
+top (~1.10 m): `ExcavationArea.position.y = 1.1`, with the initial soil level
+across the whole strip. Building plinth visuals (`BuildingPlinths` MultiMesh, 378 ground-
 floor skirt instances) are mirrored by a generated `BuildingPlinthsCollision`
 StaticBody3D with one `CollisionShape3D` per instance sharing 38 BoxShapes;
 the collider's transform carries the plinth rotation and the box carries the

@@ -11,39 +11,34 @@ extends SceneTree
 # Tile x-seams in this stretch:
 #   15.09 | 18.10 | 21.07 | 23.97 | 26.72 | 28.75 | 32.08 | 35.41 | 39.47
 # Section profile (z): curb face 27.59 / yellow curb top 27.59-27.86 /
-#   riser 27.86 / flat tiles 27.86-29.59 / upper strip 30.6+ (kept).
+#   riser 27.86 / flat tiles 27.86-29.59 / upper strip 30.6+.
 # West end starts just inside seam 23.97 (tile 21.07-23.97 next to B6
-#   kept); east end stays on seam 39.47 (hedge107 tile kept).
+#   kept); the east extension clears through x87 and z33. Buildings stay.
 
 const GLB_PATH := "res://maps/urban/sidewalk_Straight_Splines_0.glb"
 const CUT_X0 := 23.96
-const CUT_X1 := 39.48
+const CUT_X1 := 87.0
 const CUT_Z0 := 27.45
-const CUT_Z1 := 29.65
+const CUT_Z1 := 33.0
 const OUT_PATH := "res://maps/urban/sidewalk_Straight_Splines_0_trimmed.res"
 
-# Clip a triangle (3 vertex indices) against half-space x<=limit
-# (keep_below) or x>=limit. Returns polygon of handles: int index or
-# [a:int, b:int, t:float] for an interpolated edge point.
-static func clip_x(tri: Array, verts: PackedVector3Array, limit: float,
-		keep_below: bool) -> Array:
+# Clip a polygon against one half-space, interpolating seam attributes.
+static func clip_axis(tri: Array, arrays: Array, axis: int, limit: float,
+		keep_below: bool, cache: Dictionary, next_idx: Array) -> Array:
 	var out: Array = []
 	var n: int = tri.size()
 	for i in n:
 		var ai: int = tri[i]
 		var bi: int = tri[(i + 1) % n]
-		var ax: float = verts[ai].x
-		var bx: float = verts[bi].x
+		var ax: float = arrays[Mesh.ARRAY_VERTEX][ai][axis]
+		var bx: float = arrays[Mesh.ARRAY_VERTEX][bi][axis]
 		var ina: bool = ax <= limit if keep_below else ax >= limit
 		var inb: bool = bx <= limit if keep_below else bx >= limit
 		if ina:
 			out.append(ai)
 		if ina != inb:
-			out.append([ai, bi, (limit - ax) / (bx - ax)])
+			out.append(materialize(arrays, [ai, bi, (limit - ax) / (bx - ax)], cache, next_idx))
 	return out
-
-static func in_cut_band(v: Vector3) -> bool:
-	return v.z >= CUT_Z0 and v.z <= CUT_Z1
 
 # Materialize a handle into a vertex index, appending interpolated
 # attributes to every present array. stride: floats-per-vertex for
@@ -96,24 +91,30 @@ func _init() -> void:
 		var arrays: Array = mesh.surface_get_arrays(surf)
 		if surf == 0:
 			arrays = arrays.duplicate(true)
-			var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 			var idxs: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
 			var new_idx := PackedInt32Array()
 			var cache := {}
-			var next_idx := [verts.size()]
+			var next_idx := [arrays[Mesh.ARRAY_VERTEX].size()]
 			for t in range(0, idxs.size(), 3):
 				var tri := [idxs[t], idxs[t + 1], idxs[t + 2]]
-				var in_band := true
-				for vi in tri:
-					if not in_cut_band(verts[vi]):
-						in_band = false
-				if not in_band:
+				var a: Vector3 = arrays[Mesh.ARRAY_VERTEX][tri[0]]
+				var b: Vector3 = arrays[Mesh.ARRAY_VERTEX][tri[1]]
+				var c: Vector3 = arrays[Mesh.ARRAY_VERTEX][tri[2]]
+				if maxf(a.x, maxf(b.x, c.x)) <= CUT_X0 or minf(a.x, minf(b.x, c.x)) >= CUT_X1 \
+						or maxf(a.z, maxf(b.z, c.z)) <= CUT_Z0 or minf(a.z, minf(b.z, c.z)) >= CUT_Z1:
 					new_idx.append_array(tri)
 					kept += 1
 					continue
 				var parts: Array = []
-				for poly in [clip_x(tri, verts, CUT_X0, true),
-						clip_x(tri, verts, CUT_X1, false)]:
+				# Partition outside the rectangle; triangles crossing Z edges
+				# must be clipped too, not retained as an entire pavement slab.
+				var left := clip_axis(tri, arrays, 0, CUT_X0, true, cache, next_idx)
+				var remaining := clip_axis(tri, arrays, 0, CUT_X0, false, cache, next_idx)
+				var right := clip_axis(remaining, arrays, 0, CUT_X1, false, cache, next_idx)
+				remaining = clip_axis(remaining, arrays, 0, CUT_X1, true, cache, next_idx)
+				var south := clip_axis(remaining, arrays, 2, CUT_Z0, true, cache, next_idx)
+				var north := clip_axis(remaining, arrays, 2, CUT_Z1, false, cache, next_idx)
+				for poly in [left, right, south, north]:
 					for i in range(1, poly.size() - 1):
 						parts.append([poly[0], poly[i], poly[i + 1]])
 				if parts.is_empty():
@@ -123,7 +124,7 @@ func _init() -> void:
 					clipped += 1
 				for p in parts:
 					for h in p:
-						new_idx.append(materialize(arrays, h, cache, next_idx))
+						new_idx.append(h)
 				kept += 1
 			arrays[Mesh.ARRAY_INDEX] = new_idx
 		out_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
@@ -134,4 +135,5 @@ func _init() -> void:
 	print("tris kept:", kept, " removed:", removed, " clipped:", clipped)
 	var err := ResourceSaver.save(out_mesh, OUT_PATH)
 	print("save:", error_string(err), " -> ", OUT_PATH)
-	quit()
+	root.free()
+	quit(0 if err == OK else 1)
