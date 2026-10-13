@@ -61,3 +61,6 @@ godot/worldbuilding/**/*.zip
 
 # generated prop-grounding survey report
 godot/worldbuilding/urban/tests/_prop_grounding.json
+
+# Keep the 128 MB source sky locally; it exceeds GitHub's ordinary blob limit.
+/godot/worldbuilding/urban/maps/urban/UrbanCity/Textures/Tileable/Sky01.hdr
