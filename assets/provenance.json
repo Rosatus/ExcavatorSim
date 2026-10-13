@@ -101,12 +101,30 @@
     },
     {
       "source_path": "C:/code/x86-linux-debug/database/calibration.toml",
-      "destination_path": "tools/can_gateway/resources/qml_sy80u_calibration.toml",
+      "destination_path": "tools/can_gateway/config/calibration_sy80u.toml",
       "byte_size": 1676,
       "sha256": "8d51ad18169367023884500e6ed8141335afecb60869e6c2fd45bedf763c2749",
       "hash_mode": "raw",
       "relationship": "sy80u-reference-protocol-and-runtime-calibration",
       "imported_at": "2026-09-28"
+    },
+    {
+      "source_path": "C:/code/GuideSystem/services/can/models/SY135C_RT/dbc/can3.sy135c_RT.dbc",
+      "destination_path": "tools/can_gateway/resources/dbc/sy135c_rt_reference/can3.sy135c_RT.dbc",
+      "byte_size": 7024,
+      "sha256": "6a311a7c5ac2903737c152ef4b69a32901b2d8fa218e403b406ffb69234a053b",
+      "hash_mode": "raw",
+      "relationship": "owner-specified-sy155w-rootpilot-protocol-baseline",
+      "imported_at": "2026-10-12"
+    },
+    {
+      "source_path": "C:/code/GuideSystem/services/can/models/SY135C_RT/dbc/can4.sy135c_RT.dbc",
+      "destination_path": "tools/can_gateway/resources/dbc/sy135c_rt_reference/can4.sy135c_RT.dbc",
+      "byte_size": 4780,
+      "sha256": "3b32bde7a389f21483731771ed01d0fd2405493bb9535393ba29971d79dd4458",
+      "hash_mode": "raw",
+      "relationship": "owner-specified-sy155w-rootpilot-protocol-baseline",
+      "imported_at": "2026-10-12"
     }
   ],
   "generated_assets": [
@@ -680,6 +698,40 @@
       "license": "user-supplied-source-assets",
       "generated_at": "2026-09-21",
       "relationship": "sy155w-runtime-adaptation"
+    },
+    {
+      "destination_path": "tools/can_gateway/resources/dbc/sy155w/can3.sy155w.dbc",
+      "destination_sha256": "d0637a668194c15ac1ffc28e72d32614e9b0424fdcab6040fa12b6db203d3732",
+      "generator": {
+        "path": "tools/can_gateway/generate_sy155w_dbc.py",
+        "sha256": "3dcff7f0af72df268f4cd36ee87a7dc5a99d132f84552fc5bfc271be411145c8"
+      },
+      "inputs": [
+        {
+          "path": "tools/can_gateway/resources/dbc/sy135c_rt_reference/can3.sy135c_RT.dbc",
+          "sha256": "6a311a7c5ac2903737c152ef4b69a32901b2d8fa218e403b406ffb69234a053b"
+        }
+      ],
+      "license": "project-owner-approved-can-protocol-dbc",
+      "generated_at": "2026-10-12",
+      "relationship": "sy155w-rootpilot-second-boom-attitude-extension"
+    },
+    {
+      "destination_path": "tools/can_gateway/resources/dbc/sy155w/can4.sy155w.dbc",
+      "destination_sha256": "3b32bde7a389f21483731771ed01d0fd2405493bb9535393ba29971d79dd4458",
+      "generator": {
+        "path": "tools/can_gateway/generate_sy155w_dbc.py",
+        "sha256": "3dcff7f0af72df268f4cd36ee87a7dc5a99d132f84552fc5bfc271be411145c8"
+      },
+      "inputs": [
+        {
+          "path": "tools/can_gateway/resources/dbc/sy135c_rt_reference/can4.sy135c_RT.dbc",
+          "sha256": "3b32bde7a389f21483731771ed01d0fd2405493bb9535393ba29971d79dd4458"
+        }
+      ],
+      "license": "project-owner-approved-can-protocol-dbc",
+      "generated_at": "2026-10-12",
+      "relationship": "sy155w-rootpilot-second-boom-attitude-extension"
     }
   ],
   "conceptual_derivations": [

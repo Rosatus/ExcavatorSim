@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from calibration import (
     CalibrationError,
     invert_sensor2ang,
+    invert_two_boom_sensor2ang,
     main_antenna_enu,
     wire_body_angles,
 )
@@ -66,6 +67,7 @@ class QmlPoseProjection:
     wire_heading_deg: float
     satellite_status: int
     boom_swing_deg: float = 0.0  # Godot local +Y == QML local +Z == DBC SWING
+    boom2_joint_deg: float = 0.0
 
     def main_geodetic(self) -> tuple[float, float, float]:
         return enu_to_geodetic(self.main_antenna_enu_m)
@@ -101,6 +103,8 @@ class QmlCanMapper:
 
     def project(self, sample: TelemetrySample) -> QmlPoseProjection:
         required = {"chassis", "upper", "boom", "arm", "bucket"}
+        if self.profile.model_id == "sy155w":
+            required.add("boom2")
         missing = required.difference(sample.bodies)
         if missing:
             raise QmlMappingError(f"telemetry sample missing bodies: {sorted(missing)}")
@@ -124,14 +128,29 @@ class QmlCanMapper:
             neutral[1] + signs[1] * joint_delta_deg[1],
             neutral[2] + signs[2] * joint_delta_deg[2],
         )
-        boom_pitch, arm_pitch, bucket_pitch = invert_sensor2ang(
-            body_pitch,
-            qml_joints,
-            calibration,
+        inverse_policy = dict(
             mnq_range_deg=self.profile.bucket_mnq_range_deg,
             tolerance_deg=self.profile.bucket_tolerance_deg,
             forward_error_deg=self.profile.joint_forward_error_deg,
         )
+        boom2_joint = 0.0
+        boom2_pitch = 0.0
+        if self.profile.model_id == "sy155w":
+            boom2_joint = self.profile.boom2_neutral_qml_deg + joint_delta_deg[3]
+            boom_pitch, boom2_pitch, arm_pitch, bucket_pitch = invert_two_boom_sensor2ang(
+                body_pitch,
+                qml_joints,
+                boom2_joint,
+                calibration,
+                **inverse_policy,
+            )
+        else:
+            boom_pitch, arm_pitch, bucket_pitch = invert_sensor2ang(
+                body_pitch,
+                qml_joints,
+                calibration,
+                **inverse_policy,
+            )
 
         imu_rpy: dict[str, tuple[float, float, float]] = {
             "body": (wire_body_roll, wire_body_pitch, body_heading),
@@ -147,6 +166,9 @@ class QmlCanMapper:
         ):
             roll, _legacy_pitch, yaw = quat_to_yup_euler_deg(sample.bodies[link].quat_xyzw)
             imu_rpy[link] = (roll, reported_pitch, yaw)
+        if self.profile.model_id == "sy155w":
+            roll, _, yaw = quat_to_yup_euler_deg(sample.bodies["boom2"].quat_xyzw)
+            imu_rpy["boom2"] = (roll, boom2_pitch, yaw)
 
         slew_center_enu = godot_point_to_enu(upper.origin_m)
         main_enu = main_antenna_enu(slew_center_enu, exca, calibration)
@@ -171,6 +193,7 @@ class QmlCanMapper:
             wire_heading_deg=wire_heading,
             satellite_status=self.profile.satellite_status,
             boom_swing_deg=self._boom_swing(sample),
+            boom2_joint_deg=boom2_joint,
         )
         self._previous_tick_ms = sample.tick_ms
         self._previous_main_enu_m = main_enu
@@ -195,9 +218,12 @@ class QmlCanMapper:
         vu = (main_enu_m[2] - self._previous_main_enu_m[2]) * scale
         return ve, vn, vu, math.sqrt(ve * ve + vn * vn + vu * vu)
 
-    def _joint_deltas(self, sample: TelemetrySample) -> tuple[float, float, float]:
+    def _joint_deltas(self, sample: TelemetrySample) -> tuple[float, ...]:
         pairs = (("upper", "boom"), ("boom", "arm"), ("arm", "bucket"))
         neutral = self.profile.neutral_relation_deg[1:]
+        if self.profile.model_id == "sy155w":
+            pairs = (("upper", "boom"), ("boom2", "arm"), ("arm", "bucket"), ("boom", "boom2"))
+            neutral = (*neutral, self.profile.boom2_neutral_relation_deg)
         values = []
         for (parent, child), neutral_deg in zip(pairs, neutral, strict=True):
             relation = quat_multiply(
@@ -218,7 +244,7 @@ class QmlCanMapper:
                     f"off-axis quaternion={off_axis:.6g}"
                 )
             values.append(math.degrees(2.0 * math.atan2(delta[0], delta[3])))
-        return values[0], values[1], values[2]
+        return tuple(values)
 
     def _boom_swing(self, sample: TelemetrySample) -> float:
         if self.profile.model_id != "sy80u":

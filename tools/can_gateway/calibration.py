@@ -15,7 +15,7 @@ it is deliberately not part of this contract.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 Matrix3 = tuple[
@@ -62,6 +62,7 @@ class CalibrationParams:
     GO_Tx: float
     GO_Ty: float
     GO_Tz: float
+    pitch_error_IMU_Boom2: float | None = None
 
     @property
     def go_vehicle_m(self) -> Vector3:
@@ -154,11 +155,7 @@ def invert_sensor2ang(
     boom_phi, arm_phi, bucket_phi = qml_joint_deg
     boom_pitch = params.pitch_error_IMU_Boom - body_phi_pitch_deg - boom_phi
     arm_pitch = (
-        boom_pitch
-        - params.pitch_error_IMU_Boom
-        + params.pitch_error_IMU_Arm
-        + 180.0
-        - arm_phi
+        boom_pitch - params.pitch_error_IMU_Boom + params.pitch_error_IMU_Arm + 180.0 - arm_phi
     )
     mnq = invert_bucket_phi(
         bucket_phi,
@@ -166,9 +163,7 @@ def invert_sensor2ang(
         mnq_range_deg=mnq_range_deg,
         tolerance_deg=tolerance_deg,
     )
-    bucket_pitch = (
-        arm_pitch + params.pitch_error_IMU_Bkt - params.pitch_error_IMU_Arm - mnq
-    )
+    bucket_pitch = arm_pitch + params.pitch_error_IMU_Bkt - params.pitch_error_IMU_Arm - mnq
     roundtrip = sensor2ang_from_reported(
         body_phi_pitch_deg,
         boom_pitch,
@@ -182,6 +177,31 @@ def invert_sensor2ang(
     if max(errors) > forward_error_deg:
         raise CalibrationError(f"Sensor2Ang inverse forward error too large: {errors}")
     return boom_pitch, arm_pitch, bucket_pitch
+
+
+def invert_two_boom_sensor2ang(
+    body_pitch: float,
+    joints: tuple[float, float, float],
+    boom2_relative_deg: float,
+    params: CalibrationParams,
+    **policy: Any,
+) -> tuple[float, float, float, float]:
+    """SY135 sensor convention extended by one absolute boom IMU.
+
+    The second boom is the parent of the arm. Its pitch reports cumulative
+    boom + fold elevation; the first boom retains its own sensor reading.
+    """
+    if params.pitch_error_IMU_Boom2 is None:
+        raise CalibrationError("second boom calibration is missing")
+    boom, arm, bucket = joints
+    second, arm_pitch, bucket_pitch = invert_sensor2ang(
+        body_pitch,
+        (boom + boom2_relative_deg, arm, bucket),
+        replace(params, pitch_error_IMU_Boom=params.pitch_error_IMU_Boom2),
+        **policy,
+    )
+    first = params.pitch_error_IMU_Boom - body_pitch - boom
+    return first, second, arm_pitch, bucket_pitch
 
 
 def invert_bucket_phi(
@@ -260,6 +280,9 @@ def parse_calibration(document: dict[str, Any]) -> CalibrationParams:
         GO_Tx=_number(offset, "GO_Tx"),
         GO_Ty=_number(offset, "GO_Ty"),
         GO_Tz=_number(offset, "GO_Tz"),
+        pitch_error_IMU_Boom2=_number(component, "pitch_boom2")
+        if "pitch_boom2" in component
+        else None,
     )
 
 

@@ -1,0 +1,46 @@
+# 单位：length/offset 为 m，angle/imu_car/imu_component 为 degree。
+
+[meta]
+schema_version = 2
+
+[length]
+m_lMN = 0.4930
+m_lNQ = 0.2900
+m_lQK = 0.3750
+m_lMK = 0.4220
+m_lFQ = 2.4926
+m_lCF = 4.5736
+m_lQV = 1.2291
+bucketWidth = 0.9550
+
+[angle]
+m_angNQF = 4.8820
+m_angKQV = 108.4000
+
+[imu_car]
+roll = 1.0475
+pitch = -0.5500
+yaw = -0.2699
+
+[imu_component]
+pitch_boom = 0.4713
+pitch_boom2 = 0.4713
+pitch_arm = -0.1928
+pitch_bucket = 4.9748
+
+[offset]
+OC_Tx = 0.1424
+OC_Ty = 0.2048
+OC_Tz = -1.0747
+GO_Tx = -1.0958
+GO_Ty = 1.6517
+GO_Tz = 0.0000
+
+[slew_sensor]
+calibrated = false
+
+[swing_boom_sensor]
+calibrated = false
+
+[sensor]
+type = "RootPilotOEM"

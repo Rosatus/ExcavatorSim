@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import hashlib
 import math
 import sys
 import tempfile
+import tomllib
 import unittest
+from contextlib import chdir
 from pathlib import Path
 from unittest.mock import patch
 
@@ -75,18 +76,106 @@ def make_sample(
 
 
 class QmlProfileTest(unittest.TestCase):
-    def test_builtin_profile_is_bound_to_reference_fixture_bytes(self) -> None:
-        profile = load_qml_profile(BUILTIN_PROFILE)
-        actual = hashlib.sha256(profile.calibration_path.read_bytes()).hexdigest()
-        self.assertEqual(actual, profile.calibration_sha256)
-        self.assertEqual(actual, "47cab86524d35866a0fa4fd7490feb0ab8ca4a0645b89ddc29f6380fed421b56")
+    def test_shipped_calibrations_match_reference_schema(self) -> None:
+        reference_path = TOOLS_DIR.parents[1] / "assets" / "calibration" / "calibration.toml"
+        reference = tomllib.loads(reference_path.read_text(encoding="utf-8-sig"))
+        for model in ("sy135", "sy80u"):
+            with self.subTest(model=model):
+                path = TOOLS_DIR / "config" / f"calibration_{model}.toml"
+                document = tomllib.loads(path.read_text(encoding="utf-8-sig"))
+                self.assertEqual(document.keys(), reference.keys())
+                self.assertEqual(document["meta"], reference["meta"])
+                for table, fields in reference.items():
+                    self.assertEqual(document[table].keys(), fields.keys())
+                    for key, value in fields.items():
+                        self.assertIs(type(document[table][key]), type(value), f"{table}.{key}")
 
-    def test_calibration_override_fails_closed_on_hash_mismatch(self) -> None:
+    def test_builtin_profiles_use_per_model_config_files(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, chdir(directory):
+            for model in ("sy135", "sy80u", "sy155w"):
+                with self.subTest(model=model):
+                    profile = load_qml_profile(f"builtin:qml-{model}-ground-truth")
+                    self.assertEqual(
+                        profile.calibration_path,
+                        TOOLS_DIR / "config" / f"calibration_{model}.toml",
+                    )
+                    self.assertEqual(profile.model_id, model)
+
+    def test_edited_override_accepts_bom_extra_fields_and_no_hash(self) -> None:
+        original = load_qml_profile(BUILTIN_PROFILE).calibration_path.read_text(encoding="utf-8")
         with tempfile.TemporaryDirectory() as directory:
             changed = Path(directory) / "calibration.toml"
-            changed.write_text("[angle]\nm_angKQV = 1\n", encoding="utf-8")
-            with self.assertRaisesRegex(QmlProfileError, "SHA-256 mismatch"):
-                load_qml_profile(BUILTIN_PROFILE, changed)
+            changed.write_text(
+                original.replace("pitch_boom = 0.4713", "pitch_boom = 2.4713")
+                .replace("[angle]", "[angle]\nm_angDMX = 49.51667"),
+                encoding="utf-8-sig",
+            )
+            profile = load_qml_profile(BUILTIN_PROFILE, changed)
+            self.assertEqual(profile.calibration.pitch_error_IMU_Boom, 2.4713)
+            self.assertEqual(profile.calibration_path, changed.resolve())
+
+    def test_invalid_calibration_still_fails_closed(self) -> None:
+        original = load_qml_profile(BUILTIN_PROFILE).calibration_path.read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as directory:
+            changed = Path(directory) / "calibration.toml"
+            for text, message in (
+                ("[angle]\nm_angKQV = 1\n", "missing calibration table"),
+                (original.replace("pitch_boom = 0.4713", "pitch_boom = nan"), "must be finite"),
+                (original.replace("m_lQK = 0.3750", "m_lQK = -1"), "must be positive"),
+                (original.replace("pitch_boom = 0.4713", "pitch_boom = true"), "must be numeric"),
+                ("[angle", "invalid QML calibration"),
+            ):
+                with self.subTest(message=message):
+                    changed.write_text(text, encoding="utf-8")
+                    with self.assertRaisesRegex(QmlProfileError, message):
+                        load_qml_profile(BUILTIN_PROFILE, changed)
+
+    def test_frozen_startup_reads_config_beside_executable_on_each_restart(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = root / "config"
+            config.mkdir()
+            for model in ("sy135", "sy80u"):
+                source = TOOLS_DIR / "config" / f"calibration_{model}.toml"
+                (config / source.name).write_bytes(source.read_bytes())
+            with (
+                patch("qml_profile.sys.frozen", True, create=True),
+                patch("qml_profile.sys.executable", str(root / "gateway.exe")),
+                patch("qml_profile.resource_root", return_value=TOOLS_DIR / "resources"),
+                patch("gateway.run", return_value=0) as run,
+            ):
+                for model, previous in (("sy135", "0.4713"), ("sy80u", "-0.7980")):
+                    with self.subTest(model=model):
+                        self.assertEqual(gateway_main(["--model", model]), 0)
+                        old_mapper = run.call_args.args[1]
+                        calibration = config / f"calibration_{model}.toml"
+                        calibration.write_text(
+                            calibration.read_text(encoding="utf-8").replace(
+                                f"pitch_boom = {previous}", "pitch_boom = 2.5"
+                            ),
+                            encoding="utf-8",
+                        )
+                        self.assertNotEqual(
+                            old_mapper.profile.calibration.pitch_error_IMU_Boom, 2.5
+                        )
+                        self.assertEqual(gateway_main(["--model", model]), 0)
+                        new_mapper = run.call_args.args[1]
+                        self.assertEqual(new_mapper.profile.calibration.pitch_error_IMU_Boom, 2.5)
+                        self.assertEqual(new_mapper.profile.calibration_path, calibration.resolve())
+                        self.assertAlmostEqual(
+                            new_mapper.project(make_sample()).imu_rpy_deg["boom"][1], -32.5
+                        )
+
+    def test_missing_external_config_has_no_bundled_fallback(self) -> None:
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch("qml_profile.sys.frozen", True, create=True),
+            patch("qml_profile.sys.executable", str(Path(directory) / "gateway.exe")),
+            patch("qml_profile.resource_root", return_value=TOOLS_DIR / "resources"),
+            patch("gateway.run") as run,
+        ):
+            self.assertEqual(gateway_main([]), 1)
+            run.assert_not_called()
 
     def test_wrong_model_and_frame_contract_fail_closed(self) -> None:
         builtin = load_qml_profile(BUILTIN_PROFILE)

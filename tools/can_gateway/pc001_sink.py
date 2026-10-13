@@ -119,12 +119,8 @@ class TcpPc001Sink:
                 dropped_disconnect=self._dropped_disconnect,
             )
 
-    def append(
-        self, can_id: int, payload: bytes, channel: CanChannel = "ch0"
-    ) -> None:
-        self.submit(
-            can_id, payload, channel=channel, source="unknown", family="unknown"
-        )
+    def append(self, can_id: int, payload: bytes, channel: CanChannel = "ch0") -> None:
+        self.submit(can_id, payload, channel=channel, source="unknown", family="unknown")
 
     def submit(
         self,
@@ -135,29 +131,32 @@ class TcpPc001Sink:
         source: str,
         family: str,
         is_extended: bool | None = None,
+        fragments: tuple[bytes, ...] = (),
     ) -> None:
         raw_id = can_id & 0x1FFFFFFF
         extended = bool(can_id & 0x80000000) or raw_id > 0x7FF
         if is_extended is not None:
             extended = is_extended
         transport_id = raw_id | (0x80000000 if extended else 0)
-        frame = pack_can_frame(transport_id, payload)
+        payloads = fragments or (payload,)
+        frames = [pack_can_frame(transport_id, part) for part in payloads]
         with self._state:
             if self._closing or self._client is None:
-                self._dropped_no_client += 1
+                self._dropped_no_client += len(frames)
                 return
-            if len(self._pending) >= self._queue_capacity:
-                self._dropped_queue_full += 1
+            if len(self._pending) + len(frames) > self._queue_capacity:
+                self._dropped_queue_full += len(frames)
                 return
-            self._pending.append(
+            self._pending.extend(
                 _PendingFrame(
                     frame + CHANNEL_STRUCT.pack(channel_number(channel)),
                     source,
                     family,
                     raw_id,
                     extended,
-                    bytes(payload),
+                    bytes(part),
                 )
+                for frame, part in zip(frames, payloads, strict=True)
             )
             self._state.notify_all()
 

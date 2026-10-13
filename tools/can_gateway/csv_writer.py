@@ -44,8 +44,8 @@ class CanapeCsvWriter:
         return self._row_count
 
     def append(self, can_id: int, payload: bytes, channel: CanChannel = "ch0") -> None:
-        if len(payload) != 8:
-            raise ValueError(f"CAN payload must be 8 bytes, got {len(payload)}")
+        if len(payload) > 8:
+            raise ValueError(f"CAN payload must be at most 8 bytes, got {len(payload)}")
         extended = can_id > 0x7FF
         now = time.localtime()
         milliseconds = int(time.time() * 1000) % 1000
@@ -62,7 +62,7 @@ class CanapeCsvWriter:
                 f"0x{can_id:08X}" if extended else f"0x{can_id:03X}",
                 "数据帧",
                 "扩展帧" if extended else "标准帧",
-                "0x08",
+                f"0x{len(payload):02X}",
                 "x| " + payload.hex(" ").upper(),
             ]
         )

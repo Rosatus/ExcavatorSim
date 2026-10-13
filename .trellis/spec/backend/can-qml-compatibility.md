@@ -2,21 +2,23 @@
 
 ## 1. Scope And Trigger
 
-This contract applies when Godot launches `tools/can_gateway/gateway.py` with
-`--compat-profile`. QML and its C++ protocol/kinematics implementation are the
-immutable semantic authority. Godot remains the simulation authority and the
-Python gateway projects Godot truth into the CAN fields that the QML call path
-actually consumes. Without a compatibility profile, the legacy gateway path
-must remain byte-compatible.
+This contract applies to the SY135/SY80U/SY155W built-in profiles selected by default
+and explicit `--compat-profile` launches of `tools/can_gateway/gateway.py`.
+QML and its C++ protocol/kinematics implementation are the immutable semantic
+authority. Godot remains the simulation authority and the Python gateway
+projects Godot truth into the CAN fields that the QML call path actually consumes.
+Models without a built-in or explicit profile retain the byte-compatible legacy
+path.
 
 ## 2. Public Interfaces And Signatures
 
-- `--compat-profile PATH|builtin:qml-sy135-ground-truth` selects a strict TOML
-  mapping profile. `--qml-calibration PATH` may replace only the referenced
-  calibration bytes.
+- `--compat-profile PATH|builtin:qml-{sy135,sy80u,sy155w}-ground-truth` selects a strict
+  TOML mapping profile; SY135/SY80U/SY155W select their built-in profile by default.
+  `--qml-calibration PATH` explicitly overrides the calibration file.
 - `load_qml_profile(...)` validates version, target, model, frame declarations,
-  finite numeric values, ranges and the calibration SHA-256 before any UDP or
-  CAN transport is opened.
+  required calibration fields, finite numeric values and positive lengths before
+  any UDP or CAN transport is opened. Calibration has no hash binding, allowing
+  operators to replace GuideSystem-compatible TOML without regenerating profiles.
 - `QmlCanMapper.project(MachineState)` returns the body IMU fields, work-equipment
   fields, GNSS A/B fields and RTK status for one strictly increasing physics
   tick.
@@ -35,6 +37,24 @@ must remain byte-compatible.
   header uint16 to model identity (1=SY135, 2=SY80U). CTNC/CTNK remain v1.
   Gateway accepts legacy CTN1 v1 using its CLI model; v2 selects a matching
   codec/profile per sample. Unknown model IDs are rejected.
+- SY155W uses model ID 3 and CTN1 v3 (204 bytes), appending boom2 after the
+  five existing pose records and before the unchanged scalar tail. Versions
+  1/2 retain their 176-byte layout; v3 requires model 3 and vice versa.
+  Its isolated DBC derives from owner-specified SY135C_RT can3/can4 snapshots.
+  Body/boom/arm/bucket IDs are 18F00000/18F10000/18F20000/18F30000; extra
+  boom2 is18F40000. Signed LE Roll/Pitch at0.01deg, unsigned Yaw, zero offset,
+  valid zero readings, channel3/DLC8. Parser negates Pitch only. Second-boom
+  pitch is cumulative boom+fold; arm is relative to boom2. Circular angles wrap.
+  GNSS09F80230 gives equipment heading in radians and speed;09F80530 uses
+  eight classic-CAN fragments1..8 carrying51 BE bytes in a virtual64-byte DBC
+  buffer. First header01/33, last fourFF padding, no transfer-ID bits. can4 maps
+  to ch2. No old slew/A000..A900 output for155W. SocketCAN coalesces whole
+  transfers and drops unsent remainder on congestion; PC001 queues whole groups.
+  Zero/calibration conventions retain the requested135 physical mapping while
+  RT DBC owns bytes. Other model bytes remain unchanged.
+  The default neutral XTR13/GB12 tip ray defines bucket alignment; independent
+  attachment articulation is outside this protocol. Receiver implementation
+  of the extra IMU is required; sender tests do not imply receiver GUI acceptance.
 - SY135 NEO is a visual variant: Godot publishes it as wire model 1 (SY135),
   using the existing SY135 profile and DBC. SY135/NEO switches must preserve
   the gateway model, PC001 socket and completed handshake.
@@ -74,20 +94,27 @@ must remain byte-compatible.
 - Raw CAN IDs above `0x7ff` are packed with `CAN_EFF_FLAG`; standard IDs such as
   travel `0x256` remain standard. Already flagged valid extended IDs are
   preserved.
-- The bundled calibration is byte-bound by SHA-256. Packaged applications must
-  include both profile and calibration resources and log the selected profile
-  version and calibration hash.
+- Each startup reads `config/calibration_sy135.toml` or
+  `config/calibration_sy80u.toml` or `config/calibration_sy155w.toml` beside the gateway executable (beside the script
+  in source runs), independent of the working directory and PyInstaller extraction
+  directory. Built-in profiles remain embedded; editable calibrations do not.
+  Custom profiles resolve `calibration_file` relative to their own directory.
+  GuideSystem's `[angle]`, `[imu_car]`, `[imu_component]`, `[length]`, `[offset]`
+  schema accepts UTF-8 BOM and ignores extra fields. There is no runtime watcher
+  or missing-file fallback. Log the profile version, model and calibration path.
+  DBC hash enforcement and build/provenance hashes remain unchanged.
 
 ## 4. Rejection And Fallback Matrix
 
 | Condition | Required behavior |
 |---|---|
-| Profile/calibration missing, malformed, hash-mismatched or wrong model | Fail before opening transport |
-| Non-finite pose, origin, calibration or mount value | Reject the sample; emit no partial family |
+| Profile/calibration missing, malformed, invalid numeric values or wrong profile model | Fail before opening transport |
+| Non-finite pose or origin | Reject the sample; emit no partial family |
 | Off-axis joint rotation, gimbal singularity or unreachable bucket branch | Reject the sample with an actionable diagnostic |
 | Duplicate or decreasing physics tick | Reject the sample; do not reuse a tick-only cache |
 | Profile mapping fails at runtime | Drop that sample; never fall back to legacy projection |
-| No compatibility profile configured | Use the unchanged legacy projection and encoding path |
+| No explicit profile for SY135/SY80U/SY155W | Load the matching built-in profile and external per-model calibration |
+| Other model without a compatibility profile | Use the unchanged legacy projection and encoding path |
 
 ## 5. Examples
 
@@ -126,9 +153,13 @@ or work-equipment family.
 - Godot headless tests compare authoritative post-step transforms,
   presentation transforms, joint scalars and the emitted CTN1 packet for neutral
   and one positive checkpoint per joint.
-- Packaging verification builds the Windows onefile executable and starts it
-  with the bundled strict profile. The Python suite and focused Godot CAN E2E
-  tests must pass before completion.
+- `tests/test_qml_compat.py` covers per-model source/frozen config lookup,
+  explicit overrides, BOM/extra fields, restart adoption and invalid-file rejection.
+  `smoke_frozen_gateway.py` starts a Windows onefile package from a different
+  working directory, edits each model calibration in a temporary package copy and
+  verifies changed CAN payloads after restart. Both platform distributions require
+  all three config files. The Python suite and focused Godot CAN E2E tests must pass
+  before completion.
 
 ## 7. Common Wrong And Correct Patterns
 

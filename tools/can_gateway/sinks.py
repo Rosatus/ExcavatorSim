@@ -68,12 +68,11 @@ class _PendingSocketCanFrame:
     is_extended: bool
     payload: bytes
     generation: int | None = None
+    fragments: tuple[bytes, ...] = ()
 
 
 class FrameSink(Protocol):
-    def append(
-        self, can_id: int, payload: bytes, channel: CanChannel = "ch0"
-    ) -> None: ...
+    def append(self, can_id: int, payload: bytes, channel: CanChannel = "ch0") -> None: ...
 
     def close(self) -> None: ...
 
@@ -106,9 +105,7 @@ class CsvFrameSink:
     def path(self):
         return self._writer.path
 
-    def append(
-        self, can_id: int, payload: bytes, channel: CanChannel = "ch0"
-    ) -> None:
+    def append(self, can_id: int, payload: bytes, channel: CanChannel = "ch0") -> None:
         self._writer.append(can_id, payload, channel)
 
     def close(self) -> None:
@@ -155,9 +152,7 @@ class SocketCanSink:
     def set_outcome_observer(self, observer: Callable[[SocketCanDelta], None] | None) -> None:
         self._observer = observer
 
-    def append(
-        self, can_id: int, payload: bytes, channel: CanChannel = "ch0"
-    ) -> None:
+    def append(self, can_id: int, payload: bytes, channel: CanChannel = "ch0") -> None:
         self.submit(
             can_id,
             payload,
@@ -176,6 +171,7 @@ class SocketCanSink:
         family: str,
         generation: int | None = None,
         is_extended: bool | None = None,
+        fragments: tuple[bytes, ...] = (),
     ) -> None:
         del channel
         if self.last_send_error is not None:
@@ -192,6 +188,7 @@ class SocketCanSink:
             is_extended=extended,
             payload=bytes(payload),
             generation=generation,
+            fragments=fragments,
         )
         self._count(frame, "submitted")
         previous = self._pending.get(normalized_id)
@@ -216,18 +213,34 @@ class SocketCanSink:
             frame = self._pop_next()
             if frame is None:
                 break
-            attempts += 1
-            try:
-                transport_id = frame.can_id | (CAN_EFF_FLAG if frame.is_extended else 0)
-                self.sock.send(pack_can_frame(transport_id, frame.payload))
-            except OSError as exc:
-                if exc.errno in SOCKETCAN_CONGESTION_ERRNOS:
-                    self._count(frame, "congestion_dropped", reason="kernel_congestion")
+            # A multi-frame transfer is queued/coalesced as one value. Once
+            # started, finish its bounded group before another value can replace
+            # it. Congestion discards the remaining group; the next starts at1.
+            fragments = frame.fragments or (frame.payload,)
+            failed = False
+            for index, payload in enumerate(fragments):
+                attempts += 1
+                part = replace(frame, payload=payload, fragments=())
+                try:
+                    transport_id = frame.can_id | (CAN_EFF_FLAG if frame.is_extended else 0)
+                    self.sock.send(pack_can_frame(transport_id, payload))
+                except OSError as exc:
+                    if exc.errno in SOCKETCAN_CONGESTION_ERRNOS:
+                        self._count(part, "congestion_dropped", reason="kernel_congestion")
+                    else:
+                        self.last_send_error = exc
+                        self._count(part, "terminal_error", reason="send_failed")
+                    for remaining in fragments[index + 1 :]:
+                        self._count(
+                            replace(part, payload=remaining),
+                            "congestion_dropped",
+                            reason="incomplete_transfer",
+                        )
+                    failed = True
                     break
-                self.last_send_error = exc
-                self._count(frame, "terminal_error", reason="send_failed")
+                self._count(part, "sent")
+            if failed:
                 break
-            self._count(frame, "sent")
         return attempts
 
     def purge(
@@ -275,6 +288,10 @@ class SocketCanSink:
         *,
         reason: str = "",
     ) -> None:
+        if frame.fragments:
+            for payload in frame.fragments:
+                self._count(replace(frame, payload=payload, fragments=()), outcome, reason=reason)
+            return
         self._stats = replace(
             self._stats,
             **{outcome: getattr(self._stats, outcome) + 1},

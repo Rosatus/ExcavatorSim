@@ -50,6 +50,24 @@ class PackCanFrameTest(unittest.TestCase):
 
 
 class CsvFrameSinkTest(unittest.TestCase):
+    def test_records_actual_classic_can_dlc(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "out.csv"
+            sink = CsvFrameSink(CanapeCsvWriter(path))
+            try:
+                for size in (0, 2, 8):
+                    sink.append(0x18FFF000, bytes(range(size)))
+                with self.assertRaisesRegex(ValueError, "at most 8 bytes"):
+                    sink.append(0x18FFF000, bytes(9))
+            finally:
+                sink.close()
+            rows = path.read_text(encoding="utf-8-sig").splitlines()[1:]
+            self.assertEqual(sink.row_count, 3)
+            for row, size in zip(rows, (0, 2, 8), strict=True):
+                fields = row.split(",")
+                self.assertEqual(fields[8], f"0x{size:02X}")
+                self.assertEqual(fields[9], "x| " + bytes(range(size)).hex(" ").upper())
+
     def test_wraps_writer(self):
         with tempfile.TemporaryDirectory() as tmp:
             writer = CanapeCsvWriter(Path(tmp) / "out.csv")

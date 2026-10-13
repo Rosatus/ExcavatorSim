@@ -1,0 +1,47 @@
+[profile]
+version = 1
+target = "qml-guidance-3d"
+model_id = "sy155w"
+calibration_file = "calibration_sy155w.toml"
+
+[frames]
+body_imu = "upper"
+rtk_attitude = "upper"
+slew_center = "upper"
+
+[alignment]
+# SY155W source-local neutral: boom 58, fold -47, arm -99, bucket 97.
+# Bucket reference follows SY135's pivot-to-tip (-Z) convention. Default
+# XTR13/GB12 tip (0,-1.2760000309944153,0.668) adds -117.632550289 deg.
+# This expresses the default tool's tip ray, not its raw mesh pivot frame.
+boom_phi_neutral_deg = 58.0
+boom2_phi_neutral_deg = -47.0
+arm_phi_neutral_deg = 81.0
+bucket_phi_neutral_deg = 159.367449711
+boom_sign = 1.0
+arm_sign = 1.0
+bucket_sign = 1.0
+
+[neutral_relation]
+swing_deg = 0.0
+boom_deg = 58.0
+boom2_deg = -47.0
+arm_deg = -99.0
+bucket_deg = 97.0
+
+[bucket_inverse]
+min_mnq_deg = 0.0
+max_mnq_deg = 180.0
+tolerance_deg = 0.000001
+
+[gnss]
+# Vehicle frame is X right, Y forward, Z up. The reference UI identifies the
+# primary antenna as right and secondary as left. This synthetic one-metre
+# baseline is explicit/profile-bound until field mount geometry is supplied.
+vice_offset_vehicle_m = [-1.0, 0.0, 0.0]
+satellite_status = 4
+
+[tolerance]
+off_axis_quaternion = 0.0001
+gimbal_cosine = 0.000001
+joint_forward_error_deg = 0.00001

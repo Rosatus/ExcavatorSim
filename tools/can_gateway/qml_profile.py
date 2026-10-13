@@ -1,15 +1,7 @@
-"""Strict QML compatibility-profile loading.
-
-The reference QML repository is an offline oracle only. Runtime profiles and
-calibration bytes live with the gateway and are SHA-256 bound so a field
-calibration change cannot silently alter emitted CAN semantics. The calibration
-document itself is owned by `calibration.py`, which also owns every formula that
-consumes it; this module only binds a profile to those bytes.
-"""
+"""Load QML mapping profiles and editable per-model calibration TOML."""
 
 from __future__ import annotations
 
-import hashlib
 import math
 import sys
 import tomllib
@@ -32,7 +24,6 @@ class QmlCompatibilityProfile:
     version: int
     target: str
     model_id: str
-    calibration_sha256: str
     calibration: CalibrationParams
     neutral_qml_deg: tuple[float, float, float]
     joint_signs: tuple[float, float, float]
@@ -46,6 +37,8 @@ class QmlCompatibilityProfile:
     joint_forward_error_deg: float
     source_path: Path
     calibration_path: Path
+    boom2_neutral_relation_deg: float = 0.0
+    boom2_neutral_qml_deg: float = 0.0
 
 
 def resource_root() -> Path:
@@ -55,7 +48,15 @@ def resource_root() -> Path:
     return Path(__file__).resolve().parent / "resources"
 
 
+def calibration_config_root() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent / "config"
+    return Path(__file__).resolve().parent / "config"
+
+
 def resolve_profile_path(value: str | Path) -> Path:
+    if str(value) == "builtin:qml-sy155w-ground-truth":
+        return resource_root() / "qml_sy155w_ground_truth.toml"
     if str(value) == "builtin:qml-sy80u-ground-truth":
         return resource_root() / "qml_sy80u_ground_truth.toml"
     if str(value) == BUILTIN_PROFILE:
@@ -77,28 +78,27 @@ def load_qml_profile(
         raise QmlProfileError(f"unsupported profile version {version}")
     if target != "qml-guidance-3d":
         raise QmlProfileError(f"unsupported profile target {target!r}")
-    if model_id not in ("sy135", "sy80u"):
+    if model_id not in ("sy135", "sy80u", "sy155w"):
         raise QmlProfileError(f"unsupported QML model {model_id!r}")
 
-    expected_hash = _string(identity, "calibration_sha256").lower()
-    if len(expected_hash) != 64 or any(char not in "0123456789abcdef" for char in expected_hash):
-        raise QmlProfileError("profile.calibration_sha256 must be 64 lowercase hex characters")
     if calibration_override is None:
         calibration_name = _string(identity, "calibration_file")
-        calibration_path = (profile_path.parent / calibration_name).resolve()
+        calibration_root = (
+            calibration_config_root()
+            if str(profile_value).startswith("builtin:")
+            else profile_path.parent
+        )
+        calibration_path = (calibration_root / calibration_name).resolve()
     else:
         calibration_path = Path(calibration_override).expanduser().resolve()
     calibration_bytes = _read_bytes(calibration_path, "QML calibration")
-    actual_hash = hashlib.sha256(calibration_bytes).hexdigest()
-    if actual_hash != expected_hash:
-        raise QmlProfileError(
-            f"QML calibration SHA-256 mismatch: expected {expected_hash}, got {actual_hash}"
-        )
     try:
-        calibration_doc = tomllib.loads(calibration_bytes.decode("utf-8"))
+        calibration_doc = tomllib.loads(calibration_bytes.decode("utf-8-sig"))
         calibration = parse_calibration(calibration_doc)
     except (UnicodeDecodeError, tomllib.TOMLDecodeError, CalibrationError) as exc:
         raise QmlProfileError(f"invalid QML calibration {calibration_path}: {exc}") from exc
+    if model_id == "sy155w" and calibration.pitch_error_IMU_Boom2 is None:
+        raise QmlProfileError("SY155W calibration requires imu_component.pitch_boom2")
 
     frames = _table(profile_doc, "frames")
     required_frames = {"body_imu": "upper", "rtk_attitude": "upper", "slew_center": "upper"}
@@ -143,7 +143,6 @@ def load_qml_profile(
         version=version,
         target=target,
         model_id=model_id,
-        calibration_sha256=expected_hash,
         calibration=calibration,
         neutral_qml_deg=neutral,
         joint_signs=signs,
@@ -157,6 +156,12 @@ def load_qml_profile(
         joint_forward_error_deg=_positive(tolerance, "joint_forward_error_deg"),
         source_path=profile_path,
         calibration_path=calibration_path,
+        boom2_neutral_relation_deg=_number(neutral_relation, "boom2_deg")
+        if model_id == "sy155w"
+        else 0.0,
+        boom2_neutral_qml_deg=_number(alignment, "boom2_phi_neutral_deg")
+        if model_id == "sy155w"
+        else 0.0,
     )
 
 

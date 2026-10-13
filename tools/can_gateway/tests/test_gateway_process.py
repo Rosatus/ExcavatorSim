@@ -325,7 +325,7 @@ class GatewayGodotActivityProcessTest(unittest.TestCase):
                     # Malformed poses/scalars and finite RTK overflow must not
                     # terminate the owner or emit any part of the bad sample.
                     for offset, value in ((16, float("nan")), (44, float("inf")),
-                                          (36, 1e30), (160, float("nan"))):
+                                          (64, 1e30), (160, float("nan"))):
                         packet = bytearray(make_telemetry_packet(50))
                         struct.pack_into("<f", packet, offset, value)
                         sender.sendto(packet, ("127.0.0.1", udp_port))

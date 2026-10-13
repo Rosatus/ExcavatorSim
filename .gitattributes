@@ -1,7 +1,7 @@
 
 *.sh text eol=lf
 *.dbc -text
-tools/can_gateway/resources/qml_sy80u_calibration.toml -text
+tools/can_gateway/config/calibration_sy80u.toml -text
 
 # Sha-pinned generated artifacts must check out byte-identical on every host
 # (core.autocrlf=true would otherwise hand CRLF bytes to FileAccess.get_sha256).

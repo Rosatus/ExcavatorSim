@@ -17,7 +17,15 @@ from pathlib import Path
 from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from conventions import BODY_ORDER, PACKET_STRUCT, BodyPose, TelemetrySample, parse_packet
+from conventions import (
+    ARTICULATED_BODY_ORDER,
+    ARTICULATED_PACKET_STRUCT,
+    BODY_ORDER,
+    PACKET_STRUCT,
+    BodyPose,
+    TelemetrySample,
+    parse_packet,
+)
 from gateway import FrameScheduler, emit_frames, model_console, protocol_codec
 from qml_compat import QmlCanMapper, quat_inverse, quat_multiply
 from qml_profile import load_qml_profile
@@ -26,6 +34,10 @@ from test_qml_compat import qx, qy
 
 
 def sample(model="sy80u", tick=1000, joints=(35.0, -90.0, -50.0), side=0.0, body=(0.0, 0.0, 0.0)):
+    if model == "sy155w":
+        from test_sy155w import articulated_sample
+
+        return articulated_sample(tick=tick, body=body)
     pitch, roll, yaw = body
     half = math.radians(roll) / 2
     upper = quat_multiply(qy(yaw), quat_multiply(qx(pitch), (0, 0, math.sin(half), math.cos(half))))
@@ -40,10 +52,18 @@ def sample(model="sy80u", tick=1000, joints=(35.0, -90.0, -50.0), side=0.0, body
 
 
 def packet(s):
-    data = [0x314E5443, 2, 0, 1 if s.model_id == "sy135" else 2, s.tick_ms]
-    for name in BODY_ORDER:
+    articulated = s.model_id == "sy155w"
+    data = [
+        0x314E5443,
+        3 if articulated else 2,
+        0,
+        {"sy135": 1, "sy80u": 2, "sy155w": 3}[s.model_id],
+        s.tick_ms,
+    ]
+    for name in ARTICULATED_BODY_ORDER if articulated else BODY_ORDER:
         data.extend((*s.bodies[name].quat_xyzw, *s.bodies[name].origin_m))
-    return PACKET_STRUCT.pack(*data, s.swing_rad, s.track_left_mps, s.track_right_mps, 0, 0)
+    layout = ARTICULATED_PACKET_STRUCT if articulated else PACKET_STRUCT
+    return layout.pack(*data, s.swing_rad, s.track_left_mps, s.track_right_mps, 0, 0)
 
 
 class Capture:
@@ -285,7 +305,7 @@ class ModelSwitchProcessTest(unittest.TestCase):
                             self.assertLess(time.monotonic(), deadline)
                             time.sleep(0.02)
                         initial_135_imu = None
-                        for index, model in enumerate(("sy135", "sy80u", "sy135")):
+                        for index, model in enumerate(("sy135", "sy80u", "sy155w", "sy135")):
                             udp.sendto(
                                 packet(sample(model, 1000 + index * 1000)), ("127.0.0.1", udp_port)
                             )
@@ -317,10 +337,15 @@ class ModelSwitchProcessTest(unittest.TestCase):
                                     ("127.0.0.1", udp_port),
                                 )
                             frames = {}
-                            while len(frames) < (17 if model == "sy80u" else 16):
+                            gnss_parts = []
+                            received = 0
+                            while received < (
+                                15 if model == "sy155w" else (16 if model == "sy135" else 17)
+                            ):
                                 count = struct.unpack("<H", recv_exact(peer, 2))[0]
                                 raw = recv_exact(peer, count * 20)
                                 for offset in range(0, len(raw), 20):
+                                    received += 1
                                     can_id, length = struct.unpack_from("<IB", raw, offset)
                                     self.assertEqual(
                                         bool(can_id & 0x80000000), (can_id & 0x1FFFFFFF) != 0x256
@@ -328,24 +353,41 @@ class ModelSwitchProcessTest(unittest.TestCase):
                                     frames[can_id & 0x1FFFFFFF] = raw[
                                         offset + 8 : offset + 8 + length
                                     ]
-                            self.assertEqual(len(frames[0x18FFF000]), 2 if model == "sy80u" else 8)
+                                    if can_id & 0x1FFFFFFF == 0x09F80530:
+                                        gnss_parts.append(raw[offset + 8 : offset + 8 + length])
+                            if model != "sy155w":
+                                self.assertEqual(
+                                    len(frames[0x18FFF000]), 2 if model == "sy80u" else 8
+                                )
+                            else:
+                                self.assertNotIn(0x18FFF000, frames)
+                                self.assertNotIn(0x18FF3A00, frames)
+                                self.assertEqual(
+                                    [part[0] for part in gnss_parts], list(range(1, 9))
+                                )
+                                self.assertEqual(gnss_parts[0][1], 51)
+                                self.assertEqual(gnss_parts[-1][4:], b"\xff" * 4)
                             self.assertEqual(0x18FF3E00 in frames, model == "sy80u")
+                            self.assertEqual(0x18F40000 in frames, model == "sy155w")
                             if index == 0:
                                 initial_135_imu = frames[0x18FF3B00]
-                            elif index == 2:
+                            elif model == "sy135":
                                 self.assertEqual(frames[0x18FF3B00], initial_135_imu)
                             snapshot = request_json(base + "/api/v1/can-console")["console"]
                             row = next(
                                 row
                                 for row in snapshot["messages"]
-                                if row["message"]["frame_id"] == 0x18FF3A00
+                                if row["message"]["frame_id"]
+                                == (0x18F00000 if model == "sy155w" else 0x18FF3A00)
                             )
                             pitch = next(
                                 signal
                                 for signal in row["message"]["signals"]
                                 if signal["name"] == "Pitch_Angle"
                             )
-                            self.assertEqual(pitch["offset"], 0 if model == "sy80u" else -180)
+                            self.assertEqual(
+                                pitch["offset"], 0 if model in ("sy80u", "sy155w") else -180
+                            )
                             self.assertTrue(
                                 request_json(base + "/api/v1/status")["status"]["pc001_handshake"]
                             )

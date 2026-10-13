@@ -1,0 +1,137 @@
+VERSION ""
+
+
+NS_ :
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	CAT_DEF_
+	CAT_
+	FILTER
+	BA_DEF_DEF_
+	EV_DATA_
+	ENVVAR_DATA_
+	SGTYPE_
+	SGTYPE_VAL_
+	BA_DEF_SGTYPE_
+	BA_SGTYPE_
+	SIG_TYPE_REF_
+	VAL_TABLE_
+	SIG_GROUP_
+	SIG_VALTYPE_
+	SIGTYPE_VALTYPE_
+	BO_TX_BU_
+	BA_DEF_REL_
+	BA_REL_
+	BA_DEF_DEF_REL_
+	BU_SG_REL_
+	BU_EV_REL_
+	BU_BO_REL_
+	SG_MUL_VAL_
+
+BS_:
+
+BU_: IMU_BODY CONTROLLER IMU_BOOM IMU_ARM IMU_BUCKET
+
+
+BO_ 2565865472 MSG_18F00000: 8 IMU_BODY
+ SG_ Roll_Angle : 0|16@1- (0.01,0) [-180|180] "°"  CONTROLLER
+ SG_ Pitch_Angle : 16|16@1- (0.01,0) [-180|180] "°"  CONTROLLER
+ SG_ Yaw_Angle : 32|16@1+ (0.01,0) [0|360] "°"  CONTROLLER
+ SG_ Reserved_1 : 48|8@1+ (1,0) [0|255] ""  CONTROLLER
+ SG_ Reserved_2 : 56|8@1+ (1,0) [0|255] ""  CONTROLLER
+
+BO_ 2565865476 MSG_18F00004: 8 IMU_BODY
+ SG_ Angular_Velocity_1 : 0|16@1- (0.01,0) [-327|327] "°/s"  CONTROLLER
+ SG_ Angular_Acceleration_1 : 16|16@1- (0.01,0) [-327|327] "°/s²"  CONTROLLER
+ SG_ Angular_Velocity_2 : 32|16@1- (0.01,0) [-327|327] "°/s"  CONTROLLER
+ SG_ Angular_Acceleration_2 : 48|16@1- (0.01,0) [-327|327] "°/s²"  CONTROLLER
+
+BO_ 2565931008 MSG_18F10000: 8 IMU_BOOM
+ SG_ Roll_Angle : 0|16@1- (0.01,0) [-180|180] "°"  CONTROLLER
+ SG_ Pitch_Angle : 16|16@1- (0.01,0) [-180|180] "°"  CONTROLLER
+ SG_ Yaw_Angle : 32|16@1+ (0.01,0) [0|360] "°"  CONTROLLER
+ SG_ Reserved_1 : 48|8@1+ (1,0) [0|255] ""  CONTROLLER
+ SG_ Reserved_2 : 56|8@1+ (1,0) [0|255] ""  CONTROLLER
+
+BO_ 2565931012 MSG_18F10004: 8 IMU_BOOM
+ SG_ Angular_Velocity_1 : 0|16@1- (0.01,0) [-327|327] "°/s"  CONTROLLER
+ SG_ Angular_Acceleration_1 : 16|16@1- (0.01,0) [-327|327] "°/s²"  CONTROLLER
+ SG_ Angular_Velocity_2 : 32|16@1- (0.01,0) [-327|327] "°/s"  CONTROLLER
+ SG_ Angular_Acceleration_2 : 48|16@1- (0.01,0) [-327|327] "°/s²"  CONTROLLER
+
+BO_ 2565996544 MSG_18F20000: 8 IMU_ARM
+ SG_ Roll_Angle : 0|16@1- (0.01,0) [-180|180] "°"  CONTROLLER
+ SG_ Pitch_Angle : 16|16@1- (0.01,0) [-180|180] "°"  CONTROLLER
+ SG_ Yaw_Angle : 32|16@1+ (0.01,0) [0|360] "°"  CONTROLLER
+ SG_ Reserved_1 : 48|8@1+ (1,0) [0|255] ""  CONTROLLER
+ SG_ Reserved_2 : 56|8@1+ (1,0) [0|255] ""  CONTROLLER
+
+BO_ 2565996548 MSG_18F20004: 8 IMU_ARM
+ SG_ Angular_Velocity_1 : 0|16@1- (0.01,0) [-327|327] "°/s"  CONTROLLER
+ SG_ Angular_Acceleration_1 : 16|16@1- (0.01,0) [-327|327] "°/s²"  CONTROLLER
+ SG_ Angular_Velocity_2 : 32|16@1- (0.01,0) [-327|327] "°/s"  CONTROLLER
+ SG_ Angular_Acceleration_2 : 48|16@1- (0.01,0) [-327|327] "°/s²"  CONTROLLER
+
+BO_ 2566062080 MSG_18F30000: 8 IMU_BUCKET
+ SG_ Roll_Angle : 0|16@1- (0.01,0) [-180|180] "°"  CONTROLLER
+ SG_ Pitch_Angle : 16|16@1- (0.01,0) [-180|180] "°"  CONTROLLER
+ SG_ Yaw_Angle : 32|16@1+ (0.01,0) [0|360] "°"  CONTROLLER
+ SG_ Reserved_1 : 48|8@1+ (1,0) [0|255] ""  CONTROLLER
+ SG_ Reserved_2 : 56|8@1+ (1,0) [0|255] ""  CONTROLLER
+
+BO_ 2566062084 MSG_18F30004: 8 IMU_BUCKET
+ SG_ Angular_Velocity_1 : 0|16@1- (0.01,0) [-327|327] "°/s"  CONTROLLER
+ SG_ Angular_Acceleration_1 : 16|16@1- (0.01,0) [-327|327] "°/s²"  CONTROLLER
+ SG_ Angular_Velocity_2 : 32|16@1- (0.01,0) [-327|327] "°/s"  CONTROLLER
+ SG_ Angular_Acceleration_2 : 48|16@1- (0.01,0) [-327|327] "°/s²"  CONTROLLER
+
+
+
+
+CM_ BO_ 2565865472 "channel=can3;RootPilot SYD body IMU angular readings";
+CM_ SG_ 2565865472 Reserved_2 "Supplier field meaning is not yet defined";
+CM_ SG_ 2565865472 Reserved_1 "Supplier field meaning is not yet defined";
+CM_ SG_ 2565865472 Yaw_Angle "Yaw angle; normalized from the supplier's repeated Angular readings label";
+CM_ SG_ 2565865472 Pitch_Angle "Pitch angle; normalized from the supplier's repeated Angular readings label";
+CM_ SG_ 2565865472 Roll_Angle "Roll angle; normalized from the supplier's repeated Angular readings label";
+CM_ BO_ 2565865476 "channel=can3;RootPilot SYD body IMU angular velocity and acceleration";
+CM_ SG_ 2565865476 Angular_Acceleration_2 "Supplier axis is not yet defined";
+CM_ SG_ 2565865476 Angular_Velocity_2 "Supplier axis is not yet defined";
+CM_ SG_ 2565865476 Angular_Acceleration_1 "Supplier axis is not yet defined";
+CM_ SG_ 2565865476 Angular_Velocity_1 "Supplier axis is not yet defined";
+CM_ BO_ 2565931008 "channel=can3;RootPilot SYD boom IMU angular readings";
+CM_ SG_ 2565931008 Reserved_2 "Supplier field meaning is not yet defined";
+CM_ SG_ 2565931008 Reserved_1 "Supplier field meaning is not yet defined";
+CM_ SG_ 2565931008 Yaw_Angle "Yaw angle; normalized from the supplier's repeated Angular readings label";
+CM_ SG_ 2565931008 Pitch_Angle "Pitch angle; normalized from the supplier's repeated Angular readings label";
+CM_ SG_ 2565931008 Roll_Angle "Roll angle; normalized from the supplier's repeated Angular readings label";
+CM_ BO_ 2565931012 "channel=can3;RootPilot SYD boom IMU angular velocity and acceleration";
+CM_ SG_ 2565931012 Angular_Acceleration_2 "Supplier axis is not yet defined";
+CM_ SG_ 2565931012 Angular_Velocity_2 "Supplier axis is not yet defined";
+CM_ SG_ 2565931012 Angular_Acceleration_1 "Supplier axis is not yet defined";
+CM_ SG_ 2565931012 Angular_Velocity_1 "Supplier axis is not yet defined";
+CM_ BO_ 2565996544 "channel=can3;RootPilot SYD arm IMU angular readings";
+CM_ SG_ 2565996544 Reserved_2 "Supplier Length corrected from 56 to 8; field meaning is not yet defined";
+CM_ SG_ 2565996544 Reserved_1 "Supplier Length corrected from 48 to 8; field meaning is not yet defined";
+CM_ SG_ 2565996544 Yaw_Angle "Yaw angle; supplier Length corrected from 32 to 16";
+CM_ SG_ 2565996544 Pitch_Angle "Pitch angle";
+CM_ SG_ 2565996544 Roll_Angle "Roll angle; supplier Length corrected from 0 to 16";
+CM_ BO_ 2565996548 "channel=can3;RootPilot SYD arm IMU angular velocity and acceleration";
+CM_ SG_ 2565996548 Angular_Acceleration_2 "Supplier Length corrected from 48 to 16; axis is not yet defined";
+CM_ SG_ 2565996548 Angular_Velocity_2 "Supplier Length corrected from 32 to 16; axis is not yet defined";
+CM_ SG_ 2565996548 Angular_Acceleration_1 "Supplier axis is not yet defined";
+CM_ SG_ 2565996548 Angular_Velocity_1 "Supplier Length corrected from 0 to 16; axis is not yet defined";
+CM_ BO_ 2566062080 "channel=can3;RootPilot SYD bucket IMU angular readings";
+CM_ SG_ 2566062080 Reserved_2 "Supplier Length corrected from 56 to 8; field meaning is not yet defined";
+CM_ SG_ 2566062080 Reserved_1 "Supplier Length corrected from 48 to 8; field meaning is not yet defined";
+CM_ SG_ 2566062080 Yaw_Angle "Yaw angle; supplier Length corrected from 32 to 16";
+CM_ SG_ 2566062080 Pitch_Angle "Pitch angle";
+CM_ SG_ 2566062080 Roll_Angle "Roll angle; supplier Length corrected from 0 to 16";
+CM_ BO_ 2566062084 "channel=can3;RootPilot SYD bucket IMU angular velocity and acceleration";
+CM_ SG_ 2566062084 Angular_Acceleration_2 "Supplier Length corrected from 48 to 16; axis is not yet defined";
+CM_ SG_ 2566062084 Angular_Velocity_2 "Supplier Length corrected from 32 to 16; axis is not yet defined";
+CM_ SG_ 2566062084 Angular_Acceleration_1 "Supplier axis is not yet defined";
+CM_ SG_ 2566062084 Angular_Velocity_1 "Supplier Length corrected from 0 to 16; axis is not yet defined";

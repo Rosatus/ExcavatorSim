@@ -20,14 +20,17 @@ func _init() -> void:
 
 
 func _run() -> void:
-	if OS.get_environment("CAN_POSE_MODEL") == "sy80u":
-		model_id = "sy80u"
+	if OS.get_environment("CAN_POSE_MODEL") in ["sy80u", "sy155w"]:
+		model_id = OS.get_environment("CAN_POSE_MODEL")
 	await _capture_case("neutral", -1)
 	for joint_index in JOINT_NAMES.size():
 		await _capture_case("%s_positive" % JOINT_NAMES[joint_index], joint_index)
 	if model_id == "sy80u":
 		await _capture_case("swing_left", -1, 65.0)
 		await _capture_case("swing_right", -1, -51.0)
+	if model_id == "sy155w":
+		await _capture_case("fold_positive", -1, 10.0)
+		await _capture_case("fold_negative", -1, -30.0)
 	var output := OS.get_environment("CAN_POSE_OUTPUT")
 	if not output.is_empty():
 		var file := FileAccess.open(output, FileAccess.WRITE)
@@ -69,7 +72,8 @@ func _capture_case(label: String, joint_index: int, side_deg: float = 0.0) -> vo
 		await _drive_joint(chassis, runtime, joint_index)
 	if side_deg != 0.0:
 		var presentation := scene.get_node("MotionPresentation") as MotionPresentation
-		if not presentation.set_local_axis_angle_for_test("boom_swing", side_deg):
+		var axis_id := "boom_fold" if model_id == "sy155w" else "boom_swing"
+		if not presentation.set_local_axis_angle_for_test(axis_id, side_deg):
 			_fail("side swing could not be configured")
 	var snapshot := runtime.get_post_step_snapshot()
 	var bridge := root.get_node_or_null("CanTelemetryBridge")
@@ -85,7 +89,9 @@ func _capture_case(label: String, joint_index: int, side_deg: float = 0.0) -> vo
 	bridge.call("_resolve_once")
 	var packet: PackedByteArray = bridge.call("_build_packet", Time.get_ticks_msec())
 	if packet.size() > 8:
-		if packet[4] != 2 or packet.decode_u16(6) != (2 if model_id == "sy80u" else 1):
+		var expected_version := 3 if model_id == "sy155w" else 2
+		var expected_model := 3 if model_id == "sy155w" else (2 if model_id == "sy80u" else 1)
+		if packet[4] != expected_version or packet.decode_u16(6) != expected_model:
 			_fail("telemetry model/version does not match active presentation")
 	packets.append({"label": label, "model": model_id, "packet_hex": packet.hex_encode(), "side_deg": side_deg})
 	_assert_checkpoint(label, scene, snapshot, packet, side_deg == 0.0)
@@ -131,8 +137,9 @@ func _assert_checkpoint(
 	packet: PackedByteArray,
 	compare_authority: bool = true,
 ) -> void:
-	if packet.size() != 176:
-		_fail("%s: packet size %d != 176" % [label, packet.size()])
+	var expected_size := 204 if model_id == "sy155w" else 176
+	if packet.size() != expected_size:
+		_fail("%s: packet size %d != %d" % [label, packet.size(), expected_size])
 		return
 	var authoritative := {"base_link": snapshot.get("body_transform", Transform3D.IDENTITY)}
 	for value in snapshot.get("kinematic_frames", []):
@@ -144,27 +151,31 @@ func _assert_checkpoint(
 	buffer.big_endian = false
 	buffer.data_array = packet
 	buffer.seek(16)
-	for frame_name in FRAME_NAMES:
+	var frame_names := FRAME_NAMES.duplicate()
+	if model_id == "sy155w":
+		frame_names.append("boom_fold")
+	for frame_name in frame_names:
 		var packet_quat := Quaternion(
 			buffer.get_float(), buffer.get_float(), buffer.get_float(), buffer.get_float()
 		).normalized()
 		var packet_origin := Vector3(buffer.get_float(), buffer.get_float(), buffer.get_float())
 		packet_quats[frame_name] = packet_quat
-		var node := presentation.get_frame_node(frame_name) as Node3D
-		if node == null or not authoritative.has(frame_name):
+		var node := (presentation.get_local_axis_node(frame_name) if frame_name == "boom_fold"
+			else presentation.get_frame_node(frame_name)) as Node3D
+		if node == null or (frame_name != "boom_fold" and not authoritative.has(frame_name)):
 			_fail("%s: frame %s missing" % [label, frame_name])
 			continue
 		var visual_transform := node.global_transform
-		var truth_transform := authoritative[frame_name] as Transform3D
 		# Side swing is an existing presentation-local articulation layer.
-		if compare_authority:
+		if compare_authority and frame_name != "boom_fold":
+			var truth_transform := authoritative[frame_name] as Transform3D
 			_assert_transform_close(label, frame_name, visual_transform, truth_transform)
 		if packet_origin.distance_to(visual_transform.origin) > TRANSFORM_EPSILON:
 			_fail("%s: %s packet origin differs from presentation" % [label, frame_name])
 		var visual_quat := visual_transform.basis.orthonormalized().get_rotation_quaternion().normalized()
 		if absf(packet_quat.dot(visual_quat)) < 1.0 - TRANSFORM_EPSILON:
 			_fail("%s: %s packet quaternion differs from presentation" % [label, frame_name])
-	if label == "neutral":
+	if label == "neutral" and model_id != "sy155w":
 		_assert_qml_profile_neutral_relations(packet_quats)
 	var joint_values: Array[String] = []
 	for value in snapshot.get("joints", []):

@@ -206,6 +206,10 @@ func get_frame_node(frame_name: String) -> Node3D:
 	return _frame_nodes.get(frame_name) as Node3D
 
 
+func get_local_axis_node(axis_id: String) -> Node3D:
+	return _local_axis_nodes.get(axis_id) as Node3D
+
+
 func get_frame_visual_nodes(frame_name: String) -> Array[Node3D]:
 	var result: Array[Node3D] = []
 	if _asset_root == null or not is_instance_valid(_asset_root):

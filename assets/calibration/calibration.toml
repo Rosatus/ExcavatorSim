@@ -1,0 +1,64 @@
+# ICT calibration parameters
+# 单位：length/offset 为 m，angle/imu_car/imu_component 为 degree。
+# [length]
+# m_lMN: EC 固定连杆长度；m_lNQ: CD 固定连杆长度；m_lQK: DF 固定连杆长度；m_lMK: EF 固定连杆长度。
+# m_lFQ: LD 小臂长度；m_lCF: AL 大臂长度；m_lQV 为铲斗长 DM，等于属具长度 + 误差补偿；bucketWidth 为铲斗宽。
+# [angle]
+# m_angNQF: CDL 固定夹角；m_angKQV: FDM 固定夹角。
+# [imu_car]
+# roll: 车身 IMU 横滚角安装误差；pitch: 车身 IMU 俯仰角安装误差；yaw: 车身 IMU 航向角安装误差。
+# [imu_component]
+# pitch_boom: 动臂 IMU 俯仰角安装误差；pitch_arm: 斗杆 IMU 俯仰角安装误差；pitch_bucket: 铲斗 IMU 俯仰角安装误差。
+# [offset]
+# OC_Tx/OC_Ty/OC_Tz: 天线到车体原点 X/Y/Z 向偏移；GO_Tx/GO_Ty/GO_Tz: GNSS 到工作装置原点 X/Y/Z 向偏移。
+# [slew_sensor]
+# calibrated: 回转传感器零点标定状态（true/false）。
+# [swing_boom_sensor]
+# calibrated: 偏摆传感器零点标定状态（true/false）。
+# [sensor]
+# type: 传感器类型（RootPilotOEM 或 legacy）。
+
+[meta]
+schema_version = 2
+
+[length]
+m_lMN = 0.4930
+m_lNQ = 0.2900
+m_lQK = 0.3750
+m_lMK = 0.4220
+m_lFQ = 2.5294
+m_lCF = 4.6543
+m_lQV = 1.1927
+bucketWidth = 0.9550
+
+[angle]
+m_angNQF = 4.8820
+m_angKQV = 108.4000
+
+[imu_car]
+roll = 0.0575
+pitch = -0.4300
+yaw = -0.6676
+
+[imu_component]
+pitch_boom = -0.7980
+pitch_arm = 1.5965
+pitch_bucket = 9.1512
+
+[offset]
+OC_Tx = 0.1850
+OC_Ty = 0.9350
+OC_Tz = -1.1160
+GO_Tx = -0.1350
+GO_Ty = -0.6800
+GO_Tz = 0.0000
+
+[slew_sensor]
+calibrated = false
+
+[swing_boom_sensor]
+calibrated = false
+
+[sensor]
+type = "RootPilotOEM"
+

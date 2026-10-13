@@ -20,7 +20,7 @@ const PROTOCOL_VERSION := 1
 const TELEMETRY_VERSION := 2
 # SY135 NEO is a visual variant of SY135. Keep its wire identity identical so
 # skin switches preserve the gateway profile, PC001 socket and handshake.
-const TELEMETRY_MODELS := {"sy135": 1, "sy135neo": 1, "sy80u": 2}
+const TELEMETRY_MODELS := {"sy135": 1, "sy135neo": 1, "sy80u": 2, "sy155w": 3}
 const CMD_RECORD_START := 1
 const CMD_RECORD_STOP := 2
 const CMD_SHUTDOWN := 3
@@ -52,8 +52,7 @@ enum GatewayLifecycle { IDLE, STARTING, STOPPING, FAILED }
 @export var python_command := "python"
 ## Startup/legacy model. Each telemetry v2 packet selects the active rig.
 @export var model_id := "sy135"
-## QML is the CAN semantic authority; the gateway fails closed if this strict
-## profile or its SHA-bound calibration cannot be loaded.
+## QML is the CAN semantic authority; invalid profiles or calibration prevent startup.
 @export var compatibility_profile := "builtin:qml-sy135-ground-truth"
 @export_file("*.toml") var qml_calibration_path := ""
 
@@ -811,14 +810,18 @@ func _build_packet(tick_ms: int) -> PackedByteArray:
 	var header := StreamPeerBuffer.new()
 	header.big_endian = false
 	header.put_32(TELEMETRY_MAGIC)
-	header.put_8(TELEMETRY_VERSION)
+	header.put_8(3 if active_model == "sy155w" else TELEMETRY_VERSION)
 	header.put_8(0)
 	header.put_16(TELEMETRY_MODELS[active_model])
 	header.put_64(tick_ms)
 	_send_buffer.append_array(header.data_array)
 
-	for frame_name in FRAME_NAMES:
-		var node := _presentation.get_frame_node(frame_name) as Node3D
+	var frame_names := FRAME_NAMES.duplicate()
+	if active_model == "sy155w":
+		frame_names.append("boom_fold")
+	for frame_name in frame_names:
+		var node := (_presentation.get_local_axis_node(frame_name) if frame_name == "boom_fold"
+			else _presentation.get_frame_node(frame_name)) as Node3D
 		if node == null:
 			return PackedByteArray()
 		var transform := node.global_transform

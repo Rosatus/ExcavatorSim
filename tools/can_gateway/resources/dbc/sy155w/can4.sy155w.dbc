@@ -1,0 +1,109 @@
+VERSION ""
+
+
+NS_ :
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	CAT_DEF_
+	CAT_
+	FILTER
+	BA_DEF_DEF_
+	EV_DATA_
+	ENVVAR_DATA_
+	SGTYPE_
+	SGTYPE_VAL_
+	BA_DEF_SGTYPE_
+	BA_SGTYPE_
+	SIG_TYPE_REF_
+	VAL_TABLE_
+	SIG_GROUP_
+	SIG_VALTYPE_
+	SIGTYPE_VALTYPE_
+	BO_TX_BU_
+	BA_DEF_REL_
+	BA_REL_
+	BA_DEF_DEF_REL_
+	BU_SG_REL_
+	BU_EV_REL_
+	BU_BO_REL_
+	SG_MUL_VAL_
+
+BS_:
+
+BU_: GNSS_Receiver Controller
+
+
+BO_ 2314732080 MSG_09F80230: 8 GNSS_Receiver
+ SG_ Sequence_ID : 0|8@1+ (1,0) [0|255] "/"  Controller
+ SG_ COG_Reference : 8|2@1+ (1,0) [0|3] "/"  Controller
+ SG_ NMEA_Reserved_1 : 10|6@1+ (1,0) [0|63] "/"  Controller
+ SG_ Course_Over_Ground : 16|16@1+ (0.0001,0) [0|6.2831] "rad"  Controller
+ SG_ Speed_Over_Ground : 32|16@1+ (0.01,0) [0|655.32] "m/s"  Controller
+ SG_ NMEA_Reserved_2 : 48|8@1+ (1,0) [0|255] "/"  Controller
+ SG_ Sol_Status : 56|2@1+ (1,0) [0|3] "/"  Controller
+ SG_ Pos_Type : 58|6@1+ (1,0) [0|63] "/"  Controller
+
+BO_ 2314732848 N2K_129029_FastPacket: 64 GNSS_Receiver
+ SG_ Sequence_ID : 7|8@0+ (1,0) [0|255] "/"  Controller
+ SG_ Position_Date : 15|16@0+ (1,0) [0|65532] "days"  Controller
+ SG_ Position_Time : 31|32@0+ (0.0001,0) [0|86401] "s"  Controller
+ SG_ Latitude : 63|64@0- (1e-16,0) [-90|90] "deg"  Controller
+ SG_ Longitude : 127|64@0- (1e-16,0) [-180|180] "deg"  Controller
+ SG_ Altitude : 191|64@0- (1e-06,0) [-9223372036854.775|9223372036854.775] "m"  Controller
+ SG_ Type_of_System : 255|4@0+ (1,0) [0|15] "/"  Controller
+ SG_ Method_GNSS : 251|4@0+ (1,0) [0|15] "/"  Controller
+ SG_ Integrity : 263|2@0+ (1,0) [0|3] "/"  Controller
+ SG_ NMEA_Reserved : 261|6@0+ (1,0) [0|63] "/"  Controller
+ SG_ Number_of_SVs : 271|8@0+ (1,0) [0|252] "/"  Controller
+ SG_ HDOP : 279|16@0- (0.01,0) [-327.64|327.64] "/"  Controller
+ SG_ PDOP : 295|16@0- (0.01,0) [-327.64|327.64] "/"  Controller
+ SG_ Geoidal_Separation : 311|32@0- (0.01,0) [-21474836.48|21474836.47] "m"  Controller
+ SG_ Number_of_Reference_Stations : 343|8@0+ (1,0) [0|252] "/"  Controller
+ SG_ Reference_Station_Type_1 : 351|4@0+ (1,0) [0|15] "/"  Controller
+ SG_ Reference_Station_ID_1 : 347|12@0+ (1,0) [0|4095] "/"  Controller
+ SG_ Age_of_DGNSS_Corrections_1 : 367|16@0+ (0.01,0) [0|655.32] "s"  Controller
+ SG_ Heading_Standard_Deviation : 383|32@0+ (0.0001,0) [0|429496.7295] "/"  Controller
+
+BO_ 2565484798 MSG_00005802: 8 Controller
+ SG_ Diff_data : 0|64@1+ (1,0) [0|18446744073709551615] "/"  GNSS_Receiver
+
+
+
+
+CM_ BO_ 2314732080 "channel=can4;RootPilot NMEA 2000 COG/SOG rapid update";
+CM_ SG_ 2314732080 NMEA_Reserved_2 "Protocol value is 0xFF";
+CM_ SG_ 2314732080 Speed_Over_Ground "Speed over ground";
+CM_ SG_ 2314732080 Course_Over_Ground "Course over ground in radians";
+CM_ SG_ 2314732080 NMEA_Reserved_1 "Protocol reserved bits";
+CM_ SG_ 2314732080 Sequence_ID "255=No valid position fix; 253 and 254 are reserved";
+CM_ BO_ 2314732848 "channel=can4;RootPilot PGN 129029 assembled 51-byte big-endian payload in a zero-padded 64-byte virtual buffer";
+CM_ SG_ 2314732848 Heading_Standard_Deviation "Heading standard deviation";
+CM_ SG_ 2314732848 Age_of_DGNSS_Corrections_1 "Age of differential corrections";
+CM_ SG_ 2314732848 Reference_Station_ID_1 "Differential reference station ID";
+CM_ SG_ 2314732848 Number_of_Reference_Stations "Number of reference stations";
+CM_ SG_ 2314732848 Geoidal_Separation "Geoidal separation";
+CM_ SG_ 2314732848 PDOP "Position dilution of precision";
+CM_ SG_ 2314732848 HDOP "Horizontal dilution of precision";
+CM_ SG_ 2314732848 Number_of_SVs "Number of satellites used";
+CM_ SG_ 2314732848 NMEA_Reserved "Protocol value is all ones";
+CM_ SG_ 2314732848 Altitude "Altitude";
+CM_ SG_ 2314732848 Longitude "Longitude";
+CM_ SG_ 2314732848 Latitude "Latitude";
+CM_ SG_ 2314732848 Position_Time "Seconds since midnight";
+CM_ SG_ 2314732848 Position_Date "Days since 1970-01-01";
+CM_ SG_ 2314732848 Sequence_ID "255=No valid position fix; 253 and 254 are reserved";
+CM_ BO_ 2565484798 "channel=can4;RootPilot TR206 RTCM transport; one complete RTCM3 packet per transfer, up to 1784 bytes";
+CM_ SG_ 2565484798 Diff_data "Frame sequence, first-frame total frame count, RTCM payload; tail padded with 0xFF";
+
+
+
+VAL_ 2314732080 Pos_Type 50 "Narrow-lane fixed solution" ;
+VAL_ 2314732080 Sol_Status 0 "Solved" 1 "Insufficient observations" 2 "No convergence" 3 "Covariance trace exceeded" ;
+VAL_ 2314732080 COG_Reference 0 "True north" 1 "Magnetic north" 2 "Error" 3 "Null" ;
+VAL_ 2314732848 Reference_Station_Type_1 0 "GPS" 1 "GLONASS" 14 "Error" 15 "Null" ;
+VAL_ 2314732848 Integrity 0 "Not available" 1 "Safe" 2 "Caution" 3 "Unsafe" ;
+VAL_ 2314732848 Method_GNSS 0 "No GNSS" 1 "Single point" 2 "Pseudo-range differential" 4 "RTK fixed" 5 "RTK float" ;
+VAL_ 2314732848 Type_of_System 0 "GPS" 1 "GLONASS" 2 "GPS+GLONASS" 3 "GPS+SBAS" 4 "GPS+SBAS+GLONASS" 5 "All constellations" ;

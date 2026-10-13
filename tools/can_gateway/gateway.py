@@ -82,6 +82,7 @@ from gateway_web import DEFAULT_WEB_PORT, GatewayWebServer
 from pc001_sink import TcpPc001Sink
 from qml_compat import QmlCanMapper, QmlMappingError, QmlRtkState
 from qml_profile import QmlProfileError, load_qml_profile, resource_root
+from rootpilot import COG_ID, GNSS_ID, IMU_IDS, encode_gnss, encode_imu, gnss_fragments
 from sinks import CsvFrameSink, FrameSink, SocketCanDelta, SocketCanSink
 from vcan_setup import VcanSetupError, ensure_vcan_interface
 
@@ -110,7 +111,7 @@ _MODEL_CODECS: dict[str, DbcCodec] = {}
 
 
 def protocol_codec(model: str = DEFAULT_MODEL) -> DbcCodec:
-    if model == "sy80u":
+    if model in ("sy80u", "sy155w"):
         if model not in _MODEL_CODECS:
             _MODEL_CODECS[model] = load_protocol_codec(resource_root() / "dbc", model)
         return _MODEL_CODECS[model]
@@ -131,6 +132,42 @@ def append_frame(
     generation: int | None = None,
     is_extended: bool | None = None,
 ) -> None:
+    if can_id == GNSS_ID and len(payload) == 64:
+        fragments = gnss_fragments(payload)
+        if isinstance(sink, SocketCanSink):
+            sink.submit(
+                can_id,
+                fragments[0],
+                channel=channel,
+                source=source,
+                family=family,
+                generation=generation,
+                is_extended=is_extended,
+                fragments=fragments,
+            )
+        elif isinstance(sink, TcpPc001Sink):
+            sink.submit(
+                can_id,
+                fragments[0],
+                channel=channel,
+                source=source,
+                family=family,
+                is_extended=is_extended,
+                fragments=fragments,
+            )
+        else:
+            for fragment in fragments:
+                append_frame(
+                    sink,
+                    can_id,
+                    fragment,
+                    channel=channel,
+                    source=source,
+                    family=family,
+                    generation=generation,
+                    is_extended=is_extended,
+                )
+        return
     if isinstance(sink, SocketCanSink):
         sink.submit(
             can_id,
@@ -292,6 +329,14 @@ def simulation_rates(args: argparse.Namespace, model: str) -> dict[int, float]:
     }
     if model == "sy80u":
         rates[0x18FF3E00] = float(args.imu_hz)
+    if model == "sy155w":
+        rates = {
+            **{can_id: float(args.imu_hz) for can_id in IMU_IDS.values()},
+            COG_ID: float(args.rtk_hz),
+            GNSS_ID: float(args.rtk_hz),
+            0x256: float(args.travel_hz),
+            TIMED_CAN_ID: float(TIMED_CAN_FREQUENCY_HZ),
+        }
     return rates
 
 
@@ -303,15 +348,15 @@ def model_console(
         if getattr(sys, "frozen", False)
         else Path(__file__).resolve().parent / "dbc"
     )
-    model_subdir = "sy80u" if model == "sy80u" else ""
+    model_subdir = model if model in ("sy80u", "sy155w") else ""
     operator_roots = [resource_root() / "dbc" / model_subdir]
     adjacent_root = adjacent_root / model_subdir
     if getattr(sys, "frozen", False) or adjacent_root.is_dir():
         operator_roots.append(adjacent_root)
     operator_roots.extend(Path(path) for path in getattr(args, "dbc_dir", []))
     store = DbcConfigStore()
-    if model == "sy80u":
-        store = DbcConfigStore(store.path.parent / "sy80u" / store.path.name)
+    if model in ("sy80u", "sy155w"):
+        store = DbcConfigStore(store.path.parent / model / store.path.name)
     operator_dbc = OperatorDbcRuntime(operator_roots, store=store)
     can_console = CanConsoleRuntime(
         operator_dbc,
@@ -1318,7 +1363,11 @@ def emit_frames(
                 is_extended=is_extended,
             )
         if observer is not None:
-            observer(can_id, payload)
+            if can_id == GNSS_ID and len(payload) == 64:
+                for fragment in gnss_fragments(payload):
+                    observer(can_id, fragment)
+            else:
+                observer(can_id, payload)
 
     if scheduler.due("imu", tick):
         scheduler.advance("imu", tick)
@@ -1342,25 +1391,31 @@ def _prepare_frames(
         raise QmlMappingError("telemetry model does not match the selected CAN model")
     if qml_mapper is not None and qml_mapper.profile.model_id != model:
         raise QmlMappingError("projection profile does not match the selected CAN model")
-    if model == "sy80u" and qml_mapper is None:
-        raise QmlMappingError("SY80U requires its calibrated pose profile")
+    if model in ("sy80u", "sy155w") and qml_mapper is None:
+        raise QmlMappingError(f"{model} requires its calibrated pose profile")
     state = MachineState(sample, model=model)
     projection = qml_mapper.project(sample) if qml_mapper is not None else None
     tick = float(sample.tick_ms)
     pending: list[tuple[str, int, bool, CanChannel, bytes]] = []
 
     if scheduler.due("imu", tick):
-        for link in ("body", "boom", "arm", "bucket"):
+        links = ("body", "boom", "arm", "bucket")
+        if model == "sy155w":
+            links = (*links, "boom2")
+        for link in links:
             if projection is None:
                 roll, pitch, yaw = state.link_rpy(link)
             else:
                 roll, pitch, yaw = projection.imu_rpy_deg[link]
-            can_id = RUFINEN_IDS[link]
+            can_id = IMU_IDS[link] if model == "sy155w" else RUFINEN_IDS[link]
             definition = codec.unique_message_by_frame(can_id, is_extended=True)
+            slots = state.sensor_slots(roll, pitch, yaw)
             payload = (
-                encode_sy80u_imu(codec, can_id, (roll, pitch, yaw))
+                encode_imu(codec, can_id, (roll, pitch, yaw))
+                if model == "sy155w"
+                else encode_sy80u_imu(codec, can_id, (roll, pitch, yaw))
                 if model == "sy80u"
-                else encode_godot_imu(codec, can_id, state.sensor_slots(roll, pitch, yaw))
+                else encode_godot_imu(codec, can_id, slots)
             )
             pending.append(("imu", can_id, True, definition.channel, payload))
         if model == "sy80u":
@@ -1376,7 +1431,7 @@ def _prepare_frames(
                 )
             )
 
-    if scheduler.due("slew", tick):
+    if model != "sy155w" and scheduler.due("slew", tick):
         definition = codec.unique_message_by_frame(0x18FFF000, is_extended=True)
         # Round on the circular sensor lattice before strict physical-range
         # validation: tiny negative angles can round through 65536 back to zero.
@@ -1407,11 +1462,12 @@ def _prepare_frames(
     if scheduler.due("rtk", tick):
         rtk_state = state if projection is None else QmlRtkState(projection)
         satellite_status = 0 if projection is None else projection.satellite_status
-        for can_id, payload in encode_godot_rtk(
-            codec,
-            rtk_state,
-            satellite_status=satellite_status,
-        ).items():
+        rtk_frames = (
+            encode_gnss(codec, rtk_state, sample.tick_ms)
+            if model == "sy155w"
+            else encode_godot_rtk(codec, rtk_state, satellite_status=satellite_status)
+        )
+        for can_id, payload in rtk_frames.items():
             definition = codec.unique_message_by_frame(can_id, is_extended=True)
             pending.append(("rtk", can_id, True, definition.channel, payload))
 
@@ -1449,19 +1505,19 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--model",
-        choices=(*IMU_MOUNT_COMPENSATION_DEG, "sy80u"),
+        choices=(*IMU_MOUNT_COMPENSATION_DEG, "sy80u", "sy155w"),
         default=DEFAULT_MODEL,
         help="machine model selecting the IMU zero-mount compensation table",
     )
     parser.add_argument(
         "--compat-profile",
         default=None,
-        help="strict CAN semantic profile (for example builtin:qml-sy135-ground-truth)",
+        help="CAN semantic profile (defaults to the selected SY135/SY80U built-in profile)",
     )
     parser.add_argument(
         "--qml-calibration",
         default=None,
-        help="optional QML calibration TOML override; SHA-256 must match the selected profile",
+        help="calibration TOML override (default: per-model file in the adjacent config directory)",
     )
     parser.add_argument("--ack-port", type=int, default=29765, help="heartbeat destination port")
     parser.add_argument(
@@ -1513,8 +1569,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"SocketCAN interface ready: {args.interface}")
         return 0
 
-    if args.model == "sy80u" and not args.compat_profile:
-        args.compat_profile = "builtin:qml-sy80u-ground-truth"
+    if args.model in ("sy135", "sy80u", "sy155w") and not args.compat_profile:
+        args.compat_profile = f"builtin:qml-{args.model}-ground-truth"
     if args.qml_calibration and not args.compat_profile:
         print("--qml-calibration requires --compat-profile", file=sys.stderr)
         return 1
@@ -1536,7 +1592,7 @@ def main(argv: list[str] | None = None) -> int:
         print(
             "QML compatibility profile active: "
             f"version={profile.version} model={profile.model_id} "
-            f"calibration_sha256={profile.calibration_sha256}"
+            f"calibration={profile.calibration_path}"
         )
 
     if args.max_rows:
@@ -1593,7 +1649,9 @@ def run_with_injection(
         while writer.row_count < args.max_rows:
             tick_ms = int(time.time() * 1000.0 - start_ms) + 1000
             sender.sendto(
-                make_synthetic_packet(tick_ms, qml_compatible=qml_mapper is not None),
+                make_synthetic_packet(
+                    tick_ms, qml_compatible=qml_mapper is not None, model=args.model
+                ),
                 (args.host, args.port),
             )
             try:
@@ -1629,11 +1687,24 @@ def run_with_injection(
     return 0 if writer.row_count >= args.max_rows else 1
 
 
-def make_synthetic_packet(tick_ms: int, qml_compatible: bool = False) -> bytes:
+def make_synthetic_packet(
+    tick_ms: int, qml_compatible: bool = False, model: str = DEFAULT_MODEL
+) -> bytes:
     quat_identity = (0.0, 0.0, 0.0, 1.0)
-    parts = [struct.pack("<IBBHQ", PACKET_MAGIC, 1, 0, 0, tick_ms)]
+    parts = [
+        struct.pack(
+            "<IBBHQ",
+            PACKET_MAGIC,
+            3 if model == "sy155w" else 1,
+            0,
+            3 if model == "sy155w" else 0,
+            tick_ms,
+        )
+    ]
     neutral_x_deg = (0.0, 0.0, 35.0, -55.0, -105.0)
-    for index in range(5):
+    if model == "sy155w":
+        neutral_x_deg = (0.0, 0.0, 58.0, -88.0, 9.0, 11.0)
+    for index in range(len(neutral_x_deg)):
         origin = (float(index), 0.0, 0.0)
         quaternion = quat_identity
         if qml_compatible:

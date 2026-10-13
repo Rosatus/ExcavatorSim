@@ -35,9 +35,9 @@ func expected_matrix_capture_count() -> int:
 func configure_product_for_capture(
 	scene: Node3D, model_id: String, quality_profile: String
 ) -> Dictionary:
-	# CAN pose checkpoints also exercise SY80U; the visual release matrix above
+	# CAN pose checkpoints also exercise SY80U/SY155W; the visual release matrix above
 	# remains the existing two-model matrix.
-	if (not MODELS.has(model_id) and model_id != "sy80u") or not QUALITY_PROFILES.has(quality_profile):
+	if (not MODELS.has(model_id) and model_id not in ["sy80u", "sy155w"]) or not QUALITY_PROFILES.has(quality_profile):
 		return {"ok": false, "reason": "unsupported_model_or_quality"}
 	var nodes := _required_nodes(scene)
 	if not bool(nodes.get("ok", false)):

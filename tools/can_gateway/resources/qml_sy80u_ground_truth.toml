@@ -4,8 +4,7 @@
 version = 1
 target = "qml-guidance-3d"
 model_id = "sy80u"
-calibration_file = "qml_sy80u_calibration.toml"
-calibration_sha256 = "8d51ad18169367023884500e6ed8141335afecb60869e6c2fd45bedf763c2749"
+calibration_file = "calibration_sy80u.toml"
 
 [frames]
 body_imu = "upper"

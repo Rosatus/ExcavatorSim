@@ -2,8 +2,7 @@
 version = 1
 target = "qml-guidance-3d"
 model_id = "sy135"
-calibration_file = "qml_ground_truth_calibration.toml"
-calibration_sha256 = "47cab86524d35866a0fa4fd7490feb0ab8ca4a0645b89ddc29f6380fed421b56"
+calibration_file = "calibration_sy135.toml"
 
 [frames]
 body_imu = "upper"

@@ -17,11 +17,14 @@ from dataclasses import dataclass, field
 PACKET_MAGIC = 0x314E5443  # "CTN1"
 PACKET_VERSION = 1
 MODEL_PACKET_VERSION = 2
-PACKET_MODELS = {1: "sy135", 2: "sy80u"}
+ARTICULATED_PACKET_VERSION = 3
+PACKET_MODELS = {1: "sy135", 2: "sy80u", 3: "sy155w"}
 BODY_COUNT = 5
 BODY_ORDER = ("chassis", "upper", "boom", "arm", "bucket")
 LINK_BY_BODY = {"chassis": "body", "upper": "body", "boom": "boom", "arm": "arm", "bucket": "bucket"}
 PACKET_STRUCT = struct.Struct("<IBBHQ" + "4f3f" * BODY_COUNT + "5f")
+ARTICULATED_BODY_ORDER = (*BODY_ORDER, "boom2")
+ARTICULATED_PACKET_STRUCT = struct.Struct("<IBBHQ" + "4f3f" * 6 + "5f")
 TRAVEL_PRESSURE_MOVING = 9
 SPEED_EPSILON_MPS = 0.05
 
@@ -77,19 +80,25 @@ class TelemetrySample:
 
 
 def parse_packet(data: bytes) -> TelemetrySample | None:
-    if len(data) != PACKET_STRUCT.size:
+    if len(data) < 16:
         return None
-    values = PACKET_STRUCT.unpack(data)
+    articulated = data[4] == ARTICULATED_PACKET_VERSION
+    layout = ARTICULATED_PACKET_STRUCT if articulated else PACKET_STRUCT
+    if len(data) != layout.size:
+        return None
+    values = layout.unpack(data)
     magic, version, _flags = values[0], values[1], values[2]
-    if magic != PACKET_MAGIC or version not in (PACKET_VERSION, MODEL_PACKET_VERSION):
+    if magic != PACKET_MAGIC or version not in (PACKET_VERSION, MODEL_PACKET_VERSION, ARTICULATED_PACKET_VERSION):
         return None
-    model_id = PACKET_MODELS.get(values[3]) if version == MODEL_PACKET_VERSION else None
-    if version == MODEL_PACKET_VERSION and model_id is None:
+    model_id = PACKET_MODELS.get(values[3]) if version != PACKET_VERSION else None
+    if version != PACKET_VERSION and model_id is None:
+        return None
+    if articulated != (model_id == "sy155w"):
         return None
     tick_ms = values[4]
     bodies: dict[str, BodyPose] = {}
     offset = 5
-    for name in BODY_ORDER:
+    for name in ARTICULATED_BODY_ORDER if articulated else BODY_ORDER:
         quat = values[offset:offset + 4]
         origin = values[offset + 4:offset + 7]
         bodies[name] = BodyPose(quat_xyzw=quat, origin_m=origin)

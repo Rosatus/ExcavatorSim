@@ -33,6 +33,10 @@ SY80U_DBC_HASHES = {
     "can3.sy80c6y5lu.dbc": "b8fe11cf672dc020acecde957df4a286630aafcedf332cbd8fbab90b137ee6f5",
     "can4.sy80c6y5lu.dbc": "ccaa2675a953db326e4d7158843daf477e2891f5cd9f7b3b26f87c1500f93a5d",
 }
+SY155W_DBC_HASHES = {
+    "can3.sy155w.dbc": "d0637a668194c15ac1ffc28e72d32614e9b0424fdcab6040fa12b6db203d3732",
+    "can4.sy155w.dbc": "3b32bde7a389f21483731771ed01d0fd2405493bb9535393ba29971d79dd4458",
+}
 RTK_FRAME_IDS = tuple(0x0CFDA000 + offset * 0x100 for offset in range(10))
 IMU_ANGLE_FRAME_IDS = (0x18FF3A00, 0x18FF3B00, 0x18FF3C00, 0x18FF3D00)
 GPS_EPOCH_UNIX_S = 315_964_800.0
@@ -988,9 +992,11 @@ class OperatorDbcRuntime:
 
 def load_protocol_codec(bundled_root: Path, model: str = "sy135") -> DbcCodec:
     """Load only the approved bundled files and reject any protocol drift."""
-    hashes = SY80U_DBC_HASHES if model == "sy80u" else PROTOCOL_DBC_HASHES
-    if model == "sy80u":
-        bundled_root = bundled_root / "sy80u"
+    hashes = {"sy80u": SY80U_DBC_HASHES, "sy155w": SY155W_DBC_HASHES}.get(
+        model, PROTOCOL_DBC_HASHES
+    )
+    if model in ("sy80u", "sy155w"):
+        bundled_root = bundled_root / model
     for name, expected_hash in hashes.items():
         path = bundled_root / name
         try:
@@ -1009,7 +1015,11 @@ def load_protocol_codec(bundled_root: Path, model: str = "sy135") -> DbcCodec:
             "protocol_dbc_invalid", "approved protocol DBC failed to parse", status=500
         )
     codec = DbcCodec(catalog)
-    for frame_id in (*RTK_FRAME_IDS, *IMU_ANGLE_FRAME_IDS):
+    required = (*RTK_FRAME_IDS, *IMU_ANGLE_FRAME_IDS)
+    if model == "sy155w":
+        from rootpilot import COG_ID, GNSS_ID, IMU_IDS
+        required = (*IMU_IDS.values(), COG_ID, GNSS_ID)
+    for frame_id in required:
         codec.unique_message_by_frame(frame_id)
     return codec
 
