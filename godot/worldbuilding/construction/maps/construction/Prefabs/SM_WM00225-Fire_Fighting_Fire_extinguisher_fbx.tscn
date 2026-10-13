@@ -9,7 +9,7 @@ data = PackedVector3Array(0.082112, 0.012445, -0.106638, 0.082112, 0.614931, -0.
 [node name = "SM_WM00225-Fire_Fighting_Fire_extinguisher_fbx" instance = ExtResource("1_c67m3")]
 
 [node name="Mesh" parent="." index="0"]
-visibility_range_end = 110.0
+visibility_range_end = 400.0
 surface_material_override/0 = ExtResource("2_d1wt0")
 
 [node name="StaticBody" type="StaticBody3D" parent="." ]

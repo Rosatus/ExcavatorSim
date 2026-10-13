@@ -9,7 +9,7 @@ data = PackedVector3Array(-0.048786, 1.894603, 0.002536, -0.048823, 0.093876, 0.
 [node name = "SM_Scaffolding_Ladder" instance = ExtResource("1_ngry0")]
 
 [node name="Mesh" parent="." index="0"]
-visibility_range_end = 160.0
+visibility_range_end = 600.0
 surface_material_override/0 = ExtResource("2_bxgr4")
 
 [node name="StaticBody" type="StaticBody3D" parent="." ]

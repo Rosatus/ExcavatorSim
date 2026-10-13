@@ -9,7 +9,7 @@ data = PackedVector3Array(0.496366, 1.048634, 0.506250, 0.596483, 0.949127, 0.50
 [node name = "SM_MM00951_Wrapped_Cylinders_Palet" instance = ExtResource("1_c6p7b")]
 
 [node name="Mesh" parent="." index="0"]
-visibility_range_end = 160.0
+visibility_range_end = 600.0
 surface_material_override/0 = ExtResource("2_ds5yo")
 
 [node name="StaticBody" type="StaticBody3D" parent="." ]

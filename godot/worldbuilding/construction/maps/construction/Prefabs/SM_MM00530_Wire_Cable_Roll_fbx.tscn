@@ -9,7 +9,7 @@ data = PackedVector3Array(-0.224027, 0.671815, 0.535973, -0.223718, 0.670808, 0.
 [node name = "SM_MM00530_Wire_Cable_Roll_fbx" instance = ExtResource("1_bcecg")]
 
 [node name="Mesh" parent="." index="0"]
-visibility_range_end = 110.0
+visibility_range_end = 400.0
 surface_material_override/0 = ExtResource("2_dub80")
 
 [node name="StaticBody" type="StaticBody3D" parent="." ]

@@ -9,7 +9,7 @@ data = PackedVector3Array(0.087724, 1.334955, 0.031581, 0.087724, 1.366250, -0.0
 [node name = "SM_MM00933_Metal_Fencing_Support_Pillar" instance = ExtResource("1_cm71b")]
 
 [node name="Mesh" parent="." index="0"]
-visibility_range_end = 160.0
+visibility_range_end = 600.0
 surface_material_override/0 = ExtResource("2_b81wu")
 
 [node name="StaticBody" type="StaticBody3D" parent="." ]

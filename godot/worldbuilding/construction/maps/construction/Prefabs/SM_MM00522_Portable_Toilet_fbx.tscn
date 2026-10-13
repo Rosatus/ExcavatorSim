@@ -11,7 +11,7 @@ data = PackedVector3Array(0.609793, 0.015625, 0.664375, 0.609449, 2.317170, 0.66
 [node name = "SM_MM00522_Portable_Toilet_fbx" instance = ExtResource("1_cdbf7")]
 
 [node name="Mesh" parent="." index="0"]
-visibility_range_end = 160.0
+visibility_range_end = 600.0
 surface_material_override/0 = ExtResource("2_cs7ew")
 surface_material_override/1 = ExtResource("3_c3aca")
 surface_material_override/2 = ExtResource("4_djnn0")

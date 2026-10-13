@@ -9,7 +9,7 @@ data = PackedVector3Array(-1.175464, 0.773286, 0.933797, -1.210565, 0.738185, 0.
 [node name = "SM_MM00951_Wrapped_Square" instance = ExtResource("1_dhvwm")]
 
 [node name="Mesh" parent="." index="0"]
-visibility_range_end = 160.0
+visibility_range_end = 600.0
 surface_material_override/0 = ExtResource("2_ds5yo")
 
 [node name="StaticBody" type="StaticBody3D" parent="." ]

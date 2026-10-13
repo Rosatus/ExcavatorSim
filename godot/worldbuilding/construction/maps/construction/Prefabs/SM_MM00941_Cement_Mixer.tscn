@@ -9,7 +9,7 @@ data = PackedVector3Array(0.227091, 1.577909, 0.884884, 0.875000, 0.929609, 0.85
 [node name = "SM_MM00941_Cement_Mixer" instance = ExtResource("1_dydqc")]
 
 [node name="Mesh" parent="." index="0"]
-visibility_range_end = 160.0
+visibility_range_end = 600.0
 surface_material_override/0 = ExtResource("2_xx2of")
 
 [node name="StaticBody" type="StaticBody3D" parent="." ]

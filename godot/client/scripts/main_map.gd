@@ -33,6 +33,8 @@ func _enter_tree() -> void:
 		return
 	var map := packed.instantiate()
 	map.name = "StaticMap"
+	# Match the map workbench cameras; profile changes must not clip the site.
+	$VisualQualityController.minimum_camera_far_m = 1500.0
 	# Product Sky3D remains the single lighting owner; the workbench sky is preview-only.
 	var preview_sky := map.get_node_or_null("WorldEnvironment")
 	if preview_sky != null:

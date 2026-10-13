@@ -9,7 +9,7 @@ data = PackedVector3Array(0.743445, 0.683750, 0.305000, 0.826875, 0.618165, 0.22
 [node name = "SM_MM00534_Concrete_Block_fbx" instance = ExtResource("1_7tkwn")]
 
 [node name="Mesh" parent="." index="0"]
-visibility_range_end = 160.0
+visibility_range_end = 600.0
 surface_material_override/0 = ExtResource("2_djtlp")
 
 [node name="StaticBody" type="StaticBody3D" parent="." ]

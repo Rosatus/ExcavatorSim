@@ -9,7 +9,7 @@ data = PackedVector3Array(1.186088, 0.064310, -0.665458, 1.195313, 0.074063, -0.
 [node name = "SM_MM00940_Transport_Cubes" instance = ExtResource("1_befhd")]
 
 [node name="Mesh" parent="." index="0"]
-visibility_range_end = 160.0
+visibility_range_end = 600.0
 surface_material_override/0 = ExtResource("2_btmlx")
 
 [node name="StaticBody" type="StaticBody3D" parent="." ]

@@ -10,6 +10,8 @@ const PROFILES := {
 
 @export var profile := "balanced"
 @export var target_fps := 60
+## Large optional maps must retain their skyline across quality changes.
+var minimum_camera_far_m := 0.0
 
 var last_error := ""
 var _applied := false
@@ -39,7 +41,7 @@ func apply_profile(profile_name: String) -> bool:
 	profile = profile_name
 	var camera := get_node_or_null("../Camera3D") as CameraRig
 	if camera != null:
-		camera.far = float(settings["camera_far"])
+		camera.far = maxf(float(settings["camera_far"]), minimum_camera_far_m)
 		camera.set_quality_distance_for_test(float(settings["camera_far"]) * 0.1)
 	var effects := get_node_or_null("../SoilEffects") as SoilEffects
 	if effects != null:
@@ -75,7 +77,7 @@ func get_quality_snapshot() -> Dictionary:
 		"profile": profile,
 		"target_fps": target_fps,
 		"particles": int(settings.get("particles", 0)),
-		"camera_far": float(settings.get("camera_far", 0.0)),
+		"camera_far": maxf(float(settings.get("camera_far", 0.0)), minimum_camera_far_m),
 		"shadows": bool(settings.get("shadows", false)),
 		"site_cues": int(settings.get("site_cues", 0)),
 		"site_shadows": bool(settings.get("site_shadows", false)),

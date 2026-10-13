@@ -9,7 +9,7 @@ data = PackedVector3Array(1.048088, 0.970662, -0.854375, -0.041838, 0.970662, -0
 [node name = "SM_MM00929-MetalStorageBin_01" instance = ExtResource("1_chrns")]
 
 [node name="Mesh" parent="." index="0"]
-visibility_range_end = 110.0
+visibility_range_end = 400.0
 surface_material_override/0 = ExtResource("2_biyu1")
 
 [node name="StaticBody" type="StaticBody3D" parent="." ]

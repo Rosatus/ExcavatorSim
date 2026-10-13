@@ -10,7 +10,7 @@ data = PackedVector3Array(1.001325, 1.107457, 0.449801, 1.001325, 0.049576, 0.44
 [node name = "SM_MM00559_Shipping_Crate_fbx" instance = ExtResource("1_cibun")]
 
 [node name="Mesh" parent="." index="0"]
-visibility_range_end = 160.0
+visibility_range_end = 600.0
 surface_material_override/0 = ExtResource("2_cf0pd")
 surface_material_override/1 = ExtResource("3_dadyi")
 

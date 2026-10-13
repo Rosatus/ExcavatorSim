@@ -6,8 +6,8 @@ extends SceneTree
 ## Construction-Site.tscn inherits it without touching the big scene.
 ##
 ## Tiers by merged mesh AABB max dimension:
-##   < 1.2 m            -> 110 m
-##   1.2 m .. < 2.5 m   -> 160 m
+##   < 1.2 m            -> 400 m
+##   1.2 m .. < 2.5 m   -> 600 m
 ##   >= 2.5 m           -> untouched (structures, vehicles, pipes, beams)
 ##
 ## Usage:
@@ -17,8 +17,8 @@ extends SceneTree
 const PREFAB_DIR := "res://maps/construction/Prefabs"
 const TIER_SMALL := 1.2
 const TIER_MID := 2.5
-const RANGE_SMALL := 110.0
-const RANGE_MID := 160.0
+const RANGE_SMALL := 400.0
+const RANGE_MID := 600.0
 
 var apply := false
 
