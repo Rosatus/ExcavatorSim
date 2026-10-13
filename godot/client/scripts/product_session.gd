@@ -48,6 +48,14 @@ const SIMPLE_DIGGING_ASSIST_ONLY := 2
 var simple_digging_mode := SIMPLE_DIGGING_OFF
 var _simple_digging_pushed := false
 var simple_digging_enabled := false
+var offzone_soil_enabled := false
+
+
+func request_offzone_soil(enabled: bool) -> void:
+	offzone_soil_enabled = enabled
+	if _excavation != null:
+		_excavation.set_offzone_soil_enabled(enabled)
+
 
 var _presentation: MotionPresentation
 var _motion_client: MotionClient

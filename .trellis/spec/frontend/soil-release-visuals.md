@@ -91,6 +91,28 @@ on a receiving surface captured from the failing recorded-input replay.
 
 ## Visual events
 
+### Optional static-ground piles (2026-10-13)
+
+Urban/construction expose the default-off advanced `offzone_soil` preference.
+`VoxelExcavationAuthority` remains the single owner: confirmed outside dumping
+routes to `OffzoneSoilLayer` in bounded 100ms batches, otherwise to the existing
+export sink. Simple digging prohibits both. Failed pile admission retains stock.
+The sparse SDF layer uses world-aligned 0.125m samples, Transvoxel chunk meshes and
+derived static collision; namespaced `offzone` material mutations initialize only
+from deposits. Static support never creates native material. Deposited-only cutter
+paths disable original-grade cleanup. Jolt track/wheel queries recognize ready
+pile support. Generation teardown clears it; disabling preserves existing piles.
+
+Only exposed map ground receives piles (Terrain3D RID or urban ground subtree).
+The source column is freshly checked for obstructions. Mutable original voxel
+ownership is excluded, so cross-chunk fusion works but cross-work-zone spreading
+is deferred until foundation-change settlement exists. This is stable quasi-static
+soil, without continuous collapse after undercutting. Mesh/collision publication
+is bounded and may lag SDF commits. Empty-pile buffers are reclaimed after recuts.
+
+Focused tests: `offzone_soil_layer_test.gd`, `offzone_soil_maps_test.gd`, and
+`menu_preferences_test.gd`; actual SY135 support/driving is covered in both packs.
+
 One immutable `voxel-soil-release-event-v1` is published after the deposit commits.
 It includes `terrain_stable=true`, `release_committed=true`, process-local
 `published_usec`, frozen source/landing transforms, mass, volume and emission duration.

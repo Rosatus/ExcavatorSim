@@ -30,6 +30,7 @@ func run() -> void:
 		await process_frame
 		await physics_frame
 	var ui := scene.get_node("OperatorUI") as MotionOperatorUI
+	check(ui._offzone_soil_button.disabled, "training explains unavailable pile mode")
 	check(ui._feedback.is_muted() and ui._mute_audio_button.button_pressed, "fresh config defaults muted")
 	ui._mute_audio_button.button_pressed = false
 	ui._save_video_config(MotionOperatorUI.WINDOW_MODE_WINDOWED, 120)
@@ -60,6 +61,11 @@ func run() -> void:
 		await physics_frame
 	verify(scene, "map")
 	ui = scene.get_node("OperatorUI") as MotionOperatorUI
+	check(not ui._offzone_soil_button.disabled, "construction enables pile option")
+	ui._offzone_soil_button.button_pressed = true
+	ui.set_ui_theme_for_test("debug")
+	check(ui._offzone_soil_button.button_pressed, "theme preserves pile option")
+	ui = scene.get_node("OperatorUI") as MotionOperatorUI
 	ui._on_bucket_passthrough_toggled(true)
 	await physics_frame
 	scene.queue_free()
@@ -70,6 +76,7 @@ func run() -> void:
 	root.add_child(scene)
 	for i in 5:
 		await physics_frame
+	check(scene.get_node("ProductSession").offzone_soil_enabled and scene.get_node("TerrainRoot/ExcavationWorld").offzone_soil_enabled, "map reload preserves pile option")
 	check(scene.get_node("ProductSession").bucket_ground_mode == BucketGroundInteractionMode.PASSTHROUGH, "explicit bucket policy wins over map default")
 	scene.queue_free()
 	await process_frame

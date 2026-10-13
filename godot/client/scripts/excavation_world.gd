@@ -317,6 +317,15 @@ func set_bucket_ground_mode(value: String) -> bool:
 ## bucket never blocks cutting. Capacity already overflows into discarded
 ## mass (capacity_clipped), so cutting continues unbounded; the mode only
 ## needs to suppress dumping. Re-applied after every authority rebuild.
+var offzone_soil_enabled := false
+
+
+func set_offzone_soil_enabled(value: bool) -> void:
+	offzone_soil_enabled = value
+	if _voxel_authority != null:
+		_voxel_authority.set_offzone_enabled(value and get_node_or_null("../../StaticMap/Ground") != null)
+
+
 var simple_digging_enabled := false
 
 
@@ -1004,6 +1013,7 @@ func _ensure_voxel_authority() -> bool:
 	_voxel_authority.set_diagnostics_enabled(voxel_diagnostics_enabled)
 	_voxel_authority.performance_timing_enabled = performance_capture_enabled
 	_voxel_authority.set_dump_gate_enabled(not simple_digging_enabled)
+	_voxel_authority.set_offzone_enabled(offzone_soil_enabled and get_node_or_null("../../StaticMap/Ground") != null)
 	var capacity_override := TEST_BUCKET_CAPACITY_M3 if voxel_unlimited_bucket_for_testing else 0.0
 	return _voxel_authority.configure(
 		voxel_work_zone,

@@ -108,13 +108,15 @@ func stage_cut(cell_changes: Array[Dictionary], requested_mass_q: int, allow_ove
 		if remaining <= 0:
 			break
 		var coordinate := change.get("coordinate", Vector3i.ZERO) as Vector3i
-		var key := _key(coordinate)
+		var region := String(change.get("region_id", ""))
+		var key := _key(coordinate, region)
 		var existing := (_cells.get(key, {}) as Dictionary).duplicate(true)
 		if existing.is_empty():
 			var pre_volume := maxf(0.0, float(change.get("pre_fraction", 0.0)) * float(change.get("cell_volume_m3", 0.0)))
 			existing = {
 				"coordinate": coordinate,
-				"stable_mass_q": _mass_q(pre_volume),
+				"stable_mass_q": _mass_q(pre_volume) if region.is_empty() else 0,
+				"region_id": region,
 			}
 		var desired := mini(remaining, maxi(0, int(change.get("removed_mass_q", 0))))
 		var accepted := mini(desired, maxi(0, int(existing.get("stable_mass_q", 0))))
@@ -298,7 +300,7 @@ func stage_deposit(cell_changes: Array[Dictionary], requested_mass_q: int) -> Di
 		if remaining <= 0:
 			break
 		var coordinate := change.get("coordinate", Vector3i.ZERO) as Vector3i
-		var key := _key(coordinate)
+		var key := _key(coordinate, String(change.get("region_id", "")))
 		var existing := _state_for_change(change, pending_states)
 		var desired := mini(remaining, maxi(0, int(change.get("added_mass_q", 0))))
 		if desired <= 0:
@@ -339,8 +341,8 @@ func commit_deposit(staged: Dictionary) -> bool:
 	return conservation_error_q == 0
 
 
-func stable_mass_q_at(coordinate: Vector3i) -> int:
-	return maxi(0, int((_cells.get(_key(coordinate), {}) as Dictionary).get("stable_mass_q", 0)))
+func stable_mass_q_at(coordinate: Vector3i, region_id: String = "") -> int:
+	return maxi(0, int((_cells.get(_key(coordinate, region_id), {}) as Dictionary).get("stable_mass_q", 0)))
 
 
 func get_state_revision() -> int:
@@ -435,19 +437,21 @@ func _mass_q(volume_m3: float) -> int:
 	return roundi(maxf(0.0, volume_m3) * material_density_kg_m3 * float(MASS_Q_PER_KG))
 
 
-func _key(coordinate: Vector3i) -> String:
-	return "%d,%d,%d" % [coordinate.x, coordinate.y, coordinate.z]
+func _key(coordinate: Vector3i, region_id: String = "") -> String:
+	return (region_id + ":" if not region_id.is_empty() else "") + "%d,%d,%d" % [coordinate.x, coordinate.y, coordinate.z]
 
 
 func _state_for_change(change: Dictionary, pending_states: Dictionary) -> Dictionary:
 	var coordinate := change.get("coordinate", Vector3i.ZERO) as Vector3i
-	var key := _key(coordinate)
+	var region := String(change.get("region_id", ""))
+	var key := _key(coordinate, region)
 	var existing := (pending_states.get(key, _cells.get(key, {})) as Dictionary).duplicate(true)
 	if existing.is_empty():
 		var pre_volume := maxf(0.0, float(change.get("pre_fraction", 0.0)) * float(change.get("cell_volume_m3", 0.0)))
 		existing = {
 			"coordinate": coordinate,
-			"stable_mass_q": _mass_q(pre_volume),
+			"stable_mass_q": _mass_q(pre_volume) if region.is_empty() else 0,
+			"region_id": region,
 		}
 	return existing
 

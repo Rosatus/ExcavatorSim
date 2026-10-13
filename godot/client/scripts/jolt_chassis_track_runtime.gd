@@ -1450,6 +1450,8 @@ func _accept_track_support_hit(hit: Dictionary) -> Dictionary:
 func _find_voxel_support_owner(collider: Node) -> Node:
 	var current: Node = collider
 	while current != null:
+		if current is OffzoneSoilLayer:
+			return current
 		if current.is_class("VoxelTerrain"):
 			var owner := current.get_parent()
 			return owner if owner != null and owner.has_method("is_support_ready_at") else null

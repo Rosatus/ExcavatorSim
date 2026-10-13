@@ -21,6 +21,8 @@ const CLEARANCE_REGION_IDS := ["floor_wear_plate", "inner_shell"]
 const OCCUPANCY_WIDTH_FRACTIONS := [-0.8, -0.4, 0.0, 0.4, 0.8]
 const OCCUPANCY_HEIGHT_FRACTIONS := [-0.68, 0.0, 0.68]
 
+## Deposited-only layers have no original grade or native overburden.
+var deposited_only := false
 var configured := false
 var model_id := ""
 var voxel_scale_m := WorkZoneConfig.DEFAULT_VOXEL_SCALE_M
@@ -180,7 +182,7 @@ func build_proposal(
 	# teeth lift out. Teeth-only entry tests cannot decide that the whole bucket
 	# has left the soil. Never use this continuation to start an unengaged cut.
 	var finishing_lift := false
-	if was_engaged and uses_native_paths():
+	if was_engaged and uses_native_paths() and not deposited_only:
 		# Exit contact needs occupancy only; the leading edge still needs normals.
 		finishing_lift = _has_lift_exit_contact(tool_snapshot,
 			contact_sampler if contact_sampler.is_valid() else sdf_sampler, true, batch_contact_sampler)
@@ -267,6 +269,8 @@ func build_proposal(
 
 
 func _within_lift_exit_envelope(tool_snapshot: Dictionary) -> bool:
+	if deposited_only:
+		return false
 	var inner := _find_region(tool_snapshot, "inner_shell")
 	var half := _box_half_dimensions(inner)
 	var current := inner.get("current_transform", Transform3D.IDENTITY) as Transform3D
@@ -416,7 +420,8 @@ func _build_sy135_native_paths(tool_snapshot: Dictionary, finishing_lift: bool =
 			"bucket_occupancy",
 			NATIVE_SURFACE_RADIUS_VOXELS,
 		))
-		result.append_array(_overburden_cleanup_paths(inner, finishing_lift))
+		if not deposited_only:
+			result.append_array(_overburden_cleanup_paths(inner, finishing_lift))
 	var floor := _find_region(tool_snapshot, "floor_wear_plate")
 	if not floor.is_empty():
 		result.append_array(_box_surface_paths(
@@ -484,7 +489,7 @@ func _lip_bridge_paths(tool_snapshot: Dictionary, finishing_lift: bool) -> Array
 			points.reverse()
 		for point in points:
 			_append_distinct_path_point(surface, point)
-			if point.y >= cutoff:
+			if deposited_only or point.y >= cutoff:
 				continue
 			var upper := Vector3(point.x, layout.INITIAL_SURFACE_Y + voxel_scale_m * 0.5, point.z)
 			var reverse := (roof.size() / 2) % 2 == 1

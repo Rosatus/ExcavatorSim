@@ -104,6 +104,7 @@ var _unlimited_bucket_button: CheckButton
 var _cutting_diagnostics_button: CheckButton
 var _race_mode_button: CheckButton
 var _relaxed_assist_button: CheckButton
+var _offzone_soil_button: CheckButton
 var _simple_digging_selector: OptionButton
 
 const GATEWAY_CONFIG_PATH := "user://ict_config.cfg"
@@ -223,6 +224,16 @@ func _connect_controls() -> void:
 	_cutting_diagnostics_button.toggled.connect(_on_cutting_diagnostics_toggled)
 	_race_mode_button.toggled.connect(_on_race_mode_toggled)
 	_relaxed_assist_button.toggled.connect(_on_relaxed_assist_toggled)
+	_offzone_soil_button = CheckButton.new()
+	_offzone_soil_button.name = "OffzoneSoil"
+	_offzone_soil_button.text = "区外堆土（可挖掘、可行驶）"
+	_offzone_soil_button.tooltip_text = "在地图地面倾倒形成土堆。关闭后已有土堆保留，重置地图清除。简易挖掘生效时不能卸土。"
+	_simple_digging_selector.get_parent().add_child(_offzone_soil_button)
+	_offzone_soil_button.disabled = get_parent().get_node_or_null("StaticMap/Ground") == null
+	if _offzone_soil_button.disabled:
+		_offzone_soil_button.tooltip_text = "区外堆土适用于 urban 和 construction 地图。"
+	_offzone_soil_button.set_pressed_no_signal(_product_session != null and _product_session.offzone_soil_enabled)
+	_offzone_soil_button.toggled.connect(_on_offzone_soil_toggled)
 	_configure_simple_digging_selector()
 	_can_output_button.pressed.connect(_on_can_output_pressed)
 	_gateway_button.pressed.connect(_on_gateway_restart_pressed)
@@ -730,6 +741,7 @@ func get_control_for_test(id: String) -> Control:
 		"fps_limit_selector": _menu.get("fps_limit_selector"),
 		"relaxed_assist": _relaxed_assist_button,
 		"simple_digging": _simple_digging_selector,
+		"offzone_soil": _offzone_soil_button,
 	}.get(id) as Control
 
 
@@ -1010,6 +1022,15 @@ func _sync_relaxed_assist_toggle() -> void:
 
 ## Items are (re)populated on every menu-controls rebuild — the AdvancedPanel
 ## is re-instantiated by _instantiate_menu_controls, not just reparented.
+func _on_offzone_soil_toggled(enabled: bool) -> void:
+	var config := ConfigFile.new()
+	config.load(preferences_path)
+	config.set_value(CONFIG_SECTION_UI, "offzone_soil", enabled)
+	config.save(preferences_path)
+	if _product_session != null:
+		_product_session.request_offzone_soil(enabled)
+
+
 func _configure_simple_digging_selector() -> void:
 	if _simple_digging_selector == null:
 		return
@@ -1065,6 +1086,9 @@ func _load_assist_options() -> void:
 	if config.load(preferences_path) != OK:
 		return
 	if _product_session != null:
+		var offzone := bool(config.get_value(CONFIG_SECTION_UI, "offzone_soil", false))
+		_product_session.request_offzone_soil(offzone)
+		_offzone_soil_button.set_pressed_no_signal(offzone)
 		if bool(config.get_value(CONFIG_SECTION_UI, "relaxed_assist", false)):
 			_product_session.request_relaxed_assist(true)
 		# Legacy saves stored a bool: true maps to ALWAYS, false to OFF.

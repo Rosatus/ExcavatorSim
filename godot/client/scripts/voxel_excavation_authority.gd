@@ -59,6 +59,68 @@ const NATIVE_COVERAGE_OFFSETS: Array[Vector3i] = [
 	Vector3i.UP,
 ]
 
+const OffzoneLayer = preload("res://scripts/offzone_soil_layer.gd")
+var offzone_enabled := false
+var offzone_layer: OffzoneSoilLayer
+var _offzone_elapsed := 0.0
+var _offzone_mass := 0
+var _offzone_origin := Vector3.ZERO
+var _offzone_changed := false
+
+
+func set_offzone_enabled(value: bool) -> void:
+	offzone_enabled = value
+	_offzone_mass = 0
+	_offzone_elapsed = 0.0
+
+
+func _ensure_offzone_layer() -> bool:
+	if is_instance_valid(offzone_layer):
+		return true
+	var ground := _work_zone.get_node_or_null("../../StaticMap/Ground")
+	if ground == null:
+		return false
+	offzone_layer = OffzoneLayer.new()
+	offzone_layer.name = "OffzoneSoilLayer"
+	_work_zone.get_parent().add_child(offzone_layer)
+	return offzone_layer.configure(ground, layout, _contract)
+
+
+func _submit_offzone_dump(pose: Dictionary, amount: int, delta_s: float) -> Dictionary:
+	_cancel_uncommitted_dumps("offzone_receiver")
+	if not _ensure_offzone_layer():
+		return _reject_submission("offzone_ground_unavailable")
+	var opening := (pose.get("current", {}) as Dictionary).get("opening", Transform3D.IDENTITY) as Transform3D
+	if opening.origin.distance_to(_offzone_origin) > 0.5:
+		_offzone_elapsed = 0.0
+		_offzone_mass = 0
+	_offzone_origin = opening.origin
+	_offzone_mass = mini(material_field.bucket_mass_q, _offzone_mass + amount)
+	_offzone_elapsed += clampf(delta_s, 0.0, DUMP_BATCH_PERIOD_S)
+	if _offzone_elapsed + 0.000001 < DUMP_BATCH_PERIOD_S:
+		return {"accepted": true, "reason": "offzone_dump_pending", "operation": "dump"}
+	var result := offzone_layer.deposit(opening.origin, _offzone_mass, material_field)
+	_offzone_elapsed = 0.0
+	_offzone_mass = 0
+	if bool(result.get("accepted", false)):
+		var transaction := CutTransaction.new()
+		data_revision += 1
+		transaction.transaction_id = "offzone:%d:%d" % [generation, data_revision]
+		transaction.generation = generation
+		transaction.revision = data_revision
+		transaction.accepted_mass_q = int(result["accepted_mass_q"])
+		transaction.accepted_volume_m3 = float(result["accepted_volume_m3"])
+		transaction.release_world = opening.origin
+		transaction.release_transform_world = opening
+		transaction.release_normal_world = Release.opening_normal(pose)
+		transaction.release_direction_world = Vector3.DOWN
+		transaction.deposit_world = result["landing_world"]
+		transaction.release_fill_ratio = material_field.visual_fill_ratio()
+		_publish_accepted_dump_event(transaction)
+		_offzone_changed = true
+	return result
+
+
 var configured := false
 var generation := -1
 var data_revision := 0
@@ -219,6 +281,8 @@ func set_bucket_capacity_override_for_testing(capacity_override_m3: float) -> Di
 func set_dump_gate_enabled(value: bool) -> void:
 	_dump_gate_enabled = value
 	if not value:
+		_offzone_mass = 0
+		_offzone_elapsed = 0.0
 		_dump_gate_raw_active = false
 		_dump_gate_active = false
 		_dump_gate_hold_s = 0.0
@@ -226,6 +290,13 @@ func set_dump_gate_enabled(value: bool) -> void:
 
 
 func clear() -> void:
+	if is_instance_valid(offzone_layer):
+		offzone_layer.get_parent().remove_child(offzone_layer)
+		offzone_layer.queue_free()
+	offzone_layer = null
+	_offzone_mass = 0
+	_offzone_elapsed = 0.0
+	_offzone_changed = false
 	if is_instance_valid(_cut_worker):
 		_cut_worker.abandon()
 	_cut_worker = null
@@ -339,10 +410,14 @@ func submit_pose(pose_snapshot: Dictionary, identity: Dictionary, delta_s: float
 	_next_sequence = maxi(_next_sequence, motion_sequence + 1)
 	_update_dump_gate_diagnostics(pose_snapshot, delta_s)
 	if not _dump_gate_raw_active:
+		_offzone_elapsed = 0.0
+		_offzone_mass = 0
 		_cancel_uncommitted_dumps("dump_gate_closed_before_commit")
 	var proposal_started_usec := _diagnostic_clock_usec()
 	var dump_result := _build_dump_proposal(pose_snapshot, identity, delta_s)
 	if bool(dump_result.get("export", false)):
+		if offzone_enabled:
+			return _submit_offzone_dump(pose_snapshot, int(dump_result["mass_q"]), delta_s)
 		_cancel_uncommitted_dumps("release_outside_receiver")
 		var amount := int(dump_result["mass_q"])
 		if not material_field.export_bucket_mass(amount):
@@ -350,6 +425,8 @@ func submit_pose(pose_snapshot: Dictionary, identity: Dictionary, delta_s: float
 		_release_published_since_step = true
 		_engaged = false
 		return {"accepted": true, "operation": "dump", "reason": "dump_exported", "exported_mass_q": amount}
+	_offzone_elapsed = 0.0
+	_offzone_mass = 0
 	if bool(dump_result.get("attempted", false)):
 		var dump_candidate := dump_result.get("proposal") as VoxelSoilOperationProposal
 		_record_proposal_telemetry(
@@ -384,6 +461,12 @@ func submit_pose(pose_snapshot: Dictionary, identity: Dictionary, delta_s: float
 			"queue_depth": _queue.size() + _soil_queue.size(),
 			"pending_dump": _pending_dump != null,
 		}
+	var pile_cut: Dictionary = {}
+	if is_instance_valid(offzone_layer):
+		pile_cut = offzone_layer.cut_pose(pose_snapshot, identity, material_field)
+		if bool(pile_cut.get("changed", false)):
+			_offzone_changed = true
+			data_revision += 1
 	proposal_started_usec = _diagnostic_clock_usec()
 	# No edits occur inside build_proposal. Share repeated rounded contact cells
 	# only within this call, never across ticks, commits or generation changes.
@@ -408,6 +491,8 @@ func submit_pose(pose_snapshot: Dictionary, identity: Dictionary, delta_s: float
 	_last_cutter_result = _sanitized_cutter_result(result)
 	_engaged = bool(result.get("engaged", false))
 	if not bool(result.get("accepted", false)):
+		if bool(pile_cut.get("changed", false)):
+			return pile_cut
 		return _reject_submission(String(result.get("reason", "cutter_rejected")))
 	var proposal := result.get("proposal") as VoxelCutProposal
 	if proposal == null or not proposal.is_valid() or proposal.tool_hash != tool_hash:
@@ -431,6 +516,9 @@ func submit_pose(pose_snapshot: Dictionary, identity: Dictionary, delta_s: float
 func step_fixed(delta: float) -> Dictionary:
 	preparation_sample.clear()
 	var result := _step_fixed_impl(delta)
+	if _offzone_changed:
+		result["changed"] = true
+		_offzone_changed = false
 	result["release_changed"] = _release_published_since_step
 	_release_published_since_step = false
 	return result
@@ -679,6 +767,8 @@ func get_status_snapshot(refresh_diagnostics: bool = false) -> Dictionary:
 		"data_revision": data_revision,
 		"mesh_revision": mesh_revision,
 		"collision_revision": collision_revision,
+		"offzone_enabled": offzone_enabled,
+		"offzone_soil": offzone_layer.get_status_snapshot() if is_instance_valid(offzone_layer) else {},
 		"model_id": model_id,
 		"tool_hash": tool_hash,
 		"queue_depth": _queue.size() + _soil_queue.size() + (1 if _preparing_cut != null else 0),
