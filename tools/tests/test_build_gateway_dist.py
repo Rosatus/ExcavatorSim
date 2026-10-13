@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "tools" / "build_gateway_dist.ps1"
@@ -51,7 +52,7 @@ class BuildGatewayDistPlanTest(unittest.TestCase):
         self.assertEqual(plan["platforms"], ["windows", "linux"])
         self.assertEqual(plan["web_builds"], 1)
         self.assertEqual(plan["windows_output"], "dist/can_gateway")
-        self.assertEqual(plan["linux_output"], "dist/can_gateway_linux")
+        self.assertEqual(plan["linux_output"], "godot/dist/linux/can_gateway")
         self.assertTrue(plan["manifests"])
         self.assertTrue(plan["packaged_smoke"])
 
@@ -85,6 +86,42 @@ class BuildGatewayDistPlanTest(unittest.TestCase):
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("ValidateSet", result.stderr)
+
+    def test_package_layout_requires_both_model_calibrations(self) -> None:
+        command = r"""
+$ErrorActionPreference = 'Stop'
+. $env:GATEWAY_SCRIPT -PlanOnly | Out-Null
+Assert-PackageLayout -PackageRoot $env:PACKAGE_ROOT `
+    -RequiredFiles @('gateway.exe') -AllowedFiles @('gateway.exe')
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "gateway.exe").write_bytes(b"test")
+            (root / "config").mkdir()
+            environment = dict(os.environ, GATEWAY_SCRIPT=str(SCRIPT), PACKAGE_ROOT=str(root))
+            for missing in (None, "sy135", "sy80u", "sy155w"):
+                with self.subTest(missing=missing):
+                    for model in ("sy135", "sy80u", "sy155w"):
+                        path = root / "config" / f"calibration_{model}.toml"
+                        if model == missing:
+                            path.unlink(missing_ok=True)
+                        else:
+                            path.write_bytes(b"test")
+                    result = subprocess.run(
+                        ["pwsh", "-NoProfile", "-NonInteractive", "-Command", command],
+                        cwd=REPO_ROOT,
+                        env=environment,
+                        capture_output=True,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
+                        check=False,
+                    )
+                    if missing is None:
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                    else:
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertIn(f"calibration_{missing}.toml", result.stderr)
 
     def test_multi_package_install_rolls_back_as_one_transaction(self) -> None:
         with tempfile.TemporaryDirectory(prefix="gateway-transaction-") as temp_dir:
@@ -150,6 +187,22 @@ catch {
 
 
 class PlatformBuilderArgumentTest(unittest.TestCase):
+    def test_windows_builder_stages_both_calibrations(self) -> None:
+        from build_exe import main
+
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch("build_exe.validate_web_bundle", return_value=True),
+            patch("build_exe.subprocess.run", return_value=subprocess.CompletedProcess([], 0)),
+        ):
+            self.assertEqual(main(["--skip-web-build", "--dist-dir", directory]), 0)
+            for model in ("sy135", "sy80u", "sy155w"):
+                name = f"calibration_{model}.toml"
+                self.assertEqual(
+                    Path(directory, "config", name).read_bytes(),
+                    (GATEWAY_TOOLS / "config" / name).read_bytes(),
+                )
+
     def test_windows_builder_defaults_remain_compatible(self) -> None:
         arguments = parse_args([])
         self.assertFalse(arguments.skip_web_build)

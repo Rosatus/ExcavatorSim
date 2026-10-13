@@ -8,7 +8,7 @@
 #   ./dist_linux.sh --skip-web-build --dist-dir /path/to/staging \
 #       --build-dir "$HOME/.cache/excavatorsim/can-gateway-build" --keep-build-dir
 #
-# Output: dist/can_gateway_linux/{gateway,can0-setup-helper,install/uninstall scripts}
+# Output: godot/dist/linux/can_gateway/{gateway,can0-setup-helper,install/uninstall scripts}
 set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -16,7 +16,7 @@ repo_root=$(cd "$script_dir/../.." && pwd)
 cd "$script_dir"
 
 PY="${PYTHON:-python3}"
-DIST_DIR="${CAN_GATEWAY_DIST_DIR:-$repo_root/dist/can_gateway_linux}"
+DIST_DIR="${CAN_GATEWAY_DIST_DIR:-$repo_root/godot/dist/linux/can_gateway}"
 DEFAULT_BUILD_DIR="$script_dir/build-linux"
 BUILD_DIR="${CAN_GATEWAY_BUILD_DIR:-$DEFAULT_BUILD_DIR}"
 KEEP_BUILD_DIR="${CAN_GATEWAY_KEEP_BUILD_DIR:-0}"
@@ -146,8 +146,12 @@ mkdir -p "$SPEC_DIR"
 
 install -m 0755 "$script_dir/install_can0_helper.sh" "$DIST_DIR/install_can0_helper.sh"
 install -m 0755 "$script_dir/uninstall_can0_helper.sh" "$DIST_DIR/uninstall_can0_helper.sh"
-mkdir -p "$DIST_DIR/dbc"
-install -m 0644 "$script_dir"/resources/dbc/*.dbc "$DIST_DIR/dbc/"
+mkdir -p "$DIST_DIR/dbc" "$DIST_DIR/config"
+while IFS= read -r -d '' dbc_file; do
+    relative_dbc="${dbc_file#"$script_dir/resources/dbc/"}"
+    install -D -m 0644 "$dbc_file" "$DIST_DIR/dbc/$relative_dbc"
+done < <(find "$script_dir/resources/dbc" -type f -name '*.dbc' -print0)
+install -m 0644 "$script_dir"/config/*.toml "$DIST_DIR/config/"
 chmod +x "$DIST_DIR/gateway" "$DIST_DIR/can0-setup-helper"
 if [[ "$KEEP_BUILD_DIR" != "1" ]]; then
     rm -rf "$BUILD_DIR"

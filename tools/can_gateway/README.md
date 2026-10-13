@@ -1,6 +1,6 @@
 # CAN Telemetry Gateway
 
-把 ExcavatorSim 的机器姿态编码为 SY135 / SY80U CAN 帧，通过 PC001 TCP、
+把 ExcavatorSim 的机器姿态编码为 SY135 / SY80U / SY155W CAN 帧，通过 PC001 TCP、
 SocketCAN 或 CSV 输出。
 
 ## Model-aware telemetry
@@ -16,15 +16,63 @@ its queued frames discarded; the listener reopens on the same port and requires
 a fresh client handshake. Pending SocketCAN frames and custom schedules are retired. Standalone console storage is isolated per model.
 Both updated client source and gateway are required for automatic switching.
 
+SY155W uses model ID 3 and CTN1 v3 (204 bytes): the first five body records
+retain their order, followed by the second boom quaternion/origin and the
+existing five-float tail. Other models retain v1/v2 compatibility. Switching
+to/from SY155W follows the same PC001 reconnect and state isolation policy.
+
+SY155W derives from the owner-specified `SY135C_RT/dbc/can3.sy135c_RT.dbc`
+and `can4.sy135c_RT.dbc` in GuideSystem. Byte-for-byte snapshots live under
+`resources/dbc/sy135c_rt_reference`; `generate_sy155w_dbc.py` preserves all their
+messages/signals and adds only the next attitude IMU, `0x18F40000` (second boom).
+The generated catalog is isolated under `resources/dbc/sy155w` with hash checks.
+IMUs use extended frames, DLC8, channel3: Roll/Pitch are signed little-endian
+int16 at0.01deg with zero offset; Yaw is unsigned at0.01deg. The receiver maps
+Roll unchanged and Pitch negated. Zero angles are valid. Circular angles wrap
+before encoding. Existing SY135/80U model protocols are unchanged.
+
+RT GNSS uses `0x09F80230` for computed equipment heading (radians, including at
+rest) and speed. `0x09F80530` carries the DBC's51-byte big-endian position payload
+in eight classic-CAN frames: `[01,33,data0..5]`, then sequences02..08 with seven
+bytes each; the last contains three bytes and fourFF padding bytes. Sequence
+bytes have no transfer-ID bits. The DBC's64-byte length describes a virtual
+zero-padded decoding buffer, not CAN-FD output. Both use the existing can4→ch2
+transport mapping. SocketCAN coalesces whole transfers; PC001 admits all eight
+fragments atomically. SocketCAN finishes a bounded eight-frame group once started
+(up to seven frames beyond the requested service budget), drops its remainder on
+congestion, and resumes with a new first fragment. Ordinary-frame budgets stay unchanged.
+The RT catalog has no slew/old A000..A900 frames, so SY155W emits neither. Native
+travel pressure output remains. No angular-rate/acceleration or RTCM correction
+measurements are fabricated; those DBC entries remain available to the console.
+
+`--model sy155w` selects `builtin:qml-sy155w-ground-truth` and editable
+`config/calibration_sy155w.toml`. Its initial calibration copies SY135 and
+adds `imu_component.pitch_boom2` with the same initial offset as `pitch_boom`.
+This is a sender extension based on the requested SY135 convention; receiving
+software must recognize the extra IMU and two-boom chain. No receiver is modified.
+
+| Signal | Godot source | Receiver convention / projection | CAN ID |
+|---|---|---|---|
+| Body | upper world transform | existing SY135 body axis/calibration inverse | 0x18F00000 |
+| Boom | upper → boom | calibrated first-boom elevation | 0x18F10000 |
+| Second boom | boom → boom_fold | cumulative boom + fold elevation | 0x18F40000 |
+| Arm | boom_fold → arm | SY135 arm zero, relative to second boom | 0x18F20000 |
+| Bucket | arm → bucket | SY135 four-bar inverse, default GB12 tip-ray reference | 0x18F30000 |
+
+The bucket alignment covers the default neutral XTR13/GB12 attachment geometry.
+Independent tiltrotator motion/tool changes are not represented by this five-IMU
+protocol. Angle parity does not imply receiver link lengths or tooth positions
+match the simulator. Receiver GUI acceptance remains separate from wire tests.
+
 SY80U uses signed IMU axes with 0.01-degree scale and no 180-degree offset,
 two-byte slew frames, and the additional `0x18FF3E00` boom-side-swing frame.
 The approved DBCs live in `resources/dbc/sy80u`; never merge them into the
 SY135 directory because identical frame IDs have different layouts.
 
-`--model sy80u` defaults to `builtin:qml-sy80u-ground-truth`. Its hash-bound
-calibration is a snapshot of `C:/code/x86-linux-debug/database/calibration.toml`
-on 2026-09-28. GuideSystem with `ICT_MACHINE_MODEL=SY80U` loads that existing
-file over its factory defaults. The mapper reverses the SY80 parser's signed
+`--model sy135` and `--model sy80u` default to their corresponding built-in QML
+profiles. The shipped SY80U calibration is a snapshot of
+`C:/code/x86-linux-debug/database/calibration.toml` on 2026-09-28. GuideSystem
+with `ICT_MACHINE_MODEL=SY80U` loads that existing file over its factory defaults. The mapper reverses the SY80 parser's signed
 angles, the extra body-axis remap, common calibrated linkage and QML rotations.
 The parser's all-zero IMU sentinel is avoided with a 0.01-degree yaw value only
 when all three quantized axes are zero; displayed heading comes from RTK.
@@ -33,9 +81,10 @@ Parity covers body and joint orientations and movement directions under that
 calibration. The existing runtime calibration still specifies CF/FQ/QV lengths
 4.6543/2.5294/1.1927 m, whereas the simulator SY80U uses 3.52/2.05/0.972 m;
 CAN angles cannot change the receiver's configured lengths or mesh geometry.
-If the receiver calibration changes, supply a matching profile and calibration
-hash. Uncalibrated factory SY80 linkage parameters cannot represent the
-simulator's neutral bucket angle; the gateway never silently substitutes them.
+If the receiver calibration changes, replace the corresponding file in `config`
+and restart the gateway. No calibration hash update is needed. Uncalibrated
+factory SY80 linkage parameters cannot represent the simulator's neutral bucket
+angle; the gateway never silently substitutes them.
 
 ```
 ExcavatorSim (CanTelemetryBridge autoload)          Python gateway（独立进程）
@@ -45,6 +94,30 @@ ExcavatorSim (CanTelemetryBridge autoload)          Python gateway（独立进�
 游戏启动时自动 spawn python；失败/心跳超时 → 面板显示 offline。
 headless（测试/CI）不自动 spawn，测试显式调 spawn_gateway()。
 ```
+
+## 标定文件（启动时读取）
+
+源码运行时从 `tools/can_gateway/config/` 读取；分发包从 `gateway.exe`（Linux 为
+`gateway`）同级的 `config/` 读取，不受启动工作目录影响。分发时默认包含：
+
+- `config/calibration_sy135.toml`：SY135 / SY135 NEO。
+- `config/calibration_sy155w.toml`：SY155W，额外包含 `imu_component.pitch_boom2`。
+- `config/calibration_sy80u.toml`：SY80U。
+
+各机型随包文件统一采用 `assets/calibration/calibration.toml` 的表结构和字段，
+各自保留标定数值与传感器设置；SY135 原缺少的附加字段采用基准默认值。
+`[meta]`、`[slew_sensor]`、`[swing_boom_sensor]`、`[sensor]` 仅随文件保留，
+Gateway 当前不使用它们切换传感器协议或判断标定状态。
+
+可直接替换对应机型文件，或修改内部参数，然后重启 Gateway 生效；运行中不监听
+文件变化，也无需更新 SHA-256。使用 GuideSystem `calibration.toml` 相同的
+`[angle]`、`[imu_car]`、`[imu_component]`、`[length]`、`[offset]` 表结构，角度为度，
+长度/偏移为米，支持 UTF-8（含 BOM），额外字段会忽略。请使用与接收端、机型匹配的
+标定值；缺文件、缺必需字段、非有限数值或非正长度会拒绝启动，不回退到内嵌默认值。
+
+`--qml-calibration PATH` 可显式覆盖默认标定路径。自定义 `--compat-profile PATH`
+中的 `calibration_file` 仍相对该 profile 所在目录解析。启动日志会显示实际读取路径。
+本次仅移除标定文件的哈希绑定，DBC 协议文件校验和分发来源清单不变。
 
 ## 用法
 
@@ -134,7 +207,7 @@ root helper 使用 `/run/excavatorsim/can0.lock` 串行化完整配置事务。�
 cd tools/can_gateway && ./dist_linux.sh        # 优先 uv，缺 uv 时回退 venv+pip
 
 # 目标机安装阶段：管理员只执行一次；默认授权给 sudo 的原始调用用户
-cd dist/can_gateway_linux
+cd godot/dist/linux/can_gateway
 sudo ./install_can0_helper.sh                   # 也可显式追加运行游戏的用户名
 
 # 仅显式低延时模式需要安装 helper；默认 TCP 模式不需要 sudo
@@ -157,8 +230,9 @@ WSL2 通常没有真实 `can0`，只能用于构建和无硬件测试。构建�
 .\tools\build_gateway_dist.ps1
 ```
 
-该入口只更新 `dist/can_gateway` 和 `dist/can_gateway_linux`，不会导出或改写 Godot
-发行包。它在 Windows 上只构建一次 Web bundle，Windows/Linux PyInstaller 都复用
+该入口更新 Windows 独立包 `dist/can_gateway` 和 Linux 游戏旁的
+`godot/dist/linux/can_gateway`，不会重新导出 Godot 可执行文件。Linux 客户端启动时
+自动查找自身目录下的 `can_gateway/gateway`，不依赖启动时的工作目录，也无需目标机安装 Python。它在 Windows 上只构建一次 Web bundle，Windows/Linux PyInstaller 都复用
 该 bundle；前端依赖按 `package.json`、`package-lock.json`、Node 与 npm 版本缓存，
 未变化时跳过耗时的 `npm ci`。Linux 构建环境保存在 WSL 的
 `$HOME/.cache/excavatorsim/can-gateway-build`，避免反复跨 `/mnt/e` 安装依赖。
@@ -179,7 +253,8 @@ WSL2 通常没有真实 `can0`，只能用于构建和无硬件测试。构建�
 ```
 
 默认执行打包后二进制 smoke、脚本语法检查、包布局检查和 manifest 生成；Windows
-smoke 会实际启动冻结程序并验证 Web 首页、状态 API、静态资源及相邻 DBC 加载。验证
+smoke 会实际启动冻结程序并验证 Web 首页、状态 API、静态资源及相邻 DBC 加载，
+并在临时副本中分别修改三个机型标定、重启验证实际 CAN 帧变化。验证
 通过后再以同盘改名方式整体替换所选正式目录；旧包里的运行输出会先保存到
 `output/release-build-residue`。`-SkipSmoke` 仅用于明确不需要验收的临时构建。
 
@@ -190,8 +265,7 @@ smoke 会实际启动冻结程序并验证 Web 首页、状态 API、静态资�
 .\tools\build_release_dist.ps1
 ```
 
-最终平台包位于 `godot/dist/windows` 与 `godot/dist/linux`。每个平台包和根目录
-下的独立 Gateway 包都包含 `build-manifest.json`；清单记录 Git commit、构建时
+最终平台包位于 `godot/dist/windows` 与 `godot/dist/linux`。每个平台包和 Gateway 子目录都包含 `build-manifest.json`；清单记录 Git commit、构建时
 工作树是否有未提交内容、软件版本，以及包内每个文件的大小和原始字节 SHA-256。
 Linux 正式交付请使用 `godot/dist/ExcavatorSim-linux-x86_64.tar.gz`，该归档显式
 保留游戏、Gateway、can0 helper 与安装脚本的 POSIX 执行权限。构建器若发现
@@ -276,7 +350,8 @@ channel、实际接收频率和新鲜度。该工具只接收，不参与 Gatewa
 - `conventions.py` — 包解析 / 四元数→ZYX 欧拉 / ENU→大地坐标 / 行走语义
 - `calibration.py` — 独立标定层：GuideSystem 同构 `CalibrationParams` + TOML 加载 + 全部标定量变换
 - `qml_profile.py` / `qml_compat.py` — 严格 profile 加载与 QML 数学逆投影（标定量一律经 `calibration`）
-- `resources/` — SHA-256 绑定的 QML profile 与 ground-truth calibration
+- `resources/` — QML 映射 profile、获批 DBC 与 Web 静态资源
+- `config/` — 按机型区分的可编辑 GuideSystem 格式标定 TOML，启动时读取
 - `csv_writer.py` — CANape CSV 方言（UTF-8-sig，被对方 read_can_csv 消费）
 - `sinks.py` — FrameSink 抽象：CsvFrameSink / SocketCanSink（AF_CAN 直发）
 - `can0_setup.py` / `can0_setup_helper.py` — 固定 can0 就绪检查与受限配置事务
@@ -286,3 +361,33 @@ channel、实际接收频率和新鲜度。该工具只接收，不参与 Gatewa
 - `encoders/` — ruifen_imu / dxg_slew / sinan_rtk / travel_pilot
 - `tests/` — 金样本往返（实采 24 行×15 ID）+ 合成扫描 + 语义断言 +
   对方解析器兼容冒烟；`extract_golden.py` 一键重建夹具
+
+### 已导出 Linux 客户端时更新 Gateway 和压缩
+
+在 Windows 仓库根目录运行（WSL 中执行 Linux PyInstaller）：
+
+```powershell
+.\tools\build_gateway_dist.ps1 -Platform linux
+wsl bash tools/package_linux_release.sh godot/dist/linux godot/dist/ExcavatorSim-linux-x86_64.tar.gz
+```
+
+第二步归档已有客户端，不重新导出游戏；需要当前游戏代码时先在 Godot 导出 Linux，
+或运行完整发布构建器。地图包如需随包交付，放在 `godot/dist/linux/maps/`。
+发行目录应只包含交付文件，旧 zip、日志和 `can_gateway_linux` 旧目录应移出后再归档。
+解压后的关键结构是：
+
+```text
+ExcavatorSim/
+  ExcavatorSim.sh
+  ExcavatorSim.x86_64
+  libterrain.linux.release.x86_64.so
+  can_gateway/
+    gateway
+    config/
+    dbc/
+  maps/                         # 随包地图
+```
+
+目标 Linux 上解压 tar.gz 并运行 `./ExcavatorSim/ExcavatorSim.sh`，图形模式会自动
+启动 Gateway；无界面的 `--headless` 模式按测试约定不自动启动。请使用上述归档脚本
+保留执行权限，Windows 普通 ZIP 打包可能丢失执行位。TCP 模式不需要安装 can0 helper。

@@ -122,6 +122,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         if destination.is_file() and _sha256(source) == _sha256(destination):
             continue
         copy2(source, destination)
+    adjacent_config = dist / "config"
+    adjacent_config.mkdir(parents=True, exist_ok=True)
+    for source in sorted((GW_DIR / "config").glob("*.toml")):
+        copy2(source, adjacent_config / source.name)
     print(f"\nbuilt: {dist / 'gateway.exe'}")
     return 0
 

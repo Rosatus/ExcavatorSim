@@ -17,7 +17,8 @@ $webBundle = Join-Path $repoRoot "tools\can_gateway\resources\web"
 $manifestTool = Join-Path $repoRoot "tools\build_manifest.py"
 $frozenSmokeTool = Join-Path $repoRoot "tools\can_gateway\smoke_frozen_gateway.py"
 $windowsTarget = Join-Path $distRoot "can_gateway"
-$linuxTarget = Join-Path $distRoot "can_gateway_linux"
+$linuxReleaseRoot = Join-Path $repoRoot "godot\dist\linux"
+$linuxTarget = Join-Path $linuxReleaseRoot "can_gateway"
 $selectedPlatforms = if ($Platform -eq "all") { @("windows", "linux") } else { @($Platform) }
 
 function Invoke-NativeChecked {
@@ -126,6 +127,9 @@ function Assert-PackageLayout {
         [Parameter(Mandatory)][string[]]$RequiredFiles,
         [Parameter(Mandatory)][string[]]$AllowedFiles
     )
+    $calibrationFiles = @("config/calibration_sy135.toml", "config/calibration_sy80u.toml", "config/calibration_sy155w.toml")
+    $RequiredFiles += $calibrationFiles
+    $AllowedFiles += $calibrationFiles
     foreach ($relative in $RequiredFiles) {
         if (-not (Test-Path -LiteralPath (Join-Path $PackageRoot $relative) -PathType Leaf)) {
             throw "Required Gateway release file is missing: $PackageRoot\$relative"
@@ -184,13 +188,14 @@ function Install-StagedPackages {
     param([Parameter(Mandatory)][hashtable[]]$Packages)
 
     $resolvedDist = [IO.Path]::GetFullPath($distRoot).TrimEnd([IO.Path]::DirectorySeparatorChar)
+    $resolvedLinuxRelease = [IO.Path]::GetFullPath($linuxReleaseRoot).TrimEnd([IO.Path]::DirectorySeparatorChar)
     foreach ($package in $Packages) {
         $resolvedTarget = [IO.Path]::GetFullPath([string]$package.Target)
         if (-not $resolvedTarget.StartsWith(
             $resolvedDist + [IO.Path]::DirectorySeparatorChar,
             [StringComparison]::OrdinalIgnoreCase
-        )) {
-            throw "Refusing to install outside the distribution root: $resolvedTarget"
+        ) -and $resolvedTarget -ne (Join-Path $resolvedLinuxRelease "can_gateway")) {
+            throw "Refusing to install outside the distribution roots: $resolvedTarget"
         }
         $package.Backup = Join-Path $distRoot (".gateway-backup-" + [guid]::NewGuid().ToString("N"))
         $package.HadTarget = Test-Path -LiteralPath ([string]$package.Target)
@@ -207,6 +212,7 @@ function Install-StagedPackages {
             }
         }
         foreach ($package in $Packages) {
+            New-Item -ItemType Directory -Path (Split-Path -Parent ([string]$package.Target)) -Force | Out-Null
             Move-Item -LiteralPath ([string]$package.Staged) -Destination ([string]$package.Target)
             $package.Installed = $true
         }
@@ -248,7 +254,7 @@ if ($PlanOnly) {
         web_builds = 1
         dependency_cache = "tools/can_gateway/web/node_modules/.excavatorsim-build-state.json"
         windows_output = if ($selectedPlatforms -contains "windows") { "dist/can_gateway" } else { $null }
-        linux_output = if ($selectedPlatforms -contains "linux") { "dist/can_gateway_linux" } else { $null }
+        linux_output = if ($selectedPlatforms -contains "linux") { "godot/dist/linux/can_gateway" } else { $null }
         manifests = $true
         packaged_smoke = -not $SkipSmoke
     } | ConvertTo-Json -Depth 3
@@ -313,7 +319,7 @@ export PATH="`$HOME/.local/share/fnm/aliases/default/bin:`$HOME/.local/bin:`$PAT
 cd '$wslRepoRoot/tools/can_gateway'
 ./dist_linux.sh --skip-web-build --dist-dir '$wslLinuxStage' --build-dir "`$HOME/.cache/excavatorsim/can-gateway-build" --keep-build-dir
 "@
-        Invoke-NativeChecked -FilePath "wsl.exe" -Arguments @("bash", "-lc", $linuxBuildCommand) `
+        Invoke-NativeChecked -FilePath "wsl.exe" -Arguments @("bash", "-lc", $linuxBuildCommand.Replace("`r", "")) `
             -Name "Build Linux Gateway in WSL"
         Assert-PackageLayout -PackageRoot $linuxStage `
             -RequiredFiles @(
@@ -334,7 +340,7 @@ set -e
 bash -n '$wslLinuxStage/install_can0_helper.sh'
 bash -n '$wslLinuxStage/uninstall_can0_helper.sh'
 "@
-            Invoke-NativeChecked -FilePath "wsl.exe" -Arguments @("bash", "-lc", $linuxSmokeCommand) `
+            Invoke-NativeChecked -FilePath "wsl.exe" -Arguments @("bash", "-lc", $linuxSmokeCommand.Replace("`r", "")) `
                 -Name "Smoke Linux packaged Gateway"
         }
         Invoke-NativeChecked -FilePath "python" -Arguments @(

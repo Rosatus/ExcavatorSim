@@ -18,7 +18,7 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $godotProject = Join-Path $repoRoot "godot\client"
 $godotDist = Join-Path $repoRoot "godot\dist"
 $gatewayWindows = Join-Path $repoRoot "dist\can_gateway"
-$gatewayLinux = Join-Path $repoRoot "dist\can_gateway_linux"
+$gatewayLinux = Join-Path $godotDist "linux\can_gateway"
 $manifestTool = Join-Path $repoRoot "tools\build_manifest.py"
 $linuxPackager = Join-Path $repoRoot "tools\package_linux_release.sh"
 $stagingRoot = Join-Path $godotDist (".release-staging-" + [guid]::NewGuid().ToString("N"))
@@ -139,6 +139,11 @@ function Assert-GatewayPackageLayout {
         [Parameter(Mandatory)][string]$PackageRoot,
         [Parameter(Mandatory)][string[]]$AllowedFiles
     )
+    $calibrationFiles = @("config/calibration_sy135.toml", "config/calibration_sy80u.toml", "config/calibration_sy155w.toml")
+    $AllowedFiles += $calibrationFiles
+    foreach ($relative in $calibrationFiles) {
+        Assert-ReleaseFile -Path (Join-Path $PackageRoot $relative)
+    }
     $unexpected = @(
         Get-ChildItem -LiteralPath $PackageRoot -Recurse -File | Where-Object {
             $relative = [IO.Path]::GetRelativePath($PackageRoot, $_.FullName).Replace("\", "/")
@@ -308,7 +313,7 @@ export PATH="`$HOME/.local/share/fnm/aliases/default/bin:`$HOME/.local/bin:`$PAT
 cd '$wslRepoRoot/tools/can_gateway' && ./dist_linux.sh
 "@
     Invoke-NativeChecked -FilePath "wsl.exe" -Name "Linux Gateway build" -Arguments @(
-        "bash", "-lc", $linuxGatewayCommand
+        "bash", "-lc", $linuxGatewayCommand.Replace("`r", "")
     )
 
     Move-GatewayRuntimeResidue -PackageRoot $gatewayWindows -Platform "gateway-windows"
