@@ -502,8 +502,8 @@ func _test_controller_authority_lifecycle() -> void:
 		host.queue_free()
 		return
 	var start := chassis.global_transform
-	if start.basis.z.dot(Vector3.BACK) < 0.99:
-		failures.append("SY205 authoritative spawn added an unwanted half-turn: %s" % start.basis)
+	if start.basis.z.dot(Vector3.FORWARD) < 0.99:
+		failures.append("SY205 training spawn did not apply the half-turn: %s" % start.basis)
 	chassis.set_commands_for_test(1.0, 1.0)
 	for _frame in 120:
 		await physics_frame

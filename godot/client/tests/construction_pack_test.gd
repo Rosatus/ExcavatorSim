@@ -35,8 +35,8 @@ func run() -> void:
 	var map := scene.get_node("StaticMap") as Node3D
 	var spawn_point := map.get_node("WorkArea/SpawnPoint") as Node3D
 	var excavation_area := map.get_node("WorkArea/ExcavationArea") as Node3D
-	check(spawn_point.position.is_equal_approx(Vector3(38.301582, -0.02, 31.119902)), "Saved construction spawn changed")
-	check((-spawn_point.global_basis.z).dot(Vector3.BACK) > 0.99999, "Saved construction heading is not +Z")
+	check(spawn_point.position.is_equal_approx(Vector3(38.301582, -0.02, 75.880098)), "Saved construction spawn changed")
+	check((-spawn_point.global_basis.z).dot(Vector3.FORWARD) > 0.99999, "Saved construction heading is not -Z")
 	var area_size: Vector2 = excavation_area.get_meta("size_m")
 	check(area_size == Vector2(18, 28), "Construction work area dimensions changed")
 	var near_edge := excavation_area.get_node("NearEdge") as Node3D
@@ -79,7 +79,7 @@ func run() -> void:
 		await physics_frame
 	var before := chassis.global_position
 	check(Vector2(before.x, before.z).distance_to(Vector2(spawn_point.global_position.x, spawn_point.global_position.z)) < 0.05, "Real map did not use the saved spawn")
-	check((-chassis.global_basis.z).dot(Vector3.BACK) > 0.9999, "Real map did not use the snapped heading")
+	check((-chassis.global_basis.z).dot(Vector3.FORWARD) > 0.9999, "Real map did not use the snapped heading")
 	var snapshot := chassis._jolt_runtime.get_post_step_snapshot()
 	check(snapshot.get("grounded", false), "Real map has no track support")
 	check(snapshot.get("track_support_source_counts", {}).get("static_map", 0) > 0, "Real map ground owner was rejected")

@@ -1045,7 +1045,8 @@ func _authoritative_spawn_transform(descriptor: PhysicsRigDescriptor) -> Transfo
 		spawn.origin = map_spawn_position
 	var dynamics := descriptor.chassis_dynamics()
 	var spawn_yaw := float(dynamics.get("spawn_yaw_rad", 0.0))
-	spawn.basis = Basis(Vector3.UP, map_spawn_yaw_rad) if static_map_driving else (spawn.basis * Basis(Vector3.UP, spawn_yaw)).orthonormalized()
+	# Training turns every model around relative to its rig-authored heading.
+	spawn.basis = Basis(Vector3.UP, map_spawn_yaw_rad) if static_map_driving else (spawn.basis * Basis(Vector3.UP, spawn_yaw + PI)).orthonormalized()
 	var terrain_normal := Vector3.UP if static_map_driving else _sample_authoritative_terrain_normal(spawn.origin)
 	if terrain_normal.length_squared() > 0.5:
 		var forward := (-spawn.basis.z).slide(terrain_normal)

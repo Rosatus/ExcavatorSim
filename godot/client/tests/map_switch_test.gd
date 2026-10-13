@@ -85,6 +85,8 @@ func run() -> void:
 	check(current_scene != scene, "Map did not reload scene")
 	check(current_scene.get_node_or_null("StaticMap") == null, "Construction instance leaked into training")
 	check(current_scene.get_node("ProductSession").active_model_id == "sy135", "Return to training lost model")
+	var training_chassis := current_scene.get_node("ChassisMotionRoot") as TrackedChassisController
+	check(training_chassis.global_basis.z.dot(Vector3.FORWARD) > 0.999, "Training did not apply the 180-degree spawn turn")
 	check(current_scene.get_node("TerrainRoot/VoxelWorkZone").terrain != null, "Training voxel terrain not restored")
 	await physics_frame
 	check(current_scene.get_node("ProductSession").bucket_ground_mode == BucketGroundInteractionMode.PASSTHROUGH, "Return to training did not enable pass-through")

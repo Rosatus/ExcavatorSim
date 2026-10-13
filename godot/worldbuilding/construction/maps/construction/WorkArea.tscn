@@ -15,11 +15,8 @@ size = Vector3(0.12, 0.025, 28)
 [node name="WorkArea" type="Node3D"]
 
 [node name="SpawnPoint" type="Marker3D" parent="."]
-position = Vector3(38.301582, -0.02, 31.119902)
-rotation = Vector3(0, 3.141592653589793, 0)
-metadata/captured_position = Vector3(38.301582, 0.046694, 31.119902)
-metadata/captured_yaw_degrees = 179.847266
-metadata/axis_snap_tolerance_degrees = 10.0
+position = Vector3(38.301582, -0.02, 75.880098)
+rotation = Vector3(0, 0, 0)
 
 [node name="ExcavationArea" type="Node3D" parent="."]
 position = Vector3(38.301582, -0.02, 53.5)
