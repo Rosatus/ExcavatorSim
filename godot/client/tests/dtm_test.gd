@@ -14,6 +14,10 @@ func check(ok: bool, message: String) -> void:
 		failures.append(message)
 
 func parser_tests() -> void:
+	check(View.stepped_color(NAN) == View.UNKNOWN, "voxel missing measurement stays unknown")
+	check(View.stepped_color(-0.05) == View.GRADE and View.stepped_color(0.05) == View.GRADE, "voxel tolerance remains five centimetres")
+	check(View.stepped_color(0.06) == View.stepped_color(0.19) and View.stepped_color(0.21) != View.stepped_color(0.19), "voxel fixed bands do not normalize with terrain")
+	check(View.stepped_color(3.01) == View.stepped_color(20) and View.stepped_color(-0.6) != View.stepped_color(0.6), "voxel saturation and cut/fill signs")
 	check(View.difference_color(0.05) == View.GRADE and View.difference_color(-0.05) == View.GRADE, "both tolerance edges remain on-grade")
 	check(View.difference_color(0.2) != View.difference_color(0.6) and View.difference_color(-0.6) != View.difference_color(0.6), "depth and cut/fill have distinct colors")
 	check(View.difference_color(3) == View.difference_color(20), "fixed color range saturates beyond three metres")
@@ -37,8 +41,7 @@ func parser_tests() -> void:
 	check(is_nan(grade.height_at(Vector2(1.8, 1.8))), "inside bounds outside triangle is unknown")
 	var geo: Surface = Surface.parse(Model.demo_xml("trench", Vector3(500000, 120, 4000000), 1.37)).surfaces[0]
 	check(absf(geo.bounds.size.x - 1.37) < 0.00001, "georeferenced width preserved before float32 conversion")
-	var values: Array[Dictionary] = [{"target": -1.0, "actual": 0.0}, {"target": 0.0, "actual": -0.4}, {"target": 0.0, "actual": 0.02}, {"target": 0.0, "actual": NAN}]
-	var stats := Model.summarize(values, 0.25)
+	var stats := Model.summarize(PackedFloat32Array([-1.0, 0.0, 0.0, 0.0, NAN]), PackedFloat32Array([0.0, -0.4, 0.02, NAN, 1.0]), 0.25)
 	check(is_equal_approx(stats.cut_m3, 0.255) and is_equal_approx(stats.fill_m3, 0.1), "signed cut/fill integration")
 	check(stats.valid == 3 and is_equal_approx(stats.coverage, 0.75), "unknown excluded from quantities and exposed as coverage")
 	check(is_equal_approx(stats.on_grade, 1.0 / 3), "on-grade coverage counts only valid measurements")
@@ -90,6 +93,15 @@ func run() -> void:
 			break
 	check(int(ui._dtm.model.statistics.get("valid", 0)) > 0, "live actual samples available")
 	check(absf(float(ui._dtm.model.statistics.get("cut_m3", 0)) - 54) < 1, "6x6x1.5 pit estimated cut")
+	var original_statistics: Dictionary = ui._dtm.model.statistics.duplicate(true)
+	var original_revision: int = ui._dtm.model.display_revision
+	ui._dtm.set_chart_style(View.STYLE_TERRAIN)
+	ui._dtm.controls.style.pressed.emit()
+	check(ui._dtm.chart_style == View.STYLE_VOXEL and ui._dtm._legend.voxel, "style button switches charts and legend")
+	check(ui._dtm.model.statistics == original_statistics and ui._dtm.model.display_revision == original_revision, "style switch preserves measurement and volumes")
+	var saved := ConfigFile.new()
+	saved.load(ui.preferences_path)
+	check(saved.get_value("ui", "dtm_chart_style", "") == View.STYLE_VOXEL, "chart choice persisted")
 	for resolution in [Vector2i(1280, 720), Vector2i(1920, 1080), Vector2i(2560, 1080)]:
 		root.size = resolution
 		ui._dtm.layout_dashboard()
@@ -123,6 +135,7 @@ func run() -> void:
 	root.size = Vector2i(1280, 720)
 	for variant in ["industrial", "sany"]:
 		ui.set_ui_theme_for_test(variant)
+		check(ui._dtm.chart_style == View.STYLE_VOXEL, "application skin preserves chart style")
 		await process_frame
 		await process_frame
 		check(Rect2(Vector2.ZERO, root.get_visible_rect().size).encloses(ui._dtm.get_global_rect()), "DTM theme bounds " + variant)
@@ -137,6 +150,8 @@ func run() -> void:
 		check(ui._advanced_panel.is_ancestor_of(ui._dtm_toggle), "advanced DTM entry survives theme rebuild")
 		ui._dtm_toggle.pressed.emit()
 		check(ui._dtm.visible and ui._panel_collapsed and not paused, "advanced entry opens DTM and resumes through menu ownership")
+	ui._dtm.controls.style.pressed.emit()
+	check(ui._dtm.chart_style == View.STYLE_TERRAIN and not ui._dtm._legend.voxel, "restore terrain charts and legend")
 	ui._open_dtm_import()
 	check(paused and not ui._panel_collapsed and ui._dtm_file.visible, "file dialog pauses through existing menu")
 	ui._finish_dtm_import()
@@ -188,7 +203,7 @@ func run() -> void:
 
 	zone.reset_zone()
 	ui._dtm.model.update()
-	check(ui._dtm.model.samples.is_empty(), "reset discards old generation samples immediately")
+	check(ui._dtm.model.is_empty(), "reset discards old generation samples immediately")
 	for i in 600:
 		await physics_frame
 		if is_finite(sampler.height_at(xz)):

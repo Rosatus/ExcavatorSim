@@ -437,6 +437,10 @@ func _build_dtm() -> void:
 	_dtm.visible = false
 	add_child(_dtm)
 	_dtm.set_theme_variant(_ui_theme)
+	var config := ConfigFile.new()
+	config.load(preferences_path)
+	_dtm.set_chart_style(String(config.get_value(CONFIG_SECTION_UI, "dtm_chart_style", "terrain")))
+	_dtm.chart_style_changed.connect(func(style: String) -> void: _save_menu_preference("dtm_chart_style", style))
 	_dtm.import_requested.connect(_open_dtm_import)
 	_dtm.close_requested.connect(func() -> void: _dtm_open = false; _sync_dtm_visibility())
 	_build_dtm_menu_entry()

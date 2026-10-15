@@ -31,8 +31,13 @@ func run() -> void:
 	for point in points:
 		sampler.height_at(point)
 	print("DTM_PERF grid576_usec=", Time.get_ticks_usec() - started)
+	started = Time.get_ticks_usec()
+	for z in 24:
+		sampler.heights_at(PackedVector2Array(points.slice(z * 24, z * 24 + 24)))
+	print("DTM_PERF grid576_batched_usec=", Time.get_ticks_usec() - started)
 	var ui = scene.get_node("OperatorUI")
 	var dashboard = ui._dtm
+	dashboard.set_chart_style("terrain")
 	ui._dtm_open = true
 	ui._sync_dtm_visibility()
 	dashboard.show()
@@ -41,7 +46,7 @@ func run() -> void:
 	started = Time.get_ticks_usec()
 	for i in 120:
 		dashboard._process(1.0 / 60)
-	print("DTM_PERF dashboard120_usec=", Time.get_ticks_usec() - started, " samples=", dashboard.model.samples.size(), " visible=", dashboard.is_visible_in_tree())
+	print("DTM_PERF dashboard120_usec=", Time.get_ticks_usec() - started, " samples=", dashboard.model.actuals.size(), " visible=", dashboard.is_visible_in_tree())
 	# Measure actual draw callbacks separately from scene simulation and GPU work.
 	var draw_usec := 0
 	for i in 30:
@@ -54,22 +59,64 @@ func run() -> void:
 	for view in [dashboard.views[0], dashboard.views[1]]:
 		if view.mesh_build_count != 1:
 			failures.append("unchanged cells rebuilt on redraw: " + view.mode)
-		var arrays: Array = view._cells_mesh.surface_get_arrays(0)
-		# ArrayMesh stores vertex colors at 8-bit channel precision.
+		var arrays: Array = view._surface_mesh.surface_get_arrays(0)
 		var colors: PackedColorArray = arrays[Mesh.ARRAY_COLOR]
-		if colors.size() != 576 * 4 or absf(colors[0].a - (0.48 if view.mode == "plan" else 1.0)) > 1.0 / 255.0:
-			failures.append("cached mesh changed cell count/opacity: " + view.mode)
+		# Plan: one quad per cell. Iso adds skirt walls on two design edges.
+		var expected := 576 * 4 if view.mode == "plan" else (576 + 48) * 4
+		if colors.size() != expected or absf(colors[0].a - 1.0) > 1.0 / 255.0:
+			failures.append("cached mesh changed cell count/opacity: %s %d" % [view.mode, colors.size()])
+	# Machine motion redraws only the marker overlay, not the cached map.
+	var map_draw: int = dashboard.views[1].last_draw_usec
+	dashboard.views[1].last_draw_usec = -1
+	dashboard.views[1].set_machine({"tooth": center + Vector3(0.3, 0.5, 0), "axis": Vector2(0, 1), "width": 1.0}, {})
+	await process_frame
+	if dashboard.views[1].last_draw_usec != -1:
+		failures.append("tooth motion redrew static plan map")
+	dashboard.views[1].last_draw_usec = map_draw
+	# Theme geometry must rebuild once, then retain the same cache/overlay
+	# contract. Fractional section bounds exercise pixel strata termination.
+	var revision_before_style: int = dashboard.model.display_revision
+	dashboard.set_chart_style("voxel")
+	await process_frame
+	var voxel_builds: int = dashboard.views[0].mesh_build_count
+	draw_usec = 0
+	for i in 30:
+		for view in dashboard.views:
+			view.queue_redraw()
+		await process_frame
+		for view in dashboard.views:
+			draw_usec += view.last_draw_usec
+	print("DTM_PERF voxel_draw30_usec=", draw_usec)
+	if dashboard.model.display_revision != revision_before_style or dashboard.views[0].mesh_build_count != voxel_builds:
+		failures.append("voxel redraw resampled or rebuilt unchanged geometry")
+	dashboard.views[1].last_draw_usec = -1
+	dashboard.views[1].set_machine({"tooth": center + Vector3(0.6, 0.5, 0), "axis": Vector2(0, 1), "width": 1.0}, {})
+	await process_frame
+	if dashboard.views[1].last_draw_usec != -1:
+		failures.append("voxel tooth motion redrew static map")
+	var section = dashboard.views[2]
+	section.draw.connect(func() -> void:
+		section._plot = Rect2(46, 44, 300, 100.25)
+		section._distance_min = 0.0
+		section._distance_max = 1.0
+		section._height_min = -2.0
+		section._height_max = 1.0
+		section.profile.assign([{"s": 0.0, "actual": 0.0, "target": -1.0}, {"s": 1.0, "actual": 0.0, "target": -1.0}])
+		section._draw_voxel_profile(0.25), CONNECT_ONE_SHOT)
+	section.queue_redraw()
+	await process_frame
+	if section._rect_points.is_empty():
+		failures.append("fractional voxel section produced no geometry")
+	dashboard.set_chart_style("terrain")
+	await process_frame
+	if dashboard.views[0].mesh_build_count != voxel_builds + 1:
+		failures.append("restoring terrain did not rebuild style geometry")
 	# Deterministic section motion/revision probes do not move the machine.
 	dashboard._bucket = {"tooth": center + Vector3(0, 1, 0), "axis": Vector2(0, 1), "width": 1.0}
-	dashboard._profile_cursor = 49
-	dashboard.views[3].profile.clear()
-	var section_frames := 0
-	for i in 20:
-		dashboard._sample_local_profile_step()
-		section_frames += 1
-		if dashboard._profile_cursor == 49:
-			break
-	print("DTM_PERF section_frames=", section_frames, " section_latency_ms=", dashboard.profile_latency_ms)
+	dashboard._clear_profiles(false)
+	started = Time.get_ticks_usec()
+	dashboard._sample_local_profile_step()
+	print("DTM_PERF section_usec=", Time.get_ticks_usec() - started)
 	if dashboard.views[3].profile.size() != 49:
 		failures.append("section never published")
 	var count: int = dashboard.profile_sample_count
@@ -99,6 +146,12 @@ func run() -> void:
 		if measurement.sampled_at_ms > 0:
 			break
 	print("DTM_PERF grid_frames=", grid_frames)
+	started = Time.get_ticks_usec()
+	measurement.invalidate()
+	measurement.update()
+	while measurement.sampling:
+		measurement.update()
+	print("DTM_PERF full_grid_usec=", Time.get_ticks_usec() - started)
 	if measurement.sampled_at_ms == 0:
 		failures.append("grid never completed")
 	var display_revision: int = measurement.display_revision
@@ -120,7 +173,7 @@ func run() -> void:
 		failures.append("partial sweep incorrectly reported complete")
 	identity.authority_generation += 1
 	measurement.update()
-	if not measurement.samples.is_empty():
+	if not measurement.is_empty():
 		failures.append("authority reset retained old samples")
 	dashboard.model.set_surface(null)
 	dashboard._refresh_profiles()
