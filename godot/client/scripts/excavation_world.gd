@@ -607,6 +607,16 @@ func get_bucket_pose_snapshot_for_test() -> Dictionary:
 	return _last_pose_snapshot.duplicate(true)
 
 
+## Lightweight read-only identity for terrain measurement caches. Collision
+## readiness tickets are not the revision of the committed SDF data.
+func get_surface_measurement_identity() -> Dictionary:
+	return {
+		"world_generation": terrain_world.terrain_state.world_generation if terrain_world != null and terrain_world.terrain_state != null else -1,
+		"authority_generation": authority_generation,
+		"data_revision": _voxel_authority.data_revision if _voxel_authority != null else -1,
+	}
+
+
 func get_dig_diagnostics() -> Dictionary:
 	# Live press-block triage: every gate on the downward-dig path in one read.
 	var chassis := _tracked_chassis_controller.peek_runtime_snapshot() if _tracked_chassis_controller != null else {}

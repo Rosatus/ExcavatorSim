@@ -8,6 +8,7 @@ const MenuControls := preload("res://scenes/operator_menu_controls.tscn")
 
 const UIStrings := preload("res://scripts/operator_ui_strings.gd")
 const SlopeSideView := preload("res://scripts/slope_side_view.gd")
+const DtmPanel := preload("res://scripts/dtm_dashboard.gd")
 const CONFIG_PATH := "user://operator_ui.cfg"
 # Standalone test runners can isolate preferences before this node enters the tree.
 var preferences_path := CONFIG_PATH
@@ -136,6 +137,13 @@ var _assist_menu_title: Label
 var _assist_menu_micro: Label
 var _assist_menu_hint: Label
 var _slope_side_view: SlopeSideView
+var _dtm: DtmPanel
+var _dtm_toggle: Button
+var _dtm_open := false
+var _dtm_file: FileDialog
+var _dtm_placement: OptionButton
+var _dtm_height: SpinBox
+var _dtm_import_owns_menu := false
 var _ui_theme := GameSkin.VARIANT_DEBUG
 
 
@@ -303,6 +311,7 @@ func _ready() -> void:
 	_guide_panel.visible = false
 	_build_assist_menu()
 	_build_slope_side_view()
+	_build_dtm()
 	call_deferred("_start_product_gameplay")
 	_refresh_prompt_copy()
 	_refresh()
@@ -418,11 +427,98 @@ func _pop_assist_menu() -> void:
 	pop.parallel().tween_property(_assist_menu_panel, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
-## Assist guidance side view: a right-edge panel mirroring the chassis
-## `assist_view` snapshot — machine links, terrain and target profile in the
-## cabin-facing plane. Visible while a terminal-surface assist is live
-## (slope preview/active or level grading); the chassis leaves it empty
-## otherwise.
+## Independent read-only construction guidance; import reuses menu pause ownership.
+func _build_dtm() -> void:
+	_dtm = DtmPanel.new()
+	_dtm.model.sampler.zone = get_node_or_null("../TerrainRoot/VoxelWorkZone") as VoxelWorkZone
+	if _excavation_world != null:
+		_dtm.model.identity_provider = _excavation_world.get_surface_measurement_identity
+	_dtm.presentation = get_node_or_null("../MotionPresentation") as MotionPresentation
+	_dtm.visible = false
+	add_child(_dtm)
+	_dtm.set_theme_variant(_ui_theme)
+	_dtm.import_requested.connect(_open_dtm_import)
+	_dtm.close_requested.connect(func() -> void: _dtm_open = false; _sync_dtm_visibility())
+	_build_dtm_menu_entry()
+	_dtm_file = FileDialog.new()
+	_dtm_file.title = "导入施工目标 · LandXML 米制 TIN"
+	_dtm_file.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	_dtm_file.access = FileDialog.ACCESS_FILESYSTEM
+	_dtm_file.filters = PackedStringArray(["*.xml,*.landxml ; LandXML TIN"])
+	_dtm_file.initial_position = Window.WINDOW_INITIAL_POSITION_CENTER_MAIN_WINDOW_SCREEN
+	_dtm_file.min_size = Vector2i(760, 480)
+	add_child(_dtm_file)
+	var options := HBoxContainer.new()
+	_dtm_file.get_vbox().add_child(options)
+	_dtm_placement = OptionButton.new()
+	_dtm_placement.add_item("平面居中到体素区 · 保留原标高")
+	_dtm_placement.add_item("保留原坐标 · E→X / N→Z")
+	options.add_child(_dtm_placement)
+	var label := Label.new()
+	label.text = "高程偏移 (m)"
+	options.add_child(label)
+	_dtm_height = SpinBox.new()
+	_dtm_height.min_value = -100000
+	_dtm_height.max_value = 100000
+	_dtm_height.step = 0.01
+	_dtm_height.custom_minimum_size.x = 130
+	options.add_child(_dtm_height)
+	_dtm_file.file_selected.connect(func(path: String) -> void:
+		_dtm.import_file(path, _dtm_placement.selected == 0, _dtm_height.value)
+		_finish_dtm_import())
+	_dtm_file.canceled.connect(_finish_dtm_import)
+
+
+func _build_dtm_menu_entry() -> void:
+	_dtm_toggle = Button.new()
+	_dtm_toggle.name = "DtmToggle"
+	_dtm_toggle.text = "打开 DTM 施工引导 · P"
+	_dtm_toggle.tooltip_text = "作业时按 P 打开或收起；面板内可切换 HUD 模式。"
+	_advanced_panel.add_child(_dtm_toggle)
+	_dtm_toggle.pressed.connect(func() -> void:
+		_set_panel_collapsed(true)
+		_dtm_open = true
+		if _dtm.model.surface == null:
+			_dtm.load_demo("pit")
+		_sync_dtm_visibility())
+
+
+func _toggle_dtm() -> void:
+	if not _panel_collapsed or _dtm_file.visible:
+		return
+	_dtm_open = not _dtm_open
+	if _dtm_open and _dtm.model.surface == null:
+		_dtm.load_demo("pit")
+	_sync_dtm_visibility()
+
+
+func _sync_dtm_visibility() -> void:
+	if _dtm == null:
+		return
+	var assist_open := _chassis != null and _chassis.is_assist_menu_open()
+	_dtm.visible = _dtm_open and _panel_collapsed and not assist_open
+	_hud.visible = _panel_collapsed and not _dtm.visible
+	if _slope_side_view != null and _dtm.visible:
+		_slope_side_view.hide()
+
+
+func _open_dtm_import() -> void:
+	_dtm_import_owns_menu = _panel_collapsed
+	if _dtm_import_owns_menu:
+		_set_panel_collapsed(false)
+	_sync_dtm_visibility()
+	_dtm_file.popup_centered_ratio(0.75)
+
+
+func _finish_dtm_import() -> void:
+	_dtm_file.hide()
+	if _dtm_import_owns_menu:
+		_set_panel_collapsed(true)
+	_dtm_import_owns_menu = false
+	_sync_dtm_visibility()
+
+
+## Assist guidance view of machine links, terrain and the active target profile.
 func _build_slope_side_view() -> void:
 	_slope_side_view = SlopeSideView.new()
 	_slope_side_view.name = "SlopeSideView"
@@ -647,6 +743,9 @@ func _rebuild_menu_theme() -> void:
 	_hud.set_theme_variant(_ui_theme)
 	if _slope_side_view != null:
 		_slope_side_view.set_theme_variant(_ui_theme)
+	if _dtm != null:
+		_dtm.set_theme_variant(_ui_theme)
+		_build_dtm_menu_entry()
 	_guide_panel.visible = false
 	_layout_menu()
 	_set_panel_collapsed(_panel_collapsed)
@@ -697,6 +796,7 @@ func _start_product_gameplay() -> void:
 
 
 func _process(delta: float) -> void:
+	_sync_dtm_visibility()
 	if _panel_collapsed:
 		_refresh_slew_orientation()
 		return
@@ -727,6 +827,8 @@ func _refresh_slew_orientation() -> void:
 func get_control_for_test(id: String) -> Control:
 	# Stable semantic seam; the visual hierarchy may evolve independently.
 	return {
+		"dtm_toggle": _dtm_toggle,
+		"dtm_panel": _dtm,
 		"map_selector": _menu.get("map_selector"),
 		"bucket_passthrough": _bucket_passthrough_button,
 		"level_assist": _level_assist_button,
@@ -755,6 +857,12 @@ func get_control_for_test(id: String) -> Control:
 
 
 func _input(event: InputEvent) -> void:
+	if _dtm_file != null and _dtm_file.visible:
+		return # The paused FileDialog owns keyboard/controller input.
+	if _panel_collapsed and not _confirmation.visible and event is InputEventKey and event.keycode == KEY_P and event.pressed and not event.echo:
+		_toggle_dtm()
+		get_viewport().set_input_as_handled()
+		return
 	if event is InputEventKey and event.pressed and not event.echo and not _confirmation.visible:
 		if event.keycode == KEY_F12:
 			_on_capture_pressed()
@@ -2181,7 +2289,7 @@ func _sync_slope_side_view() -> void:
 	var status := _product_session.get_status_snapshot() if _product_session != null else {}
 	var view := status.get("assist_view", {}) as Dictionary
 	var mode := String(view.get("mode", ""))
-	_slope_side_view.visible = mode == "preview" or mode == "active" or mode == "level"
+	_slope_side_view.visible = (mode == "preview" or mode == "active" or mode == "level") and not (_dtm != null and _dtm.visible)
 	if _slope_side_view.visible:
 		_slope_side_view.set_view(view)
 
