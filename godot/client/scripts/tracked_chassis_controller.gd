@@ -12,6 +12,7 @@ const TOGGLE_ACTIONS := {
 	"operator_assist": {"keys": [KEY_T], "joy_button": JOY_BUTTON_Y},
 }
 const SlopePreviewVisual := preload("res://scripts/slope_cut_preview_visual.gd")
+const WaypointDriverScript := preload("res://scripts/waypoint_driver.gd")
 
 enum {
 	SLOPE_MODE_OFF,
@@ -26,6 +27,8 @@ const SLOPE_PREVIEW_REFRESH_S := 0.15
 const ASSIST_MENU_ENTRIES := [
 	{"id": "level", "label": "平地辅助"},
 	{"id": "slope", "label": "修坡辅助"},
+	{"id": "navigation", "label": "训练场正方形自动驾驶"},
+	{"id": "navigation_cancel", "label": "取消自动驾驶"},
 ]
 const MENU_NAV_THRESHOLD := 0.5
 
@@ -88,6 +91,8 @@ var _assist_menu_open := false
 var _assist_menu_index := 0
 var _menu_nav_axis := 0.0
 var race_mode_enabled := false
+var waypoint_driver := WaypointDriverScript.new()
+var _navigation_route: MeshInstance3D
 
 
 func _ready() -> void:
@@ -127,6 +132,7 @@ func _physics_process(delta: float) -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		waypoint_driver.pause("focus_lost")
 		_input_focused = false
 		locomotion_state.stop_motion()
 		if _jolt_runtime != null:
@@ -148,6 +154,8 @@ func _exit_tree() -> void:
 
 
 func set_controller_enabled(value: bool) -> void:
+	if not value:
+		waypoint_driver.pause("session_paused")
 	controller_enabled = value
 	if not value:
 		if AuthorityProfile.writes_product_pose(authority_profile):
@@ -158,6 +166,8 @@ func set_controller_enabled(value: bool) -> void:
 
 
 func set_race_mode(value: bool) -> void:
+	if value:
+		waypoint_driver.cancel("race_mode")
 	race_mode_enabled = value
 	if _jolt_runtime != null:
 		_jolt_runtime.set_race_mode(value)
@@ -172,6 +182,7 @@ func set_product_session_state(running: bool, focused: bool) -> void:
 
 
 func stop_product_motion() -> void:
+	waypoint_driver.pause("session_paused")
 	locomotion_state.stop_motion()
 	_test_commands = Vector2.ZERO
 	_test_equipment_commands = Vector4.ZERO
@@ -311,6 +322,7 @@ func get_status_snapshot() -> Dictionary:
 	status["slope_assist"] = slope_status_snapshot()
 	status["assist_menu"] = assist_menu_snapshot()
 	status["assist_view"] = _assist_view_cache
+	status["navigation"] = navigation_snapshot()
 	return status
 
 
@@ -356,6 +368,8 @@ func set_relaxed_assist_enabled(value: bool) -> bool:
 
 
 func set_level_assist_enabled(value: bool) -> bool:
+	if value:
+		waypoint_driver.cancel("equipment_assist")
 	level_assist_enabled = value
 	if _jolt_runtime == null:
 		return false
@@ -375,6 +389,7 @@ func set_level_assist_enabled(value: bool) -> bool:
 ## soil volume the confirmed cut would remove; active hands boom/arm/bucket/swing
 ## to the profile-following stage.
 func advance_slope_mode() -> String:
+	waypoint_driver.cancel("equipment_assist")
 	match _slope_mode:
 		SLOPE_MODE_OFF:
 			if _jolt_runtime == null or not _jolt_runtime.configured:
@@ -458,6 +473,7 @@ func set_assist_menu_open(open: bool) -> void:
 	_assist_menu_open = open
 	_menu_nav_axis = 0.0
 	if open:
+		waypoint_driver.pause("menu_open")
 		_assist_menu_index = clampi(_assist_menu_index, 0, ASSIST_MENU_ENTRIES.size() - 1)
 
 
@@ -471,10 +487,21 @@ func activate_assist_entry(index: int) -> String:
 	set_assist_menu_open(false)
 	match String(ASSIST_MENU_ENTRIES[index].get("id", "")):
 		"level":
+			waypoint_driver.cancel("equipment_assist")
 			set_level_assist_enabled(not level_assist_enabled)
 			return "level"
 		"slope":
+			waypoint_driver.cancel("equipment_assist")
 			return "slope:" + advance_slope_mode()
+		"navigation":
+			if waypoint_driver.state == "paused":
+				resume_navigation()
+			else:
+				start_training_square()
+			return "navigation"
+		"navigation_cancel":
+			cancel_navigation()
+			return "navigation_cancel"
 	return ""
 
 
@@ -487,6 +514,12 @@ func assist_menu_snapshot() -> Dictionary:
 				row["state"] = "on" if level_assist_enabled else "off"
 			"slope":
 				row["state"] = slope_mode_state()
+			"navigation":
+				row["state"] = waypoint_driver.state
+				if waypoint_driver.state == "paused":
+					row["label"] = "恢复自动驾驶"
+				elif static_map_driving or race_mode_enabled:
+					row["state"] = "unavailable"
 		entries.append(row)
 	return {
 		"open": _assist_menu_open,
@@ -820,6 +853,7 @@ func _sample_terrain_height(world_xz: Vector2) -> float:
 
 
 func _reset_motion() -> void:
+	waypoint_driver.cancel("reset")
 	locomotion_state.reset()
 	ground_lift_reaction.reset()
 	_base_local_transform = Transform3D.IDENTITY
@@ -859,7 +893,77 @@ func _on_world_reset(_generation: int) -> void:
 	_reset_motion()
 
 
+func navigation_snapshot() -> Dictionary:
+	return waypoint_driver.snapshot()
+
+
+func start_navigation(route: PackedVector3Array) -> bool:
+	if _jolt_runtime == null or not controller_enabled or not _input_focused or race_mode_enabled or _assist_menu_open:
+		return false
+	if not AuthorityProfile.writes_product_pose(authority_profile):
+		return false
+	var descriptor := PhysicsRigDescriptor.load_for_model(active_model_id)
+	var parameters: Dictionary = descriptor.tracks()
+	if _jolt_runtime.uses_wheels():
+		parameters = WheeledMachineProfile.load_for_model(active_model_id).data.parameters.duplicate()
+	if not waypoint_driver.start(route, _jolt_runtime.peek_post_step_snapshot(), parameters):
+		return false
+	set_level_assist_enabled(false)
+	_exit_slope_mode()
+	_show_navigation_route(route)
+	return true
+
+
+func start_training_square() -> bool:
+	if static_map_driving:
+		return false
+	return start_navigation(PackedVector3Array([
+		Vector3(-6, 0, -8), Vector3(6, 0, -8), Vector3(6, 0, 4),
+		Vector3(-6, 0, 4), Vector3(-6, 0, -8)]))
+
+
+func resume_navigation() -> bool:
+	if _jolt_runtime == null or not controller_enabled or not _input_focused or _assist_menu_open or race_mode_enabled:
+		return false
+	set_level_assist_enabled(false)
+	_exit_slope_mode()
+	return waypoint_driver.resume(_jolt_runtime.peek_post_step_snapshot())
+
+
+func cancel_navigation(why := "operator_cancelled") -> void:
+	waypoint_driver.cancel(why)
+	if is_instance_valid(_navigation_route):
+		_navigation_route.visible = false
+
+
+func _show_navigation_route(route: PackedVector3Array) -> void:
+	if not is_instance_valid(_navigation_route):
+		_navigation_route = MeshInstance3D.new()
+		_navigation_route.name = "NavigationRoute"
+		add_child(_navigation_route)
+		_navigation_route.top_level = true
+	_navigation_route.global_transform = Transform3D.IDENTITY
+	var mesh := ImmediateMesh.new()
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.albedo_color = Color(0.15, 0.85, 1.0)
+	mesh.surface_begin(Mesh.PRIMITIVE_LINES, material)
+	for i in range(route.size() - 1):
+		mesh.surface_add_vertex(route[i] + Vector3.UP * 0.15)
+		mesh.surface_add_vertex(route[i + 1] + Vector3.UP * 0.15)
+	# Crosses also make single-point goals visible.
+	for point in route:
+		for axis in [Vector3.RIGHT, Vector3.FORWARD]:
+			mesh.surface_add_vertex(point + Vector3.UP * 0.15 - axis * 0.35)
+			mesh.surface_add_vertex(point + Vector3.UP * 0.15 + axis * 0.35)
+	mesh.surface_end()
+	_navigation_route.mesh = mesh
+	_navigation_route.visible = true
+
+
 func _step_authoritative_chassis(delta: float) -> void:
+	if is_instance_valid(_navigation_route) and waypoint_driver.state == "cancelled":
+		_navigation_route.visible = false
 	if _jolt_runtime == null or not _jolt_runtime.configured:
 		return
 	if controller_enabled and _input_focused:
@@ -892,14 +996,7 @@ func _step_authoritative_chassis(delta: float) -> void:
 		left = 0.0
 		right = 0.0
 	_jolt_runtime.set_enabled(controller_enabled)
-	if _jolt_runtime.uses_wheels():
-		if not controller_enabled or not _input_focused or _slope_mode == SLOPE_MODE_PREVIEW or _assist_menu_open:
-			_jolt_runtime.stop_motion()
-		else:
-			var command := _test_wheel_commands if _use_test_wheel_commands else WheeledVehicleController.read_machine_input()
-			_jolt_runtime.set_wheeled_commands(command.x, command.y, command.z, command.w)
-	else:
-		_jolt_runtime.set_commands(left, right)
+	var wheel_command := _test_wheel_commands if _use_test_wheel_commands else WheeledVehicleController.read_machine_input()
 	var equipment_axes := Vector4.ZERO
 	if controller_enabled and (
 		_input_focused or (_test_input_focus_bypass and _use_test_equipment_commands)
@@ -919,6 +1016,29 @@ func _step_authoritative_chassis(delta: float) -> void:
 	elif _assist_menu_open:
 		_navigate_assist_menu(equipment_axes.z)
 		equipment_axes = Vector4.ZERO
+	var navigation_allowed := controller_enabled and _input_focused and not _assist_menu_open and _slope_mode != SLOPE_MODE_PREVIEW
+	if not navigation_allowed:
+		waypoint_driver.pause("input_suspended")
+	var manual_travel := absf(left) + absf(right) > 0.05
+	if _jolt_runtime.uses_wheels():
+		# Released wheel input includes automatic parking; only explicit brake is takeover.
+		manual_travel = absf(wheel_command.x) + absf(wheel_command.z) + absf(wheel_command.w) > 0.05 or wheel_command.y > 0.05
+	if navigation_allowed and (manual_travel or equipment_axes.length() > 0.08):
+		if waypoint_driver.is_active() or waypoint_driver.state == "paused":
+			waypoint_driver.cancel("manual_takeover")
+	if waypoint_driver.is_active() and navigation_allowed:
+		var automatic: Vector3 = waypoint_driver.step(delta, _jolt_runtime.peek_post_step_snapshot())
+		left = automatic.x
+		right = automatic.y
+		wheel_command = Vector4(automatic.x, automatic.y, automatic.z, 0)
+		equipment_axes = Vector4.ZERO
+	if _jolt_runtime.uses_wheels():
+		if not navigation_allowed:
+			_jolt_runtime.stop_motion()
+		else:
+			_jolt_runtime.set_wheeled_commands(wheel_command.x, wheel_command.y, wheel_command.z, wheel_command.w)
+	else:
+		_jolt_runtime.set_commands(left, right)
 	_jolt_runtime.set_attachment_bucket_limits(
 		_motion_presentation.get_active_attachment_id() if _motion_presentation != null else ""
 	)
@@ -1008,6 +1128,7 @@ func _configure_jolt_runtime(catalog_entry: Dictionary) -> bool:
 
 
 func _destroy_jolt_runtime() -> void:
+	waypoint_driver.cancel("runtime_changed")
 	_assist_view_cache = {}
 	_hide_slope_preview()
 	if _jolt_runtime == null:

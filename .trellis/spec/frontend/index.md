@@ -24,6 +24,7 @@ code; this policy does not authorize removing SY205 or deliberately breaking it.
 
 - [Game Menu and Driving HUD](./game-menu-hud.md) — automatic entry, modal input/pause ownership, controller navigation and hardware supervision.
 - [Optional Map Packs](./optional-map-packs.md) — isolated map sources, pack loading, static-map driving and scene reload lifecycle.
+- [Automatic Driving](../../../docs/automatic-driving.md) — local waypoint command arbitration, tracked/wheeled training-square acceptance, pause/takeover and straight-drive diagnostics.
 
 - [Client Boundary](./client-boundary.md) — ownership, transport, derived terrain, and local physics rules.
 - [Godot MCP Development Tool](./godot-mcp.md) — connection checks, safe editor automation, and cross-layer boundaries.

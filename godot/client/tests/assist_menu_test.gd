@@ -19,11 +19,13 @@ func _initialize() -> void:
 	if not _expect(not bool(menu.get("open", true)), "menu closed by default"):
 		failures += 1
 	var entries := menu.get("entries", []) as Array
-	if not _expect(entries.size() == 2, "two menu entries"):
+	if not _expect(entries.size() == 4, "equipment and navigation menu entries"):
 		failures += 1
 	if not _expect(String((entries[0] as Dictionary).get("id", "")) == "level", "entry 0 = level"):
 		failures += 1
 	if not _expect(String((entries[1] as Dictionary).get("id", "")) == "slope", "entry 1 = slope"):
+		failures += 1
+	if not _expect(entries[2].id == "navigation" and entries[3].id == "navigation_cancel", "navigation entries"):
 		failures += 1
 
 	# Open + nav wraparound: W (positive arm axis) moves selection up/previous,
@@ -37,13 +39,14 @@ func _initialize() -> void:
 	chassis._navigate_assist_menu(-1.0)
 	if not _expect(int(chassis.assist_menu_snapshot().get("index", -1)) == 1, "held axis does not repeat"):
 		failures += 1
-	chassis._navigate_assist_menu(0.0)
-	chassis._navigate_assist_menu(-1.0)
+	for i in 3:
+		chassis._navigate_assist_menu(0.0)
+		chassis._navigate_assist_menu(-1.0)
 	if not _expect(int(chassis.assist_menu_snapshot().get("index", -1)) == 0, "re-press wraps to 0"):
 		failures += 1
 	chassis._navigate_assist_menu(0.0)
 	chassis._navigate_assist_menu(1.0)
-	if not _expect(int(chassis.assist_menu_snapshot().get("index", -1)) == 1, "W nav up wraps to last"):
+	if not _expect(int(chassis.assist_menu_snapshot().get("index", -1)) == 3, "W nav up wraps to last"):
 		failures += 1
 
 	# Level activation toggles the flag and closes the menu.

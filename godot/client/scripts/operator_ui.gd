@@ -127,6 +127,7 @@ var _guide_recovery_label: Label
 var _guide_close_button: Button
 var _confirmation: ConfirmationDialog
 var _assist_menu_panel: PanelContainer
+var _navigation_label: Label
 var _assist_menu_rows_box: VBoxContainer
 var _assist_menu_rows: Array[Button] = []
 var _assist_menu_stripe: ColorRect
@@ -320,6 +321,14 @@ func _apply_dialog_theme() -> void:
 ## chassis assist_menu status block. Keyboard W/S navigates, Enter activates,
 ## T/Esc closes — rows stay clickable when the pointer is free.
 func _build_assist_menu() -> void:
+	_navigation_label = Label.new()
+	_navigation_label.name = "NavigationStatus"
+	_navigation_label.position = Vector2(24, 80)
+	_navigation_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_navigation_label.add_theme_color_override("font_shadow_color", Color.BLACK)
+	_navigation_label.add_theme_constant_override("shadow_offset_x", 2)
+	_navigation_label.add_theme_constant_override("shadow_offset_y", 2)
+	add_child(_navigation_label)
 	_assist_menu_panel = PanelContainer.new()
 	_assist_menu_panel.name = "AssistMenu"
 	_assist_menu_panel.visible = false
@@ -2101,6 +2110,15 @@ func _sync_assist_menu() -> void:
 		return
 	var status := _product_session.get_status_snapshot() if _product_session != null else {}
 	var menu := status.get("assist_menu", {}) as Dictionary
+	var navigation: Dictionary = status.get("navigation", {})
+	var navigation_state := String(navigation.get("state", "idle"))
+	if _navigation_label != null:
+		_navigation_label.visible = navigation_state not in ["idle", "cancelled"]
+		var names := {"arming": "准备", "aligning": "对正方向", "driving": "行驶中", "braking": "停车中", "paused": "已暂停", "completed": "已完成", "failed": "已停止"}
+		_navigation_label.text = "自动驾驶：%s · %d/%d · %.1f m  |  T 辅助菜单" % [names.get(navigation_state, navigation_state), mini(int(navigation.get("index", 0)) + 1, int(navigation.get("count", 0))), int(navigation.get("count", 0)), float(navigation.get("distance_m", 0))]
+		var reasons := {"no_progress": "长时间无进展", "unsupported": "失去地面支撑", "invalid_state": "车辆状态无效", "stale_state": "车辆状态未更新", "position_tolerance": "停车或转向后偏离目标，请重新定位后启动"}
+		if navigation_state == "failed":
+			_navigation_label.text += " · " + String(reasons.get(navigation.get("reason", ""), navigation.get("reason", "")))
 	var open := bool(menu.get("open", false))
 	var was_open := _assist_menu_panel.visible
 	_assist_menu_panel.visible = open
@@ -2132,11 +2150,14 @@ func _sync_assist_menu() -> void:
 			_assist_menu_rows_box.add_child(row)
 			_assist_menu_rows.append(row)
 	var selected := int(menu.get("index", 0))
-	var state_names := {"off": "关", "on": "作业中", "preview": "预览", "active": "作业中"}
+	var state_names := {"off": "关", "on": "作业中", "preview": "预览", "active": "作业中", "idle": "待机", "arming": "准备", "aligning": "对正", "driving": "行驶中", "braking": "停车中", "paused": "已暂停", "completed": "完成", "failed": "已停止", "cancelled": "已取消"}
 	for i in _assist_menu_rows.size():
 		var entry := entries[i] as Dictionary
 		var row := _assist_menu_rows[i]
 		var state := String(entry.get("state", "off"))
+		row.disabled = state == "unavailable"
+		if state == "unavailable":
+			state_names[state] = "仅训练场普通模式"
 		row.text = "%d  %s · %s" % [i + 1, String(entry.get("label", "")), state_names.get(state, state)]
 		if console:
 			# Nav styling carries the selection: accent left bar plus lit text.

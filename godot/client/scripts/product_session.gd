@@ -196,7 +196,9 @@ func get_attachment_input_axes() -> Vector2:
 		return Vector2.ZERO
 	if _chassis != null and _chassis.input_axes_suspended():
 		return Vector2.ZERO
-	return _motion_client.get_attachment_input_axes()
+	var axes := _motion_client.get_attachment_input_axes()
+	_cancel_navigation_for_manual_axis(axes.length())
+	return axes
 
 
 ## Model-local presentation axis input in [-1, 1] (e.g. SY80U boom offset).
@@ -208,7 +210,14 @@ func get_local_axis_input(axis_id: String, negative_action: String, positive_act
 		return 0.0
 	if _chassis != null and _chassis.input_axes_suspended():
 		return 0.0
-	return _motion_client.get_local_axis_input(axis_id, negative_action, positive_action)
+	var axis := _motion_client.get_local_axis_input(axis_id, negative_action, positive_action)
+	_cancel_navigation_for_manual_axis(absf(axis))
+	return axis
+
+
+func _cancel_navigation_for_manual_axis(strength: float) -> void:
+	if strength > 0.08 and _chassis != null and (_chassis.waypoint_driver.is_active() or _chassis.waypoint_driver.state == "paused"):
+		_chassis.cancel_navigation("manual_takeover")
 
 
 func request_coupler_switch(coupler_id: String) -> bool:
@@ -244,6 +253,8 @@ func _request_attachment_switch(coupler_id: String, tool_id: String) -> bool:
 
 
 func _on_attachment_activated(_attachment_id: String) -> void:
+	if _chassis != null:
+		_chassis.cancel_navigation("attachment_changed")
 	_sync_attachment_ids()
 
 
@@ -428,6 +439,7 @@ func get_status_snapshot() -> Dictionary:
 		"simple_digging_mode": simple_digging_mode,
 		"slope_assist": _chassis.slope_status_snapshot() if _chassis != null else {"state": "off"},
 		"assist_menu": _chassis.assist_menu_snapshot() if _chassis != null else {"open": false, "index": 0, "entries": []},
+		"navigation": _chassis.navigation_snapshot() if _chassis != null else {"state": "idle"},
 		"assist_view": _chassis.assist_view_snapshot() if _chassis != null else {},
 		"last_error": last_error,
 	}
