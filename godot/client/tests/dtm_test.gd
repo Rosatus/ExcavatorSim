@@ -166,6 +166,19 @@ func run() -> void:
 	zone.issue_edit_ticket(AABB(zone.layout.world_to_voxel(center - Vector3.ONE, zone.voxel_scale_m), Vector3.ONE * 2 / zone.voxel_scale_m), &"dtm_test")
 	var cut := sampler.height_at(xz)
 	check(is_finite(cut) and cut < initial - 0.8, "DTM observes excavated SDF immediately, not initial heightfield")
+	# Batched row/section reads must equal the scalar column search, including
+	# the dug bowl, its rim and points outside the voxel domain.
+	var probe := PackedVector2Array()
+	for k in 61:
+		probe.append(xz + Vector2(-1.9 + k * 0.0637, 0.31 - k * 0.0217))
+	probe.append(Vector2(500, 500))
+	var batched := sampler.heights_at(probe)
+	var batch_ok := true
+	for k in probe.size():
+		var scalar := sampler.height_at(probe[k])
+		if is_finite(scalar) != is_finite(batched[k]) or (is_finite(scalar) and absf(scalar - batched[k]) > 0.0001):
+			batch_ok = false
+	check(batch_ok, "batched SDF heights equal scalar sampler")
 	ui._dtm.model.invalidate()
 	for i in 300:
 		await process_frame
