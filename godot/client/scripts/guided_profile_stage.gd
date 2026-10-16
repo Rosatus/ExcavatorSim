@@ -269,7 +269,7 @@ func step(ctx: RefCounted, commands: Vector4) -> Dictionary:
 			normal_row[index] = (columns[WORK_JOINTS[index]] as Vector3).dot(normal)
 			tangent_row[index] = (columns[WORK_JOINTS[index]] as Vector3).dot(axis)
 		var normal_speed := clampf(height_gain_hz * height_error, -max_height_correction_m_s, max_height_correction_m_s) - chassis.dot(normal)
-		solved = Solver.solve_surface(normal_row, tangent_row, normal_speed, intent_speed - chassis.dot(axis), dls_lambda, ctx, WORK_JOINTS)
+		solved = Solver.solve_surface(normal_row, tangent_row, normal_speed, intent_speed - chassis.dot(axis), dls_lambda, ctx, WORK_JOINTS, ctx.tooth_contact_preference(ctx.exterior_points, normal) * 0.15)
 		_attitude_ref = ctx.bucket_attitude_rad()
 		_last_attitude_error_rad = 0.0
 		flags.append("%s_relaxed" % flag_prefix)

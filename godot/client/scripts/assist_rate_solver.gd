@@ -224,7 +224,7 @@ static func rates_to_commands(rates: Vector3, ctx: RefCounted, work_joints: Arra
 ## then optimize travel and a small joint-centering regularizer on that plane.
 ## Enumerating 3^3 active sets is bounded and avoids iterative QP convergence
 ## or removing an entire joint simply because one direction is saturated.
-static func solve_surface(normal: Vector3, tangent: Vector3, normal_speed: float, travel_speed: float, lambda: float, ctx: RefCounted, joints: Array) -> Dictionary:
+static func solve_surface(normal: Vector3, tangent: Vector3, normal_speed: float, travel_speed: float, lambda: float, ctx: RefCounted, joints: Array, contact_preference := Vector3.ZERO) -> Dictionary:
 	var low := Vector3.ZERO
 	var high := Vector3.ZERO
 	var preferred := Vector3.ZERO
@@ -257,7 +257,7 @@ static func solve_surface(normal: Vector3, tangent: Vector3, normal_speed: float
 		normal_low += normal[index] * (low[index] if normal[index] >= 0.0 else high[index])
 		normal_high += normal[index] * (high[index] if normal[index] >= 0.0 else low[index])
 	var attainable := clampf(normal_speed, normal_low, normal_high)
-	var rates := bounded_surface_rates(normal, tangent, attainable, travel_speed, low, high, preferred, lambda)
+	var rates := bounded_surface_rates(normal, tangent, attainable, travel_speed, low, high, preferred + contact_preference, lambda)
 	var commands := Vector3.ZERO
 	for index in 3:
 		commands[index] = ctx.command_for_velocity(joints[index], rates[index])

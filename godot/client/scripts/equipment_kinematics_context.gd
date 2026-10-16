@@ -65,6 +65,22 @@ func pitch_coeff(joint_name: String) -> float:
 	return (joint_axis_world.get(joint_name, Vector3.ZERO) as Vector3).dot(hinge_normal)
 
 
+## Bias the redundant pitch degree of freedom toward tooth contact. The
+## surface constraint still protects the complete exterior from overcut.
+func tooth_contact_preference(points: Array[Vector3], normal: Vector3) -> Vector3:
+	var worst := 0.0
+	var derivative := 0.0
+	for point in points:
+		var offset := point - bucket_ref_world
+		var gap := normal.dot(offset)
+		if gap < worst:
+			worst = gap
+			derivative = normal.dot(hinge_normal.cross(offset))
+	var pitch_rate := clampf((-worst + 0.025) * derivative / (derivative * derivative + 0.04), -0.45, 0.45) if worst < -0.025 else 0.0
+	var row := Vector3(pitch_coeff("boom_joint"), pitch_coeff("arm_joint"), pitch_coeff("bucket_joint"))
+	return row * pitch_rate / maxf(row.length_squared(), 0.001)
+
+
 ## The fraction of a commanded joint rate that the integrator is predicted to
 ## honor this tick: dig-direction rates lose to cut engagement, and both
 ## directions fade inside the limit margin. Mirrors propose_step exactly so a
