@@ -46,7 +46,7 @@ func run() -> void:
 	var initial: Dictionary = chassis.peek_runtime_snapshot().duplicate()
 	var maximum_yaw := 0.0
 	var maximum_lateral := 0.0
-	for i in 36000:
+	for i in 180000:
 		session.set_focused(true)
 		await physics_frame
 		var status := chassis.surface_job.snapshot()
@@ -64,10 +64,10 @@ func run() -> void:
 			break
 	var result := chassis.surface_job.snapshot()
 	print("URBAN_RESULT ", result)
-	var passed: bool = result.state == "completed" and result.completed >= 2
+	var passed: bool = result.state == "completed" and result.completed == 10 and result.count == 10
 	var max_remaining := -INF
 	var min_remaining := INF
-	for longitudinal in 20:
+	for longitudinal in 100:
 		for lateral in 5:
 			var p := center - axis * ((longitudinal + 0.5) * 0.1) + side * ((lateral - 2) * 0.2)
 			var actual := sampler.height_at(p)

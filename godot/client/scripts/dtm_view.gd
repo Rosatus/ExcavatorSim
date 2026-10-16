@@ -98,6 +98,8 @@ func _ready() -> void:
 			arrow.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 			arrow.tooltip_text = "向左旋转 90°" if direction < 0 else "向右旋转 90°"
 			if mode == "section":
+				arrow.name = "SectionSwap"
+				arrow.text = "⇄"
 				arrow.tooltip_text = "交换 A / A′ 显示方向"
 			add_child(arrow)
 			arrow.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT if direction < 0 else Control.PRESET_TOP_RIGHT)
@@ -327,6 +329,10 @@ func _draw() -> void:
 		draw_line(Vector2(12, 9 if compact else 15), Vector2(12, 22 if compact else 30), accent, 2)
 	_text(self, Vector2(21, 21 if compact else 28), TITLES.get(mode, mode), TEXT, 12 if compact else 14)
 	_plot = Rect2(Vector2(36 if compact else 46, 30 if compact else 44), Vector2(maxf(size.x - (48 if compact else 62), 1), maxf(size.y - (50 if compact else 76), 1)))
+	if mode == "section" and has_node("SectionSwap"):
+		var swap := get_node("SectionSwap") as Label
+		swap.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		swap.position = Vector2(_plot.get_center().x - 12, _plot.position.y - 6)
 	if voxel:
 		draw_texture_rect(_dots(), _plot, true, Color(0.55, 0.68, 0.78, 0.13))
 	if model == null or model.surface == null:

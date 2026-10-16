@@ -186,7 +186,11 @@ func _ready() -> void:
 	mode_row.add_child(side)
 	controls["dump_side"] = side
 	_automatic_label = Label.new()
-	_automatic_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_automatic_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_automatic_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_automatic_label.custom_minimum_size.y = 24
+	_automatic_label.add_theme_font_size_override("font_size", 12)
+	_automatic_label.add_theme_color_override("font_color", Color("94aebe"))
 	outer.add_child(_automatic_label)
 	_source = Label.new()
 	_source.add_theme_font_size_override("font_size", 11)
@@ -477,7 +481,14 @@ func _process(delta: float) -> void:
 		(controls["simple_digging"] as CheckButton).set_pressed_no_signal(bool(job.get("simple_mode", false)))
 		var names := {"idle": "未开始", "cancelled": "已停止", "paused": "已暂停", "failed": "失败", "completed": "复测达标", "select": "选择作业点", "lift": "抬斗", "finish_lift": "收尾抬斗", "navigate": "转场", "orient": "朝向校正", "approach": "对准切削点", "cut": "分层切削", "sweep": "收斗精修", "verify": "地表复测"}
 		names.merge({"dump_lift": "卸土抬斗", "dump_swing": "回转至卸土区", "dump_open": "倾倒", "dump_close": "收斗", "dump_return": "回转复位"})
-		_automatic_label.text = "自动作业：%s · 作业点 %d/%d · 已卸土 %d 次 %s" % [names.get(job.state, job.state), int(job.completed), int(job.count), int(job.get("dump_cycles", 0)), job.reason]
+		names["cut"] = "连续切削" if bool(job.get("simple_mode", false)) else "挖掘"
+		_automatic_label.text = "自动作业  ·  %s  ·  %d / %d" % [names.get(job.state, job.state), int(job.completed), int(job.count)]
+		if not bool(job.get("simple_mode", false)):
+			_automatic_label.text += "  ·  卸土 %d 次" % int(job.get("dump_cycles", 0))
+		if not String(job.reason).is_empty():
+			_automatic_label.text += "  ·  " + String(job.reason)
+		_automatic_label.tooltip_text = _automatic_label.text
+		_automatic_label.add_theme_color_override("font_color", Color("ee9b55") if job.state in ["failed", "paused"] else Color("94aebe"))
 	var machine_key := presentation.get_active_model_id() + ":" + presentation.get_active_attachment_id() if is_instance_valid(presentation) else ""
 	if machine_key != _machine_key:
 		_machine_key = machine_key
@@ -554,12 +565,12 @@ func _refresh_metrics() -> void:
 	_summary.text = "铲齿 %s   |   挖 %s   填 %s   达标 %s" % [clearance, _hud_values[0].text, _hud_values[1].text, _hud_values[2].text]
 	var age := (Time.get_ticks_msec() - model.sampled_at_ms) / 1000.0 if model.sampled_at_ms > 0 else 0.0
 	var coverage := float(stats.get("coverage", 0)) * 100
-	_status.text = "实测覆盖 %.0f%% · %.2f m 采样 · %s · SDF 顶表面 · 切削刃中心" % [coverage, maxf(model.cell_size.x, model.cell_size.y), "采样中" if model.sampling else "%.1f s 前更新" % age]
+	_status.text = "实测覆盖 %.0f%% · %.2f m 采样 · SDF 顶表面 · 切削刃中心" % [coverage, maxf(model.cell_size.x, model.cell_size.y)]
 	if bool(stats.get("mixed_revision", false)):
 		_status.text += " · 施工中分批测量"
-	_status.tooltip_text = _status.text + "\n" + _summary.text + "\n" + _message.text
+	_status.tooltip_text = _status.text + "\n地表更新于 %.1f 秒前" % age + "\n" + _summary.text + "\n" + _message.text
 	if hud_mode:
-		_status.text = "覆盖 %.0f%% · %s" % [coverage, "采样中" if model.sampling else "%.1f s 前" % age]
+		_status.text = "覆盖 %.0f%%" % coverage
 
 func _refresh_profiles() -> void:
 	if model.surface == null:

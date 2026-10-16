@@ -333,6 +333,19 @@ func _build_assist_menu() -> void:
 	_navigation_label = Label.new()
 	_navigation_label.name = "NavigationStatus"
 	_navigation_label.position = Vector2(24, 80)
+	_navigation_label.custom_minimum_size = Vector2(320, 30)
+	_navigation_label.size.x = 320
+	_navigation_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_navigation_label.add_theme_font_size_override("font_size", 13)
+	_navigation_label.add_theme_color_override("font_color", Color("b6ccd8"))
+	var navigation_style := StyleBoxFlat.new()
+	navigation_style.bg_color = Color(0.035, 0.065, 0.085, 0.88)
+	navigation_style.set_corner_radius_all(6)
+	navigation_style.content_margin_left = 12
+	navigation_style.content_margin_right = 12
+	navigation_style.content_margin_top = 6
+	navigation_style.content_margin_bottom = 6
+	_navigation_label.add_theme_stylebox_override("normal", navigation_style)
 	_navigation_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_navigation_label.add_theme_color_override("font_shadow_color", Color.BLACK)
 	_navigation_label.add_theme_constant_override("shadow_offset_x", 2)
@@ -506,9 +519,9 @@ func _load_automatic_trench() -> void:
 	if not is_finite(height):
 		_dtm.show_error("铲斗轴线不在可测量的体素区")
 		return
-	var xml := '<LandXML><Units><Metric linearUnit="meter"/></Units><Surfaces><Surface name="轴线沟 · 2m · 深1m"><Definition surfType="TIN"><Pnts>'
+	var xml := '<LandXML><Units><Metric linearUnit="meter"/></Units><Surfaces><Surface name="轴线沟 · 10m · 深1m"><Definition surfType="TIN"><Pnts>'
 	for i in 4:
-		var p := center + side * float(bucket.width) * (-0.5 if i in [0, 3] else 0.5) - axis * (2.0 if i in [2, 3] else 0.0)
+		var p := center + side * float(bucket.width) * (-0.5 if i in [0, 3] else 0.5) - axis * (10.0 if i in [2, 3] else 0.0)
 		xml += '<P id="%d">%.6f %.6f %.6f</P>' % [i + 1, p.y, p.x, height - 1.0]
 	xml += '</Pnts><Faces><F>1 2 3</F><F>1 3 4</F></Faces></Definition></Surface></Surfaces></LandXML>'
 	var parsed := LandXmlSurface.parse(xml)
@@ -516,7 +529,7 @@ func _load_automatic_trench() -> void:
 		_dtm.show_error(parsed.error)
 		return
 	_chassis.cancel_surface_job()
-	_dtm.load_local_surfaces(parsed.surfaces, "当前铲斗轴线向后 2m · 深1m · 正常模式自动回转卸土")
+	_dtm.load_local_surfaces(parsed.surfaces, "当前铲斗轴线向后 10m · 深1m · 正常模式自动回转卸土")
 
 
 func _build_dtm_menu_entry() -> void:
@@ -2271,9 +2284,9 @@ func _sync_assist_menu() -> void:
 	var navigation: Dictionary = status.get("navigation", {})
 	var navigation_state := String(navigation.get("state", "idle"))
 	if _navigation_label != null:
-		_navigation_label.visible = navigation_state not in ["idle", "cancelled"]
+		_navigation_label.visible = navigation_state not in ["idle", "cancelled", "completed"] and not (_product_session._chassis != null and _product_session._chassis.surface_job.active())
 		var names := {"arming": "准备", "aligning": "对正方向", "driving": "行驶中", "braking": "停车中", "paused": "已暂停", "completed": "已完成", "failed": "已停止"}
-		_navigation_label.text = "自动驾驶：%s · %d/%d · %.1f m  |  T 辅助菜单" % [names.get(navigation_state, navigation_state), mini(int(navigation.get("index", 0)) + 1, int(navigation.get("count", 0))), int(navigation.get("count", 0)), float(navigation.get("distance_m", 0))]
+		_navigation_label.text = "自动驾驶  ·  %s  ·  %d/%d  ·  %.1f m" % [names.get(navigation_state, navigation_state), mini(int(navigation.get("index", 0)) + 1, int(navigation.get("count", 0))), int(navigation.get("count", 0)), float(navigation.get("distance_m", 0))]
 		var reasons := {"no_progress": "长时间无进展", "unsupported": "失去地面支撑", "invalid_state": "车辆状态无效", "stale_state": "车辆状态未更新", "position_tolerance": "停车或转向后偏离目标，请重新定位后启动"}
 		if navigation_state == "failed":
 			_navigation_label.text += " · " + String(reasons.get(navigation.get("reason", ""), navigation.get("reason", "")))
