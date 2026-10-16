@@ -23,6 +23,7 @@ var distance_m := 0.0
 var cross_track_m := 0.0
 var completed_points := 0
 var wheeled := false
+var reverse := false
 var belt_speed := 3.1
 var track_width := 2.0
 var wheelbase := 2.6
@@ -63,6 +64,7 @@ func start(route: PackedVector3Array, snapshot: Dictionary, parameters: Dictiona
 			if Vector2(route[i].x - route[i - 1].x, route[i].z - route[i - 1].z).length() < next_wheelbase / tan(next_steer) * 2.16:
 				return false
 	wheeled = next_wheeled
+	reverse = bool(parameters.get("reverse", false)) and not wheeled
 	belt_speed = next_belt
 	track_width = next_gauge
 	wheelbase = next_wheelbase
@@ -163,6 +165,8 @@ func step(delta: float, snapshot: Dictionary) -> Vector3:
 	var speed := Vector2(velocity.x, velocity.z).length()
 	var forward_3d: Vector3 = snapshot.vehicle_forward_world
 	var forward := Vector2(forward_3d.x, forward_3d.z).normalized()
+	if reverse:
+		forward = -forward
 	var right := Vector2(-forward.y, forward.x)
 	var line := target - start_xz
 	var along := clampf((p - start_xz).dot(line) / maxf(line.length_squared(), 0.0001), 0, 1)
@@ -259,8 +263,9 @@ func step(delta: float, snapshot: Dictionary) -> Vector3:
 		var approach_speed := 0.8 * distance_m if distance_m <= 0.25 else 0.2 + 1.6 * (distance_m - 0.25)
 		desired = minf(desired, maxf(0.04, approach_speed))
 		var travel := desired * maxf(0, cos(error)) if state == "driving" else 0.0
-		var left := (travel + omega * track_width * 0.5) / belt_speed
-		var right_command := (travel - omega * track_width * 0.5) / belt_speed
+		var signed_travel := -travel if reverse else travel
+		var left := (signed_travel + omega * track_width * 0.5) / belt_speed
+		var right_command := (signed_travel - omega * track_width * 0.5) / belt_speed
 		return Vector3(clampf(left, -1, 1), clampf(right_command, -1, 1), 0)
 	return _wheel_command(snapshot, p, forward, right, speed)
 

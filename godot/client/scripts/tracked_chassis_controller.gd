@@ -92,6 +92,7 @@ var _assist_menu_index := 0
 var _menu_nav_axis := 0.0
 var race_mode_enabled := false
 var waypoint_driver := WaypointDriverScript.new()
+var surface_job := preload("res://scripts/surface_job_executor.gd").new()
 var _navigation_route: MeshInstance3D
 
 
@@ -132,6 +133,9 @@ func _physics_process(delta: float) -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		_input_focused = false
+		if surface_job.active():
+			return
 		waypoint_driver.pause("focus_lost")
 		_input_focused = false
 		locomotion_state.stop_motion()
@@ -167,6 +171,7 @@ func set_controller_enabled(value: bool) -> void:
 
 func set_race_mode(value: bool) -> void:
 	if value:
+		surface_job.cancel("race_mode")
 		waypoint_driver.cancel("race_mode")
 	race_mode_enabled = value
 	if _jolt_runtime != null:
@@ -177,11 +182,12 @@ func set_product_session_state(running: bool, focused: bool) -> void:
 	if AuthorityProfile.writes_product_pose(authority_profile):
 		controller_enabled = running
 	_input_focused = focused
-	if not running or not focused:
+	if not running or (not focused and not surface_job.active()):
 		stop_product_motion()
 
 
 func stop_product_motion() -> void:
+	surface_job.pause("session_paused")
 	waypoint_driver.pause("session_paused")
 	locomotion_state.stop_motion()
 	_test_commands = Vector2.ZERO
@@ -369,6 +375,7 @@ func set_relaxed_assist_enabled(value: bool) -> bool:
 
 func set_level_assist_enabled(value: bool) -> bool:
 	if value:
+		surface_job.cancel("equipment_assist")
 		waypoint_driver.cancel("equipment_assist")
 	level_assist_enabled = value
 	if _jolt_runtime == null:
@@ -389,6 +396,7 @@ func set_level_assist_enabled(value: bool) -> bool:
 ## soil volume the confirmed cut would remove; active hands boom/arm/bucket/swing
 ## to the profile-following stage.
 func advance_slope_mode() -> String:
+	surface_job.cancel("equipment_assist")
 	waypoint_driver.cancel("equipment_assist")
 	match _slope_mode:
 		SLOPE_MODE_OFF:
@@ -897,6 +905,62 @@ func navigation_snapshot() -> Dictionary:
 	return waypoint_driver.snapshot()
 
 
+func start_surface_job(surface: LandXmlSurface, sampler: DtmSurfaceSampler) -> bool:
+	if surface_job.active():
+		return false
+	if _jolt_runtime == null or not controller_enabled or not _input_focused or race_mode_enabled or _jolt_runtime.uses_wheels():
+		surface_job.reason = "请启动履带设备并退出竞速模式"
+		return false
+	if _excavation_world == null:
+		surface_job.reason = "土方系统不可用"
+		return false
+	if not _excavation_world.automatic_soil_enabled:
+		surface_job.reason = "请启用土方交互后开始作业"
+		return false
+	if BucketGroundInteractionMode.is_passthrough(_bucket_ground_mode):
+		surface_job.reason = "请关闭铲斗穿透地面后开始作业"
+		return false
+	surface_job.simple_mode = _excavation_world.simple_digging_enabled
+	surface_job.soil_payload = _excavation_world.get_selected_soil_payload_snapshot
+	surface_job.soil_visual = _excavation_world.get_soil_visual_snapshot
+	var ctx := _jolt_runtime.equipment_context(1.0 / 60.0)
+	if ctx == null:
+		return false
+	var bucket := DtmModel.bucket_state(_motion_presentation)
+	if sampler == null or not is_instance_valid(sampler.zone) or not surface_job.configure_tool(_motion_presentation.get_soil_contract(), sampler.zone):
+		surface_job.reason = "切削工具或体素区不可用"
+		return false
+	var reach := (ctx.bucket_ref_world - ctx.chassis_transform.origin).dot(ctx.horizontal)
+	var plan := SurfaceJobPlanner.build(surface, sampler.height_at, ctx.chassis_transform.origin,
+		ctx.horizontal, float(bucket.get("width", 0)), reach)
+	if not String(plan.get("error", "")).is_empty():
+		surface_job.reason = plan.error
+		return false
+	waypoint_driver.cancel("surface_job")
+	set_level_assist_enabled(false)
+	_exit_slope_mode()
+	return surface_job.start(plan, surface, sampler, _jolt_runtime.peek_post_step_snapshot(), ctx, _surface_job_identity())
+
+
+func _surface_job_identity() -> String:
+	return "%s:%s" % [active_model_id, _motion_presentation.get_active_attachment_id() if _motion_presentation != null else ""]
+
+
+func cancel_surface_job() -> void:
+	surface_job.cancel()
+	waypoint_driver.cancel("surface_job_cancelled")
+
+
+func resume_surface_job() -> bool:
+	if not controller_enabled or not _input_focused or _assist_menu_open or race_mode_enabled:
+		return false
+	if surface_job.state != "paused":
+		return false
+	if waypoint_driver.state == "paused" and not waypoint_driver.resume(_jolt_runtime.peek_post_step_snapshot()):
+		return false
+	return surface_job.resume()
+
+
 func start_navigation(route: PackedVector3Array) -> bool:
 	if _jolt_runtime == null or not controller_enabled or not _input_focused or race_mode_enabled or _assist_menu_open:
 		return false
@@ -908,6 +972,7 @@ func start_navigation(route: PackedVector3Array) -> bool:
 		parameters = WheeledMachineProfile.load_for_model(active_model_id).data.parameters.duplicate()
 	if not waypoint_driver.start(route, _jolt_runtime.peek_post_step_snapshot(), parameters):
 		return false
+	surface_job.cancel("navigation_started")
 	set_level_assist_enabled(false)
 	_exit_slope_mode()
 	_show_navigation_route(route)
@@ -923,6 +988,8 @@ func start_training_square() -> bool:
 
 
 func resume_navigation() -> bool:
+	if surface_job.active() or surface_job.state == "paused":
+		return false
 	if _jolt_runtime == null or not controller_enabled or not _input_focused or _assist_menu_open or race_mode_enabled:
 		return false
 	set_level_assist_enabled(false)
@@ -931,6 +998,8 @@ func resume_navigation() -> bool:
 
 
 func cancel_navigation(why := "operator_cancelled") -> void:
+	if surface_job.active() or surface_job.state == "paused":
+		surface_job.cancel(why)
 	waypoint_driver.cancel(why)
 	if is_instance_valid(_navigation_route):
 		_navigation_route.visible = false
@@ -997,6 +1066,8 @@ func _step_authoritative_chassis(delta: float) -> void:
 		right = 0.0
 	_jolt_runtime.set_enabled(controller_enabled)
 	var wheel_command := _test_wheel_commands if _use_test_wheel_commands else WheeledVehicleController.read_machine_input()
+	if not _input_focused:
+		wheel_command = Vector4.ZERO
 	var equipment_axes := Vector4.ZERO
 	if controller_enabled and (
 		_input_focused or (_test_input_focus_bypass and _use_test_equipment_commands)
@@ -1016,16 +1087,31 @@ func _step_authoritative_chassis(delta: float) -> void:
 	elif _assist_menu_open:
 		_navigate_assist_menu(equipment_axes.z)
 		equipment_axes = Vector4.ZERO
-	var navigation_allowed := controller_enabled and _input_focused and not _assist_menu_open and _slope_mode != SLOPE_MODE_PREVIEW
+	var navigation_allowed := controller_enabled and (_input_focused or surface_job.active()) and not _assist_menu_open and _slope_mode != SLOPE_MODE_PREVIEW
 	if not navigation_allowed:
+		surface_job.pause("input_suspended")
 		waypoint_driver.pause("input_suspended")
 	var manual_travel := absf(left) + absf(right) > 0.05
 	if _jolt_runtime.uses_wheels():
 		# Released wheel input includes automatic parking; only explicit brake is takeover.
 		manual_travel = absf(wheel_command.x) + absf(wheel_command.z) + absf(wheel_command.w) > 0.05 or wheel_command.y > 0.05
 	if navigation_allowed and (manual_travel or equipment_axes.length() > 0.08):
+		if surface_job.active() or surface_job.state == "paused":
+			surface_job.cancel("manual_takeover")
 		if waypoint_driver.is_active() or waypoint_driver.state == "paused":
 			waypoint_driver.cancel("manual_takeover")
+	if race_mode_enabled and (surface_job.active() or surface_job.state == "paused"):
+		surface_job.cancel("race_mode")
+		waypoint_driver.cancel("race_mode")
+	if surface_job.active() and navigation_allowed:
+		if surface_job.simple_mode != _excavation_world.simple_digging_enabled:
+			surface_job.fail("挖掘模式已改变，请重新开始任务")
+		equipment_axes = surface_job.step(delta, _jolt_runtime.peek_post_step_snapshot(),
+			_jolt_runtime.equipment_context(delta), _surface_job_identity(), waypoint_driver)
+		left = surface_job.drive_command.x
+		right = surface_job.drive_command.y
+		if surface_job.state == "failed":
+			waypoint_driver.cancel("surface_job_failed")
 	if waypoint_driver.is_active() and navigation_allowed:
 		var automatic: Vector3 = waypoint_driver.step(delta, _jolt_runtime.peek_post_step_snapshot())
 		left = automatic.x
@@ -1128,6 +1214,7 @@ func _configure_jolt_runtime(catalog_entry: Dictionary) -> bool:
 
 
 func _destroy_jolt_runtime() -> void:
+	surface_job.cancel("runtime_changed")
 	waypoint_driver.cancel("runtime_changed")
 	_assist_view_cache = {}
 	_hide_slope_preview()

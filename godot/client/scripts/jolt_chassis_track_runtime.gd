@@ -514,6 +514,14 @@ func set_assist_context(context: Dictionary) -> void:
 	_assist_context = context.duplicate(true)
 
 
+## Shared, read-only kinematics for autonomous task-space control.
+func equipment_context(delta: float) -> EquipmentKinematicsContext:
+	if not _assist_configured or _articulation == null or _body == null:
+		return null
+	return _assist_pipeline.build_context(_articulation, _body.global_transform,
+		delta, _assist_context, _body.linear_velocity, _body.angular_velocity)
+
+
 ## Build the slope profile the current preview parameters imply: the anchor
 ## is the live tooth position, the axis the live outward direction, and the
 ## toe height the terrain under the toe point. Shared by the preview flash

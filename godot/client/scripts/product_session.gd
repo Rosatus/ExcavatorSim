@@ -180,7 +180,7 @@ func request_model_switch(model_id: String) -> bool:
 
 func set_focused(value: bool) -> void:
 	focused = value
-	if not focused and _chassis != null:
+	if not focused and _chassis != null and not _chassis.surface_job.active():
 		_chassis.stop_product_motion()
 	status_changed.emit(get_status_snapshot())
 
@@ -216,7 +216,7 @@ func get_local_axis_input(axis_id: String, negative_action: String, positive_act
 
 
 func _cancel_navigation_for_manual_axis(strength: float) -> void:
-	if strength > 0.08 and _chassis != null and (_chassis.waypoint_driver.is_active() or _chassis.waypoint_driver.state == "paused"):
+	if strength > 0.08 and _chassis != null and (_chassis.waypoint_driver.is_active() or _chassis.waypoint_driver.state == "paused" or _chassis.surface_job.active() or _chassis.surface_job.state == "paused"):
 		_chassis.cancel_navigation("manual_takeover")
 
 
