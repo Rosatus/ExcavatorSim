@@ -46,6 +46,28 @@ func run() -> void:
 	driver.pause("menu")
 	check(driver.step(1.0 / 60, physics) == Vector3.ZERO, "paused reverse neutral")
 	var job := SurfaceJobExecutor.new()
+	var empty_payload := {"bucket_capacity_m3": 0.6, "bucket_volume_m3": 0.0}
+	var loaded_payload := {"bucket_capacity_m3": 0.6, "bucket_volume_m3": 0.3}
+	check(job.capacity_distance(empty_payload, 1.0, 0.3) > job.capacity_distance(loaded_payload, 1.0, 0.3), "remaining capacity reduces cut distance")
+	check(job.capacity_distance(empty_payload, 1.0, 0.6) < job.capacity_distance(empty_payload, 1.0, 0.3), "deeper bite shortens capacity distance")
+	for direction in [-1.0, 1.0]:
+		var ctx := EquipmentKinematicsContext.new()
+		ctx.delta = 1.0 / 60.0
+		ctx.joint_positions = {"swing_joint": 0.0}
+		ctx.joint_velocities = {"swing_joint": 0.0}
+		ctx.joint_accelerations = {"swing_joint": 0.0}
+		ctx.joint_accel_limits = {"swing_joint": Vector2(0.9, 3.6)}
+		ctx.joint_ceiling = {"swing_joint": 1.0}
+		var target: float = direction * PI / 2.0
+		var overshoot := 0.0
+		for tick in 1200:
+			var cmd := job._joint_command(ctx, "swing_joint", target)
+			var velocity := ctx.velocity_for_command("swing_joint", cmd)
+			ctx.joint_accelerations.swing_joint = move_toward(float(ctx.joint_accelerations.swing_joint), clampf((cmd * ctx.effective_ceiling("swing_joint", cmd) - float(ctx.joint_velocities.swing_joint)) / ctx.delta, -0.9, 0.9), 3.6 * ctx.delta)
+			ctx.joint_velocities.swing_joint = velocity
+			ctx.joint_positions.swing_joint += velocity * ctx.delta
+			overshoot = maxf(overshoot, direction * (float(ctx.joint_positions.swing_joint) - target))
+		check(overshoot < deg_to_rad(0.1) and job._joint_reached(ctx, "swing_joint", target), "slew settles without overshoot in both directions")
 	job.state = "cut"
 	job.pause("focus")
 	check(job.state == "paused" and not job.active(), "job pause latched")

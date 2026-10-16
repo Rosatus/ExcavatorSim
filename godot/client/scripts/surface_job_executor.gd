@@ -44,10 +44,28 @@ var _carry_bucket := 0.0
 var _after_dump := "approach"
 var _pre_dump_goal := Vector3.ZERO
 var _dump_release_id := ""
+var _continuous_cut := false
+var _bite_distance := 0.18
+var _sweep_start := Vector3.ZERO
+const LOAD_TARGET := 0.85
+
+static func capacity_distance(payload: Dictionary, width: float, depth: float) -> float:
+	var capacity := float(payload.get("visual_bucket_capacity_m3", payload.get("bucket_capacity_m3", 0.0)))
+	var remaining := maxf(0.0, capacity * LOAD_TARGET - float(payload.get("bucket_volume_m3", 0.0)))
+	# Loose material occupies more bucket volume than its in-situ prism.
+	return remaining / maxf(width * depth * 1.25, 0.001)
 
 func _joint_command(ctx: EquipmentKinematicsContext, joint: String, target: float) -> float:
 	var error := target - float(ctx.joint_positions.get(joint, 0.0))
-	return ctx.command_for_velocity(joint, clampf(error * 2.0, -0.6, 0.6))
+	var velocity := float(ctx.joint_velocities.get(joint, 0.0))
+	var limits: Vector2 = ctx.joint_accel_limits.get(joint, Vector2(0.5, 1.0))
+	# Reserve distance for acceleration reversal before decelerating. Pure
+	# position feedback commanded full speed until too late for the jerk limit.
+	var braking := maxf(limits.x * 0.5, 0.01)
+	var delay := limits.x / maxf(limits.y, 0.01) + ctx.delta * 2.0
+	var remaining := maxf(absf(error) - absf(velocity) * delay, 0.0)
+	var speed := minf(0.8, minf(absf(error) * 1.8, sqrt(2.0 * braking * remaining)))
+	return ctx.command_for_velocity(joint, signf(error) * speed)
 
 func _joint_reached(ctx: EquipmentKinematicsContext, joint: String, target: float) -> bool:
 	return absf(target - float(ctx.joint_positions.get(joint, 0.0))) < 0.001 and absf(float(ctx.joint_velocities.get(joint, 0.0))) < 0.003
@@ -106,6 +124,7 @@ func start(plan: Dictionary, surface: LandXmlSurface, measurement: DtmSurfaceSam
 	dump_cycles = 0
 	_stale = 0
 	_recut = false
+	_continuous_cut = false
 	_finish_offset = 0.0
 	drive_command = Vector2.ZERO
 	_epoch = String(snapshot.get("authority_epoch", ""))
@@ -205,7 +224,7 @@ func step(delta: float, physics: Dictionary, ctx: EquipmentKinematicsContext,
 	_stale = 0
 	_tick = tick
 	var payload: Dictionary = soil_payload.call() if soil_payload.is_valid() else {}
-	if not simple_mode and state in ["cut", "sweep", "verify"] and float(payload.get("fill_ratio", 0.0)) >= 0.65:
+	if not simple_mode and state in ["cut", "sweep", "verify"] and float(payload.get("fill_ratio", 0.0)) >= LOAD_TARGET:
 		_begin_dump(ctx, "approach")
 	if state == "dump_lift" and reached(ctx, delta):
 		transition("dump_swing")
@@ -320,11 +339,19 @@ func step(delta: float, physics: Dictionary, ctx: EquipmentKinematicsContext,
 			# Simple digging has no bucket-capacity cycle: descend directly to
 			# design grade. Normal digging takes a substantial bite, then unloads.
 			goal.y = point.y - Planner.TOLERANCE * 0.5 if _recut else (point.y if simple_mode else maxf(point.y, actual - 0.6))
+			if not simple_mode:
+				var width := float(stations[station_index].vertices[vertex_index].get("lane_width", 1.0))
+				var depth := maxf(actual - goal.y, 0.05)
+				var last: Vector3 = stations[station_index].vertices[-1].target
+				var available := maxf(0.18, (point - last).dot(stations[station_index].axis))
+				_bite_distance = clampf(capacity_distance(payload, width, depth), 0.18, minf(0.8, available))
 			_recut = false
 			transition("cut")
 	if state == "cut" and reached(ctx, delta):
+		_sweep_start = ctx.bucket_ref_world
 		transition("sweep")
-	if state == "sweep" and _elapsed >= 1.0 and absf((_cut_contact(ctx) - goal).y) < 0.005:
+	var sweep_distance := (_sweep_start - ctx.bucket_ref_world).dot(stations[station_index].axis) if station_index >= 0 else 0.0
+	if state == "sweep" and _elapsed >= 1.0 and (simple_mode or sweep_distance >= _bite_distance) and absf((_cut_contact(ctx) - goal).y) < 0.005:
 		if not simple_mode and float(payload.get("bucket_volume_m3", 0.0)) >= 0.003:
 			_begin_dump(ctx, "verify")
 			return Vector4.ZERO
@@ -357,7 +384,15 @@ func step(delta: float, physics: Dictionary, ctx: EquipmentKinematicsContext,
 				completed_stations += 1
 				transition("select")
 			else:
-				_begin_vertex(ctx)
+				var next_point: Vector3 = stations[station_index].vertices[vertex_index].target
+				# Adjacent simple-mode rows share the same cutting plane. Keep the
+				# bucket engaged instead of returning to transport clearance.
+				if simple_mode and absf(next_point.y - point.y) < 0.02 and next_point.distance_to(point) < 0.3:
+					goal = next_point
+					_continuous_cut = true
+					transition("cut")
+				else:
+					_begin_vertex(ctx)
 		else:
 			_pass += 1
 			if _pass > 25:
@@ -408,12 +443,17 @@ func step(delta: float, physics: Dictionary, ctx: EquipmentKinematicsContext,
 	# The complete brush envelope still limits vertical depth; a switching
 	# lowest brush must not drag the axial control reference around the bucket.
 	var axial_goal := goal
-	if state == "cut":
+	if state == "cut" and not _continuous_cut:
 		axial_goal += axis * 0.45 * clampf((contact.y - goal.y) / maxf(clearance - goal.y, 0.1), 0.0, 1.0)
 	var axial_error := (axial_goal - ctx.bucket_ref_world).dot(axis)
+	# Loaded cuts retain the validated carry trajectory; faster Cartesian
+	# motion changes bucket pitch and can spill material onto finished rows.
+	var gain := 3.0 if simple_mode else 2.0
+	var travel_speed := 1.1 if simple_mode else 0.65
+	var cut_speed := 0.6 if simple_mode else 0.3
 	var solved := Solver.solve_surface(normal, tangent,
-		clampf(offset.y * 2.0, -0.3 if cutting else -0.65, 0.65) - transport.y,
-		(-0.18 if state == "sweep" else clampf(axial_error * 2.0, -0.65, 0.65)) - transport.dot(axis), 0.04, ctx, JOINTS,
+		clampf(offset.y * gain, -cut_speed if cutting else -travel_speed, travel_speed) - transport.y,
+		(-0.18 if state == "sweep" else clampf(axial_error * gain, -travel_speed, travel_speed)) - transport.dot(axis), 0.04, ctx, JOINTS,
 		ctx.tooth_contact_preference(_envelope_points, Vector3.UP) if cutting else Vector3.ZERO)
 	var command: Vector3 = solved.commands
 	return Vector4(0, command.x, command.y, command.z)
@@ -435,6 +475,7 @@ func reached(ctx: EquipmentKinematicsContext, delta: float) -> bool:
 	return _settled > 0.2
 
 func _begin_vertex(_ctx: EquipmentKinematicsContext) -> void:
+	_continuous_cut = false
 	goal = stations[station_index].vertices[vertex_index].target
 	goal += stations[station_index].axis * _finish_offset
 	goal += stations[station_index].axis * 0.45
