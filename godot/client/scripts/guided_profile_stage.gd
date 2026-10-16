@@ -22,6 +22,15 @@ const VELOCITY_DAMPING := 0.5
 ## Whole-tool support changes have a non-smooth Jacobian. Precision travel
 ## leaves acceleration/jerk authority to arrest the incoming floor/back contact.
 const RELAXED_TRAVEL_SCALE := 0.3
+## Release braking: when the operator returns the stick to neutral the stage
+## keeps solving the full task (height/attitude feedback on the latched
+## setpoints) while ramping the travel demand to zero at this deceleration.
+## Zeroing all three joints independently instead let each jerk-limited
+## joint coast on its own curve, sliding ~0.35 m and leaving the grade plane
+## by several centimetres after a 1 m/s pass.
+const RELEASE_DECEL_M_S2 := 3.0
+const RELEASE_SETTLE_RAD_S := 0.01
+const RELEASE_MAX_S := 1.5
 var horizontal_speed_m_s := 1.0
 var input_deadband := 0.05
 var height_gain_hz := 4.0
@@ -39,6 +48,9 @@ var relaxed_attitude := false
 
 var _attitude_ref := 0.0
 var _active := false
+var _travel_speed := 0.0
+var _braking := false
+var _brake_s := 0.0
 var _solve_count := 0
 var _last_scale := 1.0
 var _last_error_m := 0.0
@@ -91,6 +103,10 @@ func apply_params(params: Dictionary) -> bool:
 
 func reset(_reason := "reset") -> void:
 	_active = false
+	_travel_speed = 0.0
+	_braking = false
+	_brake_s = 0.0
+	holds_at_neutral = false
 	_last_scale = 1.0
 	_last_error_m = 0.0
 	_last_attitude_error_rad = 0.0
@@ -159,6 +175,7 @@ func step(ctx: RefCounted, commands: Vector4) -> Dictionary:
 		out[int(index)] = 0.0
 	if not ctx.cutting_edge_available:
 		_active = false
+		_end_braking()
 		_last_flags = ["%s_no_cutting_edge" % flag_prefix]
 		out.y = 0.0
 		out.z = 0.0
@@ -169,14 +186,23 @@ func step(ctx: RefCounted, commands: Vector4) -> Dictionary:
 	# operator intent (W pushes out, S pulls in); boom/bucket operator input
 	# is fully overridden and any locked extra channel is silenced above.
 	var intent := commands.z
+	var travel_scale := RELAXED_TRAVEL_SCALE if relaxed_attitude else 1.0
+	var intent_speed := intent * horizontal_speed_m_s * travel_scale
 	if absf(intent) <= input_deadband:
-		_latch(ctx)
-		_active = false
-		out.y = 0.0
-		out.z = 0.0
-		out.w = 0.0
-		_last_flags = []
-		return {"commands": out, "scale": 1.0, "flags": flags}
+		if not _active or not _continue_braking(ctx):
+			_latch(ctx)
+			_active = false
+			_end_braking()
+			out.y = 0.0
+			out.z = 0.0
+			out.w = 0.0
+			_last_flags = []
+			return {"commands": out, "scale": 1.0, "flags": flags}
+		intent_speed = _travel_speed
+		flags.append("%s_braking" % flag_prefix)
+	else:
+		_end_braking()
+		_travel_speed = intent_speed
 	# Rising edge (fresh enable or input returning from deadband): latch the
 	# setpoints to the current pose so a held key never starts with a stale
 	# reference and plunges the bucket.
@@ -220,7 +246,6 @@ func step(ctx: RefCounted, commands: Vector4) -> Dictionary:
 	# the feedback path a tick late.
 	var chassis: Vector3 = ctx.chassis_point_velocity(ctx.bucket_ref_world) + ctx.tool_point_velocity
 	var axis := _intent_axis(ctx)
-	var intent_speed := intent * horizontal_speed_m_s * (RELAXED_TRAVEL_SCALE if relaxed_attitude else 1.0)
 	var desired := Vector3(
 		clampf(height_gain_hz * height_error, -max_height_correction_m_s, max_height_correction_m_s)
 			+ float(target.get("grade", 0.0)) * intent_speed
@@ -298,6 +323,10 @@ func step(ctx: RefCounted, commands: Vector4) -> Dictionary:
 		)
 		if blocked == Solver.BLOCKED_KINEMATIC and not relaxed_attitude:
 			_latch(ctx)
+		if _braking:
+			# A blocked brake solve falls back to the plain zero-output stop.
+			_active = false
+			_end_braking()
 		_last_scale = 0.0
 		_last_flags = flags
 		out.y = 0.0
@@ -316,6 +345,35 @@ func step(ctx: RefCounted, commands: Vector4) -> Dictionary:
 func _latch(ctx: RefCounted) -> void:
 	_attitude_ref = ctx.bucket_attitude_rad()
 	_latch_payload(ctx)
+
+
+## Advances the coordinated release ramp. Returns false once the travel
+## demand is zero and the work joints have settled (or the ramp timed out);
+## the caller then latches the resting pose and emits neutral output.
+func _continue_braking(ctx: RefCounted) -> bool:
+	if not _braking:
+		_braking = true
+		_brake_s = 0.0
+	_brake_s += ctx.delta
+	_travel_speed = move_toward(_travel_speed, 0.0, RELEASE_DECEL_M_S2 * ctx.delta)
+	var moving := false
+	for joint_name in WORK_JOINTS:
+		if absf(float(ctx.joint_velocities.get(joint_name, 0.0))) > RELEASE_SETTLE_RAD_S:
+			moving = true
+	if (absf(_travel_speed) <= 0.000001 and not moving) or _brake_s > RELEASE_MAX_S:
+		return false
+	# The pipeline neutral guard only lets a stage drive while the operator
+	# input is zero when it declares a hold; scope that to the release ramp.
+	holds_at_neutral = true
+	return true
+
+
+func _end_braking() -> void:
+	_braking = false
+	_brake_s = 0.0
+	holds_at_neutral = false
+	if not _active:
+		_travel_speed = 0.0
 
 
 func set_attitude_ref_rad(value: float) -> void:
