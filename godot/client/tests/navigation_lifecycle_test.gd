@@ -111,7 +111,11 @@ func precision_arrival_guard() -> void:
 	value.physics_tick += 1
 	var approach := driver.step(1.0 / 60, value)
 	check(driver.index == 0 and driver.state == "driving" and approach.x + approach.y > 0, "25 cm short requires continued approach")
-	check((approach.x + approach.y) * 0.5 * driver.belt_speed <= 0.21, "final approach is at crawl speed")
+	# The approach no longer crawls; it must instead be stoppable inside the
+	# remaining 25 cm using the conservative braking model (decel + lag).
+	var final_speed := (approach.x + approach.y) * 0.5 * driver.belt_speed
+	var stop_distance := final_speed * final_speed / (2.0 * Driver.TRACK_DECEL) + final_speed * Driver.TRACK_LAG_S
+	check(final_speed > 0.21 and stop_distance <= 0.25, "final approach is brakeable without crawling")
 	value.body_transform.origin = Vector3(9.98, 0, 0)
 	value.linear_velocity = Vector3(0.1, 0, 0)
 	for i in 30:

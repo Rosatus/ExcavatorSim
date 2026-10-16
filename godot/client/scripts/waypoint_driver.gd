@@ -13,6 +13,22 @@ const PIVOT_ENTER_RAD := 0.65 # About 37 degrees; retain the existing entry thre
 const ALIGN_TOLERANCE_RAD := PI / 180.0
 const ALIGN_YAW_RATE := 0.035
 const ALIGN_SETTLE_S := 0.2
+## Identified SY135-class tracked plant (60 Hz headless): belt speed responds
+## with tau ~0.1 s and neutral braking stops 3 m/s within 0.4 s; counter-
+## rotating belts deliver only ~0.55-0.8 of ideal kinematic yaw because of
+## lateral slip. Profiles below use deliberately conservative fractions of
+## those limits and compensate the response lag instead of crawling.
+const TRACK_DECEL := 2.5
+const TRACK_LAG_S := 0.2
+const TRACK_TAIL_GAIN := 2.0
+const PIVOT_MAX_RATE := 1.2
+const PIVOT_ACCEL := 3.0
+const PIVOT_LAG_S := 0.15
+const PIVOT_TAIL_GAIN := 4.5
+## Nominal yaw-slip feedforward; the integrator absorbs terrain variation.
+const PIVOT_SLIP_GAIN := 0.6
+const PIVOT_RATE_KI := 6.0
+const PIVOT_TRIM_LIMIT := 0.6
 
 var state := "idle"
 var reason := ""
@@ -40,6 +56,7 @@ var _segment_s := 0.0
 var _best_heading_error := INF
 var _align_stall_s := 0.0
 var _aligned_s := 0.0
+var _yaw_trim := 0.0
 
 
 func is_active() -> bool:
@@ -118,6 +135,7 @@ func _reset_segment() -> void:
 	_best_heading_error = INF
 	_align_stall_s = 0.0
 	_aligned_s = 0.0
+	_yaw_trim = 0.0
 
 
 func step(delta: float, snapshot: Dictionary) -> Vector3:
@@ -254,14 +272,23 @@ func step(delta: float, snapshot: Dictionary) -> Vector3:
 			if _align_stall_s > 8.0:
 				_fail("no_progress")
 				return stopped
-		# Faster large-angle pivots; retain the gentle feedback near alignment.
-		var turn_gain := 2.6 if state == "aligning" and absf(error) > 0.25 else 1.8
-		var omega := clampf(turn_gain * error - 0.6 * yaw_right, -0.8, 0.8)
-		# Brake by remaining distance, reserving precision crawl for the last
-		# 25 cm. The continuous outer ramp avoids a sudden speed-demand step.
-		var desired := minf(minf(CRUISE_SPEED, belt_speed), sqrt(2.0 * 0.9 * maxf(distance_m - TRACK_ARRIVAL_RADIUS, 0)))
-		var approach_speed := 0.8 * distance_m if distance_m <= 0.25 else 0.2 + 1.6 * (distance_m - 0.25)
-		desired = minf(desired, maxf(0.04, approach_speed))
+		var omega := 0.0
+		if state == "aligning":
+			# Time-optimal pivot: brake-to-rest yaw-rate profile with lag
+			# compensation, then a measured yaw-rate loop. The old pure P law
+			# was capped at 0.8 rad/s request but delivered ~0.45 rad/s after
+			# slip and decayed exponentially into the 1 degree window.
+			var yaw_rate_target := MotionProfile.approach_rate(error, yaw_right, PIVOT_MAX_RATE, PIVOT_ACCEL, PIVOT_TAIL_GAIN, PIVOT_LAG_S)
+			_yaw_trim = clampf(_yaw_trim + PIVOT_RATE_KI * (yaw_rate_target - yaw_right) * delta, -PIVOT_TRIM_LIMIT, PIVOT_TRIM_LIMIT)
+			omega = yaw_rate_target / PIVOT_SLIP_GAIN + _yaw_trim
+		else:
+			omega = clampf(1.8 * error - 0.6 * yaw_right, -0.8, 0.8)
+		# Lag-compensated braking envelope to the waypoint with a linear
+		# precision tail. Measured closing speed shortens the envelope so the
+		# chassis arrives at rest inside the 3 cm window instead of crawling.
+		var closing := Vector2(velocity.x, velocity.z).dot(offset.normalized()) if distance_m > 0.0001 else 0.0
+		var desired := MotionProfile.approach_rate(distance_m, closing, minf(CRUISE_SPEED, belt_speed), TRACK_DECEL, TRACK_TAIL_GAIN, TRACK_LAG_S)
+		desired = maxf(desired, minf(0.03, distance_m))
 		var travel := desired * maxf(0, cos(error)) if state == "driving" else 0.0
 		var signed_travel := -travel if reverse else travel
 		var left := (signed_travel + omega * track_width * 0.5) / belt_speed

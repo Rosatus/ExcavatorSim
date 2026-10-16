@@ -156,11 +156,19 @@ func step(body: RigidBody3D, commands: Vector2, delta: float, terrain_mask: int,
 		# non-zero velocity. The normal effort must cross zero first so reversal
 		# remains smooth and predictable.
 		var same_direction := speed * commands[side] >= -0.02
-		var recovery_active := not samples.is_empty() and absf(commands[side]) > 0.01 and absf(speed) < recovery_speed and same_direction
+		# The floor only rescues a belt that is below its commanded speed. It
+		# must not push a fine creep command past its own target: that turned
+		# commands 0.02..0.1 into an on/off ~0.25 m/s step and made precise
+		# manual or automatic positioning limit-cycle.
+		var commanded_speed := absf(commands[side]) * float(_tracks["max_belt_speed_m_s"])
+		var recovery_active := not samples.is_empty() and absf(commands[side]) > 0.01 and absf(speed) < minf(recovery_speed, commanded_speed) and same_direction
 		var contact_quality := 0.0
 		for sample in samples:
 			contact_quality = maxf(contact_quality, clampf((sample["normal"] as Vector3).dot(Vector3.UP), 0.0, 1.0))
-		var minimum_side_force := float(_tracks["max_drive_force_n"]) * minimum_ratio * contact_quality if recovery_active else 0.0
+		# Fade the floor out as the belt approaches its target speed so it
+		# hands over to ordinary speed feedback instead of bang-bang cycling.
+		var deficit := clampf((commanded_speed - absf(speed)) / maxf(minf(recovery_speed, commanded_speed), 0.001), 0.0, 1.0)
+		var minimum_side_force := float(_tracks["max_drive_force_n"]) * minimum_ratio * contact_quality * deficit if recovery_active else 0.0
 		var saturated := false
 		var slip := 0.0
 		for sample in samples:
