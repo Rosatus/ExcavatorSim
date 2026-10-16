@@ -48,6 +48,15 @@ var _continuous_cut := false
 var _bite_distance := 0.18
 var _sweep_start := Vector3.ZERO
 const LOAD_TARGET := 0.85
+const SLEW_TAIL_GAIN := 4.0
+## Cartesian bucket positioning: conservative tooth deceleration of the boom/
+## arm/bucket chain (the tooth reaches ~1 m/s within 0.6 s) and its jerk-reversal lag.
+const TASK_DECEL_M_S2 := 2.0
+const TASK_LAG_S := 0.12
+const TASK_TAIL_SCALE := 1.5
+## Arrival gates require rest, not a fixed dwell after entering the window.
+const REACHED_SPEED_M_S := 0.02
+const REACHED_DWELL_S := 0.05
 
 static func capacity_distance(payload: Dictionary, width: float, depth: float) -> float:
 	var capacity := float(payload.get("visual_bucket_capacity_m3", payload.get("bucket_capacity_m3", 0.0)))
@@ -55,17 +64,16 @@ static func capacity_distance(payload: Dictionary, width: float, depth: float) -
 	# Loose material occupies more bucket volume than its in-situ prism.
 	return remaining / maxf(width * depth * 1.25, 0.001)
 
+## Time-optimal single-joint slew through the exact accel/jerk command chain:
+## a brake-to-rest envelope with jerk-reversal lag, then a linear tail. The
+## previous law used half the available deceleration and a 1.8/s tail.
 func _joint_command(ctx: EquipmentKinematicsContext, joint: String, target: float) -> float:
 	var error := target - float(ctx.joint_positions.get(joint, 0.0))
 	var velocity := float(ctx.joint_velocities.get(joint, 0.0))
 	var limits: Vector2 = ctx.joint_accel_limits.get(joint, Vector2(0.5, 1.0))
-	# Reserve distance for acceleration reversal before decelerating. Pure
-	# position feedback commanded full speed until too late for the jerk limit.
-	var braking := maxf(limits.x * 0.5, 0.01)
-	var delay := limits.x / maxf(limits.y, 0.01) + ctx.delta * 2.0
-	var remaining := maxf(absf(error) - absf(velocity) * delay, 0.0)
-	var speed := minf(0.8, minf(absf(error) * 1.8, sqrt(2.0 * braking * remaining)))
-	return ctx.command_for_velocity(joint, signf(error) * speed)
+	var ceiling := ctx.effective_ceiling(joint, error)
+	var rate := MotionProfile.joint_rate(error, velocity, limits.x, limits.y, ceiling, SLEW_TAIL_GAIN, ctx.delta)
+	return ctx.command_for_velocity(joint, rate)
 
 func _joint_reached(ctx: EquipmentKinematicsContext, joint: String, target: float) -> bool:
 	return absf(target - float(ctx.joint_positions.get(joint, 0.0))) < 0.001 and absf(float(ctx.joint_velocities.get(joint, 0.0))) < 0.003
@@ -451,28 +459,48 @@ func step(delta: float, physics: Dictionary, ctx: EquipmentKinematicsContext,
 	var gain := 3.0 if simple_mode else 2.0
 	var travel_speed := 1.1 if simple_mode else 0.65
 	var cut_speed := 0.6 if simple_mode else 0.3
+	# Brake-to-rest profile on each task axis using the measured joint-driven
+	# tool velocity. The old saturated P law (gain 2-3/s) crawled through an
+	# exponential tail and still ignored the jerk-limited actuator lag.
+	var joint_rates := Vector3.ZERO
+	for i in 3:
+		joint_rates[i] = float(ctx.joint_velocities.get(JOINTS[i], 0.0))
+	var vertical_rate := normal.dot(joint_rates)
+	var axial_rate := tangent.dot(joint_rates)
+	var vertical_limit := cut_speed if cutting and offset.y < 0.0 else travel_speed
+	var vertical := MotionProfile.approach_rate(offset.y, vertical_rate, vertical_limit, TASK_DECEL_M_S2, gain * TASK_TAIL_SCALE, TASK_LAG_S)
+	var axial := -0.18 if state == "sweep" else MotionProfile.approach_rate(axial_error, axial_rate, travel_speed, TASK_DECEL_M_S2, gain * TASK_TAIL_SCALE, TASK_LAG_S)
 	var solved := Solver.solve_surface(normal, tangent,
-		clampf(offset.y * gain, -cut_speed if cutting else -travel_speed, travel_speed) - transport.y,
-		(-0.18 if state == "sweep" else clampf(axial_error * gain, -travel_speed, travel_speed)) - transport.dot(axis), 0.04, ctx, JOINTS,
+		vertical - transport.y,
+		axial - transport.dot(axis), 0.04, ctx, JOINTS,
 		ctx.tooth_contact_preference(_envelope_points, Vector3.UP) if cutting else Vector3.ZERO)
 	var command: Vector3 = solved.commands
 	return Vector4(0, command.x, command.y, command.z)
 
 func reached(ctx: EquipmentKinematicsContext, delta: float) -> bool:
 	var error := ctx.bucket_ref_world - goal
+	# Tooth speed from the joint chain plus chassis transport; arrival must be
+	# at rest so the next phase starts without inherited momentum.
+	var speed := (ctx.chassis_point_velocity(ctx.bucket_ref_world) + ctx.tool_point_velocity + _joint_tool_velocity(ctx)).length()
+	var inside := false
 	if state == "cut":
 		var contact_error := _cut_contact(ctx) - goal
 		var axis: Vector3 = stations[station_index].axis
-		if absf(contact_error.y) < 0.005 and absf(error.dot(axis)) < 0.015:
-			_settled += delta
-		else:
-			_settled = 0
-		return _settled > 0.2
-	if error.length() < 0.035:
+		inside = absf(contact_error.y) < 0.005 and absf(error.dot(axis)) < 0.015
+	else:
+		inside = error.length() < 0.035
+	if inside and speed < REACHED_SPEED_M_S:
 		_settled += delta
 	else:
 		_settled = 0
-	return _settled > 0.2
+	return _settled > REACHED_DWELL_S
+
+func _joint_tool_velocity(ctx: EquipmentKinematicsContext) -> Vector3:
+	var columns := ctx.rate_columns(ctx.bucket_ref_world, JOINTS)
+	var velocity := Vector3.ZERO
+	for joint in JOINTS:
+		velocity += Vector3(columns[joint]) * float(ctx.joint_velocities.get(joint, 0.0))
+	return velocity
 
 func _begin_vertex(_ctx: EquipmentKinematicsContext) -> void:
 	_continuous_cut = false

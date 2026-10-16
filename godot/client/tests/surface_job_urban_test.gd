@@ -46,6 +46,8 @@ func run() -> void:
 	var initial: Dictionary = chassis.peek_runtime_snapshot().duplicate()
 	var maximum_yaw := 0.0
 	var maximum_lateral := 0.0
+	var phase_seconds := {}
+	var overcut := {}
 	for i in 180000:
 		session.set_focused(true)
 		await physics_frame
@@ -56,6 +58,11 @@ func run() -> void:
 		maximum_yaw = maxf(maximum_yaw, absf(Vector2(heading.x, heading.z).angle_to(Vector2(initial_heading.x, initial_heading.z))))
 		var movement: Vector3 = physics.body_transform.origin - initial.body_transform.origin
 		maximum_lateral = maxf(maximum_lateral, absf(Vector2(movement.x, movement.z).dot(side)))
+		phase_seconds[status.state] = float(phase_seconds.get(status.state, 0.0)) + 1.0 / 60.0
+		var lowest: Variant = chassis.surface_job.envelope_debug.get("point")
+		if status.state in ["cut", "sweep"] and lowest is Vector3:
+			# Positive values are cutter-envelope excursions below the commanded goal.
+			overcut[status.state] = maxf(float(overcut.get(status.state, -INF)), chassis.surface_job.goal.y - (lowest as Vector3).y)
 		var key := str(status)
 		if previous != key or i % 600 == 0:
 			print("JOB ", i, " ", status, " tooth=", DtmModel.bucket_state(scene.get_node("MotionPresentation")).tooth, " goal=", chassis.surface_job.goal)
@@ -64,6 +71,8 @@ func run() -> void:
 			break
 	var result := chassis.surface_job.snapshot()
 	print("URBAN_RESULT ", result)
+	print("URBAN_PHASE_SECONDS ", phase_seconds)
+	print("URBAN_GOAL_OVERSHOOT_M ", overcut)
 	var passed: bool = result.state == "completed" and result.completed == 10 and result.count == 10
 	var max_remaining := -INF
 	var min_remaining := INF
