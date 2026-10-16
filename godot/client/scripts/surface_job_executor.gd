@@ -39,6 +39,7 @@ var dump_right := true
 var soil_payload := Callable()
 var soil_visual := Callable()
 var dump_cycles := 0
+var skipped_vertices := 0
 var _swing_home := 0.0
 var _carry_bucket := 0.0
 var _after_dump := "approach"
@@ -130,6 +131,7 @@ func start(plan: Dictionary, surface: LandXmlSurface, measurement: DtmSurfaceSam
 	_heading = snapshot.vehicle_forward_world
 	_swing_home = float(ctx.joint_positions.get("swing_joint", 0.0))
 	dump_cycles = 0
+	skipped_vertices = 0
 	_stale = 0
 	_recut = false
 	_continuous_cut = false
@@ -180,7 +182,7 @@ func resume() -> bool:
 func snapshot() -> Dictionary:
 	return {"state": state, "reason": reason, "station": station_index,
 		"count": stations.size(), "completed": completed_stations, "vertex": vertex_index,
-		"verification": verification_result, "dump_cycles": dump_cycles, "simple_mode": simple_mode}
+		"verification": verification_result, "dump_cycles": dump_cycles, "simple_mode": simple_mode, "skipped_vertices": skipped_vertices}
 
 func verify_surface() -> bool:
 	if verification.is_empty() or initial_heights.size() != verification.size():
@@ -369,18 +371,7 @@ func step(delta: float, physics: Dictionary, ctx: EquipmentKinematicsContext,
 		if _elapsed < 0.3:
 			return Vector4.ZERO
 		var point: Vector3 = stations[station_index].vertices[vertex_index].target
-		var actual := sampler.height_at(Vector2(point.x, point.z))
-		# Certify the entire planned row before advancing; a center sample can
-		# miss shoulders after a loaded bucket has returned from unloading.
-		var row_axis: Vector3 = stations[station_index].axis
-		var half_width := float(stations[station_index].vertices[vertex_index].get("lane_width", 1.0)) * 0.5
-		for sample in verification:
-			if absf((sample - point).dot(row_axis)) < 0.01 and absf((sample - point).dot(Vector3(-row_axis.z, 0, row_axis.x))) < half_width:
-				var measured := sampler.height_at(Vector2(sample.x, sample.z))
-				if not is_finite(measured):
-					actual = NAN
-					break
-				actual = maxf(actual, measured)
+		var actual := _row_height(vertex_index)
 		if not is_finite(actual):
 			fail("复测缺失")
 		elif actual <= point.y + Planner.TOLERANCE:
@@ -502,7 +493,47 @@ func _joint_tool_velocity(ctx: EquipmentKinematicsContext) -> Vector3:
 		velocity += Vector3(columns[joint]) * float(ctx.joint_velocities.get(joint, 0.0))
 	return velocity
 
+## Re-measure the full planned width, including shoulders, from current SDF.
+## Shared by post-cut verification and pre-entry admission: a long sweep may
+## already have finished several later rows, but its distance alone proves nothing.
+func _row_height(index: int) -> float:
+	var vertex: Dictionary = stations[station_index].vertices[index]
+	var point: Vector3 = vertex.target
+	var actual := sampler.height_at(Vector2(point.x, point.z))
+	if not is_finite(actual):
+		return NAN
+	var axis: Vector3 = stations[station_index].axis
+	var side := Vector3(-axis.z, 0, axis.x)
+	var half_width := float(vertex.get("lane_width", 1.0)) * 0.5
+	for sample in verification:
+		if absf((sample - point).dot(axis)) < 0.01 and absf((sample - point).dot(side)) < half_width:
+			var measured := sampler.height_at(Vector2(sample.x, sample.z))
+			if not is_finite(measured):
+				return NAN
+			actual = maxf(actual, measured)
+	return actual
+
 func _begin_vertex(_ctx: EquipmentKinematicsContext) -> void:
+	# Never lower into a row merely because it was present in the initial plan.
+	# Recheck after unloading too: deposits may have changed previously cut rows.
+	while vertex_index < stations[station_index].vertices.size():
+		var actual := _row_height(vertex_index)
+		if not is_finite(actual):
+			fail("进刀前复测缺失")
+			return
+		var point: Vector3 = stations[station_index].vertices[vertex_index].target
+		if actual > point.y + Planner.TOLERANCE:
+			break
+		vertex_index += 1
+		skipped_vertices += 1
+		_pass = 0
+		_recut = false
+		_finish_offset = 0.0
+	if vertex_index == stations[station_index].vertices.size():
+		stations[station_index].complete = true
+		completed_stations += 1
+		transition("select")
+		return
 	_continuous_cut = false
 	goal = stations[station_index].vertices[vertex_index].target
 	goal += stations[station_index].axis * _finish_offset

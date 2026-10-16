@@ -2,6 +2,33 @@ extends SceneTree
 
 var failures: Array[String] = []
 
+class RowSampler extends DtmSurfaceSampler:
+	var shoulder := -1.0
+	func height_at(p: Vector2) -> float:
+		return shoulder if p.x > 0.3 else -1.0
+
+func check_finished_rows() -> void:
+	var job := SurfaceJobExecutor.new()
+	var measurement := RowSampler.new()
+	job.sampler = measurement
+	job.station_index = 0
+	job.clearance = 1.0
+	job.stations = [{"axis": Vector3.BACK, "complete": false, "vertices": [
+		{"target": Vector3(0, -1, 0.4), "lane_width": 1.0},
+		{"target": Vector3(0, -1, 0.2), "lane_width": 1.0},
+		{"target": Vector3(0, -1, 0), "lane_width": 1.0}]}]
+	job.verification = PackedVector3Array([Vector3(0.4, -1, 0.4), Vector3(0.4, -1, 0.2), Vector3(0.4, -1, 0)])
+	measurement.shoulder = -0.8
+	job._begin_vertex(null)
+	check(job.state == "approach" and job.vertex_index == 0, "finished center cannot skip residual shoulder")
+	measurement.shoulder = NAN
+	job._begin_vertex(null)
+	check(job.state == "failed" and job.vertex_index == 0, "missing shoulder cannot skip row")
+	measurement.shoulder = -0.98
+	job._begin_vertex(null)
+	check(job.state == "select" and job.skipped_vertices == 3 and job.completed_stations == 1, "long sweep skips all measured finished rows without lowering")
+	check(job.stations[0].complete, "finished station advances through ordinary selection")
+
 func _init() -> void:
 	call_deferred("run")
 
@@ -10,6 +37,7 @@ func check(value: bool, message: String) -> void:
 		failures.append(message)
 
 func run() -> void:
+	check_finished_rows()
 	var parsed := LandXmlSurface.parse(DtmModel.demo_xml("trench", Vector3.ZERO, 1.0))
 	var surface: LandXmlSurface = parsed.surfaces[0]
 	surface.translation = Vector3(surface.source_origin.e, surface.source_origin.h, surface.source_origin.n)
