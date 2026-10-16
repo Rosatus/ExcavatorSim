@@ -5,7 +5,7 @@ func _init() -> void:
 
 func run() -> void:
 	root.get_node("MapCatalog").active_map_id = "training" if "--training" in OS.get_cmdline_user_args() else "urban"
-	root.get_node("MapCatalog").retained_model_id = "sy135"
+	root.get_node("MapCatalog").retained_model_id = "sy135neo" if "--neo" in OS.get_cmdline_user_args() else "sy135"
 	var scene := load("res://scenes/main.tscn").instantiate() as Node3D
 	scene.get_node("OperatorUI").preferences_path = "user://surface-job-test-unused.cfg"
 	root.add_child(scene)
@@ -26,7 +26,7 @@ func run() -> void:
 	var side := Vector2(-axis.y, axis.x)
 	var center := Vector2(tooth.x, tooth.z)
 	var height := sampler.height_at(center)
-	print("URBAN_START ", bucket, " surface=", height, " body=", chassis.peek_runtime_snapshot().body_transform.origin)
+	print("URBAN_START ", bucket, " model=", root.get_node("MapCatalog").retained_model_id, " surface=", height, " body=", chassis.peek_runtime_snapshot().body_transform.origin)
 	if not is_finite(height):
 		quit(1)
 		return

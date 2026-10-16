@@ -70,8 +70,24 @@ static func load_for_model(model_id: String) -> PhysicsRigDescriptor:
 		if candidate is Dictionary and String(candidate.get("model_id", "")) == model_id:
 			var descriptor := PhysicsRigDescriptor.new()
 			var rig_path := String(candidate.get("physics_rig_path", ""))
-			descriptor._data = _load_json(rig_path)
 			descriptor._expected_sha256 = String(candidate.get("physics_rig_sha256", ""))
+			var source_model := model_id
+			# SY135NEO is a visual/detail variant of SY135. Keep its model and
+			# soil contract identity, but use the validated SY135 rigid-body and
+			# joint anchors so all motion/control calculations share one kinematic
+			# reference. This is deliberately centralized at descriptor loading.
+			if model_id == "sy135neo":
+				source_model = "sy135"
+				for source_candidate in catalog.get("models", []):
+					if source_candidate is Dictionary and String(source_candidate.get("model_id", "")) == source_model:
+						rig_path = String(source_candidate.get("physics_rig_path", rig_path))
+						descriptor._expected_sha256 = String(source_candidate.get("physics_rig_sha256", ""))
+						break
+			descriptor._data = _load_json(rig_path)
+			if source_model != model_id:
+				descriptor._data["model_id"] = model_id
+				descriptor._data["rig_id"] = "sy135neo-jolt-rig"
+				descriptor._data["rig_version"] = "sy135neo-jolt-rig-v3"
 			descriptor._actual_sha256 = FileAccess.get_sha256(rig_path) if FileAccess.file_exists(rig_path) else ""
 			return descriptor
 	return null

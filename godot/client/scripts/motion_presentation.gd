@@ -697,6 +697,15 @@ func _load_mapping_contract(model_id: String) -> bool:
 				_contract_error = "%s imported pivot parent drifted for %s" % [model_id, frame_name]
 				push_error(_contract_error)
 				return false
+		# NEO is the detailed SY135 skin. Validate its imported hierarchy above,
+		# then align the articulated pivots to the same physical rest frames.
+		# Soil sampling uses these nodes too, so visual and control teeth agree.
+		if model_id == "sy135neo" and not parent_frame.is_empty():
+			var reference_local: Transform3D = _physics_rest_globals[parent_frame].affine_inverse() * _physics_rest_globals[frame_name]
+			frame_node.transform = reference_local
+			_rest_locals[frame_name] = reference_local
+			_rest_globals[frame_name] = frame_node.global_transform
+			_rest_presentation_locals[frame_name] = _presentation_root.global_transform.affine_inverse() * frame_node.global_transform
 		_frame_parent_names[frame_name] = parent_frame
 		_frame_runtime_axes[frame_name] = runtime_axis
 	if not _validate_local_axis_parents(model_id):

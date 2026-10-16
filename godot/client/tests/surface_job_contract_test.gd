@@ -37,6 +37,13 @@ func check(value: bool, message: String) -> void:
 		failures.append(message)
 
 func run() -> void:
+	var reference_rig := PhysicsRigDescriptor.load_for_model("sy135")
+	var neo_rig := PhysicsRigDescriptor.load_for_model("sy135neo")
+	check(reference_rig.is_valid_for("sy135", reference_rig.model_version()), "SY135 reference hash and contract valid")
+	check(neo_rig.is_valid_for("sy135neo", neo_rig.model_version()), "NEO shared reference hash and contract valid")
+	var reference_data := reference_rig.to_dictionary()
+	var neo_data := neo_rig.to_dictionary()
+	check(reference_data.bodies == neo_data.bodies and reference_data.joints == neo_data.joints, "NEO bodies and joints match SY135 reference exactly")
 	check_finished_rows()
 	var parsed := LandXmlSurface.parse(DtmModel.demo_xml("trench", Vector3.ZERO, 1.0))
 	var surface: LandXmlSurface = parsed.surfaces[0]
