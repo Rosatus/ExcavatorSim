@@ -442,6 +442,26 @@ func _build_dtm() -> void:
 	_dtm.set_chart_style(String(config.get_value(CONFIG_SECTION_UI, "dtm_chart_style", "terrain")))
 	_dtm.chart_style_changed.connect(func(style: String) -> void: _save_menu_preference("dtm_chart_style", style))
 	_dtm.import_requested.connect(_open_dtm_import)
+	_dtm.automatic_requested.connect(func() -> void:
+		if BucketGroundInteractionMode.is_passthrough(_product_session.bucket_ground_mode):
+			_product_session.request_bucket_ground_mode(BucketGroundInteractionMode.NORMAL)
+			await get_tree().physics_frame
+			await get_tree().physics_frame
+		if _chassis.surface_job.state == "paused":
+			_chassis.resume_surface_job()
+		elif not _chassis.start_surface_job(_dtm.model.surface, _dtm.model.sampler):
+			_dtm.show_error("无法开始自动作业：" + _chassis.surface_job.reason))
+	_dtm.automatic_cancelled.connect(func() -> void: _chassis.cancel_surface_job())
+	_dtm.digging_mode_requested.connect(func(simple: bool) -> void:
+		_chassis.cancel_surface_job()
+		_product_session.request_simple_digging(simple)
+		_chassis.surface_job.simple_mode = simple)
+	_dtm.dump_side_requested.connect(func(right: bool) -> void:
+		_chassis.cancel_surface_job()
+		_chassis.surface_job.dump_right = right)
+	_dtm.urban_trench_requested.connect(_load_automatic_trench)
+	_dtm.design_changed.connect(func() -> void: _chassis.cancel_surface_job())
+	_dtm.automatic_status = _chassis.surface_job.snapshot
 	_dtm.close_requested.connect(func() -> void: _dtm_open = false; _sync_dtm_visibility())
 	_build_dtm_menu_entry()
 	_dtm_file = FileDialog.new()
@@ -471,6 +491,32 @@ func _build_dtm() -> void:
 		_dtm.import_file(path, _dtm_placement.selected == 0, _dtm_height.value)
 		_finish_dtm_import())
 	_dtm_file.canceled.connect(_finish_dtm_import)
+
+
+func _load_automatic_trench() -> void:
+	var bucket := DtmModel.bucket_state(_dtm.presentation)
+	if bucket.is_empty():
+		_dtm.show_error("当前附件没有可用铲齿")
+		return
+	var tooth: Vector3 = bucket.tooth
+	var axis: Vector2 = bucket.axis
+	var side := Vector2(-axis.y, axis.x)
+	var center := Vector2(tooth.x, tooth.z)
+	var height := _dtm.model.sampler.height_at(center)
+	if not is_finite(height):
+		_dtm.show_error("铲斗轴线不在可测量的体素区")
+		return
+	var xml := '<LandXML><Units><Metric linearUnit="meter"/></Units><Surfaces><Surface name="轴线沟 · 2m · 深1m"><Definition surfType="TIN"><Pnts>'
+	for i in 4:
+		var p := center + side * float(bucket.width) * (-0.5 if i in [0, 3] else 0.5) - axis * (2.0 if i in [2, 3] else 0.0)
+		xml += '<P id="%d">%.6f %.6f %.6f</P>' % [i + 1, p.y, p.x, height - 1.0]
+	xml += '</Pnts><Faces><F>1 2 3</F><F>1 3 4</F></Faces></Definition></Surface></Surfaces></LandXML>'
+	var parsed := LandXmlSurface.parse(xml)
+	if not parsed.error.is_empty():
+		_dtm.show_error(parsed.error)
+		return
+	_chassis.cancel_surface_job()
+	_dtm.load_local_surfaces(parsed.surfaces, "当前铲斗轴线向后 2m · 深1m · 正常模式自动回转卸土")
 
 
 func _build_dtm_menu_entry() -> void:

@@ -14,6 +14,18 @@ func check(ok: bool, message: String) -> void:
 		failures.append(message)
 
 func parser_tests() -> void:
+	var chart := View.new()
+	var probe := Vector3(2, 3, 5)
+	var original := chart._local_vertex(probe)
+	for direction in [-1, 1]:
+		chart.rotate_view(direction)
+		check(chart._local_vertex(probe) != original, "quarter turn changes projection")
+		for step in 3:
+			chart.rotate_view(direction)
+		check(chart.quarter_turn == 0 and chart._local_vertex(probe) == original, "four turns restore projection exactly")
+	chart.mode = "plan"
+	check(chart._local_vertex(Vector3.RIGHT).x > 0 and chart._local_vertex(Vector3.FORWARD).y < 0, "top view matches world handedness")
+	chart.free()
 	check(View.stepped_color(NAN) == View.UNKNOWN, "voxel missing measurement stays unknown")
 	check(View.stepped_color(-0.05) == View.GRADE and View.stepped_color(0.05) == View.GRADE, "voxel tolerance remains five centimetres")
 	check(View.stepped_color(0.06) == View.stepped_color(0.19) and View.stepped_color(0.21) != View.stepped_color(0.19), "voxel fixed bands do not normalize with terrain")
@@ -92,6 +104,19 @@ func run() -> void:
 		if ui._dtm.model.sampled_at_ms > 0:
 			break
 	check(int(ui._dtm.model.statistics.get("valid", 0)) > 0, "live actual samples available")
+	var plan_view: DtmView = ui._dtm.views[1]
+	plan_view.ensure_section()
+	for turn in 4:
+		ui._dtm.views[0].rotate_view(1)
+		check(plan_view.quarter_turn == ui._dtm.views[0].quarter_turn, "plan follows iso orientation")
+	var section_before: Array = ui._dtm.views[2].profile.duplicate(true)
+	ui._dtm.views[2].section_flipped.emit()
+	check(ui._dtm.views[2].section_reversed, "section arrow reverses labels")
+	check(ui._dtm.views[2].profile[0].target == section_before[-1].target, "section reversal reverses samples")
+	ui._dtm.views[2].section_flipped.emit()
+	var bounds: AABB = ui._dtm.model.surface.world_bounds()
+	var edge_point := plan_view.nearest_boundary(Vector2(bounds.end.x + 10, bounds.get_center().z))
+	check(absf(edge_point.x - bounds.end.x) < 0.0001, "drag endpoint constrained to TIN boundary")
 	check(absf(float(ui._dtm.model.statistics.get("cut_m3", 0)) - 54) < 1, "6x6x1.5 pit estimated cut")
 	var original_statistics: Dictionary = ui._dtm.model.statistics.duplicate(true)
 	var original_revision: int = ui._dtm.model.display_revision

@@ -32,6 +32,15 @@ const ISO_Y := 0.38
 const TITLES := {"iso": "01  /  2.5D 实测地表", "plan": "02  /  俯视 · 挖填偏差", "section": "03  /  施工纵断面 A—A′", "bucket": "04  /  铲齿跟随垂向截面"}
 
 var mode := "iso"
+var quarter_turn := 0
+signal orientation_changed(turn: int)
+signal section_changed
+signal section_flipped
+var section_points := PackedVector2Array()
+var section_reversed := false
+var _drag_endpoint := -1
+var _boundary: Array[PackedVector2Array] = []
+var _section_surface: LandXmlSurface
 ## Chart look: smooth "terrain" surfaces or the stepped block "voxel" theme.
 ## Both styles share the same measurement data and fixed metre colour stops.
 var style := STYLE_TERRAIN
@@ -77,6 +86,104 @@ func _ready() -> void:
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.draw.connect(_draw_overlay)
 	add_child(overlay)
+	if mode == "plan":
+		mouse_filter = Control.MOUSE_FILTER_STOP
+	if mode in ["iso", "section"]:
+		for direction in ([-1, 1] if mode == "iso" else [1]):
+			var arrow := Label.new()
+			arrow.text = "↶" if direction < 0 else "↷"
+			arrow.add_theme_font_size_override("font_size", 22)
+			arrow.add_theme_color_override("font_color", MUTED)
+			arrow.mouse_filter = Control.MOUSE_FILTER_STOP
+			arrow.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+			arrow.tooltip_text = "向左旋转 90°" if direction < 0 else "向右旋转 90°"
+			if mode == "section":
+				arrow.tooltip_text = "交换 A / A′ 显示方向"
+			add_child(arrow)
+			arrow.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT if direction < 0 else Control.PRESET_TOP_RIGHT)
+			arrow.position = Vector2(8 if direction < 0 else -32, 30)
+			arrow.size = Vector2(24, 28)
+			arrow.gui_input.connect(func(event: InputEvent) -> void:
+				if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+					if mode == "section":
+						section_flipped.emit()
+					else:
+						rotate_view(direction)
+					arrow.accept_event())
+
+func rotate_view(direction: int) -> void:
+	quarter_turn = posmod(quarter_turn + direction, 4)
+	refresh_orientation()
+	orientation_changed.emit(quarter_turn)
+
+func refresh_orientation() -> void:
+	_cells_revision = -1
+	_target_mesh = null
+	queue_redraw()
+	if overlay != null:
+		overlay.queue_redraw()
+
+func _rotated(p: Vector3) -> Vector3:
+	match quarter_turn:
+		1: return Vector3(-p.z, p.y, p.x)
+		2: return Vector3(-p.x, p.y, -p.z)
+		3: return Vector3(p.z, p.y, -p.x)
+	return p
+
+func ensure_section() -> void:
+	if model == null or model.surface == null or _section_surface == model.surface:
+		return
+	_section_surface = model.surface
+	_boundary.clear()
+	var edges := {}
+	for face in model.surface.faces:
+		for pair in [Vector2i(face.x, face.y), Vector2i(face.y, face.z), Vector2i(face.z, face.x)]:
+			var key := Vector2i(mini(pair.x, pair.y), maxi(pair.x, pair.y))
+			edges[key] = int(edges.get(key, 0)) + 1
+	for edge in edges:
+		if edges[edge] == 1:
+			var a: Vector3 = model.surface.vertices[edge.x] + model.surface.translation
+			var b: Vector3 = model.surface.vertices[edge.y] + model.surface.translation
+			_boundary.append(PackedVector2Array([Vector2(a.x, a.z), Vector2(b.x, b.z)]))
+	var bounds := model.surface.world_bounds()
+	section_points = PackedVector2Array([
+		nearest_boundary(Vector2(bounds.get_center().x, bounds.position.z)),
+		nearest_boundary(Vector2(bounds.get_center().x, bounds.end.z))])
+
+func nearest_boundary(point: Vector2) -> Vector2:
+	var best := point
+	var distance := INF
+	for edge in _boundary:
+		var candidate := Geometry2D.get_closest_point_to_segment(point, edge[0], edge[1])
+		if candidate.distance_squared_to(point) < distance:
+			distance = candidate.distance_squared_to(point)
+			best = candidate
+	return best
+
+func _gui_input(event: InputEvent) -> void:
+	if mode != "plan" or model == null or model.surface == null:
+		return
+	ensure_section()
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		_drag_endpoint = -1
+		if event.pressed:
+			for i in section_points.size():
+				var p := section_points[i]
+				if _project(Vector3(p.x, 0, p.y)).distance_to(event.position) < 14:
+					_drag_endpoint = i
+		if _drag_endpoint >= 0:
+			accept_event()
+	if event is InputEventMouseMotion and _drag_endpoint >= 0:
+		var projected: Vector2 = (event.position - _plot.get_center()) / _scale
+		var local := Vector3(projected.x, 0, projected.y)
+		for i in posmod(4 - quarter_turn, 4):
+			local = Vector3(-local.z, 0, local.x)
+		var point := nearest_boundary(Vector2(local.x + _center.x, local.z + _center.z))
+		if point.distance_to(section_points[1 - _drag_endpoint]) > 0.05:
+			section_points[_drag_endpoint] = point
+			section_changed.emit()
+			queue_redraw()
+		accept_event()
 
 func set_compact(enabled: bool) -> void:
 	compact = enabled
@@ -246,14 +353,15 @@ func _draw_pixel_corners() -> void:
 # --- map charts --------------------------------------------------------------
 
 func _project(p: Vector3) -> Vector2:
-	var local := p - _center
+	var local := _rotated(p - _center)
 	if mode == "plan":
-		return _plot.get_center() + Vector2(local.x, -local.z) * _scale
+		return _plot.get_center() + Vector2(local.x, local.z) * _scale
 	return _plot.get_center() + Vector2((local.x - local.z) * ISO_X, (local.x + local.z) * ISO_Y - local.y) * _scale
 
 func _local_vertex(local: Vector3) -> Vector3:
+	local = _rotated(local)
 	if mode == "plan":
-		return Vector3(local.x, -local.z, 0)
+		return Vector3(local.x, local.z, 0)
 	return Vector3((local.x - local.z) * ISO_X, (local.x + local.z) * ISO_Y - local.y, 0)
 
 func _draw_map() -> void:
@@ -265,7 +373,8 @@ func _draw_map() -> void:
 	_center = bounds.get_center()
 	_center.y = (low + high) * 0.5
 	if mode == "plan":
-		_scale = minf(_plot.size.x / maxf(bounds.size.x + 1, 2), _plot.size.y / maxf(bounds.size.z + 1, 2))
+		var extent := bounds.size if quarter_turn % 2 == 0 else Vector3(bounds.size.z, bounds.size.y, bounds.size.x)
+		_scale = minf(_plot.size.x / maxf(extent.x + 1, 2), _plot.size.y / maxf(extent.z + 1, 2))
 	else:
 		_scale = minf(_plot.size.x / maxf((bounds.size.x + bounds.size.z) * ISO_X + 1, 2), _plot.size.y / maxf((bounds.size.x + bounds.size.z) * ISO_Y + high - low + 1, 2))
 	var transform := Transform2D(Vector2(_scale, 0), Vector2(0, _scale), _project(model.surface.translation))
@@ -290,15 +399,18 @@ func _draw_map() -> void:
 			var z := iz * grid_step
 			draw_line(_project(Vector3(bounds.position.x, low, z)), _project(Vector3(bounds.end.x, low, z)), Color(GRID, 0.8), 1)
 		draw_mesh(_target_mesh, null, transform, Color(TARGET, 0.6))
-		var cx := bounds.get_center().x
-		var a := _project(Vector3(cx, low, bounds.position.z))
-		var b := _project(Vector3(cx, low, bounds.end.z))
+		ensure_section()
+		var a := _project(Vector3(section_points[0].x, low, section_points[0].y))
+		var b := _project(Vector3(section_points[1].x, low, section_points[1].y))
 		draw_dashed_line(a, b, TEXT, 1, 5)
+		for endpoint in [a, b]:
+			draw_circle(endpoint, 6, Color("0e1a25"))
+			draw_arc(endpoint, 6, 0, TAU, 24, TARGET, 1.5, true)
 		_text(self, a + Vector2(4, 12), "A", TEXT, 10)
 		_text(self, b + Vector2(4, -2), "A′", TEXT, 10)
 		if not compact:
-			_text(self, Vector2(size.x - 58, 52), "+Z ↑", MUTED, 11)
-			_text(self, Vector2(size.x - 58, 67), "+X →", MUTED, 11)
+			_text(self, Vector2(size.x - 58, 52), ["−Z ↑", "−X ↑", "+Z ↑", "+X ↑"][quarter_turn], MUTED, 11)
+			_text(self, Vector2(size.x - 58, 67), ["+X →", "−Z →", "−X →", "+Z →"][quarter_turn], MUTED, 11)
 	var footer := ""
 	if style == STYLE_VOXEL:
 		footer = "方块层高 %s · 青线：目标 TIN · 分档色：偏差" % _length_label(_voxel_q) if mode == "iso" else "台阶等高 %s · A—A′ 纵断面 · 黄虚线 铲齿截面" % _contour_label()
@@ -423,22 +535,28 @@ func _build_voxel_iso(heights: PackedFloat32Array) -> void:
 	# Painter's order towards the +X+Z viewer; each column is a stepped block
 	# with a coloured cap, strata walls and a bevelled top.
 	for s in g.x + g.y - 1:
-		for x in range(maxi(0, s - g.y + 1), mini(g.x, s + 1)):
-			var z := s - x
+		for column in range(maxi(0, s - g.y + 1), mini(g.x, s + 1)):
+			var x := g.x - 1 - column if quarter_turn in [2, 3] else column
+			var row := s - column
+			var z := g.y - 1 - row if quarter_turn in [1, 2] else row
 			var i := z * g.x + x
 			var h := levels[i]
 			if not is_finite(h):
 				continue
 			var color := stepped_color(model.actuals[i] - model.targets[i])
 			color.a = 1.0
-			var east := levels[i + 1] if x < g.x - 1 else NAN
-			var south := levels[i + g.x] if z < g.y - 1 else NAN
+			var dx := -1 if quarter_turn in [2, 3] else 1
+			var dz := -1 if quarter_turn in [1, 2] else 1
+			var edge_x := x + 1 if dx > 0 else x
+			var edge_z := z + 1 if dz > 0 else z
+			var east := levels[i + dx] if x + dx >= 0 and x + dx < g.x else NAN
+			var south := levels[i + dz * g.x] if z + dz >= 0 and z + dz < g.y else NAN
 			var east_floor: float = east if is_finite(east) else base_y
 			var south_floor: float = south if is_finite(south) else base_y
 			if east_floor < h:
-				_voxel_wall(Vector2(x + 1, z), Vector2(x + 1, z + 1), east_floor, h, q, color, 0.74)
+				_voxel_wall(Vector2(edge_x, z), Vector2(edge_x, z + 1), east_floor, h, q, color, 0.74)
 			if south_floor < h:
-				_voxel_wall(Vector2(x, z + 1), Vector2(x + 1, z + 1), south_floor, h, q, color, 0.56)
+				_voxel_wall(Vector2(x, edge_z), Vector2(x + 1, edge_z), south_floor, h, q, color, 0.56)
 			_flat_quad(x, z, x + 1, z + 1, h, _shaded(color, 0.8))
 			_flat_quad(x + 0.16, z + 0.16, x + 0.84, z + 0.84, h, _shaded(color, 1.06))
 
@@ -519,8 +637,10 @@ func _build_iso(heights: PackedFloat32Array, corners: PackedFloat32Array) -> voi
 	_map_low = base_y
 	# Painter's order: the viewer sits at +X+Z, so draw by increasing x + z.
 	for s in g.x + g.y - 1:
-		for x in range(maxi(0, s - g.y + 1), mini(g.x, s + 1)):
-			var z := s - x
+		for column in range(maxi(0, s - g.y + 1), mini(g.x, s + 1)):
+			var x := g.x - 1 - column if quarter_turn in [2, 3] else column
+			var row := s - column
+			var z := g.y - 1 - row if quarter_turn in [1, 2] else row
 			var i := z * g.x + x
 			if not is_finite(heights[i]):
 				continue
@@ -534,9 +654,15 @@ func _build_iso(heights: PackedFloat32Array, corners: PackedFloat32Array) -> voi
 			_quad([_corner_world(x, z, c00), _corner_world(x + 1, z, c10), _corner_world(x + 1, z + 1, c11), _corner_world(x, z + 1, c01)], [shaded, shaded, shaded, shaded])
 			# Skirt walls on the two viewer-facing design edges give the block
 			# its volume: soil strata from the surface down to a common base.
-			if x == g.x - 1 or not is_finite(heights[i + 1]):
+			if quarter_turn in [2, 3]:
+				if x == 0 or not is_finite(heights[i - 1]):
+					_wall(x, z, x, z + 1, c00, c01, base_y, 0.62)
+			elif x == g.x - 1 or not is_finite(heights[i + 1]):
 				_wall(x + 1, z, x + 1, z + 1, c10, c11, base_y, 0.62)
-			if z == g.y - 1 or not is_finite(heights[i + g.x]):
+			if quarter_turn in [1, 2]:
+				if z == 0 or not is_finite(heights[i - g.x]):
+					_wall(x, z, x + 1, z, c00, c10, base_y, 0.46)
+			elif z == g.y - 1 or not is_finite(heights[i + g.x]):
 				_wall(x, z + 1, x + 1, z + 1, c01, c11, base_y, 0.46)
 
 func _wall(ax: int, az: int, bx: int, bz: int, ha: float, hb: float, base_y: float, shade: float) -> void:
@@ -779,9 +905,11 @@ func _draw_profile() -> void:
 			draw_colored_polygon(PackedVector2Array([point + Vector2(-8, -11), point + Vector2(8, -11), point]), Color(0, 0, 0, 0.5))
 			draw_colored_polygon(PackedVector2Array([point + Vector2(-7, -10), point + Vector2(7, -10), point]), TOOTH)
 	var ends := ["机身侧", "外伸 →"] if mode == "bucket" else ["A", "A′"]
+	if mode == "section" and section_reversed:
+		ends.reverse()
 	_text(self, Vector2(_plot.position.x + 4, _plot.position.y + 12), ends[0], MUTED, label_size)
 	_text(self, Vector2(_plot.position.x, _plot.position.y + 12), ends[1], MUTED, label_size, HORIZONTAL_ALIGNMENT_RIGHT, _plot.size.x - 4)
-	var suffix := "铲齿 s=0" if mode == "bucket" else "中心线 +Z"
+	var suffix := "铲齿 s=0" if mode == "bucket" else "A—A′ 剖切线"
 	_text(self, Vector2(12, size.y - 7 if compact else size.y - 12), "标高 m · 刻度 %s m · %.1f → %.1f m · %s" % [str(s_step), _distance_min, _distance_max, suffix], MUTED, 10 if compact else 11)
 
 func _draw_smooth_profile() -> void:

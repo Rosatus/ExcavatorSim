@@ -4,6 +4,14 @@ extends PanelContainer
 signal import_requested
 signal close_requested
 signal chart_style_changed(style: String)
+signal automatic_requested
+signal automatic_cancelled
+signal urban_trench_requested
+signal design_changed
+signal digging_mode_requested(simple: bool)
+signal dump_side_requested(right: bool)
+var automatic_status := Callable()
+var _automatic_label: Label
 
 const Model := preload("res://scripts/dtm_model.gd")
 const Surface := preload("res://scripts/landxml_surface.gd")
@@ -159,6 +167,27 @@ func _ready() -> void:
 	row.add_child(_surface_selector)
 	_button(row, "pit", "示例方坑", func() -> void: load_demo("pit"))
 	_button(row, "trench", "单斗宽沟", func() -> void: load_demo("trench"))
+	var automatic_row := HBoxContainer.new()
+	outer.add_child(automatic_row)
+	_button(automatic_row, "urban_trench", "当前轴线沟", func() -> void: urban_trench_requested.emit())
+	_button(automatic_row, "automatic", "开始 / 恢复全自动切削", func() -> void: automatic_requested.emit())
+	_button(automatic_row, "automatic_stop", "停止自动作业", func() -> void: automatic_cancelled.emit())
+	var mode_row := HBoxContainer.new()
+	outer.add_child(mode_row)
+	var digging_toggle := CheckButton.new()
+	digging_toggle.text = "简易挖掘（不卸土）"
+	digging_toggle.toggled.connect(func(value: bool) -> void: digging_mode_requested.emit(value))
+	mode_row.add_child(digging_toggle)
+	controls["simple_digging"] = digging_toggle
+	var side := OptionButton.new()
+	side.add_item("向右回转 90° 卸土")
+	side.add_item("向左回转 90° 卸土")
+	side.item_selected.connect(func(index: int) -> void: dump_side_requested.emit(index == 0))
+	mode_row.add_child(side)
+	controls["dump_side"] = side
+	_automatic_label = Label.new()
+	_automatic_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	outer.add_child(_automatic_label)
 	_source = Label.new()
 	_source.add_theme_font_size_override("font_size", 11)
 	_source.add_theme_color_override("font_color", Color("94aebe"))
@@ -227,6 +256,13 @@ func _ready() -> void:
 			view.size_flags_stretch_ratio = 1.25 if mode in ["iso", "bucket"] else 1.0
 			line.add_child(view)
 			views.append(view)
+	views[0].orientation_changed.connect(func(turn: int) -> void:
+		views[1].quarter_turn = turn
+		views[1].refresh_orientation())
+	views[1].section_changed.connect(_refresh_profiles)
+	views[2].section_flipped.connect(func() -> void:
+		views[2].section_reversed = not views[2].section_reversed
+		_refresh_profiles())
 	_legend = Legend.new()
 	_legend.tooltip_text = "差值 = 实测 − 目标。固定色阶节点：5 / 20 / 60 / 150 / 300 cm；超出 3 m 使用端点颜色。暖色待挖，冷色待填，薄荷绿 ±5 cm，灰色为缺测。"
 	outer.add_child(_legend)
@@ -306,6 +342,10 @@ func set_hud_mode(enabled: bool) -> void:
 	controls.mode.text = "浮窗模式" if enabled else "HUD 模式"
 	controls.import.visible = not enabled
 	controls.expand.visible = not enabled
+	controls.style.visible = not enabled
+	controls.close.visible = not enabled
+	controls.automatic.get_parent().visible = not enabled
+	controls.simple_digging.get_parent().visible = not enabled
 	_title.text = "DTM" if enabled else "DTM  /  施工引导"
 	_title.add_theme_font_size_override("font_size", 16 if enabled else 21)
 	for item in [_design_row, _source, _message]:
@@ -399,6 +439,7 @@ func _clear_profiles(all_views := true) -> void:
 		views[i].queue_redraw()
 
 func _select_surface(index: int) -> void:
+	design_changed.emit()
 	var surface: Surface = surfaces[index]
 	if _center_import:
 		var center: Vector3 = model.sampler.zone.layout.ORIGIN_WORLD
@@ -421,9 +462,22 @@ func show_error(message: String) -> void:
 	_message.text = message
 	_message.tooltip_text = message
 
+func load_local_surfaces(values: Array, description: String) -> void:
+	demo_kind = ""
+	_center_import = false
+	_elevation_offset = 0
+	_replace_surfaces(values)
+	_source.text = description
+
 func _process(delta: float) -> void:
 	if not is_visible_in_tree():
 		return
+	if automatic_status.is_valid():
+		var job: Dictionary = automatic_status.call()
+		(controls["simple_digging"] as CheckButton).set_pressed_no_signal(bool(job.get("simple_mode", false)))
+		var names := {"idle": "未开始", "cancelled": "已停止", "paused": "已暂停", "failed": "失败", "completed": "复测达标", "select": "选择作业点", "lift": "抬斗", "finish_lift": "收尾抬斗", "navigate": "转场", "orient": "朝向校正", "approach": "对准切削点", "cut": "分层切削", "sweep": "收斗精修", "verify": "地表复测"}
+		names.merge({"dump_lift": "卸土抬斗", "dump_swing": "回转至卸土区", "dump_open": "倾倒", "dump_close": "收斗", "dump_return": "回转复位"})
+		_automatic_label.text = "自动作业：%s · 作业点 %d/%d · 已卸土 %d 次 %s" % [names.get(job.state, job.state), int(job.completed), int(job.count), int(job.get("dump_cycles", 0)), job.reason]
 	var machine_key := presentation.get_active_model_id() + ":" + presentation.get_active_attachment_id() if is_instance_valid(presentation) else ""
 	if machine_key != _machine_key:
 		_machine_key = machine_key
@@ -512,11 +566,15 @@ func _refresh_profiles() -> void:
 		views[2].profile.clear()
 		views[2].queue_redraw()
 		return
-	var bounds := model.surface.world_bounds()
+	views[1].ensure_section()
+	var endpoints: PackedVector2Array = views[1].section_points
+	var start := endpoints[1] if views[2].section_reversed else endpoints[0]
+	var end := endpoints[0] if views[2].section_reversed else endpoints[1]
 	var fixed: Array[Dictionary] = []
 	for i in FIXED_PROFILE_POINTS:
-		var s := bounds.size.z * i / float(FIXED_PROFILE_POINTS - 1)
-		var p := Vector2(bounds.get_center().x, bounds.position.z + s)
+		var fraction := i / float(FIXED_PROFILE_POINTS - 1)
+		var s := start.distance_to(end) * fraction
+		var p := start.lerp(end, fraction)
 		fixed.append({"s": s, "actual": model.cached_height(p), "target": model.surface.height_at(p)})
 	views[2].profile = fixed
 	views[2].queue_redraw()
