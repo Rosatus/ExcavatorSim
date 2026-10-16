@@ -7,7 +7,7 @@ const TRACK_ARRIVAL_RADIUS := 0.03
 const TRACK_POSITION_TOLERANCE := 0.05
 const TRACK_STOP_SPEED := 0.025
 const STOP_SPEED := 0.08
-const CRUISE_SPEED := 1.6
+const CRUISE_SPEED := 3.1
 const BRAKE_ACCEL := 0.45
 const PIVOT_ENTER_RAD := 0.65 # About 37 degrees; retain the existing entry threshold.
 const ALIGN_TOLERANCE_RAD := PI / 180.0
@@ -259,7 +259,7 @@ func step(delta: float, snapshot: Dictionary) -> Vector3:
 		var omega := clampf(turn_gain * error - 0.6 * yaw_right, -0.8, 0.8)
 		# Brake by remaining distance, reserving precision crawl for the last
 		# 25 cm. The continuous outer ramp avoids a sudden speed-demand step.
-		var desired := minf(CRUISE_SPEED, sqrt(2.0 * BRAKE_ACCEL * maxf(distance_m - TRACK_ARRIVAL_RADIUS, 0)))
+		var desired := minf(minf(CRUISE_SPEED, belt_speed), sqrt(2.0 * 0.9 * maxf(distance_m - TRACK_ARRIVAL_RADIUS, 0)))
 		var approach_speed := 0.8 * distance_m if distance_m <= 0.25 else 0.2 + 1.6 * (distance_m - 0.25)
 		desired = minf(desired, maxf(0.04, approach_speed))
 		var travel := desired * maxf(0, cos(error)) if state == "driving" else 0.0
