@@ -1,6 +1,6 @@
 # Automatic waypoint driving
 
-The product uses Godot-local fixed-tick guidance. `WaypointDriver` produces normalized commands; `TrackedChassisController` arbitrates manual/automatic input; the existing Jolt body remains the only chassis pose writer. Python and MCP are not runtime dependencies. There is no obstacle planner or automatic reverse manoeuvre.
+The product uses Godot-local fixed-tick guidance. `WaypointDriver` produces normalized commands; `TrackedChassisController` arbitrates manual/automatic input; the existing Jolt body remains the only chassis pose writer. Python and MCP are not runtime dependencies. There is no obstacle planner. Surface excavation jobs can request tracked reverse travel for station transfers; the training square retains forward travel.
 
 ## Use
 
