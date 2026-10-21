@@ -7,7 +7,6 @@
 #   trust_level = "trusted"
 
 # Keep AGENTS.md as the primary project instruction file.
-project_doc_fallback_filenames = ["AGENTS.md"]
 
 # Codex hooks (`hooks.json` in this directory) only fire when the user
 # has enabled them in their USER-level config: `[features].hooks = true`
@@ -35,9 +34,6 @@ project_doc_fallback_filenames = ["AGENTS.md"]
 # it here means an upstream default change, or a user's own global override,
 # can't silently reopen the recursion the #240/#241 fix closed. Project config
 # (this file) takes precedence over user-level `~/.codex/config.toml`.
-[agents]
-max_depth = 1
-
 [mcp_servers."godot-ai"]
 command = "C:\\Users\\rosatus\\AppData\\Roaming\\uv\\python\\cpython-3.11-windows-x86_64-none/pythonw.exe"
 args = [

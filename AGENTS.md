@@ -1,23 +1,50 @@
-Only the main agent implements and fixes. Subagents explore and verify under [.trellis/delegation.md](.trellis/delegation.md).
 
-<!-- TRELLIS:START -->
-# Trellis Instructions
+<!-- NEO-TRELLIS:START -->
+# Neo-Trellis
 
-These instructions are for AI assistants working in this project.
+This project keeps durable knowledge in `.neo-trellis/`. Use it before
+exploring code broadly; it exists to prevent context rot and repeated mistakes.
 
-This project is managed by Trellis. The working knowledge you need lives under `.trellis/`:
+## How to navigate
 
-- `.trellis/workflow.md` — development phases, when to create tasks, skill routing
-- `.trellis/spec/` — package- and layer-scoped coding guidelines (read before writing code in a given layer)
-- `.trellis/workspace/` — per-developer journals and session traces
-- `.trellis/tasks/` — active and archived tasks (PRDs, research, jsonl context)
+1. Read `.neo-trellis/map.md` — the project map: modules, responsibilities,
+   code ranges, and links to module knowledge files.
+2. Load knowledge by scope: when working in a module, read its knowledge file
+   (linked from the map, or resolved via `.neo-trellis/routes.json` which maps
+   code path prefixes to knowledge files).
+3. The map only tells you where to look. Verify against the actual code before
+   changing behavior — the code is the current implementation truth.
 
-If a Trellis command is available on your platform (e.g. `/trellis:finish-work`, `/trellis:continue`), prefer it over manual steps. Not every platform exposes every command.
+## Maintaining knowledge
 
-If you're using Codex or another agent-capable tool, additional project-scoped helpers may live in:
-- `.agents/skills/` — reusable Trellis skills
-- `.codex/agents/` — optional custom subagents
+Follow the neo-trellis internal knowledge-maintenance skill
+(`.neo-trellis/skills/knowledge.md` if installed as a file, otherwise the
+skill shipped with the neo-trellis tooling) for how to update what you find:
+keep facts and contracts distinct, record evidence-backed corrections where
+they apply, and keep `map.md` and `routes.json` consistent — routes.json
+is the machine authority for code-scope mapping, the map is the human/agent
+navigation view over the same knowledge.
 
-Managed by Trellis. Edits outside this block are preserved; edits inside may be overwritten by a future `trellis update`.
+## Product requirements
 
-<!-- TRELLIS:END -->
+When receiving a PRD or a request to clarify and document product scope, follow
+`.neo-trellis/skills/prd.md` (the neo-trellis-prd skill): grill first,
+present the complete PRD for user confirmation, then persist and implement
+authorized work. Archive only after verifying its acceptance criteria.
+PRDs live in `.neo-trellis/prds/`; load only the one relevant to the current
+task. Also use this skill to revise, implement, verify or archive an identified
+PRD, reusing settled decisions and confirmation. Ordinary fixes, questions and
+implementation tasks without PRD intent or an existing PRD do not require it.
+
+## Knowledge layers
+
+For requested Trellis migration, post-import cleanup or retirement audits,
+follow the neo-trellis-migrate
+skill at `.neo-trellis/skills/migrate.md`. Normal development uses map.md
+directly; import reports are provenance, not an additional knowledge hierarchy.
+
+- `.neo-trellis/modules/` — per-module: purpose, key entry points, code paths,
+  local constraints, and counter-intuitive traps.
+- `.neo-trellis/spec/` — cross-module contracts and stable rules.
+- `.neo-trellis/research/` — evidence, experiments, and decision rationale.
+<!-- NEO-TRELLIS:END -->
