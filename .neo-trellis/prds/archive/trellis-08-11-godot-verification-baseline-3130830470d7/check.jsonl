@@ -1,0 +1,4 @@
+{"file":".neo-trellis/modules/godot-client/godot-mcp.md","reason":"Verify editor/runtime smoke and optional-tool boundaries."}
+{"file":".neo-trellis/modules/godot-client/client-boundary.md","reason":"Review authority and generation ownership for drift."}
+{"file":".neo-trellis/modules/godot-client/motion-transport.md","reason":"Verify live transport and reconnect evidence."}
+{"file":".neo-trellis/history/guides/cross-layer-thinking-guide.md","reason":"Audit the standalone/MCP/backend verification boundary."}

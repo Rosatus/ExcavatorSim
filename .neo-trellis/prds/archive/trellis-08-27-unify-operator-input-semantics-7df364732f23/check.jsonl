@@ -1,0 +1,6 @@
+{"file":".neo-trellis/modules/godot-client/client-boundary.md","reason":"Verify one input conversion owner, lifecycle re-arm, HUD truth, and unchanged authority boundaries."}
+{"file":".neo-trellis/modules/godot-client/motion-transport.md","reason":"Verify v4 negotiation, explicit axis semantics, mismatch rejection, and input safety."}
+{"file":".neo-trellis/modules/backend/quality-guidelines.md","reason":"Verify deterministic regressions, typing, provenance, and project gates."}
+{"file":".neo-trellis/modules/backend/runtime-profiles.md","reason":"Verify gateway-only and compatibility motion paths interpret operator axes correctly."}
+{"file":".neo-trellis/history/guides/cross-layer-thinking-guide.md","reason":"Audit exactly-once conversion and prevent duplicate/private payload interpretations."}
+{"file":".neo-trellis/history/tasks/08-27-unify-operator-input-semantics/research/axis-contract-analysis.md","reason":"Use the traced flow and model-sign table as review evidence."}

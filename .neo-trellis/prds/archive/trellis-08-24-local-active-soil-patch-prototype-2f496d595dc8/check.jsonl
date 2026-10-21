@@ -1,0 +1,2 @@
+{"file":".neo-trellis/modules/godot-client/client-boundary.md","reason":"Verify shadow-only behavior, scheduler-only settlement, bounded quality budgets, and fallback continuity."}
+{"file":".neo-trellis/history/guides/code-reuse-thinking-guide.md","reason":"Check that the existing terrain snapshot/dirty-region/fallback machinery is reused."}

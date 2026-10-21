@@ -1,0 +1,2 @@
+{"file":".neo-trellis/modules/godot-client/client-boundary.md","reason":"Verify safe nonzero scaling, direction-aware recovery, deterministic response, and lifecycle re-arm."}
+{"file":".neo-trellis/history/guides/cross-layer-thinking-guide.md","reason":"Verify presentation consumers remain read-only and quality/mute cannot alter motion or material."}

@@ -1,0 +1,2 @@
+{"file":".neo-trellis/modules/godot-client/client-boundary.md","reason":"Preserve TerrainState/scheduler persistence, derived Terrain3D presentation, quality, and generation boundaries."}
+{"file":".neo-trellis/history/guides/cross-layer-thinking-guide.md","reason":"Keep active-patch aggregate outputs compatible with later ledger and presentation consumers."}

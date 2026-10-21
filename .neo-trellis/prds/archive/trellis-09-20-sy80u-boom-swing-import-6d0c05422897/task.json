@@ -1,0 +1,23 @@
+{
+  "id": "09-20-sy80u-boom-swing-import",
+  "title": "SY80U import with Godot-local boom-swing DOF (E/U keys)",
+  "status": "completed",
+  "owner": "devin",
+  "created_at": "2026-09-20",
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "godot/client/scripts/motion_presentation.gd",
+    "godot/client/scripts/equipment_command_mapper.gd",
+    "godot/client/scripts/motion_client.gd",
+    "godot/client/scripts/product_session.gd",
+    "godot/client/resources/models/model_catalog.json",
+    "assets/model/model-registry-v1.json",
+    ".neo-trellis/modules/godot-client/client-boundary.md",
+    ".neo-trellis/modules/godot-client/model-joint-semantics.md"
+  ],
+  "notes": "boom swing = Godot-local presentation axis (AttachmentRig precedent); authority protocol stays 4-axis. Implemented: manifest local_articulation + via_local_axis contract, MotionPresentation._physics_process integration, E/U via LOCAL_INPUT_ACTIONS. Tests: sy80u_import_probe, sy80u_switch_smoke, sy80u_session_switch_smoke all pass; regressions green.\n2026-09-22: Archived at user request during bulk task cleanup. Previous status: done. Archival does not assert implementation completion or new validation; outstanding work and evidence remain in the task documents.",
+  "meta": {},
+  "completedAt": "2026-09-22"
+}

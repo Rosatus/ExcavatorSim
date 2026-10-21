@@ -1,0 +1,5 @@
+{"file":".neo-trellis/modules/godot-client/client-boundary.md","reason":"Godot authority and local terrain/payload identity rules."}
+{"file":".neo-trellis/modules/backend/authority-and-concurrency.md","reason":"Python concurrency, bounded latest state, lifecycle, and no hidden writers."}
+{"file":".neo-trellis/modules/backend/runtime-profiles.md","reason":"Capability/profile composition and legacy isolation."}
+{"file":".neo-trellis/history/guides/cross-layer-thinking-guide.md","reason":"Single decoder, coordinate, sequence, and projection boundary guidance."}
+{"file":".neo-trellis/history/tasks/08-17-jolt-authoritative-simulation/research/sensor-gateway-boundary.md","reason":"Observed sensor/recording/hardware gaps and recommended boundary."}

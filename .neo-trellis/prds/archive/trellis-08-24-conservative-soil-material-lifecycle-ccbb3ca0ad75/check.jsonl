@@ -1,0 +1,3 @@
+{"file":".neo-trellis/modules/godot-client/client-boundary.md","reason":"Verify atomic transfers, one owner, generation cleanup, payload identity, quality invariance, and fallback boundaries."}
+{"file":".neo-trellis/history/guides/cross-layer-thinking-guide.md","reason":"Verify no mixed legacy/new mass or stale cross-layer snapshot occurs."}
+{"file":".neo-trellis/modules/godot-client/motion-transport.md","reason":"Verify any backend feedback remains optional telemetry rather than a competing authority."}

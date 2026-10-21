@@ -1,0 +1,3 @@
+{"file":".neo-trellis/modules/godot-client/index.md","reason":"Godot client pre-development and quality-check entry point."}
+{"file":".neo-trellis/modules/godot-client/client-boundary.md","reason":"Terrain ownership and client-side rendering boundaries."}
+{"file":".neo-trellis/modules/godot-client/godot-mcp.md","reason":"Godot editor automation and runtime verification rules."}

@@ -1,0 +1,2 @@
+{"file":".neo-trellis/modules/godot-client/client-boundary.md","reason":"Verify fail-closed model data, fixed-step sweep identity, shadow invariance, and no new collision authority."}
+{"file":".neo-trellis/history/guides/code-reuse-thinking-guide.md","reason":"Verify semantic frames and contract loaders are reused rather than hard-coded per model."}

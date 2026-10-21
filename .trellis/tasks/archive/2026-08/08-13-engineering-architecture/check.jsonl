@@ -1,5 +1,0 @@
-{"file":".trellis/spec/backend/runtime-profiles.md","reason":"检查 profile capability、disabled route 和 legacy scope。"}
-{"file":".trellis/spec/frontend/client-boundary.md","reason":"检查权威/派生关系、reset/epoch 清理和地形边界。"}
-{"file":"protocol/godot-pinocchio-v3.schema.json","reason":"核对接口消息类型、字段族和版本事实，不复制完整 schema。"}
-{"file":"docs/visual-model.md","reason":"检查 URDF/GLB/manifest/fixture 的 visual-only 关系。"}
-{"file":"docs/release-candidate.md","reason":"检查测试、运行、MCP 和部署描述。"}

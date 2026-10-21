@@ -1,0 +1,5 @@
+{"file": ".neo-trellis/modules/godot-client/index.md", "reason": "Godot client quality scope"}
+{"file": ".neo-trellis/modules/godot-client/client-boundary.md", "reason": "Authority and collider degradation review"}
+{"file": ".neo-trellis/modules/godot-client/godot-mcp.md", "reason": "MCP scene/game smoke review"}
+{"file": ".neo-trellis/modules/backend/quality-guidelines.md", "reason": "Cross-layer compatibility review"}
+{"file": ".neo-trellis/history/tasks/08-11-excavation-gameplay-loop/research/excavation-contracts.md", "reason": "M5 contract evidence"}

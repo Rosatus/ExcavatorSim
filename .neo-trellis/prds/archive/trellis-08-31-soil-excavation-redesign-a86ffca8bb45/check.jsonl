@@ -1,0 +1,5 @@
+{"file": ".neo-trellis/modules/godot-client/index.md", "reason": "Godot client quality checklist"}
+{"file": ".neo-trellis/modules/godot-client/client-boundary.md", "reason": "Authority, identity, conservation and Jolt/Terrain3D review contract"}
+{"file": ".neo-trellis/modules/godot-client/validation-budget.md", "reason": "Risk-based final verification scope and rerun limits"}
+{"file": ".neo-trellis/history/guides/cross-layer-thinking-guide.md", "reason": "Review every cell-patch and derivative boundary"}
+{"file": ".neo-trellis/history/tasks/08-31-soil-excavation-redesign/research/current-system-findings.md", "reason": "Verify implementation resolves evidenced current failure modes"}

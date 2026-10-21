@@ -1,0 +1,4 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".neo-trellis/modules/godot-client/client-boundary.md", "reason": "Verify client boundary, one-way authority, collision, visual, and test requirements"}
+{"file": ".neo-trellis/history/tasks/08-29-restore-terrain3d-visual-parity/research/current-terrain-and-terrain3d.md", "reason": "Check implementation against the researched current state and risk inventory"}
+{"file": ".neo-trellis/prds/archive/trellis-08-12-evaluate-integrate-terrain3d-9d61e06c166d/research/terrain3d-evaluation.md", "reason": "Verify the compatibility spike preserves prior evaluated boundaries"}

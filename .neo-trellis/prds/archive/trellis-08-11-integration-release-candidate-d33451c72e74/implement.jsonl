@@ -1,0 +1,5 @@
+{"file": ".neo-trellis/modules/godot-client/index.md", "reason": "Godot client quality scope"}
+{"file": ".neo-trellis/modules/godot-client/client-boundary.md", "reason": "Cross-generation authority boundary"}
+{"file": ".neo-trellis/modules/godot-client/godot-mcp.md", "reason": "MCP release smoke requirements"}
+{"file": ".neo-trellis/modules/backend/quality-guidelines.md", "reason": "Full verify and protocol compatibility gate"}
+{"file": ".neo-trellis/history/tasks/08-11-integration-release-candidate/research/release-contracts.md", "reason": "M7 test and retention constraints"}

@@ -1,0 +1,5 @@
+{"file":".neo-trellis/modules/godot-client/index.md","reason":"Quality gate and current Godot client documentation contract."}
+{"file":".neo-trellis/modules/godot-client/client-boundary.md","reason":"Verify no Terrain3D/Jolt path becomes a second terrain or motion authority."}
+{"file":".neo-trellis/modules/godot-client/godot-mcp.md","reason":"Verify addon enablement, scene edits, and standalone test boundaries."}
+{"file":".neo-trellis/modules/backend/runtime-profiles.md","reason":"Verify legacy/motion-only compatibility is unchanged."}
+{"file":".neo-trellis/history/tasks/08-12-evaluate-integrate-terrain3d/research/terrain3d-evaluation.md","reason":"Review implementation against the evaluated addon limitations and packaging risks."}

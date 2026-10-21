@@ -1,0 +1,5 @@
+{"file":".neo-trellis/modules/godot-client/client-boundary.md","reason":"Defines Godot/Jolt/terrain authority and lifecycle boundaries that the voxel redesign replaces or preserves."}
+{"file":".neo-trellis/modules/godot-client/godot-mcp.md","reason":"Keeps Godot AI MCP recommended for structural authoring while preventing it from becoming runtime authority."}
+{"file":".neo-trellis/modules/godot-client/validation-budget.md","reason":"Defines focused automated versus human Forward+ validation and stable-then-once heavy gates."}
+{"file":".neo-trellis/history/tasks/09-02-voxel-excavation-redesign/research/voxel-tools-1.7.md","reason":"Records verified Voxel Tools 1.7 capabilities, limits, API evidence, and foundation unknowns."}
+{"file":".neo-trellis/history/tasks/09-02-voxel-excavation-redesign/research/current-system-and-history.md","reason":"Records current ownership, prior failed excavation approaches, reusable boundaries, and site placement."}

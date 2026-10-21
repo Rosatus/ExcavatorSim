@@ -1,0 +1,5 @@
+{"file": ".neo-trellis/modules/godot-client/index.md", "reason": "Godot client pre-development checklist"}
+{"file": ".neo-trellis/modules/godot-client/client-boundary.md", "reason": "Authority and derived terrain ownership"}
+{"file": ".neo-trellis/modules/godot-client/godot-mcp.md", "reason": "Godot authoring and headless validation boundaries"}
+{"file": ".neo-trellis/modules/backend/quality-guidelines.md", "reason": "Cross-layer forbidden patterns and verify gate"}
+{"file": ".neo-trellis/history/tasks/08-11-deterministic-terrain-core/research/terrain-contracts.md", "reason": "M4 terrain invariants and scope"}

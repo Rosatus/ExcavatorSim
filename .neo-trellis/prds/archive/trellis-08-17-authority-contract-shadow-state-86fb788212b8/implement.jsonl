@@ -1,0 +1,6 @@
+{"file":".neo-trellis/modules/godot-client/client-boundary.md","reason":"Current Godot ownership and forbidden feedback rules to preserve during shadow mode."}
+{"file":".neo-trellis/modules/backend/authority-and-concurrency.md","reason":"Current Python single-writer/lifecycle rules that shadow state must not change."}
+{"file":".neo-trellis/modules/backend/runtime-profiles.md","reason":"Profile and capability negotiation precedent."}
+{"file":".neo-trellis/history/guides/cross-layer-thinking-guide.md","reason":"Coordinate conversion, versioning, and decoder ownership guidance."}
+{"file":".neo-trellis/history/tasks/08-17-jolt-authoritative-simulation/research/current-authority-evidence.md","reason":"Observed migration seams and strict v3 constraints."}
+{"file":".neo-trellis/history/tasks/08-17-jolt-authoritative-simulation/research/physics-rig-gaps.md","reason":"Required local Jolt probes and descriptor gaps."}

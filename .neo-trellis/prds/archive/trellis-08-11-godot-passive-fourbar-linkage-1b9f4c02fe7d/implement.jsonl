@@ -1,0 +1,4 @@
+{"file": ".neo-trellis/modules/godot-client/index.md", "reason": "Frontend package ownership and pre-development checklist"}
+{"file": ".neo-trellis/modules/godot-client/client-boundary.md", "reason": "Keeps passive linkage visual-only and Python motion authoritative"}
+{"file": ".neo-trellis/modules/godot-client/motion-transport.md", "reason": "Defines converted frame consumption and parity test boundary"}
+{"file": ".neo-trellis/history/tasks/08-11-godot-passive-fourbar-linkage/research/guide-and-glb-evidence.md", "reason": "Guide-backed A/B/C/D node semantics and solver geometry"}

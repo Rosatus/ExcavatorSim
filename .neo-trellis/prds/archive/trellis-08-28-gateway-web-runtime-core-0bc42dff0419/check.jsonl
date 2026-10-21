@@ -1,0 +1,6 @@
+{"file":".neo-trellis/modules/backend/authority-and-concurrency.md","reason":"Verify no Web/log thread mutates or sends through the transport."}
+{"file":".neo-trellis/modules/backend/can-gateway-control.md","reason":"Verify all current Gateway and platform transport contracts."}
+{"file":".neo-trellis/modules/backend/error-handling.md","reason":"Verify stable errors and fail-closed mode/platform checks."}
+{"file":".neo-trellis/modules/backend/logging-guidelines.md","reason":"Verify bounded queues, rotation, safe details, and no CAN-loop disk I/O."}
+{"file":".neo-trellis/modules/backend/quality-guidelines.md","reason":"Run concurrency, integration, and compatibility quality gates."}
+{"file":".neo-trellis/modules/godot-client/client-boundary.md","reason":"Verify Godot explicitly launches managed mode and retains ownership."}

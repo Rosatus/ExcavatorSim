@@ -1,0 +1,5 @@
+{"file": ".neo-trellis/modules/godot-client/index.md", "reason": "Godot client visual scope"}
+{"file": ".neo-trellis/modules/godot-client/client-boundary.md", "reason": "Presentation ownership and generation safety"}
+{"file": ".neo-trellis/modules/godot-client/godot-mcp.md", "reason": "Godot MCP smoke and error handling"}
+{"file": ".neo-trellis/modules/backend/quality-guidelines.md", "reason": "Cross-layer deterministic compatibility gate"}
+{"file": ".neo-trellis/history/tasks/08-11-realistic-visual-pass/research/visual-contracts.md", "reason": "M6 visual constraints"}

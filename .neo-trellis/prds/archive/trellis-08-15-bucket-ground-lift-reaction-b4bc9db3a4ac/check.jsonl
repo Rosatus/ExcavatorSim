@@ -1,0 +1,4 @@
+{"file":".neo-trellis/modules/godot-client/index.md","reason":"Run full Godot client checks for the reaction layer."}
+{"file":".neo-trellis/modules/godot-client/client-boundary.md","reason":"Audit one-way contact data and transform ownership."}
+{"file":".neo-trellis/modules/godot-client/godot-mcp.md","reason":"Require live angle/contact visual validation."}
+{"file":".neo-trellis/history/tasks/08-15-bucket-ground-lift-reaction/research/support-reaction-boundary.md","reason":"Check that full rigid-body dynamics did not enter the MVP implicitly."}

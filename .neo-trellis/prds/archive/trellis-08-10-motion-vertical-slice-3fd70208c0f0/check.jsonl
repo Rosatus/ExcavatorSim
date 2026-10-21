@@ -1,0 +1,6 @@
+{"file": ".neo-trellis/modules/godot-client/index.md", "reason": "Check Godot client scope and cross-layer integration requirements."}
+{"file": ".neo-trellis/modules/godot-client/client-boundary.md", "reason": "Check Python/Godot authority and lifecycle boundaries."}
+{"file": ".neo-trellis/modules/godot-client/godot-mcp.md", "reason": "Check MCP usage and validation requirements."}
+{"file": ".neo-trellis/modules/godot-client/motion-transport.md", "reason": "Check the executable M2 WebSocket, JSON, generation, input-safety and matrix-parity contract."}
+{"file": "protocol/babylon-sim-v3.schema.json", "reason": "Check wire compatibility and stable identifiers."}
+{"file": ".neo-trellis/history/tasks/08-10-motion-vertical-slice/research/backend-wire-contract.md", "reason": "Check implementation against exact backend findings."}

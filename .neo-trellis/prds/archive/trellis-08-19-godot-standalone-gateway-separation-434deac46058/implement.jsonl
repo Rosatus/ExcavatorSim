@@ -1,0 +1,10 @@
+{"file":".neo-trellis/modules/godot-client/index.md","reason":"Frontend pre-development checklist and package boundaries."}
+{"file":".neo-trellis/modules/godot-client/client-boundary.md","reason":"Jolt-authoritative ownership, lifecycle, terrain, and compatibility contracts."}
+{"file":".neo-trellis/modules/godot-client/motion-transport.md","reason":"Explicit Python compatibility handshake, generation, focus, and pose guards."}
+{"file":".neo-trellis/modules/godot-client/godot-mcp.md","reason":"Required live editor/runtime verification boundary."}
+{"file":".neo-trellis/modules/backend/index.md","reason":"Backend pre-development and verification checklist."}
+{"file":".neo-trellis/modules/backend/runtime-profiles.md","reason":"Gateway-only and Pinocchio compatibility composition and launcher contracts."}
+{"file":".neo-trellis/modules/backend/authority-and-concurrency.md","reason":"Prevent optional transport from becoming a second simulation writer."}
+{"file":".neo-trellis/modules/backend/sensor-telemetry.md","reason":"Keep Gateway telemetry observational and identity-guarded."}
+{"file":".neo-trellis/history/guides/cross-layer-thinking-guide.md","reason":"The change spans Godot control plane, transport, Python packaging, UI, and release docs."}
+{"file":".neo-trellis/history/tasks/08-19-godot-standalone-gateway-separation/research/current-boundary.md","reason":"Condensed evidence and decisions from current startup/control-plane audit."}

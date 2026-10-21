@@ -1,0 +1,8 @@
+{"file":".neo-trellis/modules/backend/can-gateway-control.md","reason":"Verify CTNC compatibility, ICT lifecycle truthfulness, timed-frame and PC001 non-regression."}
+{"file":".neo-trellis/modules/backend/can-qml-compatibility.md","reason":"Verify CAN construction and EFF transport boundaries remain byte-compatible."}
+{"file":".neo-trellis/modules/backend/error-handling.md","reason":"Verify stable failure categories and safe client-facing diagnostics."}
+{"file":".neo-trellis/modules/backend/logging-guidelines.md","reason":"Verify privileged command details and paths are logged safely."}
+{"file":".neo-trellis/modules/backend/quality-guidelines.md","reason":"Verify deterministic regression coverage and required project checks."}
+{"file":".neo-trellis/modules/godot-client/client-boundary.md","reason":"Verify Godot transport ownership and Gateway process/state boundaries."}
+{"file":".neo-trellis/history/guides/cross-layer-thinking-guide.md","reason":"Audit the complete ICT result flow and correlation across both runtimes."}
+{"file":".neo-trellis/history/guides/code-reuse-thinking-guide.md","reason":"Check that protocol/setup constants and parsers have a single authoritative owner."}

@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "records": [
+    {
+      "source": ".trellis/spec/backend/authority-and-concurrency.md",
+      "destination": ".neo-trellis/modules/backend/authority-and-concurrency.md",
+      "fingerprint": "8e4365872710d758f56fee5e6e68a677523428e0f697423362f4f37d59b18e88"
+    },
+    {
+      "source": ".trellis/spec/backend/can-gateway-control.md",
+      "destination": ".neo-trellis/modules/backend/can-gateway-control.md",
+      "fingerprint": "2820fe95862673e3ea048dbe7297d14365eeb46301643893c965c12a56e9052c"
+    },
+    {
+      "source": ".trellis/spec/backend/can-qml-compatibility.md",
+      "destination": ".neo-trellis/modules/backend/can-qml-compatibility.md",
+      "fingerprint": "c2e7a2afd3647f24836747fe5aabf6b17461cd9781fab7a61a34a59ba17955cc"
+    },
+    {
+      "source": ".trellis/spec/backend/directory-structure.md",
+      "destination": ".neo-trellis/modules/backend/directory-structure.md",
+      "fingerprint": "278a8cf64056c47487f0c871274cb9febfce742134d07603b9623b6124bbca00"
+    },
+    {
+      "source": ".trellis/spec/backend/error-handling.md",
+      "destination": ".neo-trellis/modules/backend/error-handling.md",
+      "fingerprint": "994bd5232ca75897250914818b3836af15be822a8d31e2488a67f89a38439261"
+    },
+    {
+      "source": ".trellis/spec/backend/index.md",
+      "destination": ".neo-trellis/modules/backend/index.md",
+      "fingerprint": "7a41eaeee3030b0589e73a682d1a0254086c785864956e2c555a32121361a24d"
+    },
+    {
+      "source": ".trellis/spec/backend/logging-guidelines.md",
+      "destination": ".neo-trellis/modules/backend/logging-guidelines.md",
+      "fingerprint": "cd4a8683725efdd576bb8eca47a853b126a5d8af4c9342097186188b31b3467e"
+    },
+    {
+      "source": ".trellis/spec/backend/quality-guidelines.md",
+      "destination": ".neo-trellis/modules/backend/quality-guidelines.md",
+      "fingerprint": "a5271279f8bc0118926db5585db78ff975a20f4874f9b62e3b0ab5076099c0ec"
+    },
+    {
+      "source": ".trellis/spec/backend/runtime-profiles.md",
+      "destination": ".neo-trellis/modules/backend/runtime-profiles.md",
+      "fingerprint": "30f1fe3fd97df05b4a2050734fb86cf40762e35a24ed6b1b5203b7333607fd33"
+    },
+    {
+      "source": ".trellis/spec/backend/sensor-telemetry.md",
+      "destination": ".neo-trellis/modules/backend/sensor-telemetry.md",
+      "fingerprint": "2094dfbd71f6659f295f7dfefbc74f1051a0d713d3df1a16845bc7e2bf050c85"
+    },
+    {
+      "source": ".trellis/spec/backend/shadow-truth.md",
+      "destination": ".neo-trellis/modules/backend/shadow-truth.md",
+      "fingerprint": "30422406e1fa4f3fa742a95ae1cc512a3717a4faefe30f59947fb0b13f8faa7c"
+    },
+    {
+      "source": ".trellis/spec/frontend/client-boundary.md",
+      "destination": ".neo-trellis/modules/godot-client/client-boundary.md",
+      "fingerprint": "9721874c44d85188657a9ade07402e948027949da476c4b1b3c0d11636297e66"
+    },
+    {
+      "source": ".trellis/spec/frontend/game-menu-hud.md",
+      "destination": ".neo-trellis/modules/godot-client/game-menu-hud.md",
+      "fingerprint": "fe73c11160d619c778fc7c2ffed688ab7c9e47b36411ed50724f7a82b77f6ec0"
+    },
+    {
+      "source": ".trellis/spec/frontend/godot-mcp.md",
+      "destination": ".neo-trellis/modules/godot-client/godot-mcp.md",
+      "fingerprint": "b0ef277b36b2e018000587cfaadda2dd4b30da781c08cc3bfed57d268c55d400"
+    },
+    {
+      "source": ".trellis/spec/frontend/index.md",
+      "destination": ".neo-trellis/modules/godot-client/index.md",
+      "fingerprint": "0b8adb562f5e589aaa4b6dd8bbe91b0714f225a7e6ed102cc872327cc4498c28"
+    },
+    {
+      "source": ".trellis/spec/frontend/model-joint-semantics.md",
+      "destination": ".neo-trellis/modules/godot-client/model-joint-semantics.md",
+      "fingerprint": "a4bc9222f168a8d451a05842c58a11ff492c908d2e55bcc628c6f554e54b0b4c"
+    },
+    {
+      "source": ".trellis/spec/frontend/motion-transport.md",
+      "destination": ".neo-trellis/modules/godot-client/motion-transport.md",
+      "fingerprint": "8aee618cc3d970105a0c3eca2829ed07d923cc4901527596f48ce00c8ede263d"
+    },
+    {
+      "source": ".trellis/spec/frontend/optional-map-packs.md",
+      "destination": ".neo-trellis/modules/godot-client/optional-map-packs.md",
+      "fingerprint": "5d1e57827c277c9cc9d8f594c57a37870fb13c86b8ee90f57de9f149b6f32882"
+    },
+    {
+      "source": ".trellis/spec/frontend/soil-release-visuals.md",
+      "destination": ".neo-trellis/modules/godot-client/soil-release-visuals.md",
+      "fingerprint": "66a8d1cd693fb811bf7a61150928c54e26df025be5bc732677f772d17dc3ee50"
+    },
+    {
+      "source": ".trellis/spec/frontend/validation-budget.md",
+      "destination": ".neo-trellis/modules/godot-client/validation-budget.md",
+      "fingerprint": "417ac6101acee38c689663ac46398d8592d2b16b7b85a9502cb8eed7428be02d"
+    },
+    {
+      "source": ".trellis/spec/guides/code-reuse-thinking-guide.md",
+      "destination": ".neo-trellis/history/guides/code-reuse-thinking-guide.md",
+      "fingerprint": "86fd10dc10916c00309714aa2275234f01b0ad40d21a485d43b3422e7ca79397"
+    },
+    {
+      "source": ".trellis/spec/guides/cross-layer-thinking-guide.md",
+      "destination": ".neo-trellis/history/guides/cross-layer-thinking-guide.md",
+      "fingerprint": "46477aa502f56b1c5c0137bd39aea8b1b661a568d14224804d1ed62927943426"
+    },
+    {
+      "source": ".trellis/spec/guides/index.md",
+      "destination": ".neo-trellis/history/guides/index.md",
+      "fingerprint": "b7416a858506e171d51e695b7e7c5a846a73610ea8eb29ef87d83f00a2ddb29c"
+    },
+    {
+      "source": ".trellis/workspace/index.md",
+      "destination": ".neo-trellis/history/workspace/index.md",
+      "fingerprint": "3efe34e8be3315b9f381f9be93b404c7ade7af5a837675cf8dbe8e21eabc445b"
+    },
+    {
+      "source": ".trellis/workspace/rosatus/index.md",
+      "destination": ".neo-trellis/history/workspace/rosatus/index.md",
+      "fingerprint": "53b87f1125651f97f7cba5962a1731138b1254fd4b54cb34254d006380214886"
+    },
+    {
+      "source": ".trellis/workspace/rosatus/journal-1.md",
+      "destination": ".neo-trellis/history/workspace/rosatus/journal-1.md",
+      "fingerprint": "078bab6f63df5fc2943583f90dec51a443b39fe53ce0358c88d82a7bcc58f4c8"
+    },
+    {
+      "source": ".trellis/workspace/rosatus/journal-2.md",
+      "destination": ".neo-trellis/history/workspace/rosatus/journal-2.md",
+      "fingerprint": "cd22ab31ccf784dd1890ce98270f06ce2ec1947c3c978b7986b91f7a96d68053"
+    },
+    {
+      "source": ".trellis/tasks/09-25-gateway-supervision/implement.md",
+      "destination": ".neo-trellis/history/tasks/09-25-gateway-supervision/implement.md",
+      "fingerprint": "675539c84341f9607172aede79e4b6964a7421ecf00ed1bdc6b08ad2177afebf"
+    }
+  ]
+}

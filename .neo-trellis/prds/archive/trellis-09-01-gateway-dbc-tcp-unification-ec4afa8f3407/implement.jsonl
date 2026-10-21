@@ -1,0 +1,11 @@
+{"file":".neo-trellis/modules/backend/index.md","reason":"Backend pre-development and package quality entry point."}
+{"file":".neo-trellis/modules/backend/can-gateway-control.md","reason":"Owning Gateway, DBC, timed CAN, authority, transport, Web API, packaging, and ICT contracts."}
+{"file":".neo-trellis/modules/backend/quality-guidelines.md","reason":"Focused regression, provenance, and final verification requirements."}
+{"file":".neo-trellis/modules/backend/can-qml-compatibility.md","reason":"Existing A800 compatibility-profile endian contract that must be reconciled with the approved DBC authority."}
+{"file":".neo-trellis/modules/godot-client/validation-budget.md","reason":"Requires focused automated Godot checks and one human-owned interactive review rather than repeated visual runs."}
+{"file":".neo-trellis/history/tasks/09-01-gateway-dbc-tcp-unification/research/dbc-delta.md","reason":"Exact new/old DBC hashes, message changes, and 0x18FFF000 migration evidence."}
+{"file":".neo-trellis/history/tasks/09-01-gateway-dbc-tcp-unification/research/gateway-dataflow.md","reason":"Current producer, sink, platform-default, channel, packaging, and persistence impact map."}
+{"file":".neo-trellis/history/tasks/09-01-gateway-dbc-tcp-unification/research/web-and-authority.md","reason":"Current React/API contracts, batch mutation design constraints, and timed CAN lifecycle."}
+{"file":".neo-trellis/history/tasks/09-01-gateway-dbc-tcp-unification/research/channel-contract.md","reason":"Separates logical CSV/Web channel labels from unchanged PC001 wire channel zero."}
+{"file":".neo-trellis/history/tasks/09-01-gateway-dbc-tcp-unification/research/validation-scope.md","reason":"Focused automated and human validation split plus release impact."}
+{"file":".neo-trellis/history/tasks/09-01-gateway-dbc-tcp-unification/research/frame-inventory.md","reason":"Authoritative current/planned producer inventory and PC001 channel framing boundary."}
